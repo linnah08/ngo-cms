@@ -9,7 +9,7 @@ $current_user = admin_user();
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><?= h($page_title_admin ?? 'Admin') ?> — Odd Minds Admin</title>
+  <title><?= h($page_title_admin ?? 'Admin') ?> — <?= h(SITE_NAME_BG) ?> Admin</title>
   <link rel="stylesheet" href="/assets/css/main.css">
   <link rel="stylesheet" href="/admin/assets/admin.css">
   <?= $page_head_extra ?? '' ?>
@@ -80,7 +80,7 @@ $current_user = admin_user();
   <aside class="admin-sidebar" id="adminSidebar">
     <div class="admin-sidebar__top">
       <a href="/admin/dashboard.php" class="admin-logo">
-        <img src="/assets/images/logo.png" alt="Odd Minds">
+        <img src="/assets/images/logo.png" alt="<?= h(SITE_NAME_BG) ?>">
       </a>
     </div>
 

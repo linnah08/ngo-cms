@@ -37,13 +37,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 send_mail(
                     $email,
-                    'Добре дошли в Odd Minds Admin',
+                    'Добре дошли в ' . SITE_NAME_BG . ' Admin',
                     '<p>Здравейте, ' . h($name) . ',</p>'
                     . '<p>Акаунтът Ви за администрацията на <strong>' . SITE_NAME_BG . '</strong> е създаден.</p>'
                     . '<p><strong>Имейл:</strong> ' . h($email) . '<br>'
                     . '<strong>Временна парола:</strong> ' . h($pass) . '</p>'
                     . '<p><a href="' . SITE_URL . '/admin/login.php">Влезте в системата</a> и сменете паролата си.</p>'
-                    . '<p>— Екипът на Odd Minds</p>'
+                    . '<p>— Екипът на ' . h(SITE_NAME_BG) . '</p>'
                 );
 
                 $success = 'Потребителят е добавен и е изпратен имейл с достъп.';

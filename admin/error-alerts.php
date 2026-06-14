@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $test_row = [
                 'id'          => 0,
                 'error_class' => 'TestException',
-                'message'     => 'Това е тестово известие за грешка от Odd Minds Admin.',
+                'message'     => 'Това е тестово известие за грешка от ' . SITE_NAME_BG . ' Admin.',
                 'file'        => '/var/www/html/index.php',
                 'line'        => 42,
                 'url'         => '/test-page',

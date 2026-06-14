@@ -118,7 +118,7 @@ $active_nav       = 'newsletter-send';
 <html lang="bg">
 <head>
   <meta charset="UTF-8">
-  <title>Изпращане — Odd Minds Admin</title>
+  <title>Изпращане — <?= h(SITE_NAME_BG) ?> Admin</title>
   <link rel="stylesheet" href="/assets/css/main.css">
   <link rel="stylesheet" href="/admin/assets/admin.css">
   <style>

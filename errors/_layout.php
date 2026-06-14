@@ -99,7 +99,7 @@ $display_message = $is_en ? $message_en : $message;
 </head>
 <body>
   <a href="<?= $is_en ? '/en/' : '/' ?>">
-    <img src="/assets/images/logo.png" alt="Odd Minds" class="err-logo">
+    <img src="/assets/images/logo.png" alt="<?= defined('SITE_NAME_BG') ? htmlspecialchars(SITE_NAME_BG) : 'Logo' ?>" class="err-logo">
   </a>
 
   <div class="err-code"><?= $code ?></div>

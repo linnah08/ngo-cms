@@ -251,7 +251,7 @@ $body_html = "<p>Здравейте,</p>
   <li><strong>Композит</strong> — снимка на тениската с позиционирания дизайн и спецификации</li>
   <li><strong>Artwork</strong> — оригиналният файл за печат/лепенка</li>
 </ul>
-<p>Odd Minds</p>";
+<p>" . SITE_NAME_BG . "</p>";
 
 $ok = send_mail($email, $subject, $body_html, '', $attachments);
 

@@ -127,22 +127,22 @@ function _email_tpl_defaults(): array {
         ],
 
         'error-alert' => [
-            'subject_bg' => '[Odd Minds] Грешка на сайта — {{error_class}}',
+            'subject_bg' => '[' . (defined('SITE_NAME_BG') ? SITE_NAME_BG : 'Site') . '] Грешка на сайта — {{error_class}}',
             'intro_bg'   => '<h2>Грешка на сайта</h2>'
                           . '<p>Засечена е нова грешка на <strong>{{timestamp}}</strong>.</p>',
             'outro_bg'   => '<p>Провери логовете на сървъра за повече детайли.</p>',
-            'subject_en' => '[Odd Minds] Site error — {{error_class}}',
+            'subject_en' => '[' . (defined('SITE_NAME_EN') ? SITE_NAME_EN : 'Site') . '] Site error — {{error_class}}',
             'intro_en'   => '<h2>Site error detected</h2>'
                           . '<p>A new error was captured at <strong>{{timestamp}}</strong>.</p>',
             'outro_en'   => '<p>Check the server logs for more details.</p>',
         ],
 
         'error-digest' => [
-            'subject_bg' => '[Odd Minds] {{count}} грешки — {{period}}',
+            'subject_bg' => '[' . (defined('SITE_NAME_BG') ? SITE_NAME_BG : 'Site') . '] {{count}} грешки — {{period}}',
             'intro_bg'   => '<h2>Обобщение на грешките</h2>'
                           . '<p>За периода <strong>{{from_date}} – {{to_date}}</strong> са засечени <strong>{{count}}</strong> грешки.</p>',
             'outro_bg'   => '<p>Провери логовете на сървъра за повече детайли.</p>',
-            'subject_en' => '[Odd Minds] {{count}} errors — {{period}}',
+            'subject_en' => '[' . (defined('SITE_NAME_EN') ? SITE_NAME_EN : 'Site') . '] {{count}} errors — {{period}}',
             'intro_en'   => '<h2>Error digest</h2>'
                           . '<p>For the period <strong>{{from_date}} – {{to_date}}</strong>, <strong>{{count}}</strong> errors were captured.</p>',
             'outro_en'   => '<p>Check the server logs for more details.</p>',

@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Админ панел — Odd Minds</title>
+  <title>Админ панел — <?= h(SITE_NAME_BG) ?></title>
   <link rel="stylesheet" href="/assets/css/main.css">
   <link rel="stylesheet" href="/admin/assets/admin.css">
 </head>
@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <div class="admin-login-wrap">
   <div class="admin-login-card">
     <div class="admin-login-logo">
-      <img src="/assets/images/logo.png" alt="Odd Minds Foundation">
+      <img src="/assets/images/logo.png" alt="<?= h(SITE_NAME_BG) ?>">
     </div>
     <h1 class="admin-login-title">Админ панел</h1>
 

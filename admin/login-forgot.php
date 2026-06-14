@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $token = admin_generate_reset_token($email);
             if ($token) {
                 $link    = SITE_URL . '/admin/login-reset.php?token=' . urlencode($token);
-                $subject = 'Нулиране на парола — Odd Minds Admin';
+                $subject = 'Нулиране на парола — ' . SITE_NAME_BG . ' Admin';
                 $body    = '<p>Получихме заявка за нулиране на вашата парола.</p>'
                          . '<p><a href="' . h($link) . '">' . h($link) . '</a></p>'
                          . '<p>Линкът е валиден 1 час. Ако не сте правили тази заявка, игнорирайте имейла.</p>';
@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Забравена парола — Odd Minds Admin</title>
+  <title>Забравена парола — <?= h(SITE_NAME_BG) ?> Admin</title>
   <link rel="stylesheet" href="/assets/css/main.css">
   <link rel="stylesheet" href="/admin/assets/admin.css">
 </head>
