@@ -23,9 +23,6 @@ $amount    = (float) ($_POST['amount']            ?? 0);
 $name      = trim($_POST['donor_name']           ?? '');
 $email     = trim($_POST['donor_email']          ?? '');
 $message   = trim($_POST['donation_message']     ?? '');
-$recipient = in_array($_POST['donation_recipient'] ?? '', ['iris', 'foundation'], true)
-    ? $_POST['donation_recipient']
-    : 'foundation';
 $donor_type = in_array($_POST['donor_type'] ?? '', ['individual', 'company'], true)
     ? $_POST['donor_type']
     : 'individual';
@@ -71,7 +68,7 @@ $pdo          = get_pdo();
 $order_number = generate_order_number();
 
 $items_json = json_encode([
-    ['type' => 'donation', 'amount_eur' => $amount, 'recipient' => $recipient]
+    ['type' => 'donation', 'amount_eur' => $amount]
 ], JSON_UNESCAPED_UNICODE);
 
 $pdo->prepare("

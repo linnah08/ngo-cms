@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $name  = trim($_POST['name']     ?? '');
         $email = trim($_POST['email']    ?? '');
         $pass  = trim($_POST['password'] ?? '');
-        $role  = in_array($_POST['role'] ?? '', ['admin','author','shop_admin','iris_admin']) ? $_POST['role'] : 'author';
+        $role  = in_array($_POST['role'] ?? '', ['admin','author','shop_admin']) ? $_POST['role'] : 'author';
         if (!$name || !$email || !$pass) {
             $error = 'Моля попълнете всички полета.';
         } elseif (strlen($pass) < 8) {
@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } elseif ($action === 'change_role') {
         $id   = (int) ($_POST['id'] ?? 0);
-        $role = in_array($_POST['role'] ?? '', ['admin','author','shop_admin','iris_admin']) ? $_POST['role'] : 'author';
+        $role = in_array($_POST['role'] ?? '', ['admin','author','shop_admin']) ? $_POST['role'] : 'author';
         if ($id === (int)($current['id'] ?? 0)) {
             $error = 'Не може да промените собствената си роля.';
         } else {
@@ -166,7 +166,6 @@ if ($_flash || $success || $error):
               $badge_class = match($user['role']) {
                 'admin'       => 'badge--published',
                 'shop_admin'  => 'badge--warning',
-                'iris_admin'  => 'badge--info',
                 default       => 'badge--draft',
               };
             ?>
@@ -184,7 +183,6 @@ if ($_flash || $success || $error):
               <select name="role" onchange="this.form.submit()" style="font-size:0.8rem;padding:2px 6px;">
                 <option value="author"     <?= $user['role']==='author'     ?'selected':'' ?>>author</option>
                 <option value="shop_admin" <?= $user['role']==='shop_admin' ?'selected':'' ?>>shop_admin</option>
-                <option value="iris_admin" <?= $user['role']==='iris_admin' ?'selected':'' ?>>iris_admin</option>
                 <option value="admin"      <?= $user['role']==='admin'      ?'selected':'' ?>>admin</option>
               </select>
             </form>

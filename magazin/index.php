@@ -879,22 +879,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
                   style="width:100%;box-sizing:border-box;padding:.6rem .75rem;border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font-body);font-size:.95rem;resize:vertical;"></textarea>
       </div>
 
-      <!-- Recipient -->
-      <div class="form-group">
-        <label style="font-weight:600;font-size:.875rem;display:block;margin-bottom:.5rem;">
-          <?= $lang === 'bg' ? 'Получател на дарението' : 'Donation recipient' ?>
-        </label>
-        <div style="display:flex;gap:1.25rem;flex-wrap:wrap;">
-          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem;">
-            <input type="radio" name="donation_recipient" value="foundation" checked style="accent-color:var(--teal);">
-            <?= $lang === 'bg' ? 'Фондация Различни Умове' : 'Odd Minds Foundation' ?>
-          </label>
-          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem;">
-            <input type="radio" name="donation_recipient" value="iris" style="accent-color:var(--teal);">
-            <?= $lang === 'bg' ? 'Център Ирис' : 'Centre Iris' ?>
-          </label>
-        </div>
-      </div>
 
       <!-- Donor type -->
       <div class="form-group">

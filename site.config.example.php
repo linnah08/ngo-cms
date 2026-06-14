@@ -33,6 +33,11 @@ define('SITE_BANK_NAME', 'ДСК Банк');
 // Email of the single admin account authorised to sign donation certificates.
 define('SIGNING_ADMIN_EMAIL', 'info@oddminds.org');
 
+// Purpose line printed on donation certificates (all donations go to your
+// organisation). Shown in the donor's chosen language.
+define('DONATION_PURPOSE_BG', 'За дейността и програмите на Фондация Различни Умове');
+define('DONATION_PURPOSE_EN', 'For the activities and programmes of Razlichni Umove Foundation');
+
 // ── Social profiles (leave '' to hide that icon) ──────────────────────────────
 define('SOCIAL_FACEBOOK',  'https://www.facebook.com/profile.php?id=61580050070685');
 define('SOCIAL_INSTAGRAM', 'https://www.instagram.com/oddminds_foundation/');

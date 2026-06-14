@@ -328,16 +328,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // Optional donation add-on
-        $donation_amount    = round(max(0.0, (float)($_POST['donation_amount'] ?? 0)), 2);
-        $donation_recipient = $_POST['donation_recipient'] ?? '';
-        if (!in_array($donation_recipient, ['iris', 'foundation'], true)) $donation_recipient = '';
-        if ($donation_amount < 1.0) { $donation_amount = 0.0; $donation_recipient = ''; }
-        if ($donation_amount > 0 && $donation_recipient) {
-            $recipient_labels = ['iris' => 'Център Ирис', 'foundation' => 'Odd Minds Foundation'];
+        $donation_amount = round(max(0.0, (float)($_POST['donation_amount'] ?? 0)), 2);
+        if ($donation_amount < 1.0) { $donation_amount = 0.0; }
+        if ($donation_amount > 0) {
             $items_json[] = [
                 'type'         => 'donation',
-                'name_bg'      => 'Дарение за ' . $recipient_labels[$donation_recipient],
-                'recipient'    => $donation_recipient,
+                'name_bg'      => 'Дарение за ' . SITE_NAME_BG,
                 'amount_eur'   => $donation_amount,
                 'subtotal_eur' => $donation_amount,
             ];
@@ -789,7 +785,6 @@ $subtotal  = $cart_info['subtotal'];
       <input type="hidden" name="lang" value="<?= h($lang) ?>">
       <input type="hidden" name="payment_method" value="card">
       <input type="hidden" name="donation_amount" id="donationAmountHidden" value="0">
-      <input type="hidden" name="donation_recipient" id="donationRecipientHidden" value="">
 
       <h2 style="margin-bottom:1.5rem;">3. Преглед и потвърждение</h2>
 
@@ -885,21 +880,6 @@ $subtotal  = $cart_info['subtotal'];
           </div>
         </label>
         <div id="donationPanel" style="display:none;padding:1.25rem;border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-lg) var(--radius-lg);background:var(--off-white);">
-          <div style="margin-bottom:1rem;">
-            <div style="font-size:.875rem;font-weight:600;margin-bottom:.5rem;">Получател</div>
-            <div style="display:flex;gap:1.5rem;flex-wrap:wrap;">
-              <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
-                <input type="radio" name="donation_recipient_ui" value="iris" checked onchange="updateDonationSummary()"
-                       style="accent-color:var(--teal);">
-                Център Ирис
-              </label>
-              <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
-                <input type="radio" name="donation_recipient_ui" value="foundation" onchange="updateDonationSummary()"
-                       style="accent-color:var(--teal);">
-                Odd Minds Foundation
-              </label>
-            </div>
-          </div>
           <div>
             <div style="font-size:.875rem;font-weight:600;margin-bottom:.5rem;">Сума</div>
             <input type="number" id="donationAmountInput" min="1" step="1" placeholder="Въведете сума (€)"
@@ -960,7 +940,6 @@ $subtotal  = $cart_info['subtotal'];
         if (!checked) {
             document.getElementById('donationAmountInput').value = '';
             document.getElementById('donationAmountHidden').value = '0';
-            document.getElementById('donationRecipientHidden').value = '';
             document.getElementById('donationRow').style.display = 'none';
             updateTotalDisplay(0);
         } else {
@@ -970,17 +949,13 @@ $subtotal  = $cart_info['subtotal'];
 
     function updateDonationSummary() {
         const amount = parseFloat(document.getElementById('donationAmountInput').value) || 0;
-        const recipientEl = document.querySelector('input[name="donation_recipient_ui"]:checked');
-        const recipient = recipientEl ? recipientEl.value : '';
-        if (amount >= 1 && recipient) {
+        if (amount >= 1) {
             document.getElementById('donationAmountHidden').value = amount.toFixed(2);
-            document.getElementById('donationRecipientHidden').value = recipient;
             document.getElementById('donationRowAmount').textContent = amount.toFixed(2) + ' €';
             document.getElementById('donationRow').style.display = '';
             updateTotalDisplay(amount);
         } else {
             document.getElementById('donationAmountHidden').value = '0';
-            document.getElementById('donationRecipientHidden').value = '';
             document.getElementById('donationRow').style.display = 'none';
             updateTotalDisplay(0);
         }

@@ -9,11 +9,6 @@ class DonationCertGenerator extends DocumentGenerator {
         return $mpdf->Output('', 'S');
     }
 
-    const DONATION_PURPOSES_EN = [
-        'iris'       => 'For biofeedback, neurofeedback and sensory therapies for children at CSRI Iris, Varna',
-        'foundation' => 'For the activities and programmes of Razlichni Umove Foundation',
-    ];
-
     protected function getOrg(): array {
         return self::FOUNDATION;
     }
@@ -80,9 +75,10 @@ class DonationCertGenerator extends DocumentGenerator {
         ];
         $pay_label = $pay_labels[$order['payment_method'] ?? 'card'] ?? ($en ? 'Bank card' : 'Банкова карта');
 
-        // Purpose
-        $purposes = $en ? self::DONATION_PURPOSES_EN : self::DONATION_PURPOSES;
-        $purpose  = self::h($purposes[$recipient] ?? $purposes['foundation']);
+        // Purpose — a single configurable line (all donations fund the org).
+        $purpose = self::h($en
+            ? (defined('DONATION_PURPOSE_EN') ? DONATION_PURPOSE_EN : 'For the activities and programmes of ' . (defined('SITE_NAME_EN') ? SITE_NAME_EN : ''))
+            : (defined('DONATION_PURPOSE_BG') ? DONATION_PURPOSE_BG : 'За дейността и програмите на ' . (defined('SITE_NAME_BG') ? SITE_NAME_BG : '')));
 
         $sig_html = $signature_b64
             ? '<img src="data:image/png;base64,' . htmlspecialchars($signature_b64, ENT_QUOTES, 'UTF-8') . '" style="height:52px;display:block;margin:4px 0 4px auto;max-width:220px;">'

@@ -381,10 +381,6 @@ function admin_require_login(): void {
         header('Location: /admin/login.php');
         exit;
     }
-    if (admin_is_iris_admin()) {
-        header('Location: /iris/');
-        exit;
-    }
 }
 
 function admin_user(): array {
@@ -401,21 +397,6 @@ function admin_session_refresh(): void {
 
 function admin_is_admin(): bool {
     return (admin_user()['role'] ?? '') === 'admin';
-}
-
-function admin_is_iris_admin(): bool {
-    return (admin_user()['role'] ?? '') === 'iris_admin';
-}
-
-function admin_can_manage_iris(): bool {
-    return admin_is_admin() || admin_is_iris_admin();
-}
-
-function admin_require_iris(): void {
-    if (!admin_logged_in() || !admin_can_manage_iris()) {
-        header('Location: /iris/login.php');
-        exit;
-    }
 }
 
 function admin_is_shop_admin(): bool {
