@@ -1,0 +1,254 @@
+/* assets/css/inline-cms.css */
+
+/* ── Admin toolbar ── */
+#om-admin-bar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 44px;
+  background: #1a1a2e;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  z-index: 99999;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.3);
+}
+#om-admin-bar .om-bar-brand {
+  font-weight: 700;
+  color: #a78bfa;
+  font-size: 12px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+#om-admin-bar .om-bar-divider {
+  width: 1px; height: 20px;
+  background: #444;
+  margin: 0 4px;
+}
+#om-edit-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #2d2d4e;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 5px 12px;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  transition: background .15s, color .15s;
+}
+#om-edit-toggle:hover { background: #3d3d6e; color: #fff; }
+#om-edit-toggle.om-active {
+  background: #7c3aed;
+  border-color: #7c3aed;
+  color: #fff;
+}
+#om-edit-toggle .om-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #555;
+  transition: background .15s;
+}
+#om-edit-toggle.om-active .om-dot { background: #c4b5fd; }
+#om-lang-switcher {
+  display: flex;
+  background: #2d2d4e;
+  border: 1px solid #444;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.om-lang-btn {
+  padding: 5px 10px;
+  cursor: pointer;
+  color: #999;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  transition: background .15s, color .15s;
+}
+.om-lang-btn:hover { color: #fff; background: #3d3d6e; }
+.om-lang-btn.om-active { background: #7c3aed; color: #fff; }
+#om-admin-bar .om-bar-spacer { flex: 1; }
+.om-exit-link {
+  color: #888;
+  font-size: 12px;
+  text-decoration: none;
+  padding: 5px 8px;
+  border-radius: 4px;
+  transition: background .15s, color .15s;
+}
+.om-exit-link:hover { color: #fff; background: #2d2d4e; }
+
+/* Push page content down so toolbar doesn't overlap */
+body.om-admin { padding-top: 44px !important; }
+
+/* ── Edit mode: editable elements ── */
+body.om-edit-mode [data-cms-field] {
+  outline: 2px dashed transparent;
+  border-radius: 3px;
+  transition: outline .15s, background .15s;
+  cursor: text;
+}
+body.om-edit-mode [data-cms-field]:hover {
+  outline: 2px dashed #a78bfa;
+  background: rgba(167,139,250,.07);
+}
+body.om-edit-mode [data-cms-field]:focus {
+  outline: 2px solid #7c3aed;
+  background: rgba(167,139,250,.1);
+}
+
+/* ── Image replace ── */
+body.om-edit-mode .om-img-wrap {
+  position: relative;
+  cursor: pointer;
+  display: inline-block;
+}
+.om-img-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(124,58,237,.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity .15s;
+  border-radius: inherit;
+  pointer-events: none;
+}
+body.om-edit-mode .om-img-wrap:hover .om-img-overlay { opacity: 1; }
+
+/* ── Add / Remove controls ── */
+.om-remove-btn {
+  display: none;
+  position: absolute;
+  top: -8px; right: -8px;
+  width: 22px; height: 22px;
+  background: #ef4444;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 15px;
+  line-height: 18px;
+  text-align: center;
+  cursor: pointer;
+  z-index: 10;
+  font-family: inherit;
+  padding: 0;
+}
+body.om-edit-mode .om-removable:hover .om-remove-btn { display: block; }
+body.om-edit-mode .om-removable { position: relative; }
+
+.om-add-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 2px dashed #d4c8ff;
+  border-radius: 8px;
+  color: #a78bfa;
+  font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  cursor: pointer;
+  background: transparent;
+  padding: 16px;
+  transition: background .15s, border-color .15s, color .15s;
+  width: 100%;
+}
+.om-add-btn:hover { background: #f3f0ff; border-color: #7c3aed; color: #7c3aed; }
+body.om-edit-mode .om-add-btn { display: flex; }
+
+/* ── Floating save button ── */
+#om-save-btn {
+  display: none;
+  position: fixed;
+  bottom: 24px; right: 24px;
+  background: #7c3aed;
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 4px 16px rgba(124,58,237,.4);
+  z-index: 99998;
+  transition: background .15s;
+}
+#om-save-btn:hover { background: #6d28d9; }
+#om-save-btn.om-dirty { display: block; }
+#om-save-btn.om-saving { background: #6d28d9; cursor: wait; }
+#om-save-btn.om-error { background: #ef4444; }
+
+/* ── Add item modal ── */
+#om-add-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 100000;
+  align-items: center;
+  justify-content: center;
+}
+#om-add-modal.om-open { display: flex; }
+#om-add-modal .om-modal-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 28px;
+  width: 480px;
+  max-width: 95vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,.2);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+#om-add-modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; color: #1a1a2e; }
+.om-field-group { margin-bottom: 14px; }
+.om-field-group label { display: block; font-size: 12px; font-weight: 600; color: #666; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .04em; }
+.om-field-group input[type="text"],
+.om-field-group input[type="url"],
+.om-field-group textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+}
+.om-field-group input[type="file"] { font-size: 13px; }
+.om-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+.om-btn-cancel {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.om-btn-save {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  background: #7c3aed;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.om-btn-save:hover { background: #6d28d9; }

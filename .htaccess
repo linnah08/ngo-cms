@@ -1,0 +1,121 @@
+Options +FollowSymLinks -Indexes
+
+# Custom error pages
+ErrorDocument 404 /errors/404.php
+ErrorDocument 403 /errors/403.php
+ErrorDocument 500 /errors/500.php
+ErrorDocument 503 /errors/503.php
+
+# PHP error logging
+<IfModule mod_php.c>
+  php_flag  log_errors on
+  php_flag  display_errors off
+  php_value error_reporting 32767
+  php_value error_log /home/detelinavasileva/public_html/oddminds.org/php_errors.log
+</IfModule>
+<IfModule mod_php8.c>
+  php_flag  log_errors on
+  php_flag  display_errors off
+  php_value error_reporting 32767
+  php_value error_log /home/detelinavasileva/public_html/oddminds.org/php_errors.log
+</IfModule>
+
+# Raise upload limits for product images
+<IfModule mod_php.c>
+  php_value upload_max_filesize 8M
+  php_value post_max_size 10M
+</IfModule>
+
+# Protect content directory from direct browser access; force HTTPS
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Force HTTPS
+  RewriteCond %{HTTPS} off
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+  # Dynamic XML sitemap
+  RewriteRule ^sitemap\.xml$ /sitemap.php [L]
+
+  # Old campaign page moved to the lafetki subdomain (permanent)
+  RewriteRule ^campaign(/.*)?$ https://lafetki.oddminds.org/ [L,R=301]
+
+  # ── Legacy URL redirects (post-WooCommerce/WordPress migration) ──────────
+  # Reclaim search ranking from old URLs that now 404. Specific product slugs
+  # that survived the migration come first; broader catch-alls follow.
+
+  # Surviving product (slug changed)
+  RewriteRule ^produkt/детска-готварска-книжка(/.*)?$    /magazin/childrens-cook-book/ [L,R=301]
+  RewriteRule ^en/product/детска-готварска-книжка(/.*)?$ /en/shop/childrens-cook-book/ [L,R=301]
+
+  # Retired products + old product/category archives → shop index
+  RewriteRule ^en/(product|product-category)/    /en/shop/ [L,R=301]
+  RewriteRule ^(produkt|produkt-kategoriya)/      /magazin/ [L,R=301]
+  RewriteRule ^en/porachka(/.*)?$                 /en/shop/ [L,R=301]
+  RewriteRule ^porachka(/.*)?$                    /magazin/ [L,R=301]
+
+  # Static pages — old English/Cyrillic slugs → current paths
+  RewriteRule ^(about|за-нас)(/.*)?$              /za-nas/ [L,R=301]
+  RewriteRule ^(how-to-help|как-да-помогна)(/.*)?$ /kak-da-pomogna/ [L,R=301]
+  RewriteRule ^(programs|projects)(/.*)?$         /proekti/ [L,R=301]
+  RewriteRule ^contacts(/.*)?$                    /kontakti/ [L,R=301]
+  RewriteRule ^(legal-info|legal-notice)(/.*)?$   /pravna-informaciya/ [L,R=301]
+  RewriteRule ^условия-за-по(/.*)?$               /usloviya/ [L,R=301]
+  RewriteRule ^home(/.*)?$                        / [L,R=301]
+  RewriteRule ^новини(/.*)?$                      /novini/ [L,R=301]
+  RewriteRule ^en/programs(/.*)?$                 /en/projects/ [L,R=301]
+  RewriteRule ^en/home(/.*)?$                     /en/ [L,R=301]
+  RewriteRule ^en/новини(/.*)?$                   /en/news/ [L,R=301]
+
+  # News articles — old slugs → current ones
+  RewriteRule ^3-months(/.*)?$                    /novini/3-months/ [L,R=301]
+  RewriteRule ^en/3-months(/.*)?$                 /en/news/3-months/ [L,R=301]
+  RewriteRule ^novini/новини-от-1ви-май/?$        /novini/новини-от-1ви-маи/ [L,R=301]
+  RewriteRule ^всяко-дете-има-шанс-защо-подкрепихме-25(/.*)?$    /novini/25/ [L,R=301]
+  RewriteRule ^en/всяко-дете-има-шанс-защо-подкрепихме-25(/.*)?$ /en/news/25/ [L,R=301]
+  RewriteRule ^купете-си-книжка-с-кауза(/.*)?$    /novini/купете-си-книжка-с-кауза/ [L,R=301]
+  RewriteRule ^en/купете-си-книжка-с-кауза(/.*)?$ /en/news/купете-си-книжка-с-кауза/ [L,R=301]
+
+  # Old author/category archives (no equivalent) → news index
+  RewriteRule ^en/(author|category)/             /en/news/ [L,R=301]
+  RewriteRule ^(author|category)/                /novini/ [L,R=301]
+  # ── end legacy redirects ────────────────────────────────────────────────
+
+  RewriteRule ^content/ - [F,L]
+
+  # Route article slugs to unified index.php handlers
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^novini/([^/]+)/?$ /novini/index.php [L,QSA]
+
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^en/news/([^/]+)/?$ /en/news/index.php [L,QSA]
+
+  # Route product slugs to shop index.php handler
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^magazin/([^/]+)/?$ /magazin/index.php [L,QSA]
+
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^en/shop/([^/]+)/?$ /magazin/index.php [L,QSA]
+</IfModule>
+
+# Security headers
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Cache static assets
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType image/png "access plus 30 days"
+  ExpiresByType image/jpeg "access plus 30 days"
+  ExpiresByType image/webp "access plus 30 days"
+  ExpiresByType image/avif "access plus 30 days"
+  ExpiresByType text/css "access plus 7 days"
+  ExpiresByType application/javascript "access plus 7 days"
+</IfModule>

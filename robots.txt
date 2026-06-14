@@ -1,0 +1,8 @@
+User-agent: *
+Disallow: /admin/
+Disallow: /cart/
+Disallow: /checkout/
+Disallow: /api/
+Disallow: /content/
+
+Sitemap: https://oddminds.org/sitemap.xml

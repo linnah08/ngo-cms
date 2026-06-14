@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Pre-push hook: run checkout browser tests when shop-related files changed.
+#
+# Auth is self-provisioning — tests/Browser/admin.setup.js seeds a known local
+# admin (tests/seed-admin.php) and logs in as it. No ADMIN_PASSWORD needed.
+# (You may still set ADMIN_PASSWORD/ADMIN_EMAIL to log in as another account.)
+#
+# This hook is tracked in .githooks/ and wired up via:
+#   git config core.hooksPath .githooks
+
+SHOP_PATTERN='(^magazin/|^cart/|^checkout/|^includes/couriers/|^includes/payment/|^includes/print_helpers\.php|^includes/settings\.php|^admin/product)'
+
+# Files changed between local HEAD and its upstream (fall back to last commit).
+changed=$(git diff --name-only @{u} HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD 2>/dev/null)
+
+if ! echo "$changed" | grep -qE "$SHOP_PATTERN"; then
+  exit 0  # no shop files changed — skip
+fi
+
+echo "🛒  Shop files changed — running checkout browser tests..."
+
+npx playwright test checkout.spec.js --reporter=list
+STATUS=$?
+
+if [ $STATUS -ne 0 ]; then
+  echo ""
+  echo "❌  Checkout tests failed. Push blocked."
+  echo "    Fix the failures or run with --no-verify to skip (not recommended)."
+  exit 1
+fi
+
+echo "✅  Checkout tests passed."
+exit 0

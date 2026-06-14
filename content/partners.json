@@ -1,0 +1,74 @@
+[
+  {
+    "id": "mushmula",
+    "name": "Мушмула",
+    "logo": "/assets/images/partners/mushmula.png",
+    "url": "",
+    "active": true,
+    "order": 1
+  },
+  {
+    "id": "step-forward",
+    "name": "Step Forward",
+    "logo": "/assets/images/partners/step-forward.png",
+    "url": "",
+    "active": true,
+    "order": 2
+  },
+  {
+    "id": "bitmate",
+    "name": "Bitmate",
+    "logo": "/assets/images/partners/bitmate.png",
+    "url": "",
+    "active": true,
+    "order": 3
+  },
+  {
+    "id": "parenting-pages",
+    "name": "Parenting Pages",
+    "logo": "/assets/images/partners/parenting-pages.png",
+    "url": "https://parenting-pages.com",
+    "active": true,
+    "order": 4
+  },
+  {
+    "id": "experian",
+    "name": "Experian",
+    "logo": "/assets/images/partners/experian.png",
+    "url": "https://www.experian.bg",
+    "active": true,
+    "order": 5
+  },
+  {
+    "id": "lab08",
+    "name": "Lab08",
+    "logo": "/assets/images/partners/lab08.png",
+    "url": "https://lab08.com",
+    "active": true,
+    "order": 6
+  },
+  {
+    "id": "vsp",
+    "name": "VSP Napkins",
+    "logo": "/assets/images/partners/vsp.png",
+    "url": "https://www.vsp-napkins.com",
+    "active": true,
+    "order": 7
+  },
+  {
+    "id": "hostellation",
+    "name": "Hostellation",
+    "logo": "/assets/images/partners/hostellation.png",
+    "url": "https://hostellation.com",
+    "active": true,
+    "order": 8
+  },
+  {
+    "id": "creative-craft",
+    "name": "Creative Craft Shop",
+    "logo": "/assets/images/partners/creative-craft.png",
+    "url": "https://www.instagram.com/creative.craftshop72",
+    "active": true,
+    "order": 9
+  }
+]

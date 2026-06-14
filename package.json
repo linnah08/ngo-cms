@@ -1,0 +1,29 @@
+{
+  "name": "oddminds",
+  "version": "1.0.0",
+  "description": "Custom PHP website and shop for Odd Minds Foundation. No framework — vanilla PHP 8.4, MySQL, flat-file JSON content.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --headed"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linnah08/oddminds.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/linnah08/oddminds/issues"
+  },
+  "homepage": "https://github.com/linnah08/oddminds#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
+  }
+}

@@ -1,0 +1,22 @@
+[
+    {
+        "id": "lesnovo",
+        "name_bg": "Център за настаняване от семеен тип, с. Лесново",
+        "name_en": "Family-type Placement Centre, Lesnovo",
+        "description_bg": "Центърът в село Лесново е дом на 12 прекрасни деца, чиито родители по една или друга причина не могат да се грижат за тях.",
+        "description_en": "The centre in Lesnovo village is home to 12 wonderful children whose parents, for one reason or another, cannot care for them.",
+        "image": "\/assets\/images\/centres\/lesnovo.jpg",
+        "active": true,
+        "order": 1
+    },
+    {
+        "id": "iris",
+        "name_bg": "Комплекс за социални услуги \"Ирис\", гр. Варна",
+        "name_en": "Social Services Complex \"Iris\", Varna",
+        "description_bg": "Центърът за социална рехабилитация и интеграция ИРИС подкрепя деца с увреждания и техните семейства с множество терапии.",
+        "description_en": "The IRIS Centre for Social Rehabilitation and Integration supports children with disabilities and their families with multiple therapies.",
+        "image": "\/assets\/images\/centres\/iris.jpg",
+        "active": true,
+        "order": 2
+    }
+]

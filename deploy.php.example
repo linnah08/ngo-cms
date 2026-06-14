@@ -1,0 +1,81 @@
+<?php
+/**
+ * GitHub webhook receiver — deploys by running git fetch + reset --hard.
+ *
+ * SETUP:
+ * 1. Copy to deploy.php on the server, fill in WEBHOOK_SECRET
+ * 2. GitHub: Settings → Webhooks → Add webhook
+ *    Payload URL : https://new.oddminds.org/deploy.php
+ *    Content type: application/json
+ *    Secret      : same value as WEBHOOK_SECRET below
+ *    Events      : Just the push event
+ * 3. Verify GIT_BIN path: `which git` or check cPanel error logs
+ *    On cPanel servers it is typically /usr/local/cpanel/3rdparty/bin/git
+ */
+
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+define('WEBHOOK_SECRET', 'REPLACE_WITH_YOUR_GITHUB_WEBHOOK_SECRET');
+define('REPO_ROOT',      '/home/YOUR_CPANEL_USER/public_html/new.oddminds.org');
+define('GIT_BIN',        '/usr/local/cpanel/3rdparty/bin/git');
+define('PHP_BIN',        'php');
+define('LOG_FILE',       '/home/YOUR_CPANEL_USER/public_html/new.oddminds.org/deploy.log');
+// ─────────────────────────────────────────────────────────────────────────────
+
+function log_msg(string $msg): void
+{
+    $line = '[' . date('Y-m-d H:i:s') . '] ' . $msg . PHP_EOL;
+    file_put_contents(LOG_FILE, $line, FILE_APPEND | LOCK_EX);
+}
+
+function abort(int $code, string $msg): void
+{
+    log_msg('ABORT ' . $code . ': ' . $msg);
+    http_response_code($code);
+    exit($msg);
+}
+
+function run(string $cmd): string
+{
+    $output = [];
+    $code   = 0;
+    exec($cmd . ' 2>&1', $output, $code);
+    $out = implode("\n", $output);
+    log_msg('$ ' . $cmd);
+    log_msg('  -> ' . ($out ?: '(no output)') . ' [exit ' . $code . ']');
+    if ($code !== 0) {
+        abort(500, 'Command failed: ' . $cmd . "\n" . $out);
+    }
+    return $out;
+}
+
+// ── VERIFY GITHUB SIGNATURE ───────────────────────────────────────────────────
+$raw     = file_get_contents('php://input');
+$sig_hdr = $_SERVER['HTTP_X_HUB_SIGNATURE_256'] ?? '';
+
+if (WEBHOOK_SECRET !== '') {
+    $expected = 'sha256=' . hash_hmac('sha256', $raw, WEBHOOK_SECRET);
+    if (!hash_equals($expected, $sig_hdr)) {
+        abort(403, 'Invalid signature');
+    }
+}
+
+$event = $_SERVER['HTTP_X_GITHUB_EVENT'] ?? '';
+if ($event !== 'push') {
+    log_msg('Ignored event: ' . $event);
+    http_response_code(200);
+    exit('ignored');
+}
+
+log_msg('Push received. Deploying...');
+
+// ── DEPLOY ────────────────────────────────────────────────────────────────────
+$git  = GIT_BIN;
+$root = REPO_ROOT;
+
+run("$git -C $root fetch origin");
+run("$git -C $root reset --hard origin/main");
+run(PHP_BIN . " $root/migrate.php >> " . LOG_FILE . ' 2>&1');
+
+log_msg('Deploy complete.');
+http_response_code(200);
+echo 'ok';

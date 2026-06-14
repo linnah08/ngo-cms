@@ -1,0 +1,55 @@
+name: Deploy to cPanel
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: cpanel
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Composer dependencies
+        run: composer install --no-dev --optimize-autoloader --no-interaction
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.FTP_SERVER }} >> ~/.ssh/known_hosts
+
+      - name: Deploy via rsync
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
+            --exclude='.git*' \
+            --exclude='deploy.php' \
+            --exclude='smtp.config.php' \
+            --exclude='db.config.php' \
+            --exclude='graph.config.php' \
+            --exclude='*.log' \
+            --exclude='.phpunit*' \
+            --exclude='phpunit.xml' \
+            --exclude='tests/' \
+            --exclude='.github/' \
+            --exclude='content/menus.json' \
+            --exclude='content/pages.json' \
+            --exclude='content/articles/' \
+            --exclude='assets/images/articles/' \
+            --exclude='assets/images/campaign/' \
+            --exclude='assets/images/pages/' \
+            --exclude='assets/images/products/' \
+            --exclude='assets/images/team/' \
+            --exclude='documents/' \
+            ./ ${{ secrets.FTP_USERNAME }}@${{ secrets.FTP_SERVER }}:/home/detelinavasileva/public_html/oddminds.org/
+
+      - name: Run database migrations
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -i ~/.ssh/id_rsa \
+              ${{ secrets.FTP_USERNAME }}@${{ secrets.FTP_SERVER }} \
+              "/usr/local/bin/php /home/detelinavasileva/public_html/oddminds.org/migrate.php"

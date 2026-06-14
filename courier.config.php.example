@@ -1,0 +1,24 @@
+<?php
+// Econt — register at https://ee.econt.com/
+define('ECONT_USER',      '');
+define('ECONT_PASS',      '');
+define('ECONT_TEST_MODE', true);   // true = demo.econt.com, false = ee.econt.com
+
+// Speedy — register at https://www.speedy.bg/
+define('SPEEDY_USER',      '');
+define('SPEEDY_PASS',      '');
+define('SPEEDY_CLIENT_ID', 0);     // numeric client/contract ID from Speedy
+define('SPEEDY_TEST_MODE', true);  // true = test.api.speedy.bg, false = api.speedy.bg
+
+// BoxNow — credentials from integrationsupport@boxnow.bg
+define('BOXNOW_CLIENT_ID',     '');
+define('BOXNOW_CLIENT_SECRET', '');
+define('BOXNOW_PARTNER_ID',    '');
+define('BOXNOW_WAREHOUSE_ID',  '');
+define('BOXNOW_TEST_MODE',     true);  // true = api-stage.boxnow.bg, false = api.boxnow.bg
+
+// Sender info (shared across couriers)
+define('SENDER_NAME',    '');
+define('SENDER_PHONE',   '');
+define('SENDER_CITY',    '');
+define('SENDER_ADDRESS', '');

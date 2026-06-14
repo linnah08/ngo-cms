@@ -1,0 +1,18 @@
+{
+    "require": {
+        "phpmailer/phpmailer": "^6.9",
+        "mpdf/mpdf": "^8.3",
+        "chillerlan/php-qrcode": "^6.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^13.1"
+    },
+    "config": {
+        "platform-check": false
+    },
+    "scripts": {
+        "setup-git-hooks": "git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
+        "post-install-cmd": ["@setup-git-hooks"],
+        "post-update-cmd": ["@setup-git-hooks"]
+    }
+}

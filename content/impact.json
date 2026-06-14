@@ -1,0 +1,26 @@
+[
+    {
+        "number": "62",
+        "label_bg": "деца подкрепяме",
+        "label_en": "children supported",
+        "order": 1
+    },
+    {
+        "number": "2",
+        "label_bg": "партньорски центъра",
+        "label_en": "partner centres",
+        "order": 2
+    },
+    {
+        "number": "75",
+        "label_bg": "финансирани терапии",
+        "label_en": "therapies funded",
+        "order": 3
+    },
+    {
+        "number": "9",
+        "label_bg": "партньори",
+        "label_en": "partners",
+        "order": 4
+    }
+]

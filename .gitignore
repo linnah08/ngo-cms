@@ -1,0 +1,47 @@
+smtp.config.php
+graph.config.php
+db.config.php
+courier.config.php
+local.config.php
+deploy.php
+*.log
+php_errors.log
+.DS_Store
+/assets/images/uploads/
+admin/setup.php
+git-reset.php
+run-migrate.php
+schema.sql
+migrate-from-woo.php
+
+/vendor/
+.phpunit.result.cache
+.cpanel.yml
+
+.idea/
+
+# Playwright
+.playwright-auth.json
+/test-results/
+/playwright-report/
+
+# Node
+node_modules/
+package-lock.json
+
+# Generated documents (served via admin/download-document.php, not committed)
+/documents/invoices/*/
+/documents/receipts/*/
+/documents/donation_certs/*/
+/documents/tickets/*/
+
+# Admin-editable content files — server is source of truth, git reset must not overwrite these
+/content/pages.json
+/content/menus.json
+
+# MCP server configuration with credentials
+.mcp.json
+
+# prod sync artifacts
+scripts/sync.log
+scripts/local-backup-*.sql.gz
