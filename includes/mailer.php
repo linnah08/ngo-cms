@@ -1,7 +1,9 @@
 <?php
 $_mailer_root = $_SERVER['DOCUMENT_ROOT'] ?: dirname(__DIR__);
 if (!defined('SITE_NAME_BG')) require_once $_mailer_root . '/config.php';
-require_once $_mailer_root . '/graph.config.php';
+// Microsoft Graph mail credentials (gitignored). Optional: when absent the site
+// still runs, but send_mail() no-ops with a logged warning until configured.
+if (is_file($_mailer_root . '/graph.config.php')) require_once $_mailer_root . '/graph.config.php';
 if (!function_exists('setting_get')) require_once $_mailer_root . '/includes/settings.php';
 require_once $_mailer_root . '/includes/email-templates.php';
 
@@ -68,6 +70,14 @@ function render_email_subject(string $key, string $lang = 'bg', array $vars = []
  */
 function send_mail(string $to, string $subject, string $body_html, string $reply_to = '', array $attachments = []): bool
 {
+    // Mail requires Microsoft Graph credentials (graph.config.php). Without them
+    // we fail gracefully rather than fatally so the rest of the site keeps working.
+    if (!defined('GRAPH_TENANT_ID') || !defined('GRAPH_CLIENT_ID')
+        || !defined('GRAPH_CLIENT_SECRET') || !defined('GRAPH_FROM')) {
+        error_log('send_mail: Microsoft Graph mail is not configured (graph.config.php missing) — email not sent.');
+        return false;
+    }
+
     // Fetch OAuth2 access token via client credentials flow
     $ch = curl_init('https://login.microsoftonline.com/' . GRAPH_TENANT_ID . '/oauth2/v2.0/token');
     curl_setopt_array($ch, [

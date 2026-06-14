@@ -1,0 +1,16 @@
+<?php
+/**
+ * Database connection + settings encryption key.
+ *
+ * Copy this file to `db.config.php` (gitignored) and fill in your values.
+ * REQUIRED — the site cannot run without a database.
+ */
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'oddminds');
+define('DB_USER', 'root');
+define('DB_PASS', '');
+
+// Key used to encrypt sensitive settings stored in the DB (courier / payment
+// credentials entered via the admin panel). Generate a fresh one with:
+//   php -r "echo bin2hex(random_bytes(32));"
+define('SETTINGS_ENCRYPTION_KEY', 'CHANGE-ME-to-64-hex-characters');

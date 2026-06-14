@@ -1,0 +1,16 @@
+<?php
+/**
+ * Outgoing email via Microsoft Graph (Microsoft 365 / Outlook mailbox).
+ *
+ * Copy this file to `graph.config.php` (gitignored) and fill in the details of
+ * an Azure AD app registration with the Mail.Send application permission.
+ *
+ * OPTIONAL — if this file is absent the site still runs, but outgoing email
+ * (order confirmations, donation receipts, admin notifications) is disabled
+ * and send attempts are logged instead of sent.
+ */
+define('GRAPH_TENANT_ID',     'your-azure-tenant-id');
+define('GRAPH_CLIENT_ID',     'your-app-client-id');
+define('GRAPH_CLIENT_SECRET', 'your-app-client-secret');
+define('GRAPH_FROM',          'info@example.org');   // mailbox the app sends from
+define('GRAPH_FROM_NAME',     'Your Organisation');
