@@ -108,28 +108,36 @@ $cart_n    = cart_count();
   <link rel="icon" href="/assets/images/favicon.png">
 
   <?php if (($_COOKIE['om_cookie_consent'] ?? '') === 'all'): ?>
+  <?php $__gtm = defined('GTM_ID') ? GTM_ID : ''; ?>
+  <?php $__ads = defined('GOOGLE_ADS_ID') ? GOOGLE_ADS_ID : ''; ?>
+  <?php $__ga4 = defined('GA4_ID') ? GA4_ID : ''; ?>
+  <?php $__ads_label = defined('GOOGLE_ADS_PURCHASE_LABEL') ? GOOGLE_ADS_PURCHASE_LABEL : ''; ?>
+  <?php if ($__gtm !== ''): ?>
   <!-- Google Tag Manager (consent given) -->
   <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
   new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
   j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-  })(window,document,'script','dataLayer','GTM-K5MKH58C');</script>
+  })(window,document,'script','dataLayer','<?= h($__gtm) ?>');</script>
   <!-- End Google Tag Manager -->
+  <?php endif; ?>
 
-  <!-- Google Ads conversion tracking (consent given) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17949247786"></script>
+  <?php if ($__ads !== '' || $__ga4 !== ''): ?>
+  <!-- Google Ads / GA4 (consent given) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=<?= h($__ads !== '' ? $__ads : $__ga4) ?>"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-    gtag('config', 'AW-17949247786');
-    gtag('config', 'G-MFR08GHCMN');
+    <?php if ($__ads !== ''): ?>gtag('config', '<?= h($__ads) ?>');<?php endif; ?>
+    <?php if ($__ga4 !== ''): ?>gtag('config', '<?= h($__ga4) ?>');<?php endif; ?>
   </script>
   <!-- End Google Ads / GA4 -->
 
-  <?php if (($_GET['gads'] ?? '') === 'atc'): ?>
+  <?php if (($_GET['gads'] ?? '') === 'atc' && $__ads !== '' && $__ads_label !== ''): ?>
   <!-- Google Ads: Add to cart conversion event -->
-  <script>gtag('event', 'conversion', {'send_to': 'AW-17949247786/un6iCMLrq7UcEKqS7-5C'});</script>
+  <script>gtag('event', 'conversion', {'send_to': '<?= h($__ads) ?>/<?= h($__ads_label) ?>'});</script>
+  <?php endif; ?>
   <?php endif; ?>
   <?php endif; ?>
   <?php $_show_admin_bar = admin_logged_in() || admin_bar_token_verify(); ?>

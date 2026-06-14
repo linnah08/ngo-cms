@@ -150,22 +150,29 @@ function cookieConsent(choice) {
     document.cookie = 'om_cookie_consent=' + choice + '; max-age=31536000; path=/; samesite=Lax';
     document.getElementById('cookieBanner').style.display = 'none';
     if (choice === 'all') {
+<?php $__gtm = defined('GTM_ID') ? GTM_ID : ''; $__ads = defined('GOOGLE_ADS_ID') ? GOOGLE_ADS_ID : ''; $__ga4 = defined('GA4_ID') ? GA4_ID : ''; ?>
+<?php if ($__gtm !== ''): ?>
         // Load GTM immediately without requiring a page reload
         (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
         new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
         j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-        })(window,document,'script','dataLayer','GTM-K5MKH58C');
+        })(window,document,'script','dataLayer','<?= h($__gtm) ?>');
+<?php endif; ?>
+<?php if ($__ads !== '' || $__ga4 !== ''): ?>
         // Load GA4 + Google Ads gtag immediately — mirrors what the PHP header does on
         // subsequent page loads. Without this, the page where the user accepts is never tracked.
         (function(d){var s=d.createElement('script');s.async=true;
-        s.src='https://www.googletagmanager.com/gtag/js?id=AW-17949247786';
+        s.src='https://www.googletagmanager.com/gtag/js?id=<?= h($__ads !== '' ? $__ads : $__ga4) ?>';
         d.head.appendChild(s);})(document);
         window.dataLayer=window.dataLayer||[];
         window.gtag=function(){dataLayer.push(arguments);};
         gtag('js',new Date());
-        gtag('config','AW-17949247786');
-        gtag('config','G-MFR08GHCMN');
+<?php if ($__ads !== ''): ?>        gtag('config','<?= h($__ads) ?>');
+<?php endif; ?>
+<?php if ($__ga4 !== ''): ?>        gtag('config','<?= h($__ga4) ?>');
+<?php endif; ?>
+<?php endif; ?>
     }
 }
 </script>

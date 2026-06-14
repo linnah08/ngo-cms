@@ -16,8 +16,10 @@ if (empty($cart)) {
 }
 
 $page_title = $lang === 'bg' ? 'Количка' : 'Cart';
-$page_head_extra = '<style>@media(max-width:640px){table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;}}</style>'
-    . '<script>gtag(\'event\',\'conversion\',{\'send_to\':\'AW-17949247786/un6iCMLrq7UcEKqS7-5C\'});</script>';
+$page_head_extra = '<style>@media(max-width:640px){table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;}}</style>';
+if (defined('GOOGLE_ADS_ID') && GOOGLE_ADS_ID !== '' && defined('GOOGLE_ADS_PURCHASE_LABEL') && GOOGLE_ADS_PURCHASE_LABEL !== '') {
+    $page_head_extra .= '<script>gtag(\'event\',\'conversion\',{\'send_to\':\'' . GOOGLE_ADS_ID . '/' . GOOGLE_ADS_PURCHASE_LABEL . '\'});</script>';
+}
 $flash      = flash_get();
 $cart_data = [];
 $subtotal  = 0.0;

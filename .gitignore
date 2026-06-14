@@ -1,3 +1,4 @@
+site.config.php
 smtp.config.php
 graph.config.php
 db.config.php

@@ -73,34 +73,18 @@ register_shutdown_function(function(): void {
 // SITE CONFIGURATION
 // ============================================
 
-define('SITE_NAME_BG', 'Фондация Различни умове');
-define('SITE_NAME_EN', 'Odd Minds Foundation');
-
-// local.config.php (gitignored) can pre-define SITE_URL and SITE_EMAIL
-// to override the production values for local development.
-if (file_exists(__DIR__ . '/local.config.php')) {
-    require_once __DIR__ . '/local.config.php';
+// ── Organisation / site configuration ─────────────────────────────────────────
+// All NGO-specific values (name, URL, contact, bank details, socials, analytics
+// IDs, feature toggles) live in site.config.php. Copy site.config.example.php to
+// site.config.php and edit it — that is the single file an adopter rebrands.
+// The example is loaded as a fallback so a fresh clone still boots.
+if (file_exists(__DIR__ . '/site.config.php')) {
+    require_once __DIR__ . '/site.config.php';
+} elseif (file_exists(__DIR__ . '/site.config.example.php')) {
+    require_once __DIR__ . '/site.config.example.php';
 }
 
-// ── MIGRATION NOTE ────────────────────────────────────────────────────────────
-// When moving from new.oddminds.org → oddminds.org, change SITE_URL here.
-// All absolute URLs in emails, payment callbacks, and lang_url() derive from it.
-// Also update REPO_ROOT / LOG_FILE in deploy.php (2 lines).
-// ─────────────────────────────────────────────────────────────────────────────
-if (!defined('SITE_URL'))   define('SITE_URL',   'https://oddminds.org');
-if (!defined('SITE_EMAIL')) define('SITE_EMAIL', 'info@oddminds.org');
-define('SITE_PHONE',   '+359896670346');
-define('SITE_IBAN',    'BG40STSA93000032062526');
-
-// Social profile URLs — single source of truth (used by templates/social-links.php)
-define('SOCIAL_FACEBOOK',  'https://www.facebook.com/profile.php?id=61580050070685');
-define('SOCIAL_INSTAGRAM', 'https://www.instagram.com/oddminds_foundation/');
-define('SOCIAL_LINKEDIN',  'https://www.linkedin.com/company/odd-minds-foundation');
-
-// Currency settings
-// Bulgaria adopted Euro 1 Jan 2026. Dual display required until 1 July 2026.
-define('EUR_BGN_RATE',     1.95583);
-define('DUAL_CURRENCY_UNTIL', '2026-07-01');
+// Derived display logic (not configuration).
 define('SHOW_DUAL_CURRENCY', date('Y-m-d') < DUAL_CURRENCY_UNTIL);
 
 // Start session early — must happen before any output so the cookie can be set.
@@ -568,12 +552,7 @@ function variant_gallery(array $pv): array {
     return array_values(array_unique($imgs));
 }
 
-// Bank details for donations (verify with your bank)
-define('SITE_BIC',       'STSABGSF');
-define('SITE_BANK_NAME', 'ДСК Банк');
-
-// The one admin account authorised to sign donation certificates.
-define('SIGNING_ADMIN_EMAIL', 'detelina@oddminds.org');
+// SITE_BIC, SITE_BANK_NAME and SIGNING_ADMIN_EMAIL are defined in site.config.php.
 
 function admin_can_sign(): bool {
     return admin_logged_in() && (admin_user()['email'] ?? '') === SIGNING_ADMIN_EMAIL;
