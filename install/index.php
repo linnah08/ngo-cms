@@ -92,7 +92,8 @@ if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // Admin
     $admin_name  = $p('admin_name') ?: 'Administrator';
     $admin_email = $p('admin_email');
-    $admin_pass  = (string) ($_POST['admin_password'] ?? '');
+    // Trim to match the login form, which trims the password before verifying.
+    $admin_pass  = trim((string) ($_POST['admin_password'] ?? ''));
 
     // Database
     $db_mode = $p('db_mode');
