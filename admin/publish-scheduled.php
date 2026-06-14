@@ -8,7 +8,7 @@
  * CRON SETUP (run once on the server):
  *   crontab -e
  *   Add this line (adjust path to match server):
- *   0 9 * * * php /home/detelinavasileva/public_html/oddminds.org/admin/publish-scheduled.php >> /home/detelinavasileva/logs/publish-scheduled.log 2>&1
+ *   0 9 * * * php /path/to/site/admin/publish-scheduled.php >> /path/to/site/logs/publish-scheduled.log 2>&1
  *
  *   If the server is in UTC, use 0 6 * * * instead (06:00 UTC = 09:00 EEST / 07:00 EET).
  *   Check server timezone with: php -r "echo date_default_timezone_get();"

@@ -2,7 +2,7 @@
 /**
  * Monthly orders report cron script.
  * Run via cPanel cron: 0 6 1 * *
- * Command: /usr/local/bin/php /home/detelinavasileva/public_html/oddminds.org/cron/monthly-report-cron.php
+ * Command: /usr/local/bin/php /path/to/site/cron/monthly-report-cron.php
  */
 
 // Ensure CLI only
