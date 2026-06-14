@@ -36,10 +36,16 @@ function abort(int $code, string $msg): void
 
 function run(string $cmd): string
 {
-    $output = [];
-    $code   = 0;
-    exec($cmd . ' 2>&1', $output, $code);
-    $out = implode("\n", $output);
+    // Use proc_open (not exec/shell_exec, which many cPanel hosts disable).
+    $desc = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+    $proc = proc_open(['/bin/sh', '-c', $cmd], $desc, $pipes);
+    if (!is_resource($proc)) {
+        abort(500, 'Cannot spawn command (proc_open unavailable): ' . $cmd);
+    }
+    $out  = stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    $code = proc_close($proc);
     log_msg('$ ' . $cmd);
     log_msg('  -> ' . ($out ?: '(no output)') . ' [exit ' . $code . ']');
     if ($code !== 0) {
