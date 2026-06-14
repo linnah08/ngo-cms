@@ -1,264 +1,141 @@
-# Фондация Различни умове — oddminds.org
+# NGO website, shop & donations platform
 
-Custom PHP website and shop for Odd Minds Foundation. No framework — vanilla PHP 8.4, MySQL, flat-file JSON content.
+An open-source, bilingual (Bulgarian/English) website for non-profit
+organisations: a content-managed public site, an online shop, one-off
+donations, crowdfunding campaigns, and automatic invoice / receipt /
+donation-certificate PDFs. Built in vanilla PHP 8.4 — no framework — with
+MySQL and flat-file JSON content.
 
----
+It was originally built for [Odd Minds Foundation](https://oddminds.org)
+(Фондация Различни умове) and released so other NGOs — particularly in Bulgaria —
+can run the same stack. The default content and configuration ship with the Odd
+Minds values as a **worked example**; you replace them with your own.
+
+## Features
+
+- **Public site** with inline, in-browser content editing (no code needed to edit copy)
+- **Shop** with product variants, cart, and a unified checkout
+- **Donations** — one-off donations with downloadable donation certificates
+- **Crowdfunding campaigns** with reward tiers and ticketed events (optional, toggleable)
+- **Documents** — invoices, receipts, credit notes and donation certificates as PDFs (with digital signatures)
+- **Admin panel** — products, orders, articles, pages, campaign, newsletter, settings
+- **Bilingual** BG/EN throughout, with optional DeepL-assisted translation
+- **Bulgaria-specific integrations** (optional): Econt / Speedy / BoxNow couriers, DSK Bank vPOS card payments, ЕИК/Булстат company invoicing, and dual BGN/EUR pricing during euro adoption
 
 ## Prerequisites
 
 - PHP 8.4+ with extensions: `pdo_mysql`, `mbstring`, `openssl`, `curl`, `json`
 - MySQL 8.0+
 - Composer
-- Apache with `mod_rewrite` (or Nginx — see note below)
+- A web server with URL rewriting (Apache `mod_rewrite`, or Nginx)
 
-On macOS the easiest path is [Homebrew](https://brew.sh):
+## Setup
 
-```bash
-brew install php mysql composer
-brew services start mysql
-```
-
----
-
-## Local setup
-
-### 1. Clone the repository
+### 1. Clone and install dependencies
 
 ```bash
-git clone https://github.com/linnah08/oddminds.git
-cd oddminds
-```
-
-### 2. Install PHP dependencies
-
-```bash
+git clone <your-repo-url>
+cd <repo>
 composer install
 ```
 
-### 3. Create config files
+### 2. Create the config files
 
-These three files are gitignored and must be created manually. Copy the examples below.
+Each config below is gitignored. Copy the matching `*.example` file and fill it in.
 
-**`db.config.php`** — database connection and encryption key:
+| Copy from | To | Required? | Purpose |
+|---|---|---|---|
+| `db.config.php.example` | `db.config.php` | **Yes** | Database connection + settings encryption key |
+| `site.config.example.php` | `site.config.php` | **Yes** | Your organisation: name, URL, contact, IBAN, socials, analytics, feature toggles |
+| `graph.config.php.example` | `graph.config.php` | No | Outgoing email via Microsoft Graph (email is disabled until set) |
+| `courier.config.php.example` | `courier.config.php` | No | Courier API credentials (Bulgaria) |
 
-```php
-<?php
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'oddminds');
-define('DB_USER', 'root');
-define('DB_PASS', '');
+`site.config.php` is the one file you edit to rebrand the site — name, base URL,
+contact details, bank account, social links, Google Analytics/Ads IDs, and
+feature toggles (e.g. `FEATURE_CAMPAIGN`). Leave any analytics ID empty (`''`)
+to disable that tag entirely.
 
-// Generate with: php -r "echo bin2hex(random_bytes(32));"
-define('SETTINGS_ENCRYPTION_KEY', '<your-random-64-char-hex>');
-```
-
-**`smtp.config.php`** — outgoing mail (use [Brevo](https://brevo.com) free tier or Mailtrap for local testing):
-
-```php
-<?php
-define('SMTP_HOST',      'smtp-relay.brevo.com');
-define('SMTP_PORT',      587);
-define('SMTP_SECURE',    'tls');
-define('SMTP_USER',      '<brevo-smtp-login>');
-define('SMTP_PASS',      '<brevo-smtp-key>');
-define('SMTP_FROM',      'info@oddminds.org');
-define('SMTP_FROM_NAME', 'Фондация Различни умове');
-```
-
-**`courier.config.php`** — courier API credentials (use test-mode values for local dev):
-
-```php
-<?php
-define('ECONT_USER',          'your-econt-user');
-define('ECONT_PASS',          'your-econt-pass');
-define('ECONT_TEST_MODE',     true);
-
-define('SPEEDY_USER',         'your-speedy-user');
-define('SPEEDY_PASS',         'your-speedy-pass');
-define('SPEEDY_CLIENT_ID',    0);
-define('SPEEDY_TEST_MODE',    true);
-
-define('BOXNOW_CLIENT_ID',    'your-client-id');
-define('BOXNOW_CLIENT_SECRET','your-client-secret');
-define('BOXNOW_PARTNER_ID',   'your-partner-id');
-define('BOXNOW_WAREHOUSE_ID', 'your-warehouse-id');
-define('BOXNOW_TEST_MODE',    true);
-
-define('SENDER_NAME',    'Фондация Различни умове');
-define('SENDER_PHONE',   '+359896670346');
-define('SENDER_CITY',    'София');
-define('SENDER_ADDRESS', 'вашият адрес');
-```
-
-See `COURIERS.md` for full API documentation for each courier.
-
-### 4. Create and seed the database
+### 3. Create and install the database
 
 ```bash
 mysql -u root -e "CREATE DATABASE oddminds CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+php install.php
 ```
 
-Then open `http://localhost/admin/setup.php` in your browser. This script creates all tables and inserts default data (shipping rates, admin user). It is gitignored and only exists on live and local — ask the team for a copy.
-
-Alternatively, if you have a DB dump from production, import it:
+`install.php` runs all migrations (creating the schema) and then creates your
+first admin account. You can pass credentials non-interactively:
 
 ```bash
-mysql -u root oddminds < oddminds-dump.sql
+ADMIN_EMAIL=you@example.org ADMIN_PASSWORD='a-strong-password' php install.php
 ```
 
-### 5. Configure the web server
+### 4. Configure the web server
 
-The site requires `mod_rewrite` (Apache) or an equivalent rewrite rule (Nginx). The document root must point directly to the repo root.
+The document root must point at the repository root, with rewriting enabled.
 
-**Apache virtual host** (`/etc/apache2/extra/httpd-vhosts.conf` or Homebrew equivalent):
+**Apache** — `AllowOverride All` so the bundled `.htaccess` is honoured:
 
 ```apache
 <VirtualHost *:80>
-    ServerName oddminds.local
-    DocumentRoot /path/to/oddminds
-    <Directory /path/to/oddminds>
+    ServerName mysite.local
+    DocumentRoot /path/to/repo
+    <Directory /path/to/repo>
         AllowOverride All
         Require all granted
     </Directory>
 </VirtualHost>
 ```
 
-Add `127.0.0.1 oddminds.local` to `/etc/hosts`, then restart Apache:
+Then add `127.0.0.1 mysite.local` to `/etc/hosts` and restart Apache. The site
+is at `http://mysite.local`, the admin panel at `http://mysite.local/admin/`.
 
-```bash
-sudo apachectl restart
-```
+> **Nginx:** translate the `.htaccess` rewrite rules into `location` blocks.
 
-The site is now available at `http://oddminds.local`. Admin panel: `http://oddminds.local/admin/`.
+## Configuring your organisation
 
-> **Nginx users:** The `.htaccess` rewrites need to be translated to Nginx `location` blocks. Ask the team for the Nginx config snippet.
+Most day-to-day content is editable in the browser:
 
----
+- **Text & images** — click-to-edit inline on every public page when logged in as admin
+- **Settings** — admin → Settings (TinyMCE/DeepL keys, courier & payment credentials, etc.)
+- **Structured content** — `content/*.json` (centres, partners, impact figures, UI strings)
 
-## Pushing changes
+What still lives in code (edit as needed for your organisation):
 
-The repo lives at `github.com/linnah08/oddminds`. Push to `main` — the production server pulls automatically via a deploy hook.
+- **Donation recipients** — the donation flow currently offers two fixed recipients
+  (the foundation and a partner centre) with certificate purpose text in
+  `includes/documents/DocumentGenerator.php` and `DonationCertGenerator.php`.
+  Adjust these for your own funds/programmes.
+- **Legal pages** — privacy policy, terms, cookie policy under their slug folders.
 
-### Typical workflow
+## Bulgaria-specific notes
 
-```bash
-# 1. Make sure you're on main and up to date
-git checkout main
-git pull
+This stack was built for the Bulgarian context. The following are optional and
+can be left unconfigured (or removed) if they don't apply to you:
 
-# 2. Make your changes
-# ... edit files ...
-
-# 3. Run tests locally (see below) — do not push broken code
-vendor/bin/phpunit --exclude-group integration
-
-# 4. Stage and commit
-git add <files>
-git commit -m "Short description of what changed"
-
-# 5. Push
-git push
-```
-
-### Commit message conventions
-
-Keep the first line short (under 60 characters) and in the imperative: *"Fix broken slug routing"*, *"Add donation step to checkout"*, *"Update project images"*.
-
-### What is and is not in the repository
-
-Gitignored (never commit these):
-- `db.config.php`, `smtp.config.php`, `courier.config.php` — contain credentials
-- `vendor/` — regenerated by `composer install`
-- `assets/images/uploads/` — user-uploaded files; managed separately
-- `admin/setup.php`, `schema.sql` — one-time setup scripts
-- `deploy.php`, `git-reset.php` — server-side utility scripts
-
-Everything else — PHP source, templates, JSON content, CSS/JS, tests — belongs in the repo.
-
----
+- **Couriers** — Econt, Speedy, BoxNow (`courier.config.php`)
+- **Card payments** — DSK Bank vPOS (configured in admin → Settings)
+- **Invoicing** — ЕИК/Булстат fields for company invoices
+- **Currency** — dual BGN/EUR display during euro adoption (`DUAL_CURRENCY_UNTIL` in `site.config.php`)
 
 ## Running tests
 
-Tests use [PHPUnit 13](https://phpunit.de) and are in `tests/`.
-
-```
-tests/
-├── bootstrap.php           — test environment setup
-├── Couriers/               — Econt, Speedy, BoxNow (live API)
-├── Payment/                — DSK Bank vPOS
-└── Shop/                   — helpers, emails, DB (products, orders)
-```
-
-### Quick start — unit tests only (no DB, no network)
+Tests use PHPUnit and live in `tests/`. Unit tests need no database or network:
 
 ```bash
-vendor/bin/phpunit --exclude-group integration,econt,speedy,boxnow,dsk-integration
+vendor/bin/phpunit --exclude-group integration,econt,speedy,boxnow,dsk-integration,http,db
 ```
 
-This is the safest check to run before every push.
+Database and integration tests self-skip when their config/credentials are
+absent, so you will never see false failures. See `COURIERS.md` for the courier
+APIs and the test groups for each integration.
 
-### Run all tests for a specific area
+## Deployment
 
-```bash
-vendor/bin/phpunit tests/Shop/HelperTest.php     # pure unit tests
-vendor/bin/phpunit tests/Shop/EmailTest.php      # email rendering
-vendor/bin/phpunit tests/Shop/ProductDbTest.php  # requires DB
-vendor/bin/phpunit tests/Shop/OrderDbTest.php    # requires DB
-vendor/bin/phpunit tests/Payment/               # DSK Bank
-```
+`.github/workflows/deploy.yml` is an example GitHub Actions workflow that
+deploys over SSH/rsync to a cPanel host and runs `migrate.php`. It expects
+repository secrets `FTP_SERVER`, `FTP_USERNAME`, `SSH_PRIVATE_KEY` and
+`DEPLOY_PATH`. Adapt or replace it for your own hosting.
 
-### Test groups
+## License
 
-| Group | Requires | Run command |
-|---|---|---|
-| `shop` | — | `--group shop` |
-| `helpers` | — | `--group helpers` |
-| `emails` | — | `--group emails` |
-| `db` | MySQL DB | `--group db` |
-| `dsk-unit` | — | `--group dsk-unit` |
-| `dsk-integration` | DB + DSK UAT credentials | `--group dsk-integration` |
-| `speedy` | Speedy test account | `--group speedy` |
-| `econt` | Econt demo account | `--group econt` |
-| `boxnow` | BoxNow test account | `--group boxnow` |
-| `integration` | Various credentials | `--group integration` |
-
-DB tests auto-skip if no `db.config.php` is present. Courier and payment integration tests auto-skip if credentials are not configured.
-
-### DSK Bank integration tests
-
-The DSK tests hit `uat.dskbank.bg`. To enable them, store UAT credentials in the settings table (via the admin Settings page, or directly):
-
-```php
-setting_set('dsk_merchant',  '<uat-merchant-id>');
-setting_set('dsk_password',  '<uat-password>');
-setting_set('dsk_test_mode', '1');
-setting_set('dsk_enabled',   '1');
-```
-
-Then run:
-
-```bash
-vendor/bin/phpunit --group dsk-integration
-```
-
-#### Test cards (for manual smoke testing via the browser)
-
-After `register()` returns a `formUrl`, open it in a browser and enter one of these cards:
-
-| Card number | CVC | Expiry | Auth | Result |
-|---|---|---|---|---|
-| 5555 5555 5555 5599 | 123 | 12/34 | 3DS2 | Success |
-| 4111 1111 1111 1111 | 123 | 12/26 | 3DS2 Frictionless | Success |
-| 5168 4948 9505 5780 | 123 | 12/26 | 3DS2 Frictionless | Failure |
-| 4000 0011 1111 1118 | 123 | 12/30 | 3DS2 Attempt | Success |
-| 4444 5555 1111 3333 | 123 | 12/26 | SSL | Success |
-
-To simulate a decline: use any card with a wrong CVC or past expiry date (error code 71015).
-
-### Run the full suite
-
-```bash
-vendor/bin/phpunit
-```
-
-Tests that need credentials will self-skip if those credentials are not configured — you will never see false failures.
+MIT — see [LICENSE](LICENSE). Originally created by Odd Minds Foundation.
