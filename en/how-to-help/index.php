@@ -36,7 +36,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
             'style' => 'primary',
         ],
         'Follow us on social media' => ['social' => true],
-        'Support Lafetki' => [
+        'Support our campaign' => [
             'label' => 'Learn more',
             'href'  => '/en/campaign/',
             'style' => 'outline',

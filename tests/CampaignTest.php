@@ -196,7 +196,7 @@ final class CampaignTest extends TestCase
         $this->assertEqualsWithDelta((float)$before['total'] + 20.0, (float)$after['total'], 0.001);
     }
 
-    // ── packs sold = total printed minus current Icebreakers variant stock ───
+    // ── packs sold = total printed minus current reward variant stock ───
 
     public function test_packs_sold_is_total_minus_current_stock(): void
     {
@@ -204,7 +204,7 @@ final class CampaignTest extends TestCase
             SELECT COALESCE(SUM(pv.stock),0)
             FROM products p
             JOIN product_variants pv ON pv.product_id = p.id
-            WHERE p.slug = 'lafetki'
+            WHERE p.slug = 'campaign-reward'
         ")->fetchColumn();
 
         $total      = 100;

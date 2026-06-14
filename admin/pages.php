@@ -601,7 +601,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 <h2 style="margin:2rem 0 1rem;font-size:1rem;">Речник за превод (DeepL)</h2>
 <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;max-width:560px;">
   <p style="font-size:.875rem;color:var(--text-muted);margin:0 0 1rem;">
-    Думи или фрази, които DeepL трябва да превежда по конкретен начин. Пример: <strong>Лафетки → Lafetki</strong>.
+    Думи или фрази, които DeepL трябва да превежда по конкретен начин. Пример: <strong>марка → Brand</strong>.
   </p>
   <?php $glossary_pairs = deepl_load_glossary(); ?>
   <?php if ($glossary_pairs): ?>
@@ -766,7 +766,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <label style="margin:0;">Button text <?= $lbl_en_badge ?></label>
         <button type="button" class="btn btn--outline" onclick="txField('campCtaBg','campCtaEn',this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
       </div>
-      <input type="text" id="campCtaEn" name="campaign_cta_en" value="<?= h($campaign['cta_en'] ?? 'Support Lafetki →') ?>">
+      <input type="text" id="campCtaEn" name="campaign_cta_en" value="<?= h($campaign['cta_en'] ?? 'Support our campaign →') ?>">
     </div>
   </div>
 

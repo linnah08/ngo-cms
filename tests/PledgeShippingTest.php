@@ -134,7 +134,7 @@ final class PledgeShippingTest extends TestCase
 
         // Due to ship: reward pledge with NO courier recorded and no order row yet.
         [$rewardNoCourier] = $this->insertPledge(['reward_id' => $rid, 'delivery_courier' => null]);
-        // Due to ship: courier-only donation, no reward (lafetki case).
+        // Due to ship: courier-only donation, no reward.
         [$courierNoReward] = $this->insertPledge(['reward_id' => null, 'delivery_courier' => 'speedy']);
         // Due to ship: label already printed (reward_shipped=1) but order still 'confirmed'.
         // This is the regression — a printed label must NOT hide the pack.

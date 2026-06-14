@@ -696,7 +696,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <div style="font-weight:600;margin-bottom:.25rem;"><?= h($pledge_reward['title']) ?></div>
         <?php if (!empty($pledge_reward['icebreaker_qty'])): ?>
           <div style="font-size:.85rem;margin-bottom:.25rem;">
-            <span style="font-weight:600;">Lafetki Icebreakers:</span> <?= (int)$pledge_reward['icebreaker_qty'] ?> бр.
+            <span style="font-weight:600;">Бройки в наградата:</span> <?= (int)$pledge_reward['icebreaker_qty'] ?> бр.
           </div>
         <?php endif; ?>
         <?php if (!empty($pledge_row['delivery_courier'])): ?>

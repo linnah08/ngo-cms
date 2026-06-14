@@ -16,16 +16,16 @@ function _email_tpl_defaults(): array {
     return [
 
         'campaign-confirmation' => [
-            'subject_bg' => 'Благодарим ти! Твоята подкрепа за Лафетки — {{pledge_number}}',
+            'subject_bg' => 'Благодарим ти! Твоята подкрепа за кампанията — {{pledge_number}}',
             'intro_bg'   => '<h2>Благодарим за твоята подкрепа!</h2>'
                           . '<p>Здравей, {{name}},</p>'
-                          . '<p>Получихме успешно твоята подкрепа за кампанията <strong>Лафетки</strong>. Ти си невероятен!</p>',
-            'outro_bg'   => '<p>Твоят принос директно помага на децата от програмата Лафетки на Фондация Различни умове.</p>',
-            'subject_en' => 'Thank you! Your support for Lafetki — {{pledge_number}}',
+                          . '<p>Получихме успешно твоята подкрепа за кампанията. Ти си невероятен!</p>',
+            'outro_bg'   => '<p>Твоят принос директно помага на децата от програмата на нашата фондация.</p>',
+            'subject_en' => 'Thank you! Your support for our campaign — {{pledge_number}}',
             'intro_en'   => '<h2>Thank you for your support!</h2>'
                           . '<p>Hello {{name}},</p>'
-                          . '<p>We have successfully received your support for the <strong>Lafetki</strong> campaign. You are amazing!</p>',
-            'outro_en'   => '<p>Your contribution directly helps the children in the Lafetki programme of the Different Minds Foundation.</p>',
+                          . '<p>We have successfully received your support for our campaign. You are amazing!</p>',
+            'outro_en'   => '<p>Your contribution directly helps the children in our foundation’s programme.</p>',
         ],
 
         'campaign-ticket' => [
@@ -33,12 +33,12 @@ function _email_tpl_defaults(): array {
             'intro_bg'   => '<h2>Твоят билет за {{event_name}}!</h2>'
                           . '<p>Здравей, {{name}},</p>'
                           . '<p>Твоята покупка е потвърдена. Намираш билета си в прикачения PDF файл. Моля, представи го (на хартия или на екран) при влизане на събитието.</p>',
-            'outro_bg'   => '<p>Ще се видим скоро! Благодарим, че подкрепяш Лафетки и децата от програмата на Фондация Различни умове.</p>',
+            'outro_bg'   => '<p>Ще се видим скоро! Благодарим, че подкрепяш децата от програмата на нашата фондация.</p>',
             'subject_en' => 'Your ticket for {{event_name}} — {{pledge_number}}',
             'intro_en'   => '<h2>Your ticket for {{event_name}}!</h2>'
                           . '<p>Hello {{name}},</p>'
                           . '<p>Your purchase is confirmed. Your ticket is attached as a PDF. Please present it (printed or on screen) when entering the event.</p>',
-            'outro_en'   => '<p>See you soon! Thank you for supporting Lafetki and the children in the Different Minds Foundation programme.</p>',
+            'outro_en'   => '<p>See you soon! Thank you for supporting the children in our foundation’s programme.</p>',
         ],
 
         'order-confirmation-customer' => [

@@ -365,7 +365,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <label style="<?= $lbl ?>">Meta description <?= $lbl_en_badge ?></label>
         <input type="text" name="campaign_meta_description_en" id="campaignMetaDescEn"
                value="<?= h($meta_desc_en) ?>" style="<?= $inp ?>"
-               placeholder="Support Lafetki — ...">
+               placeholder="Support our campaign — ...">
       </div>
     </div>
 
@@ -396,7 +396,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       </div>
     </div>
     <div style="margin-top:1rem;">
-      <label style="<?= $lbl ?>">Общо отпечатани пакета „Лафетки“</label>
+      <label style="<?= $lbl ?>">Общо налични бройки за наградата</label>
       <input type="number" name="lafetki_total_packs" value="<?= h((string)$total_packs) ?>" min="0" step="1"
              style="<?= $inp ?>">
       <div style="font-size:.8rem;color:#6b6560;margin-top:.35rem;">
