@@ -37,9 +37,6 @@ ErrorDocument 503 /errors/503.php
   # Dynamic XML sitemap
   RewriteRule ^sitemap\.xml$ /sitemap.php [L]
 
-  # Old campaign page moved to the lafetki subdomain (permanent)
-  RewriteRule ^campaign(/.*)?$ https://lafetki.oddminds.org/ [L,R=301]
-
   # ── Legacy URL redirects (post-WooCommerce/WordPress migration) ──────────
   # Reclaim search ranking from old URLs that now 404. Specific product slugs
   # that survived the migration come first; broader catch-alls follow.

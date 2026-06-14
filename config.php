@@ -89,20 +89,19 @@ define('SHOW_DUAL_CURRENCY', date('Y-m-d') < DUAL_CURRENCY_UNTIL);
 
 // Start session early — must happen before any output so the cookie can be set.
 // CSRF and cart both depend on $_SESSION being available before HTML is rendered.
-// Set cookie domain to parent domain (.oddminds.org / .oddminds.test) so that
-// subdomains like lafetki.oddminds.org share the same session — required for
-// cross-subdomain form submissions (e.g. lafetki → /campaign/checkout.php).
+// Set the cookie domain to the parent domain (e.g. .example.org) so that any
+// subdomains can share the same session — required if you run a subdomain that
+// posts forms back to the main site (e.g. sub.example.org → /campaign/checkout.php).
 if (session_status() === PHP_SESSION_NONE) {
     // Use a custom cookie name (not the default PHPSESSID). When the session
-    // cookie switched from host-only to domain=.oddminds.org (for lafetki
-    // subdomain sharing), browsers that had cached a host-only PHPSESSID ended
-    // up holding TWO cookies of the same name; the stale host-only one took
-    // precedence and silently broke login. A fresh name sidesteps the collision
-    // entirely — old PHPSESSID cookies are ignored and the new name only ever
-    // exists with domain=.oddminds.org.
+    // cookie switches from host-only to a parent domain (for subdomain sharing),
+    // browsers that cached a host-only PHPSESSID can end up holding TWO cookies
+    // of the same name; the stale host-only one takes precedence and silently
+    // breaks login. A fresh name sidesteps the collision entirely — old PHPSESSID
+    // cookies are ignored and the new name only ever exists with the parent domain.
     session_name('OMSESSID');
     if (str_starts_with(SITE_URL, 'https')) {
-        // Production (HTTPS): set .domain so lafetki subdomain shares the session;
+        // Production (HTTPS): set .domain so subdomains share the session;
         // leave cookie_secure=1 as set by .user.ini.
         $__host  = $_SERVER['HTTP_HOST'] ?? parse_url(SITE_URL, PHP_URL_HOST) ?? '';
         $__parts = explode('.', $__host);
@@ -118,7 +117,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // ── Cross-subdomain admin-bar token ───────────────────────────────────────────
-// A separate HMAC-signed cookie (om_admin_tok) lets subdomains (e.g. lafetki.oddminds.org)
+// A separate HMAC-signed cookie (om_admin_tok) lets subdomains (e.g. sub.example.org)
 // know an admin is logged in without sharing the session cookie (which would
 // cause session interference between the main site and subdomains).
 // The token is set on login and cleared on logout; it is ONLY used to decide

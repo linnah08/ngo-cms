@@ -1,8 +1,0 @@
-Options -Indexes
-
-# Admin is on the main site — redirect there directly.
-RewriteEngine On
-RewriteRule ^admin(/.*)?$ https://oddminds.org/admin/$1 [R=301,L]
-
-# English version of the campaign page (get_lang() keys off the /en prefix).
-RewriteRule ^en/?$ index.php [L,QSA]
