@@ -70,7 +70,7 @@ if ($section === 'menus') {
 }
 
 // Handle array-indexed sections (centre, partner) before the field whitelist
-// Lafetki UI strings (nav tabs, eyebrows, panel h2s) stored as JSON blob
+// Campaign UI strings (nav tabs, eyebrows, panel h2s) stored as JSON blob
 if ($section === 'lf_ui') {
     $allowed_lf_keys = [
         'tab_idea', 'tab_faq', 'tab_budget', 'tab_rewards', 'tab_series', 'tab_event',

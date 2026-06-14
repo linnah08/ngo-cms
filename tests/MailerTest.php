@@ -37,14 +37,14 @@ final class MailerTest extends TestCase
 
     public function test_tpl_subject_is_valid_utf8_bg(): void
     {
-        $tpl = email_tpl_get('campaign-ticket', 'bg', ['event_name' => 'Лафетки', 'pledge_number' => 'CP-001']);
+        $tpl = email_tpl_get('campaign-ticket', 'bg', ['event_name' => 'Нашето събитие', 'pledge_number' => 'CP-001']);
         $this->assertTrue(mb_check_encoding($tpl['subject'], 'UTF-8'));
         $this->assertNotEmpty($tpl['subject']);
     }
 
     public function test_tpl_intro_is_valid_utf8_bg(): void
     {
-        $tpl = email_tpl_get('campaign-ticket', 'bg', ['event_name' => 'Лафетки', 'name' => 'Мария', 'pledge_number' => 'CP-001']);
+        $tpl = email_tpl_get('campaign-ticket', 'bg', ['event_name' => 'Нашето събитие', 'name' => 'Мария', 'pledge_number' => 'CP-001']);
         $this->assertTrue(mb_check_encoding($tpl['intro'], 'UTF-8'));
         $this->assertStringContainsString('Мария', $tpl['intro']);
     }

@@ -20,7 +20,7 @@ function _campaign_pick(string $en_val, string $bg_val): string {
 }
 
 // Settings — pick EN if available, fall back to BG
-$title_bg   = setting_get('campaign_title',       'Помогни на Лафетки');
+$title_bg   = setting_get('campaign_title',       'Помогни на нашата кауза');
 $title_en   = setting_get('campaign_title_en',    '');
 $desc_bg    = setting_get('campaign_description', '');
 $desc_en    = setting_get('campaign_description_en', '');

@@ -38,7 +38,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
             'style' => 'primary',
         ],
         'Стани наш приятел в социалните мрежи' => ['social' => true],
-        'Подкрепи Лафетки' => [
+        'Подкрепи кампанията' => [
             'label' => 'Научи повече',
             'href'  => '/campaign/',
             'style' => 'outline',

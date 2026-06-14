@@ -759,7 +759,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </div>
     <div class="form-group">
       <label>Текст на бутона <?= $lbl_bg_badge ?></label>
-      <input type="text" id="campCtaBg" name="campaign_cta" value="<?= h($campaign['cta'] ?? 'Подкрепи Лафетки →') ?>">
+      <input type="text" id="campCtaBg" name="campaign_cta" value="<?= h($campaign['cta'] ?? 'Подкрепи кампанията →') ?>">
     </div>
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">

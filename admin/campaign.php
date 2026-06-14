@@ -216,7 +216,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // ── Load data ─────────────────────────────────────────────────────────────────
 $active      = setting_get('campaign_active', '0');
-$title        = setting_get('campaign_title',               'Помогни на Лафетки');
+$title        = setting_get('campaign_title',               'Помогни на нашата кауза');
 $title_en     = setting_get('campaign_title_en',            '');
 $meta_desc    = setting_get('campaign_meta_description',    '');
 $meta_desc_en = setting_get('campaign_meta_description_en', '');
@@ -359,7 +359,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <label style="<?= $lbl ?>">Мета описание (БГ) <span style="font-size:.72rem;color:#9b9590;font-weight:400;">— текстът, показван при споделяне на връзката</span></label>
         <input type="text" name="campaign_meta_description" id="campaignMetaDesc"
                value="<?= h($meta_desc) ?>" style="<?= $inp ?>"
-               placeholder="Подкрепи Лафетки — ...">
+               placeholder="Подкрепи кампанията — ...">
       </div>
       <div>
         <label style="<?= $lbl ?>">Meta description <?= $lbl_en_badge ?></label>
@@ -684,7 +684,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
       <div>
         <label style="<?= $lbl ?>">Название на събитието</label>
-        <input type="text" name="event_name" value="<?= h($ev_name) ?>" style="<?= $inp ?>" placeholder="напр. Лафетки — Парти за старт">
+        <input type="text" name="event_name" value="<?= h($ev_name) ?>" style="<?= $inp ?>" placeholder="напр. Парти за старт на кампанията">
       </div>
       <div>
         <label style="<?= $lbl ?>">Линк към Facebook събитие</label>

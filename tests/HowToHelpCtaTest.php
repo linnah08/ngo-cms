@@ -149,7 +149,7 @@ final class HowToHelpCtaTest extends TestCase
         $this->assertStringContainsString(
             'href="/campaign/"',
             $body,
-            'BG page should have campaign link for Lafetki way'
+            'BG page should have campaign link for the campaign'
         );
     }
 
@@ -206,7 +206,7 @@ final class HowToHelpCtaTest extends TestCase
         $this->assertStringContainsString(
             'href="/en/campaign/"',
             $body,
-            'EN page should have EN campaign link for Lafetki way'
+            'EN page should have EN campaign link for the campaign'
         );
     }
 }

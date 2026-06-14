@@ -332,7 +332,7 @@ final class OrderDbTest extends TestCase
             'payment_status' => 'paid',
             'items'          => json_encode([[
                 'type'          => 'ticket',
-                'name'          => 'Lafetki - Launch Party',
+                'name'          => 'Campaign Launch Party',
                 'ticket_code'   => 'TKT-20260508-ABCD1234',
                 'pledge_number' => 'CP-20260508-ABCD',
                 'amount_eur'    => 10.00,

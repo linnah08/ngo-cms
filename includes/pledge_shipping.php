@@ -329,7 +329,7 @@ function pledge_shipping_handle_post(PDO $pdo, array &$pledge): array
  * whose order has not yet been marked shipped. Two independent signals identify
  * a shippable pledge (either is enough):
  *   - reward_id is set (a physical reward tier was pledged), or
- *   - delivery_courier is set (delivery was arranged, e.g. lafetki donations
+ *   - delivery_courier is set (delivery was arranged, e.g. direct donations
  *     where the backer entered an address without picking a reward tier).
  *
  * Shipped state is read from the linked orders row's status — NOT the pledge's

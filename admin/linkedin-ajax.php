@@ -71,7 +71,7 @@ if ($action === 'generate') {
 
     if ($generate_type === 'post') {
         $article_url = rtrim(SITE_URL, '/') . '/en/news/' . rawurlencode($slug_en) . '/';
-        $prompt = "You write LinkedIn posts for Odd Minds Foundation (Фондация Различни Умове) — a Bulgarian NGO supporting children with developmental differences and children without parental care. Their social enterprise products include Lafetki (conversation-starter napkins) and Martenetsi (handmade decorations), packaged by young people from care homes.
+        $prompt = "You write LinkedIn posts for Odd Minds Foundation (Фондация Различни Умове) — a Bulgarian NGO supporting children with developmental differences and children without parental care.
 
 VOICE:
 - Warm, human, first-person plural — use \"we\", \"us\", \"our team\"
@@ -109,7 +109,7 @@ Content: {$content}
 
 Return only the post text. No explanations, no alternatives.";
     } else {
-        $prompt = "Write a LinkedIn post for Odd Minds Foundation, a Bulgarian NGO supporting children with developmental differences and children without parental care. The foundation also runs Lafetki, a social enterprise producing conversation-starter napkins packaged by youth from care.
+        $prompt = "Write a LinkedIn post for Odd Minds Foundation, a Bulgarian NGO supporting children with developmental differences and children without parental care.
 
 Voice: warm, honest, professional but not corporate. Real stories, real impact.
 
