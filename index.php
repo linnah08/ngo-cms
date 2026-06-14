@@ -68,6 +68,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 </section>
 
 <!-- IMPACT NUMBERS -->
+<?php if (!empty($impact) || admin_logged_in()): ?>
 <section class="section section--sm section--teal">
   <div class="container">
     <?php if (!empty($home['section_impact']) || !empty($home['section_impact_en']) || admin_logged_in()): ?>
@@ -112,6 +113,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     <?php endif; ?>
   </div>
 </section>
+<?php endif; ?>
 
 <?php
   $campaign_url  = setting_get('campaign_url');
@@ -169,6 +171,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 <?php endif; ?>
 
 <!-- WHO WE WORK WITH -->
+<?php if (!empty($centres) || admin_logged_in()): ?>
 <section class="section">
   <div class="container">
     <div class="section-header">
@@ -223,6 +226,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     <?php endif; ?>
   </div>
 </section>
+<?php endif; ?>
 
 <!-- MISSION -->
 <section class="section section--grey">
@@ -363,7 +367,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 <?php endif; ?>
 
 <!-- PARTNERS -->
-<?php if (!empty($partners)): ?>
+<?php if (!empty($partners) || admin_logged_in()): ?>
 <section class="section section--grey">
   <div class="container">
     <div class="section-header section-header--center">

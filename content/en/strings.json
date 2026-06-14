@@ -8,10 +8,8 @@
   "nav.shop": "Shop",
   "nav.toggle": "Menu",
   "nav.main": "Main navigation",
-
   "header.donate_iban": "Donations",
-
-  "footer.tagline": "Odd Minds Foundation exists to support children with disabilities and children without parental care to dream boldly, learn new skills, and grow in a better environment.",
+  "footer.tagline": "Your organisation's short tagline.",
   "footer.donate": "Bank account for donations",
   "footer.nav": "Navigation",
   "footer.help": "How to help",
@@ -22,14 +20,12 @@
   "footer.legal": "Legal Information",
   "footer.terms": "Terms of Use",
   "footer.cookies": "Cookie Policy",
-
   "cookies.banner.text": "We use cookies to keep the site working and (with your consent) for anonymous analytics.",
   "cookies.banner.learn_more": "Learn more",
   "cookies.banner.accept": "Accept all",
   "cookies.banner.decline": "Essential only",
-
-  "home.hero.title": "The world needs all kinds of minds",
-  "home.hero.text": "Odd Minds Foundation exists to support children with disabilities and children without parental care to dream boldly, learn new skills, and grow in a better environment.",
+  "home.hero.title": "Welcome",
+  "home.hero.text": "Add a short description of your organisation and mission here. Edit this text from the admin panel.",
   "home.hero.cta_primary": "How to help",
   "home.hero.cta_secondary": "Learn more",
   "home.centres.title": "Who we work with",
@@ -38,11 +34,9 @@
   "home.news.all": "All news",
   "home.partners.title": "Our partners",
   "home.mission.title": "Our mission",
-
   "news.read_more": "Read more",
   "news.published": "Published on",
   "news.by": "by",
-
   "contact.title": "Get in touch",
   "contact.name": "Full name",
   "contact.email": "Email",
@@ -50,9 +44,8 @@
   "contact.send": "Send",
   "contact.success": "Thank you! We will be in touch soon.",
   "contact.error": "There was an error. Please try again.",
-
   "newsletter.banner.title": "Stay in the loop",
-  "newsletter.banner.text": "Receive news and stories from Odd Minds Foundation directly to your inbox.",
+  "newsletter.banner.text": "Receive news and stories directly to your inbox.",
   "newsletter.banner.placeholder": "Your email address",
   "newsletter.banner.submit": "Subscribe",
   "newsletter.banner.success": "You're subscribed!"

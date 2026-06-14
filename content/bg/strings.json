@@ -8,10 +8,8 @@
   "nav.shop": "Магазин",
   "nav.toggle": "Меню",
   "nav.main": "Главна навигация",
-
   "header.donate_iban": "Дарения",
-
-  "footer.tagline": "Фондация Различни умове съществува, за да подкрепя деца с увреждания и деца, лишени от родителска грижа.",
+  "footer.tagline": "Кратко мото на вашата организация.",
   "footer.donate": "Банкова сметка за дарения",
   "footer.nav": "Навигация",
   "footer.help": "Как да помогнете",
@@ -22,14 +20,12 @@
   "footer.legal": "Правна информация",
   "footer.terms": "Условия за ползване",
   "footer.cookies": "Политика за бисквитки",
-
   "cookies.banner.text": "Използваме бисквитки за работата на сайта и (с ваше съгласие) за анонимна статистика.",
   "cookies.banner.learn_more": "Научи повече",
   "cookies.banner.accept": "Приемам всички",
   "cookies.banner.decline": "Само необходими",
-
-  "home.hero.title": "Светът има нужда от всякакви умове",
-  "home.hero.text": "Фондация Различни умове съществува, за да подкрепя деца с увреждания и деца, лишени от родителска грижа да мечтаят смело, да учат нови умения и да растат в по-добра среда.",
+  "home.hero.title": "Добре дошли",
+  "home.hero.text": "Добавете кратко описание на вашата организация и мисия тук. Редактирайте този текст от админ панела.",
   "home.hero.cta_primary": "Как да помогна",
   "home.hero.cta_secondary": "Научи повече",
   "home.centres.title": "С кого работим",
@@ -38,11 +34,9 @@
   "home.news.all": "Всички новини",
   "home.partners.title": "Нашите партньори",
   "home.mission.title": "Нашата мисия",
-
   "news.read_more": "Прочети повече",
   "news.published": "Публикувано на",
   "news.by": "от",
-
   "contact.title": "Свържете се с нас",
   "contact.name": "Имена",
   "contact.email": "Имейл",
@@ -50,9 +44,8 @@
   "contact.send": "Изпрати",
   "contact.success": "Благодарим! Ще се свържем с вас скоро.",
   "contact.error": "Грешка при изпращане. Моля опитайте отново.",
-
   "newsletter.banner.title": "Бъдете в течение",
-  "newsletter.banner.text": "Получавайте новини и истории от Фондация Различни умове директно в пощата си.",
+  "newsletter.banner.text": "Получавайте новини и истории директно в пощата си.",
   "newsletter.banner.placeholder": "Вашият имейл адрес",
   "newsletter.banner.submit": "Запишете се",
   "newsletter.banner.success": "Записахте се успешно!"
