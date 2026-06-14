@@ -22,14 +22,30 @@ Minds values as a **worked example**; you replace them with your own.
 - **Bilingual** BG/EN throughout, with optional DeepL-assisted translation
 - **Bulgaria-specific integrations** (optional): Econt / Speedy / BoxNow couriers, DSK Bank vPOS card payments, ЕИК/Булстат company invoicing, and dual BGN/EUR pricing during euro adoption
 
-## Prerequisites
+## Quick install (cPanel — no coding)
+
+For a non-technical setup on shared cPanel hosting:
+
+1. **Download** the latest `ngo-platform-*.zip` from the
+   [Releases](../../releases) page (it already includes all dependencies).
+2. In cPanel open **File Manager**, go to your domain's folder (e.g.
+   `public_html`), click **Upload**, choose the ZIP, then **Extract** it there.
+3. **Open your website** in a browser. The setup wizard launches automatically.
+4. Pick **“Create a new database”**, fill in your organisation's name, contact
+   details and an admin login, and click **Install**.
+5. When it finishes, delete the `install/` folder (File Manager → select →
+   Delete). Log in at `your-site.org/admin/`.
+
+That's it — no git, composer, SSH or database setup required.
+
+## Prerequisites (manual / developer install)
 
 - PHP 8.4+ with extensions: `pdo_mysql`, `mbstring`, `openssl`, `curl`, `json`
 - MySQL 8.0+
 - Composer
 - A web server with URL rewriting (Apache `mod_rewrite`, or Nginx)
 
-## Setup
+## Manual setup
 
 ### 1. Clone and install dependencies
 

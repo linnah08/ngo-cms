@@ -1,0 +1,52 @@
+name: Build release ZIP
+
+# Builds a ready-to-upload package (application + vendor/) so non-technical
+# users can install without git or composer: download the ZIP, upload it to
+# their hosting's File Manager, extract, and open the site to run the wizard.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+
+      - name: Install production dependencies
+        run: composer install --no-dev --optimize-autoloader --no-interaction
+
+      - name: Build ZIP
+        run: |
+          ZIP="ngo-platform-${GITHUB_REF_NAME:-manual}.zip"
+          zip -rq "$ZIP" . \
+            -x ".git/*" ".github/*" "tests/*" "node_modules/*" \
+               "*.zip" ".phpunit*" "phpunit.xml" "playwright.config.js" \
+               "package.json" "package-lock.json" ".githooks/*" "deploy.php"
+          echo "ZIP=$ZIP" >> "$GITHUB_ENV"
+
+      - name: Attach to the release (tag builds)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" "${ZIP}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes "Ready-to-upload package. Unzip into your domain folder and open the site to run the installer." \
+          || gh release upload "${GITHUB_REF_NAME}" "${ZIP}" --clobber
+
+      - name: Upload as build artifact (manual runs)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ngo-platform
+          path: ${{ env.ZIP }}

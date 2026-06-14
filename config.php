@@ -84,33 +84,31 @@ if (file_exists(__DIR__ . '/site.config.php')) {
     require_once __DIR__ . '/site.config.example.php';
 }
 
+// First-run: until the site has been configured (no site.config.php yet), send
+// every web visitor to the install wizard so a fresh upload is "next-next-finish".
+if (PHP_SAPI !== 'cli'
+    && !file_exists(__DIR__ . '/site.config.php')
+    && is_file(__DIR__ . '/install/index.php')
+    && strncmp($_SERVER['REQUEST_URI'] ?? '', '/install', 8) !== 0) {
+    header('Location: /install/');
+    exit;
+}
+
 // Derived display logic (not configuration).
 define('SHOW_DUAL_CURRENCY', date('Y-m-d') < DUAL_CURRENCY_UNTIL);
 
 // Start session early — must happen before any output so the cookie can be set.
 // CSRF and cart both depend on $_SESSION being available before HTML is rendered.
-// Set the cookie domain to the parent domain (e.g. .example.org) so that any
-// subdomains can share the same session — required if you run a subdomain that
-// posts forms back to the main site (e.g. sub.example.org → /campaign/checkout.php).
+// A host-only session cookie is used (no parent-domain override), so the site
+// works on any hostname — including multi-label hosts that sit under a public
+// suffix (e.g. *.cpanel.site, *.github.io), where a parent-domain cookie would
+// be rejected by the browser and silently break login.
 if (session_status() === PHP_SESSION_NONE) {
-    // Use a custom cookie name (not the default PHPSESSID). When the session
-    // cookie switches from host-only to a parent domain (for subdomain sharing),
-    // browsers that cached a host-only PHPSESSID can end up holding TWO cookies
-    // of the same name; the stale host-only one takes precedence and silently
-    // breaks login. A fresh name sidesteps the collision entirely — old PHPSESSID
-    // cookies are ignored and the new name only ever exists with the parent domain.
+    // Custom cookie name (not the default PHPSESSID) to avoid collisions with a
+    // stale PHPSESSID a browser may have cached from another app on the host.
     session_name('OMSESSID');
-    if (str_starts_with(SITE_URL, 'https')) {
-        // Production (HTTPS): set .domain so subdomains share the session;
-        // leave cookie_secure=1 as set by .user.ini.
-        $__host  = $_SERVER['HTTP_HOST'] ?? parse_url(SITE_URL, PHP_URL_HOST) ?? '';
-        $__parts = explode('.', $__host);
-        if (count($__parts) >= 2) {
-            ini_set('session.cookie_domain', '.' . implode('.', array_slice($__parts, -2)));
-        }
-    } else {
-        // Local dev (HTTP): no domain override — host-only cookie works in all
-        // browsers without .test TLD quirks; disable Secure flag from .user.ini.
+    if (!str_starts_with(SITE_URL, 'https')) {
+        // Local/HTTP: disable the Secure flag set by .user.ini.
         ini_set('session.cookie_secure', '0');
     }
     session_start();
@@ -132,11 +130,7 @@ function _admin_bar_secret(): string {
 }
 
 function _admin_bar_domain(): string {
-    $host = parse_url(SITE_URL, PHP_URL_HOST) ?: '';
-    $parts = explode('.', $host);
-    if (count($parts) >= 2 && $host !== 'localhost') {
-        return '.' . implode('.', array_slice($parts, -2));
-    }
+    // Host-only cookie — the admin bar is only rendered on the main site.
     return '';
 }
 
