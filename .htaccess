@@ -30,6 +30,13 @@ ErrorDocument 503 /errors/503.php
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
+  # Block access to the git repo, config files and other sensitive paths.
+  # (The git-clone deploy method leaves a .git/ directory in the web root.)
+  RewriteRule (^|/)\.git(/|$)        - [F,L]
+  RewriteRule \.(config\.php|log|sql|lock|example|yml|md)$ - [F,L]
+  # (deploy.php must stay reachable — it is the GitHub webhook receiver.)
+  RewriteRule (^|/)(migrate|install)\.php$ - [F,L]
+
   # Force HTTPS
   RewriteCond %{HTTPS} off
   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
