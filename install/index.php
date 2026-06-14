@@ -20,22 +20,34 @@ $already = is_file($ROOT . '/site.config.php') && is_file($ROOT . '/db.config.ph
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function e(string $s): string { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
 
-function shell_enabled(): bool {
-    if (!function_exists('shell_exec')) return false;
+function proc_enabled(): bool {
+    if (!function_exists('proc_open')) return false;
     $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
-    return !in_array('shell_exec', $disabled, true);
+    return !in_array('proc_open', $disabled, true);
+}
+
+/** Run a command (argv array — no shell) and return its stdout. */
+function run_argv(array $argv): string {
+    $desc = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+    $proc = @proc_open($argv, $desc, $pipes);
+    if (!is_resource($proc)) return '';
+    $out = stream_get_contents($pipes[1]);
+    fclose($pipes[1]); fclose($pipes[2]);
+    proc_close($proc);
+    return (string) $out;
 }
 
 /** Is this a cPanel account where we can auto-create a database? */
 function cpanel_available(): bool {
-    return shell_enabled() && is_executable('/usr/bin/uapi');
+    // shell_exec/exec are often disabled on cPanel; proc_open usually is not.
+    return proc_enabled() && is_executable('/usr/bin/uapi');
 }
 
 /** Call cPanel UAPI, return decoded ['ok'=>bool,'errors'=>[],'data'=>...]. */
 function uapi(string $module, string $func, array $args): array {
-    $cmd = '/usr/bin/uapi --output=json ' . escapeshellarg($module) . ' ' . escapeshellarg($func);
-    foreach ($args as $k => $v) $cmd .= ' ' . escapeshellarg($k . '=' . $v);
-    $raw  = (string) shell_exec($cmd . ' 2>&1');
+    $argv = ['/usr/bin/uapi', '--output=json', $module, $func];
+    foreach ($args as $k => $v) $argv[] = $k . '=' . $v;
+    $raw  = run_argv($argv);
     $json = json_decode($raw, true);
     $res  = $json['result'] ?? null;
     if (!is_array($res)) return ['ok' => false, 'errors' => ['Unexpected response: ' . substr($raw, 0, 300)], 'data' => null];
