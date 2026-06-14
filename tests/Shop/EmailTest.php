@@ -129,7 +129,7 @@ final class EmailTest extends TestCase
     {
         $html = render_email('order-notification-admin', [
             'order'     => self::$mockOrder,
-            'admin_url' => 'https://new.oddminds.org/admin/order-view.php?id=1',
+            'admin_url' => 'https://example.org/admin/order-view.php?id=1',
         ]);
         $this->assertStringContainsString('test@example.com', $html);
     }
@@ -138,9 +138,9 @@ final class EmailTest extends TestCase
     {
         $html = render_email('order-notification-admin', [
             'order'     => self::$mockOrder,
-            'admin_url' => 'https://new.oddminds.org/admin/order-view.php?id=1',
+            'admin_url' => 'https://example.org/admin/order-view.php?id=1',
         ]);
-        $this->assertStringContainsString('https://new.oddminds.org/admin/order-view.php?id=1', $html);
+        $this->assertStringContainsString('https://example.org/admin/order-view.php?id=1', $html);
     }
 
     public function testAdminNotificationContainsTotal(): void

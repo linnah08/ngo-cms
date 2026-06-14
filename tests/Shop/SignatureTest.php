@@ -43,32 +43,31 @@ final class SignatureTest extends TestCase
 
     public function testAdminCanSignReturnsFalseForNonFoundationEmail(): void
     {
-        // Explicitly verify that a different personal email cannot sign,
+        // Explicitly verify that a different email cannot sign,
         // even if the account has admin role.
         $_SESSION[ADMIN_SESSION_NAME] = [
             'id'    => 2,
-            'name'  => 'Detelina',
-            'email' => 'linamilcheva@gmail.com',
+            'name'  => 'Other Admin',
+            'email' => 'other-admin@example.com',
             'role'  => 'admin',
             'time'  => time(),
         ];
         $this->assertFalse(admin_can_sign());
-        $this->assertNotEquals('linamilcheva@gmail.com', SIGNING_ADMIN_EMAIL,
-            'Signing must use the foundation email, not a personal account.');
+        $this->assertNotEquals('other-admin@example.com', SIGNING_ADMIN_EMAIL,
+            'Signing must use the configured signing account, not an arbitrary one.');
     }
 
-    public function testSigningEmailIsFoundationDomain(): void
+    public function testSigningEmailIsConfigured(): void
     {
-        $this->assertStringEndsWith('@oddminds.org', SIGNING_ADMIN_EMAIL,
-            'SIGNING_ADMIN_EMAIL must be an @oddminds.org address.');
-        $this->assertEquals('detelina@oddminds.org', SIGNING_ADMIN_EMAIL);
+        $this->assertNotFalse(filter_var(SIGNING_ADMIN_EMAIL, FILTER_VALIDATE_EMAIL),
+            'SIGNING_ADMIN_EMAIL must be a valid email address.');
     }
 
     public function testAdminCanSignReturnsTrueForSigningEmail(): void
     {
         $_SESSION[ADMIN_SESSION_NAME] = [
             'id'    => 1,
-            'name'  => 'Detelina',
+            'name'  => 'Signing Admin',
             'email' => SIGNING_ADMIN_EMAIL,
             'role'  => 'admin',
             'time'  => time(),
@@ -80,7 +79,7 @@ final class SignatureTest extends TestCase
     {
         $_SESSION[ADMIN_SESSION_NAME] = [
             'id'    => 1,
-            'name'  => 'Detelina',
+            'name'  => 'Signing Admin',
             'email' => SIGNING_ADMIN_EMAIL,
             'role'  => 'admin',
             'time'  => time() - (ADMIN_SESSION_HOURS * 3600 + 1),

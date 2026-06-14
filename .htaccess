@@ -11,13 +11,13 @@ ErrorDocument 503 /errors/503.php
   php_flag  log_errors on
   php_flag  display_errors off
   php_value error_reporting 32767
-  php_value error_log /home/detelinavasileva/public_html/oddminds.org/php_errors.log
+  php_value error_log logs/php_errors.log
 </IfModule>
 <IfModule mod_php8.c>
   php_flag  log_errors on
   php_flag  display_errors off
   php_value error_reporting 32767
-  php_value error_log /home/detelinavasileva/public_html/oddminds.org/php_errors.log
+  php_value error_log logs/php_errors.log
 </IfModule>
 
 # Raise upload limits for product images

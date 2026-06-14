@@ -101,11 +101,17 @@ Most day-to-day content is editable in the browser:
 
 What still lives in code (edit as needed for your organisation):
 
-- **Donation recipients** — the donation flow currently offers two fixed recipients
-  (the foundation and a partner centre) with certificate purpose text in
-  `includes/documents/DocumentGenerator.php` and `DonationCertGenerator.php`.
-  Adjust these for your own funds/programmes.
-- **Legal pages** — privacy policy, terms, cookie policy under their slug folders.
+- **Legal / invoice identity** — your organisation's legal name, address,
+  company number, bank details and representative used on generated PDFs are in
+  `includes/documents/DocumentGenerator.php` (the `ORG_DETAILS` block). The
+  shipped values are the Odd Minds example — replace them with your entity's.
+- **Donation recipients** — the donation flow offers two fixed recipients (the
+  organisation and a partner centre) with certificate purpose text in
+  `DocumentGenerator.php` / `DonationCertGenerator.php`. Adjust these for your
+  own funds/programmes.
+- **Legal pages** — the impressum, privacy policy, terms and cookie policy
+  (under their slug folders) are inline-editable in the browser; rewrite them
+  for your organisation.
 
 ## Bulgaria-specific notes
 

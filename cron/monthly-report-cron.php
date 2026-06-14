@@ -65,7 +65,7 @@ $attachments = array_merge(
 );
 
 $ok = send_mail(
-    'detelina@oddminds.org',
+    defined('REPORT_EMAIL') ? REPORT_EMAIL : SITE_EMAIL,
     $subject,
     $body,
     '',
