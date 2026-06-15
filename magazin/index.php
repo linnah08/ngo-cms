@@ -615,8 +615,8 @@ renderGallery(<?= (int)$prod_variants[0]['id'] ?>);
 $page_title      = $lang === 'bg' ? 'Магазин' : 'Shop';
 $page_head_extra = '<style>@media(max-width:640px){.product-detail-grid{grid-template-columns:1fr!important;gap:1.5rem!important;}.company-fields-grid{grid-template-columns:1fr!important;}}</style>';
 $page_description = $lang === 'bg'
-    ? 'Подкрепете Фондация Различни умове с покупка от нашия магазин.'
-    : 'Support Odd Minds Foundation with a purchase from our shop.';
+    ? 'Подкрепете ' . SITE_NAME_BG . ' с покупка от нашия магазин.'
+    : 'Support ' . SITE_NAME_EN . ' with a purchase from our shop.';
 
 $pages = load_json(CONTENT_PATH . '/pages.json');
 $donation_text = $lang === 'bg'

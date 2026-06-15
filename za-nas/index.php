@@ -3,7 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 $pages = load_json(CONTENT_PATH . '/pages.json');
 $about = $pages['about'] ?? [];
 $page_title = $about['title'] ?? 'Кои сме ние?';
-$page_description = 'Научете повече за Фондация Различни умове, нашия екип и нашата история.';
+$page_description = 'Научете повече за ' . SITE_NAME_BG . ', нашия екип и нашата история.';
 $page_head_extra = '<style>@media(max-width:640px){.who-are-we--list-wrapper>div{grid-template-columns:1fr!important;gap:1.5rem!important;}.who-are-we--list-item--thumbnail-wrapper{max-width:160px;}}</style>';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 

@@ -1,7 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 $page_title       = 'Cookie Policy';
-$page_description = 'Information about cookies used by the Odd Minds Foundation website.';
+$page_description = 'Information about cookies used by the ' . SITE_NAME_EN . ' website.';
 $pages   = load_json(CONTENT_PATH . '/pages.json');
 $content = $pages['legal']['cookie_policy_en'] ?? '';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';

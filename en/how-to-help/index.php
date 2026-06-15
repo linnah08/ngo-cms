@@ -4,7 +4,7 @@ $pages            = load_json(CONTENT_PATH . '/pages.json');
 $how              = $pages['how_to_help'] ?? [];
 $ways             = $how['ways'] ?? [];
 $page_title       = 'How to Help';
-$page_description = 'Find out how you can support Odd Minds Foundation.';
+$page_description = 'Find out how you can support ' . SITE_NAME_EN . '.';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
 

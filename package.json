@@ -1,5 +1,5 @@
 {
-  "name": "oddminds",
+  "name": "ngo-cms",
   "version": "1.0.0",
   "description": "Open-source NGO website, shop and donations platform. No framework — vanilla PHP 8.4, MySQL, flat-file JSON content.",
   "main": "index.js",

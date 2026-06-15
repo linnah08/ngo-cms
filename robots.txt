@@ -5,4 +5,4 @@ Disallow: /checkout/
 Disallow: /api/
 Disallow: /content/
 
-Sitemap: https://oddminds.org/sitemap.xml
+Sitemap: /sitemap.xml

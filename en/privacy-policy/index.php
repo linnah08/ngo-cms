@@ -1,7 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 $page_title       = 'Privacy Policy';
-$page_description = 'Privacy policy of Odd Minds Foundation.';
+$page_description = 'Privacy policy of ' . SITE_NAME_EN . '.';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
 
@@ -17,14 +17,14 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
   <div class="container container--narrow">
 
     <h2>1. Introduction</h2>
-    <p>Odd Minds Foundation ("Foundation", "we", "us") is committed to protecting the personal data of our donors, volunteers, partners and website visitors. This privacy policy describes how we collect, use, store and protect your personal information in accordance with Regulation (EU) 2016/679 (GDPR) and the Personal Data Protection Act of the Republic of Bulgaria.</p>
+    <p><?= h(SITE_NAME_EN) ?> ("Foundation", "we", "us") is committed to protecting the personal data of our donors, volunteers, partners and website visitors. This privacy policy describes how we collect, use, store and protect your personal information in accordance with Regulation (EU) 2016/679 (GDPR) and the Personal Data Protection Act of the Republic of Bulgaria.</p>
 
     <h2>2. Data Controller</h2>
     <p>
-      Odd Minds Foundation<br>
+      <?= h(SITE_NAME_EN) ?><br>
       Address: ul. Varovita 12, Lozen<br>
       Phone: 0896670346<br>
-      Email: <a href="mailto:info@oddminds.org">info@oddminds.org</a><br>
+      Email: <a href="mailto:<?= h(SITE_EMAIL) ?>"><?= h(SITE_EMAIL) ?></a><br>
       UIC: 208453360
     </p>
 
@@ -52,7 +52,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     </ul>
 
     <h2>8. Your rights</h2>
-    <p>Right of access, rectification, erasure, restriction, portability, objection, withdrawal of consent. To exercise your rights: <a href="mailto:info@oddminds.org">info@oddminds.org</a></p>
+    <p>Right of access, rectification, erasure, restriction, portability, objection, withdrawal of consent. To exercise your rights: <a href="mailto:<?= h(SITE_EMAIL) ?>"><?= h(SITE_EMAIL) ?></a></p>
 
     <h2>9. Data security</h2>
     <p>We apply encryption of sensitive data, restricted access, regular backups and secure servers.</p>
@@ -65,7 +65,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
     <h2>12. Contact and complaints</h2>
     <p>
-      Email: <a href="mailto:info@oddminds.org">info@oddminds.org</a><br>
+      Email: <a href="mailto:<?= h(SITE_EMAIL) ?>"><?= h(SITE_EMAIL) ?></a><br>
       Phone: 0896670346
     </p>
     <p>

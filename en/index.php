@@ -3,7 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 $lang             = 'en';
 $page_title       = 'Home';
-$page_description = 'Odd Minds Foundation exists to support children with disabilities and children without parental care.';
+$page_description = SITE_NAME_EN;
 
 $partners = get_partners();
 $centres  = get_centres();
@@ -19,7 +19,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 <section class="hero">
   <div class="container">
     <div class="hero__text">
-      <span class="section-label">Odd Minds Foundation</span>
+      <span class="section-label"><?= h(SITE_NAME_EN) ?></span>
       <h1><?= h($home['hero_title_en'] ?? t('home.hero.title')) ?></h1>
       <p><?= h($home['hero_text_en'] ?? t('home.hero.text')) ?></p>
       <div class="btn-group">
@@ -29,7 +29,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     </div>
     <div class="hero__image">
       <img src="/assets/images/hero.webp"
-           alt="Children from Odd Minds Foundation"
+           alt="<?= h(SITE_NAME_EN) ?>"
            width="560" height="420">
     </div>
   </div>

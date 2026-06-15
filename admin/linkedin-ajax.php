@@ -71,7 +71,7 @@ if ($action === 'generate') {
 
     if ($generate_type === 'post') {
         $article_url = rtrim(SITE_URL, '/') . '/en/news/' . rawurlencode($slug_en) . '/';
-        $prompt = "You write LinkedIn posts for Odd Minds Foundation (Фондация Различни Умове) — a Bulgarian NGO supporting children with developmental differences and children without parental care.
+        $prompt = "You write LinkedIn posts for a Bulgarian non-profit organisation.
 
 VOICE:
 - Warm, human, first-person plural — use \"we\", \"us\", \"our team\"
@@ -109,7 +109,7 @@ Content: {$content}
 
 Return only the post text. No explanations, no alternatives.";
     } else {
-        $prompt = "Write a LinkedIn post for Odd Minds Foundation, a Bulgarian NGO supporting children with developmental differences and children without parental care.
+        $prompt = "Write a LinkedIn post for a Bulgarian non-profit organisation.
 
 Voice: warm, honest, professional but not corporate. Real stories, real impact.
 

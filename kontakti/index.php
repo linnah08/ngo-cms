@@ -5,7 +5,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 
 $page_title       = 'Контакти';
-$page_description = 'Свържете се с Фондация Различни умове.';
+$page_description = 'Свържете се с ' . SITE_NAME_BG . '.';
 $page_head_extra  = '<style>@media(max-width:640px){.contact-us-form-wrapper{grid-template-columns:1fr!important;gap:2rem!important;}}</style>';
 
 $sent  = false;

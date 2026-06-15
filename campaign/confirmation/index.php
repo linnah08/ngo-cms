@@ -15,7 +15,7 @@ if (preg_match('/^CP-\d{8}-[A-F0-9]{4}$/i', $pledge_number)) {
 }
 
 $show_bgn = date('Y-m') < '2026-06';
-$page_title = 'Благодарим ти! — Фондация Различни умове';
+$page_title = 'Благодарим ти! — ' . SITE_NAME_BG;
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
 

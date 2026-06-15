@@ -67,7 +67,7 @@ if ($action === 'generate') {
 
     if ($generate_type === 'post') {
         $article_url = rtrim(SITE_URL, '/') . '/novini/' . rawurlencode($slug) . '/';
-        $prompt = "You write Facebook posts for Фондация Различни умове (Odd Minds Foundation) — a Bulgarian NGO supporting children with developmental differences and ones growing up without parental care.
+        $prompt = "You write Facebook posts for a Bulgarian non-profit organisation.
 
 VOICE: Warm, honest, occasionally dry/funny. Team voice (\"ние\"), never corporate. Story-first. Emotion through specific detail, not adjectives.
 
@@ -96,7 +96,7 @@ Content: {$content}
 
 Return only the post text. No explanations, no alternatives.";
     } else {
-        $prompt = "Напиши публикация за Facebook и Instagram за Фондация Различни Умове - българска НПО, която подкрепя деца с различия в развитието и деца, лишени от родителска грижа.
+        $prompt = "Напиши публикация за Facebook и Instagram за българска НПО.
 
 Тон: топъл, честен, близък. Не корпоративен. Истински истории, реален ефект. Подходящ за широката аудитория.
 
@@ -109,7 +109,7 @@ Return only the post text. No explanations, no alternatives.";
 - Започни с нещо, което привлича внимание — въпрос, факт или момент
 - Топло и автентично, подходящо за родители, доброволци, дарители
 - Завърши с призив за действие или размисъл
-- 3–5 хаштага на Bulgarian (напр. #РазличниУмове #НПО #Дарение)
+- 3–5 хаштага на Bulgarian (напр. #НПО #Дарение)
 - Обикновен текст, без markdown форматиране
 
 Върни само текста на публикацията, нищо друго.";

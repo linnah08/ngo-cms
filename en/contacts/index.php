@@ -5,7 +5,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 
 $page_title       = 'Contacts';
-$page_description = 'Get in touch with Odd Minds Foundation.';
+$page_description = 'Get in touch with ' . SITE_NAME_EN . '.';
 
 $sent  = false;
 $error = '';

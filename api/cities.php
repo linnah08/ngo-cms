@@ -27,7 +27,7 @@ if ($q !== '' && $courier === 'speedy') {
 // For Speedy: use the live API city list (all Bulgarian sites, including villages).
 // Cached for 24 hours so we don't hit the Speedy API on every page load.
 if ($courier === 'speedy') {
-    $cache_file = sys_get_temp_dir() . '/oddminds_speedy_cities.json';
+    $cache_file = sys_get_temp_dir() . '/ngo_speedy_cities.json';
     $cache_ttl  = 86400; // 24 hours
 
     if (file_exists($cache_file) && (time() - filemtime($cache_file)) < $cache_ttl) {

@@ -3,7 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 $pages            = load_json(CONTENT_PATH . '/pages.json');
 $about            = $pages['about'] ?? [];
 $page_title       = 'About Us';
-$page_description = 'Learn more about Odd Minds Foundation, our team and our story.';
+$page_description = 'Learn more about ' . SITE_NAME_EN . ', our team and our story.';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
 $intro = $about['intro_en'] ?? $about['intro'] ?? '';

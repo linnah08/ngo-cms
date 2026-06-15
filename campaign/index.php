@@ -99,7 +99,7 @@ function fmt_campaign_amount(float $eur, bool $show_bgn): string {
     return $eur_str;
 }
 
-$page_title = h($title) . ' — Фондация Различни умове';
+$page_title = h($title) . ' — ' . SITE_NAME_BG;
 $page_head_extra = '';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>

@@ -131,7 +131,7 @@ if ($slug) {
 
 // ── LISTING ───────────────────────────────────────────────────────────────────
 $page_title       = 'News';
-$page_description = 'Latest news from Odd Minds Foundation.';
+$page_description = 'Latest news from ' . SITE_NAME_EN . '.';
 $articles = get_articles('en') ?: get_articles('bg');
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>

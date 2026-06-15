@@ -89,7 +89,7 @@ function newsletter_format_articles(array $articles, string $lang): string
 {
     $articles   = array_slice($articles, 0, 3);
     $read_more  = $lang === 'bg' ? 'Прочети повече →' : 'Read more →';
-    $base       = defined('SITE_URL') ? SITE_URL : 'https://oddminds.org';
+    $base       = defined('SITE_URL') ? SITE_URL : 'https://example.org';
     $url_prefix = $lang === 'bg' ? $base . '/novini/' : $base . '/en/news/';
 
     $html = '';

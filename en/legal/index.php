@@ -1,7 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 $page_title       = 'Legal Information';
-$page_description = 'Legal information of Odd Minds Foundation.';
+$page_description = 'Legal information of ' . SITE_NAME_EN . '.';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
 
@@ -18,16 +18,16 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
     <h2>1. Publisher information</h2>
     <p>
-      Odd Minds Foundation, UIC: 208453360<br>
+      <?= h(SITE_NAME_EN) ?><br>
       Address: ul. Varovita 12, Lozen<br>
       Phone: +359896670346<br>
-      Email: <a href="mailto:info@oddminds.org">info@oddminds.org</a><br>
+      Email: <a href="mailto:<?= h(SITE_EMAIL) ?>"><?= h(SITE_EMAIL) ?></a><br>
       Representative: Detelina Boyanova Vasileva, Director<br>
       IBAN: BG40STSA93000032062526, BIC: STSABGSF, Bank: DSK
     </p>
 
     <h2>2. Purpose and activities</h2>
-    <p>Odd Minds Foundation is a non-profit legal entity operating in the public interest in accordance with the Non-Profit Legal Entities Act of the Republic of Bulgaria.</p>
+    <p><?= h(SITE_NAME_EN) ?> is a non-profit legal entity operating in the public interest in accordance with the Non-Profit Legal Entities Act of the Republic of Bulgaria.</p>
 
     <h2>3. Copyright</h2>
     <p>All content is the property of the Foundation. Personal non-commercial use is permitted with retention of copyright notices. Copying for commercial purposes without written permission is prohibited.</p>
@@ -55,7 +55,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
     <h2>11. Contacts</h2>
     <p>
-      Email: <a href="mailto:info@oddminds.org">info@oddminds.org</a><br>
+      Email: <a href="mailto:<?= h(SITE_EMAIL) ?>"><?= h(SITE_EMAIL) ?></a><br>
       Phone: +359896670346
     </p>
 

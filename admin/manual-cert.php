@@ -317,7 +317,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
           <?php
           $rec = $_POST['recipient'] ?? 'foundation';
           $purposes = [
-              'foundation' => 'За дейността и програмите на Фондация Различни Умове',
+              'foundation' => 'За дейността и програмите на ' . SITE_NAME_BG . ',',
               'iris'       => 'За биофийдбек, невробийдбек и сензорни терапии — ЦСРИ Ирис',
           ];
           foreach ($purposes as $val => $label): ?>

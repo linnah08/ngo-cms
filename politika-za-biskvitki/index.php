@@ -1,7 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 $page_title       = 'Политика за бисквитки';
-$page_description = 'Информация за бисквитките, използвани от уебсайта на Фондация Различни умове.';
+$page_description = 'Информация за бисквитките, използвани от уебсайта на ' . SITE_NAME_BG . '.';
 $pages   = load_json(CONTENT_PATH . '/pages.json');
 $content = $pages['legal']['cookie_policy_bg'] ?? '';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';

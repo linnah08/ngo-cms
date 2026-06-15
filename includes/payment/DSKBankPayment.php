@@ -82,7 +82,7 @@ class DSKBankPayment
             'currency'    => '978',                           // EUR numeric code
             'orderNumber' => $orderNumber,
             'returnUrl'   => $returnUrl,
-            'jsonParams'  => json_encode(['CMS' => 'oddminds-custom-php']),
+            'jsonParams'  => json_encode(['CMS' => 'ngo-cms']),
         ]);
 
         $code = (string)($data['errorCode'] ?? '');

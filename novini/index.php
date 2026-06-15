@@ -159,7 +159,7 @@ if ($slug) {
 
 // ── LISTING ───────────────────────────────────────────────────────────────────
 $page_title       = 'Новини';
-$page_description = 'Последни новини от Фондация Различни умове.';
+$page_description = 'Последни новини от ' . SITE_NAME_BG . '.';
 $articles = get_articles('bg');
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>

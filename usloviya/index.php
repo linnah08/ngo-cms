@@ -1,7 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 $page_title       = 'Условия за ползване';
-$page_description = 'Условия за ползване на онлайн магазина на Фондация Различни умове.';
+$page_description = 'Условия за ползване на онлайн магазина на ' . SITE_NAME_BG . '.';
 $pages   = load_json(CONTENT_PATH . '/pages.json');
 $content = $pages['legal']['terms'] ?? '';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';

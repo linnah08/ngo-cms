@@ -57,7 +57,7 @@ $body    = "<p>Здравей,</p>
 <li>Дарителски удостоверения: <strong>{$cert_count}</strong></li>
 <li>Фактури: <strong>{$invoice_count}</strong></li>
 </ul>
-<p>Поздрави,<br>Фондация Различни умове</p>";
+<p>Поздрави,<br>" . SITE_NAME_BG . "</p>";
 
 $attachments = array_merge(
     [['path' => $tmp, 'name' => $filename]],

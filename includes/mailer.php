@@ -9,7 +9,7 @@ require_once $_mailer_root . '/includes/email-templates.php';
 
 function email_wrap(string $content): string {
     $logo = (defined('SITE_URL') ? SITE_URL : '') . '/assets/images/logo.png';
-    $name = defined('SITE_NAME_BG') ? SITE_NAME_BG : 'Odd Minds Foundation';
+    $name = defined('SITE_NAME_BG') ? SITE_NAME_BG : 'Your Organisation';
     $email = defined('SITE_EMAIL') ? SITE_EMAIL : '';
     return <<<HTML
 <!DOCTYPE html>

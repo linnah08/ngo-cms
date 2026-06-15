@@ -9,7 +9,7 @@ if (preg_match('/^CP-\d{8}-[A-F0-9]{4}$/i', $pledge_number)) {
     $retry_url = '/api/campaign-payment-return.php?pledge=' . urlencode($pledge_number) . '&retry=1';
 }
 
-$page_title = 'Плащането не беше успешно — Фондация Различни умове';
+$page_title = 'Плащането не беше успешно — ' . SITE_NAME_BG;
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
 

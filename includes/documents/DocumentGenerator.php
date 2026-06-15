@@ -5,18 +5,22 @@ abstract class DocumentGenerator {
 
     const EUR_TO_BGN = 1.95583;
 
+    // Issuer details printed on documents. Identity/bank fields come from
+    // site.config (set by the wizard); the legal-registry fields (address, MOL,
+    // EIK, registration note) are filled from ORG_* constants when present —
+    // see org() below. TODO: add these to the install wizard for tax-correct docs.
     const FOUNDATION = [
-        'name'         => 'ФОНДАЦИЯ РАЗЛИЧНИ УМОВЕ',
-        'address'      => 'ул. Варовита 12, с. Лозен',
-        'mol'          => 'Детелина Боянова Василева',
-        'eik'          => '208453360',
-        'bank'         => 'БАНКА ДСК ЕАД',
-        'bic'          => 'STSABGSF',
-        'iban'         => 'BG40STSA93000032062526',
-        'phone'        => '0896670346',
-        'email'        => 'info@oddminds.org',
-        'website'      => 'oddminds.org',
-        'registration' => 'Регистрирана в обществена полза в Централния регистър на ЮЛНЦ към Министерство на правосъдието',
+        'name'         => SITE_NAME_BG,
+        'bank'         => SITE_BANK_NAME,
+        'bic'          => SITE_BIC,
+        'iban'         => SITE_IBAN,
+        'phone'        => SITE_PHONE,
+        'email'        => SITE_EMAIL,
+        'website'      => SITE_URL,
+        'address'      => '',
+        'mol'          => '',
+        'eik'          => '',
+        'registration' => '',
     ];
 
     const COLORS = [

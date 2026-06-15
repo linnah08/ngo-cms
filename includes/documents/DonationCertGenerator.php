@@ -19,8 +19,8 @@ class DonationCertGenerator extends DocumentGenerator {
                 ? 'Reg. in the Central Register of Non-Profit Legal Entities in the public benefit, Ministry of Justice of Bulgaria'
                 : 'Регистрирана в обществена полза в Централния регистър на ЮЛНЦ към Министерство на правосъдието',
             'intro'     => $en
-                ? 'This certificate is issued by Razlichni Umove Foundation, registered in the Central Register of Non-Profit Legal Entities in the public benefit at the Bulgarian Ministry of Justice, confirming receipt of a donation under the following terms:'
-                : 'С настоящия сертификат Фондация Различни умове, вписана в Централния регистър на юридическите лица с нестопанска цел в обществена полза към Министерство на правосъдието, удостоверява, че е получила дарение при следните условия:',
+                ? 'This certificate is issued by ' . SITE_NAME_EN . ', registered in the Central Register of Non-Profit Legal Entities in the public benefit at the Bulgarian Ministry of Justice, confirming receipt of a donation under the following terms:'
+                : 'С настоящия сертификат ' . SITE_NAME_BG . ', вписана в Централния регистър на юридическите лица с нестопанска цел в обществена полза към Министерство на правосъдието, удостоверява, че е получила дарение при следните условия:',
             'sig_label' => $en ? 'Foundation Director:' : 'Управител на фондацията:',
         ];
     }
