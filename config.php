@@ -84,6 +84,9 @@ if (file_exists(__DIR__ . '/site.config.php')) {
     require_once __DIR__ . '/site.config.example.php';
 }
 
+// Visual theme presets (brand_themes() / current_theme()).
+require_once __DIR__ . '/includes/themes.php';
+
 // First-run: until the site has been configured (no site.config.php yet), send
 // every web visitor to the install wizard so a fresh upload is "next-next-finish".
 if (PHP_SAPI !== 'cli'

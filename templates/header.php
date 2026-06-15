@@ -95,7 +95,7 @@ $cart_n    = cart_count();
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Jura:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=<?= h(current_theme()['font_url']) ?>&display=swap" rel="stylesheet">
 
   <!-- Styles -->
   <link rel="stylesheet" href="/assets/css/main.css">
@@ -144,11 +144,21 @@ $cart_n    = cart_count();
   <?php if ($_show_admin_bar): ?>
   <link rel="stylesheet" href="<?= SITE_URL ?>/assets/css/inline-cms.css">
   <?php endif; ?>
-  <?php $_brand_primary = defined('BRAND_PRIMARY') ? BRAND_PRIMARY : ''; $_brand_accent = defined('BRAND_ACCENT') ? BRAND_ACCENT : ''; ?>
-  <?php if ($_brand_primary !== ''): ?>
-  <!-- Brand colours (set via the install wizard) -->
-  <style>:root{--teal:<?= h($_brand_primary) ?>;--teal-dark:<?= h($_brand_accent !== '' ? $_brand_accent : $_brand_primary) ?>;--teal-light:color-mix(in srgb, <?= h($_brand_primary) ?> 12%, #ffffff);}</style>
-  <?php endif; ?>
+  <?php
+    $_theme   = current_theme();
+    $_primary = (defined('BRAND_PRIMARY') && BRAND_PRIMARY !== '') ? BRAND_PRIMARY : $_theme['primary'];
+    $_accent  = (defined('BRAND_ACCENT')  && BRAND_ACCENT  !== '') ? BRAND_ACCENT  : $_theme['accent'];
+  ?>
+  <!-- Theme + brand (install wizard) -->
+  <style>:root{
+    --teal:<?= h($_primary) ?>;
+    --teal-dark:<?= h($_accent) ?>;
+    --teal-light:color-mix(in srgb, <?= h($_primary) ?> 12%, #ffffff);
+    --font-body:'<?= h($_theme['font']) ?>',sans-serif;
+    --font-display:'<?= h($_theme['font']) ?>',sans-serif;
+    --radius:<?= h($_theme['radius']) ?>;
+    --radius-lg:<?= h($_theme['radius_lg']) ?>;
+  }</style>
 </head>
 <body<?= $_show_admin_bar ? ' class="om-admin"' : '' ?>>
 <?php if ($_show_admin_bar): ?>

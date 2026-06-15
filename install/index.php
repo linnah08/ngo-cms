@@ -20,6 +20,8 @@ $already = is_file($ROOT . '/site.config.php') && is_file($ROOT . '/db.config.ph
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function e(string $s): string { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
 
+require_once dirname(__DIR__) . '/includes/themes.php';  // brand_themes()
+
 function proc_enabled(): bool {
     if (!function_exists('proc_open')) return false;
     $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
@@ -90,6 +92,7 @@ if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $bank    = $p('site_bank_name');
 
     // Branding
+    $brand_theme   = array_key_exists($p('brand_theme'), brand_themes()) ? $p('brand_theme') : 'classic';
     $brand_primary = preg_match('/^#[0-9a-fA-F]{6}$/', $p('brand_primary')) ? $p('brand_primary') : '#0387A5';
     $brand_accent  = preg_match('/^#[0-9a-fA-F]{6}$/', $p('brand_accent'))  ? $p('brand_accent')  : '#04ADBF';
 
@@ -175,6 +178,7 @@ if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
             'SITE_IBAN'    => $iban,
             'SITE_BIC'     => $bic,
             'SITE_BANK_NAME' => $bank,
+            'BRAND_THEME'    => $brand_theme,
             'BRAND_PRIMARY'  => $brand_primary,
             'BRAND_ACCENT'   => $brand_accent,
             'SIGNING_ADMIN_EMAIL' => $admin_email,
@@ -250,6 +254,11 @@ $v = fn(string $k, string $d = '') => e((string) ($_POST[$k] ?? $d));
   .alert-ok code { background: #fff; padding: 1px 5px; border-radius: 4px; }
   .radio { display: flex; gap: 1.25rem; margin: .4rem 0 .25rem; }
   .radio label { font-weight: 500; display: flex; align-items: center; gap: .4rem; margin: 0; }
+  .themes { display: flex; gap: .55rem; flex-wrap: wrap; margin: .4rem 0 .35rem; }
+  .theme-card { display: flex; align-items: center; gap: .45rem; border: 1px solid var(--border); border-radius: 8px; padding: .45rem .7rem; cursor: pointer; font-size: .9rem; }
+  .theme-card input { accent-color: var(--teal); }
+  .theme-card .sw { width: 15px; height: 15px; border-radius: 50%; display: inline-block; }
+  .theme-card:has(input:checked) { border-color: var(--teal); box-shadow: 0 0 0 1px var(--teal); }
   fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin: 0; }
   .muted-box { background: var(--bg); border-radius: 8px; padding: 1rem; font-size: .85rem; }
 </style>
@@ -329,6 +338,17 @@ $v = fn(string $k, string $d = '') => e((string) ($_POST[$k] ?? $d));
       <input type="text" name="site_bank_name" value="<?= $v('site_bank_name') ?>">
 
       <h2>3. Branding</h2>
+      <label>Style</label>
+      <div class="themes">
+        <?php foreach (brand_themes() as $tk => $tv): ?>
+        <label class="theme-card">
+          <input type="radio" name="brand_theme" value="<?= e($tk) ?>" <?= ($v('brand_theme','classic')===$tk)?'checked':'' ?> onchange="pickTheme('<?= e($tk) ?>')">
+          <span class="sw" style="background:<?= e($tv['primary']) ?>"></span>
+          <span style="font-family:'<?= e($tv['font']) ?>',sans-serif;"><?= e($tv['label']) ?></span>
+        </label>
+        <?php endforeach; ?>
+      </div>
+      <div class="hint">Pick a look (font + shape). The colours below default to the style; tweak them if you like.</div>
       <div class="row">
         <div><label>Primary colour</label><input type="color" name="brand_primary" value="<?= $v('brand_primary','#0387A5') ?>" style="height:44px;padding:3px;"></div>
         <div><label>Accent colour</label><input type="color" name="brand_accent" value="<?= $v('brand_accent','#04ADBF') ?>" style="height:44px;padding:3px;"></div>
@@ -354,6 +374,10 @@ $v = fn(string $k, string $d = '') => e((string) ($_POST[$k] ?? $d));
         document.getElementById('db-existing').style.display = (m==='existing') ? '' : 'none';
       }
       dbMode(document.querySelector('input[name=db_mode]:checked')?.value || 'existing');
+      var THEMES = <?= json_encode(array_map(fn($t) => ['p' => $t['primary'], 'a' => $t['accent']], brand_themes())) ?>;
+      function pickTheme(k){ var t = THEMES[k]; if(!t) return;
+        document.querySelector('input[name=brand_primary]').value = t.p;
+        document.querySelector('input[name=brand_accent]').value  = t.a; }
     </script>
 <?php endif; ?>
   </div>

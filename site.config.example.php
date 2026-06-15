@@ -39,6 +39,8 @@ define('DONATION_PURPOSE_EN', 'For the activities and programmes of the organisa
 // ── Brand ─────────────────────────────────────────────────────────────────────
 // Primary + accent colours (the wizard sets these; the logo is uploaded to
 // assets/images/logo.png). Accent is used for hover/gradient states.
+// Visual preset (font + corner shape + default colours): classic | friendly | modern | editorial
+define('BRAND_THEME',   'classic');
 define('BRAND_PRIMARY', '#0387A5');
 define('BRAND_ACCENT',  '#04ADBF');
 
