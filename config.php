@@ -292,13 +292,16 @@ function get_settings(): array {
     return load_json(SETTINGS_FILE);
 }
 
-// Logo URL with a cache-busting version stamp, so a newly uploaded logo
-// replaces the old one in browsers/proxies even though the filename is reused.
-function logo_url(): string {
+// Asset URL with a cache-busting version stamp, so a re-uploaded file (logo,
+// favicon) replaces the cached one even though the filename is reused.
+function asset_url(string $rel): string {
+    $rel  = '/' . ltrim($rel, '/');
     $root = $_SERVER['DOCUMENT_ROOT'] ?: dirname(__DIR__);
-    $v    = @filemtime($root . '/assets/images/logo.png');
-    return '/assets/images/logo.png' . ($v ? '?v=' . $v : '');
+    $v    = @filemtime($root . $rel);
+    return $rel . ($v ? '?v=' . $v : '');
 }
+function logo_url(): string    { return asset_url('assets/images/logo.png'); }
+function favicon_url(): string { return asset_url('assets/images/favicon.png'); }
 
 function get_articles(string $lang = '', int $limit = 0): array {
     if (!$lang) $lang = get_lang();

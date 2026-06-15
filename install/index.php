@@ -69,6 +69,30 @@ function write_config(string $path, array $defs, string $header): bool {
     return file_put_contents($path, $php) !== false;
 }
 
+/** Build a square favicon from an uploaded logo (fit + centre on transparent). */
+function make_favicon(string $src, string $dest, int $size = 64): void {
+    if (!function_exists('imagecreatetruecolor')) return;  // GD optional
+    $info = @getimagesize($src);
+    $im = match ($info['mime'] ?? '') {
+        'image/png'  => @imagecreatefrompng($src),
+        'image/jpeg' => @imagecreatefromjpeg($src),
+        'image/webp' => @imagecreatefromwebp($src),
+        default      => null,
+    };
+    if (!$im) return;
+    $sw = imagesx($im); $sh = imagesy($im);
+    $scale = min($size / $sw, $size / $sh);
+    $nw = max(1, (int) round($sw * $scale));
+    $nh = max(1, (int) round($sh * $scale));
+    $canvas = imagecreatetruecolor($size, $size);
+    imagesavealpha($canvas, true);
+    imagefill($canvas, 0, 0, imagecolorallocatealpha($canvas, 255, 255, 255, 127));
+    imagecopyresampled($canvas, $im, intdiv($size - $nw, 2), intdiv($size - $nh, 2), 0, 0, $nw, $nh, $sw, $sh);
+    @imagepng($canvas, $dest);
+    imagedestroy($canvas);
+    imagedestroy($im);
+}
+
 $errors  = [];
 $success = false;
 $created_db_info = null;
@@ -199,6 +223,7 @@ if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $allowed = ['image/png', 'image/jpeg', 'image/webp'];
             if ($info && in_array($info['mime'] ?? '', $allowed, true)) {
                 @move_uploaded_file($_FILES['logo']['tmp_name'], $ROOT . '/assets/images/logo.png');
+                make_favicon($ROOT . '/assets/images/logo.png', $ROOT . '/assets/images/favicon.png');
             }
         }
 

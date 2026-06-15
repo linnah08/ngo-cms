@@ -105,7 +105,7 @@ $cart_n    = cart_count();
   <?= $page_head_extra ?? '' ?>
 
   <!-- Favicon -->
-  <link rel="icon" href="/assets/images/favicon.png">
+  <link rel="icon" href="<?= favicon_url() ?>">
 
   <?php if (($_COOKIE['om_cookie_consent'] ?? '') === 'all'): ?>
   <?php $__gtm = defined('GTM_ID') ? GTM_ID : ''; ?>
