@@ -4,12 +4,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 $lang = get_lang();
 $page_title = 'Начало';
 // Keyword-rich homepage title (overrides the "Page — Site" template)
-$page_title_full = $lang === 'bg'
-    ? 'Фондация Различни умове — подкрепа за деца с увреждания и в риск'
-    : 'Odd Minds Foundation — support for children with disabilities and at risk';
-$page_description = $lang === 'bg'
-    ? 'Фондация Различни умове съществува, за да подкрепя деца с увреждания и деца, лишени от родителска грижа.'
-    : 'Odd Minds Foundation supports children with disabilities and children deprived of parental care.';
+$page_title_full = $lang === 'bg' ? SITE_NAME_BG : SITE_NAME_EN;
+$page_description = $lang === 'bg' ? SITE_NAME_BG : SITE_NAME_EN;
 $page_head_extra = '<style>@media(max-width:640px){.campaign-block-grid{grid-template-columns:1fr!important;}}</style>';
 
 $partners = get_partners();
@@ -26,7 +22,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 <section class="hero">
   <div class="container">
     <div class="hero__text">
-      <span class="section-label">Фондация Различни умове</span>
+      <span class="section-label"><?= h($lang === 'bg' ? SITE_NAME_BG : SITE_NAME_EN) ?></span>
       <h1 data-cms-field="hero_title"
           data-cms-section="home"
           data-cms-type="text"
@@ -59,7 +55,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
             data-cms-field="hero_image"
             data-cms-section="home">
         <img src="/assets/images/hero.webp"
-             alt="Деца от Фондация Различни умове"
+             alt="<?= h($lang === 'bg' ? SITE_NAME_BG : SITE_NAME_EN) ?>"
              width="560" height="420">
         <?php if ($_show_admin_bar): ?><span class="om-img-overlay">📷 Replace</span><?php endif; ?>
       </span>
@@ -238,7 +234,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
               data-cms-field="mission_image"
               data-cms-section="home">
           <img src="<?= h($home['mission_image']) ?>"
-               alt="Мисията на Фондация Различни умове"
+               alt="<?= h($lang === 'bg' ? SITE_NAME_BG : SITE_NAME_EN) ?>"
                loading="lazy">
           <?php if ($_show_admin_bar): ?><span class="om-img-overlay">📷 Replace</span><?php endif; ?>
         </span>

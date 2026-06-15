@@ -144,6 +144,11 @@ $cart_n    = cart_count();
   <?php if ($_show_admin_bar): ?>
   <link rel="stylesheet" href="<?= SITE_URL ?>/assets/css/inline-cms.css">
   <?php endif; ?>
+  <?php $_brand_primary = defined('BRAND_PRIMARY') ? BRAND_PRIMARY : ''; $_brand_accent = defined('BRAND_ACCENT') ? BRAND_ACCENT : ''; ?>
+  <?php if ($_brand_primary !== ''): ?>
+  <!-- Brand colours (set via the install wizard) -->
+  <style>:root{--teal:<?= h($_brand_primary) ?>;--teal-dark:<?= h($_brand_accent !== '' ? $_brand_accent : $_brand_primary) ?>;--teal-light:color-mix(in srgb, <?= h($_brand_primary) ?> 12%, #ffffff);}</style>
+  <?php endif; ?>
 </head>
 <body<?= $_show_admin_bar ? ' class="om-admin"' : '' ?>>
 <?php if ($_show_admin_bar): ?>
