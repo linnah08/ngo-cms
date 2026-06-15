@@ -294,14 +294,14 @@ function get_settings(): array {
 
 // Asset URL with a cache-busting version stamp, so a re-uploaded file (logo,
 // favicon) replaces the cached one even though the filename is reused.
-function asset_url(string $rel): string {
+function versioned_asset(string $rel): string {
     $rel  = '/' . ltrim($rel, '/');
     $root = $_SERVER['DOCUMENT_ROOT'] ?: dirname(__DIR__);
     $v    = @filemtime($root . $rel);
     return $rel . ($v ? '?v=' . $v : '');
 }
-function logo_url(): string    { return asset_url('assets/images/logo.png'); }
-function favicon_url(): string { return asset_url('assets/images/favicon.png'); }
+function logo_url(): string    { return versioned_asset('assets/images/logo.png'); }
+function favicon_url(): string { return versioned_asset('assets/images/favicon.png'); }
 
 function get_articles(string $lang = '', int $limit = 0): array {
     if (!$lang) $lang = get_lang();
