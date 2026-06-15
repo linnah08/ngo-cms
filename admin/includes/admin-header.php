@@ -80,7 +80,7 @@ $current_user = admin_user();
   <aside class="admin-sidebar" id="adminSidebar">
     <div class="admin-sidebar__top">
       <a href="/admin/dashboard.php" class="admin-logo">
-        <img src="/assets/images/logo.png" alt="<?= h(SITE_NAME_BG) ?>">
+        <img src="<?= logo_url() ?>" alt="<?= h(SITE_NAME_BG) ?>">
       </a>
     </div>
 

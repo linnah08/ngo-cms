@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <div class="admin-login-wrap">
   <div class="admin-login-card">
     <div class="admin-login-logo">
-      <img src="/assets/images/logo.png" alt="<?= h(SITE_NAME_BG) ?>">
+      <img src="<?= logo_url() ?>" alt="<?= h(SITE_NAME_BG) ?>">
     </div>
     <h1 class="admin-login-title">Админ панел</h1>
 

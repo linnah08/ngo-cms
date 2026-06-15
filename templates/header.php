@@ -207,7 +207,7 @@ $cart_n    = cart_count();
   <div class="header-main">
     <div class="container">
       <a href="<?= $lang === 'bg' ? '/' : '/en/' ?>" class="site-logo">
-        <img src="/assets/images/logo.png" alt="<?= h($site_name) ?>">
+        <img src="<?= logo_url() ?>" alt="<?= h($site_name) ?>">
       </a>
 
       <button

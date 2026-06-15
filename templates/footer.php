@@ -48,7 +48,7 @@ $_show_nl_banner = empty($_COOKIE['om_nl_sub']) && !str_starts_with($_SERVER['RE
 
       <!-- Brand -->
       <div class="footer-brand">
-        <img src="/assets/images/logo.png" alt="<?= h($site_name) ?>">
+        <img src="<?= logo_url() ?>" alt="<?= h($site_name) ?>">
         <p><span data-cms-field="tagline"
               data-cms-section="footer"
               data-cms-type="text"
