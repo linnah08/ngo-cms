@@ -68,7 +68,10 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
 <div class="admin-page-header">
   <h1>Поръчки</h1>
-  <a href="/admin/manual-cert.php" class="btn btn--outline">+ Сертификат за дарение</a>
+  <div style="display:flex;gap:.5rem;">
+    <a href="/admin/manual-invoice.php" class="btn btn--outline">+ Фактура</a>
+    <a href="/admin/manual-cert.php" class="btn btn--outline">+ Сертификат за дарение</a>
+  </div>
 </div>
 
 <!-- Filters -->
