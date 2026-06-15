@@ -6,14 +6,14 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
- * Smoke-tests every public page by making a real HTTP request to oddminds.test
+ * Smoke-tests every public page by making a real HTTP request to example.test
  * and asserting a 200 response. Tests are skipped automatically when the local
  * dev host is unreachable (e.g. in CI).
  */
 #[Group('http')]
 final class HttpTest extends TestCase
 {
-    private static string $base = 'http://oddminds.test';
+    private static string $base = 'http://example.test';
 
     public static function setUpBeforeClass(): void
     {
@@ -26,7 +26,7 @@ final class HttpTest extends TestCase
         $errno = curl_errno($ch);
         curl_close($ch);
         if ($errno !== 0) {
-            self::markTestSkipped('oddminds.test is not reachable — skipping HTTP smoke tests.');
+            self::markTestSkipped('example.test is not reachable — skipping HTTP smoke tests.');
         }
     }
 

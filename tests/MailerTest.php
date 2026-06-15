@@ -22,7 +22,7 @@ final class MailerTest extends TestCase
 
     public function test_email_wrap_preserves_cyrillic(): void
     {
-        $cyrillic = 'Фондация Различни умове — Здравей!';
+        $cyrillic = 'Тест кирилица — Здравей!';
         $html = email_wrap('<p>' . $cyrillic . '</p>');
         $this->assertStringContainsString($cyrillic, $html);
     }

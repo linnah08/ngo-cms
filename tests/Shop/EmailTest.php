@@ -31,8 +31,8 @@ final class EmailTest extends TestCase
             'items'              => json_encode([
                 [
                     'product_id'   => 1,
-                    'name_bg'      => 'Тениска Odd Minds',
-                    'name_en'      => 'Odd Minds T-Shirt',
+                    'name_bg'      => 'Тениска',
+                    'name_en'      => 'T-Shirt',
                     'price_eur'    => 15.00,
                     'quantity'     => 2,
                     'subtotal_eur' => 30.00,
@@ -107,7 +107,7 @@ final class EmailTest extends TestCase
     public function testOrderConfirmationContainsProductName(): void
     {
         $html = render_email('order-confirmation-customer', ['order' => self::$mockOrder]);
-        $this->assertStringContainsString('Тениска Odd Minds', $html);
+        $this->assertStringContainsString('Тениска', $html);
     }
 
     public function testOrderConfirmationContainsTotal(): void

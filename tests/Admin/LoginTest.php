@@ -9,7 +9,7 @@ final class LoginTest extends TestCase
 {
     private static \PDO $pdo;
     private static int  $uid;
-    private static string $email    = 'test.login@oddminds.test';
+    private static string $email    = 'test.login@example.test';
     private static string $password = 'LoginTest_Pass_42!';
 
     public static function setUpBeforeClass(): void

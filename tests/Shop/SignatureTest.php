@@ -130,10 +130,11 @@ final class SignatureTest extends TestCase
         $this->assertStringNotContainsString('<img ', $html);
     }
 
-    public function testBuildHtmlAlwaysContainsManagerName(): void
+    public function testBuildHtmlAlwaysContainsSignerName(): void
     {
         $html = $this->callBuildHtml(null);
-        $this->assertStringContainsString('Детелина Боянова Василева', $html);
+        // Signature line falls back to the organisation name when no МОЛ is set.
+        $this->assertStringContainsString(SITE_NAME_BG, $html);
     }
 
     // ── cert-needs-signature email template ─────────────────────────────────

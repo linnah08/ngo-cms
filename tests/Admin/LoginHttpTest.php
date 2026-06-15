@@ -6,21 +6,21 @@ use PHPUnit\Framework\Attributes\Group;
 
 /**
  * End-to-end login smoke test: verifies the full login round-trip through the
- * real web server (oddminds.test), including document-root resolution, session
+ * real web server (example.test), including document-root resolution, session
  * creation, and redirect to the admin dashboard.
  */
 #[Group('http')]
 #[Group('admin')]
 final class LoginHttpTest extends TestCase
 {
-    private static string $base     = 'http://oddminds.test';
-    private static string $email    = 'test.login.http@oddminds.test';
+    private static string $base     = 'http://example.test';
+    private static string $email    = 'test.login.http@example.test';
     private static string $password = 'LoginHttpTest_Pass_42!';
     private static ?int   $uid      = null;
 
     public static function setUpBeforeClass(): void
     {
-        // Skip when oddminds.test is unreachable.
+        // Skip when example.test is unreachable.
         $ch = curl_init(self::$base . '/admin/login.php');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 3);
@@ -60,7 +60,7 @@ final class LoginHttpTest extends TestCase
         $errno = curl_errno($ch);
         curl_close($ch);
         if ($errno !== 0 || !test_db_available() || self::$uid === null) {
-            $this->markTestSkipped('oddminds.test or DB not available.');
+            $this->markTestSkipped('example.test or DB not available.');
         }
     }
 
@@ -74,7 +74,7 @@ final class LoginHttpTest extends TestCase
         curl_exec($ch);
         $code  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-        if ($errno !== 0) $this->markTestSkipped('oddminds.test not reachable.');
+        if ($errno !== 0) $this->markTestSkipped('example.test not reachable.');
         $this->assertSame(200, $code);
     }
 

@@ -34,7 +34,7 @@ final class AdminAuthTest extends TestCase
         // Session was set more than 8 hours ago (ADMIN_SESSION_HOURS = 8)
         $_SESSION[ADMIN_SESSION_NAME] = [
             'logged_in' => true,
-            'email'     => 'author@oddminds.org',
+            'email'     => 'author@example.org',
             'role'      => 'author',
             'time'      => time() - (ADMIN_SESSION_HOURS * 3600 + 1),
         ];
@@ -52,7 +52,7 @@ final class AdminAuthTest extends TestCase
     {
         $_SESSION[ADMIN_SESSION_NAME] = [
             'logged_in' => true,
-            'email'     => 'admin@oddminds.org',
+            'email'     => 'admin@example.org',
             'role'      => 'admin',
             'time'      => time(),
         ];
@@ -66,7 +66,7 @@ final class AdminAuthTest extends TestCase
     {
         $_SESSION[ADMIN_SESSION_NAME] = [
             'logged_in' => true,
-            'email'     => 'author@oddminds.org',
+            'email'     => 'author@example.org',
             'role'      => 'author',
             'time'      => time(),
         ];
@@ -78,7 +78,7 @@ final class AdminAuthTest extends TestCase
     {
         $_SESSION[ADMIN_SESSION_NAME] = [
             'logged_in' => true,
-            'email'     => 'admin@oddminds.org',
+            'email'     => 'admin@example.org',
             'role'      => 'admin',
             'time'      => time(),
         ];
@@ -92,7 +92,7 @@ final class AdminAuthTest extends TestCase
     {
         $_SESSION[ADMIN_SESSION_NAME] = [
             'logged_in' => true,
-            'email'     => 'author@oddminds.org',
+            'email'     => 'author@example.org',
             'role'      => 'author',
             'time'      => time(),
         ];
@@ -107,7 +107,7 @@ final class AdminAuthTest extends TestCase
     {
         $_SESSION[ADMIN_SESSION_NAME] = [
             'logged_in' => true,
-            'email'     => 'admin@oddminds.org',
+            'email'     => 'admin@example.org',
             'role'      => 'admin',
             'time'      => time(),
         ];
@@ -122,7 +122,7 @@ final class AdminAuthTest extends TestCase
     {
         $_SESSION[ADMIN_SESSION_NAME] = [
             'logged_in' => true,
-            'email'     => 'shop@oddminds.org',
+            'email'     => 'shop@example.org',
             'role'      => 'shop_admin',
             'time'      => time(),
         ];

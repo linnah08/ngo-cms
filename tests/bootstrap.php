@@ -38,7 +38,7 @@ if (file_exists($root . '/graph.config.php')) {
     define('GRAPH_TENANT_ID',     'test-tenant');
     define('GRAPH_CLIENT_ID',     'test-client');
     define('GRAPH_CLIENT_SECRET', 'test-secret');
-    define('GRAPH_FROM',          'test@oddminds.org');
+    define('GRAPH_FROM',          'test@example.org');
     define('GRAPH_FROM_NAME',     'Test');
 }
 

@@ -6,7 +6,7 @@
  * REQUIRED — the site cannot run without a database.
  */
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'oddminds');
+define('DB_NAME', 'ngo');
 define('DB_USER', 'root');
 define('DB_PASS', '');
 

@@ -79,7 +79,7 @@ final class TranslatorTest extends TestCase
 
         $original = deepl_load_glossary();
 
-        $pairs = [['Различни', 'Different'], ['Нужди', 'Needs']];
+        $pairs = [['Дарение', 'Donation'], ['Нужди', 'Needs']];
         deepl_save_glossary($pairs);
 
         $loaded = deepl_load_glossary();

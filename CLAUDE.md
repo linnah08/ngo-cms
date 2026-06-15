@@ -1,4 +1,4 @@
-# CLAUDE.md — Odd Minds
+# CLAUDE.md — NGO Platform
 
 Project-level rules for Claude Code. These override defaults.
 

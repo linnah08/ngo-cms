@@ -52,7 +52,7 @@ final class NewsletterTest extends TestCase
     public function test_subscribe_returns_ok_true(): void
     {
         $this->skipWithoutDb();
-        $email = 'test_subscribe_ok_' . time() . '@oddminds-test.invalid';
+        $email = 'test_subscribe_ok_' . time() . '@example-test.invalid';
         try {
             $result = newsletter_subscribe($email, 'Test', 'bg', 'manual');
             $this->assertTrue($result['ok']);
@@ -64,7 +64,7 @@ final class NewsletterTest extends TestCase
     public function test_subscribe_normalises_email_to_lowercase(): void
     {
         $this->skipWithoutDb();
-        $email = 'TEST_LOWER_' . time() . '@OddMinds-TEST.invalid';
+        $email = 'TEST_LOWER_' . time() . '@Example-TEST.invalid';
         try {
             newsletter_subscribe($email, '', 'bg', 'manual');
             $stmt = self::$pdo->prepare("SELECT email FROM newsletter_subscribers WHERE email=?");
@@ -78,7 +78,7 @@ final class NewsletterTest extends TestCase
     public function test_subscribe_duplicate_sets_duplicate_flag(): void
     {
         $this->skipWithoutDb();
-        $email = 'test_dup_' . time() . '@oddminds-test.invalid';
+        $email = 'test_dup_' . time() . '@example-test.invalid';
         try {
             newsletter_subscribe($email, '', 'bg', 'manual');
             $result = newsletter_subscribe($email, '', 'bg', 'manual');
@@ -91,7 +91,7 @@ final class NewsletterTest extends TestCase
     public function test_subscribe_rejects_invalid_lang_and_defaults_to_bg(): void
     {
         $this->skipWithoutDb();
-        $email = 'test_lang_' . time() . '@oddminds-test.invalid';
+        $email = 'test_lang_' . time() . '@example-test.invalid';
         try {
             newsletter_subscribe($email, '', 'fr', 'manual');
             $stmt = self::$pdo->prepare("SELECT lang FROM newsletter_subscribers WHERE email=?");
@@ -105,7 +105,7 @@ final class NewsletterTest extends TestCase
     public function test_subscribe_rejects_invalid_source_and_defaults_to_web_banner(): void
     {
         $this->skipWithoutDb();
-        $email = 'test_source_' . time() . '@oddminds-test.invalid';
+        $email = 'test_source_' . time() . '@example-test.invalid';
         try {
             newsletter_subscribe($email, '', 'bg', 'hacker_input');
             $stmt = self::$pdo->prepare("SELECT source FROM newsletter_subscribers WHERE email=?");
@@ -139,7 +139,7 @@ final class NewsletterTest extends TestCase
     public function test_unsubscribe_valid_token_sets_status_unsubscribed(): void
     {
         $this->skipWithoutDb();
-        $email = 'test_unsub_' . time() . '@oddminds-test.invalid';
+        $email = 'test_unsub_' . time() . '@example-test.invalid';
         $token = $this->insertSubscriber($email, 'active');
         try {
             $result = newsletter_unsubscribe($token);
@@ -165,7 +165,7 @@ final class NewsletterTest extends TestCase
     public function test_unsubscribe_is_idempotent(): void
     {
         $this->skipWithoutDb();
-        $email = 'test_idem_' . time() . '@oddminds-test.invalid';
+        $email = 'test_idem_' . time() . '@example-test.invalid';
         $token = $this->insertSubscriber($email, 'active');
         try {
             newsletter_unsubscribe($token);

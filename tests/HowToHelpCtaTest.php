@@ -7,7 +7,7 @@ use PHPUnit\Framework\Attributes\Group;
 #[Group('http')]
 final class HowToHelpCtaTest extends TestCase
 {
-    private static string $base = 'http://oddminds.test';
+    private static string $base = 'http://example.test';
 
     public static function setUpBeforeClass(): void
     {
@@ -19,7 +19,7 @@ final class HowToHelpCtaTest extends TestCase
         $errno = curl_errno($ch);
         curl_close($ch);
         if ($errno !== 0) {
-            self::markTestSkipped('oddminds.test is not reachable — skipping HTTP tests.');
+            self::markTestSkipped('example.test is not reachable — skipping HTTP tests.');
         }
     }
 
@@ -137,7 +137,7 @@ final class HowToHelpCtaTest extends TestCase
             'BG page should have Facebook button in social media way'
         );
         $this->assertStringContainsString(
-            'instagram.com/oddminds_foundation/',
+            'instagram.com',
             $body,
             'BG page should have Instagram button in social media way'
         );
@@ -194,7 +194,7 @@ final class HowToHelpCtaTest extends TestCase
             'EN page should have Facebook button in social media way'
         );
         $this->assertStringContainsString(
-            'instagram.com/oddminds_foundation/',
+            'instagram.com',
             $body,
             'EN page should have Instagram button in social media way'
         );

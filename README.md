@@ -6,10 +6,8 @@ donations, crowdfunding campaigns, and automatic invoice / receipt /
 donation-certificate PDFs. Built in vanilla PHP 8.4 — no framework — with
 MySQL and flat-file JSON content.
 
-It was originally built for [Odd Minds Foundation](https://oddminds.org)
-(Фондация Различни умове) and released so other NGOs — particularly in Bulgaria —
-can run the same stack. The default content and configuration ship with the Odd
-Minds values as a **worked example**; you replace them with your own.
+It is released as open source so other NGOs — particularly in Bulgaria —
+can run the same stack. The default content and configuration ship with neutral placeholder values; you replace them with your own.
 
 ## Features
 
@@ -74,7 +72,7 @@ to disable that tag entirely.
 ### 3. Create and install the database
 
 ```bash
-mysql -u root -e "CREATE DATABASE oddminds CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+mysql -u root -e "CREATE DATABASE ngo CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 php install.php
 ```
 
@@ -120,7 +118,7 @@ What still lives in code (edit as needed for your organisation):
 - **Legal / invoice identity** — your organisation's legal name, address,
   company number, bank details and representative used on generated PDFs are in
   `includes/documents/DocumentGenerator.php` (the `ORG_DETAILS` block). The
-  shipped values are the Odd Minds example — replace them with your entity's.
+  shipped values are placeholders — replace them with your own.
 - **Legal pages** — the impressum, privacy policy, terms and cookie policy
   (under their slug folders) are inline-editable in the browser; rewrite them
   for your organisation.
@@ -156,4 +154,4 @@ repository secrets `FTP_SERVER`, `FTP_USERNAME`, `SSH_PRIVATE_KEY` and
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Originally created by Odd Minds Foundation.
+MIT — see [LICENSE](LICENSE).

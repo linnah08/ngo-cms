@@ -124,6 +124,7 @@ class DonationCertGenerator extends DocumentGenerator {
             ? 'This certificate is issued pursuant to Bulgarian tax law (Art. 22 of the Personal Income Tax Act and Art. 31 of the Corporate Income Tax Act) and may be used by the donor to claim a tax deduction when filing an annual tax return. Individuals may deduct up to 5% of their tax base; legal entities — up to 10% of their accounting profit.'
             : 'Настоящият сертификат се издава на основание чл.&nbsp;22 от ЗДДФЛ и чл.&nbsp;31 от ЗКПО и може да се използва от дарителя за ползване на данъчно облекчение при подаване на годишна данъчна декларация. Физическите лица могат да приспаднат до 5% от данъчната си основа, а юридическите лица — до 10% от счетоводната печалба.';
         $sig_label    = $orgText['sig_label'];
+        $sig_name     = ($f['mol'] ?? '') !== '' ? $f['mol'] : $f['name'];
         $addr_label   = $en ? 'Address' : 'Адрес';
         $tel_label    = $en ? 'Tel'     : 'Тел';
         $header_meta  = 'EIK: ' . self::h($f['eik']) . ' &nbsp;|&nbsp; ' . $addr_label . ': ' . self::h($f['address']);
@@ -217,7 +218,7 @@ class DonationCertGenerator extends DocumentGenerator {
         <div class="sig-block">
           <div class="sig-label">{$sig_label}</div>
           {$sig_html}
-          <div class="sig-name">{$f['mol']}</div>
+          <div class="sig-name">{$sig_name}</div>
         </div>
 
         </body>

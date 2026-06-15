@@ -28,7 +28,7 @@ if (!is_file($root . '/db.config.php')) {
     exit(1);
 }
 if (!is_file($root . '/site.config.php')) {
-    fwrite(STDOUT, "Note: site.config.php not found — the site will fall back to the Odd Minds example values.\n"
+    fwrite(STDOUT, "Note: site.config.php not found — the site will fall back to neutral placeholder values.\n"
                  . "      Copy site.config.example.php to site.config.php and edit it to rebrand.\n\n");
 }
 

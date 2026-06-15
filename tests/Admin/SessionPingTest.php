@@ -32,7 +32,7 @@ final class SessionPingTest extends TestCase
         $old = time() - 3600;
         $_SESSION[ADMIN_SESSION_NAME] = [
             'logged_in' => true,
-            'email'     => 'admin@oddminds.org',
+            'email'     => 'admin@example.org',
             'role'      => 'admin',
             'time'      => $old,
         ];
@@ -56,14 +56,14 @@ final class SessionPingTest extends TestCase
     {
         $_SESSION[ADMIN_SESSION_NAME] = [
             'logged_in' => true,
-            'email'     => 'admin@oddminds.org',
+            'email'     => 'admin@example.org',
             'role'      => 'admin',
             'time'      => time() - 100,
         ];
 
         admin_session_refresh();
 
-        $this->assertSame('admin@oddminds.org', $_SESSION[ADMIN_SESSION_NAME]['email']);
+        $this->assertSame('admin@example.org', $_SESSION[ADMIN_SESSION_NAME]['email']);
         $this->assertSame('admin',              $_SESSION[ADMIN_SESSION_NAME]['role']);
     }
 }
