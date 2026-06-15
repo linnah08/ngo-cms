@@ -281,13 +281,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $payment_method = $_POST['payment_method'] ?? 'cod';
-        if (!in_array($payment_method, ['cod', 'card'])) $payment_method = 'cod';
+        if (!in_array($payment_method, ['cod', 'card', 'iris'])) $payment_method = 'cod';
         $order_lang_raw = $_POST['lang'] ?? 'bg';
         $order_lang     = in_array($order_lang_raw, ['bg', 'en'], true) ? $order_lang_raw : 'bg';
 
-        // Fall back to COD if DSK Bank isn't configured/enabled
+        // Fall back to COD if the chosen online provider isn't configured/enabled
         require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/IRISPayment.php';
         if ($payment_method === 'card' && !DSKBankPayment::isEnabled()) {
+            $payment_method = 'cod';
+        }
+        if ($payment_method === 'iris' && !IRISPayment::isEnabled()) {
             $payment_method = 'cod';
         }
 
@@ -416,6 +420,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             } catch (Throwable $e) {
                 error_log('DSK Bank register error: ' . $e->getMessage());
+                header('Location: /checkout/payment-failed/?order=' . urlencode($order_number) . '&err=' . urlencode($e->getMessage()));
+                exit;
+            }
+        }
+
+        if ($payment_method === 'iris') {
+            // Redirect to IRIS Pay by Bank.
+            // The callback token authenticates the server-to-server confirmation;
+            // it goes only in the hookUrl, never in the browser-facing redirectUrl.
+            try {
+                $iris  = new IRISPayment();
+                $token = bin2hex(random_bytes(32));
+                $pdo->prepare('UPDATE orders SET iris_callback_token = ? WHERE id = ?')
+                    ->execute([$token, $order_id]);
+
+                $redirectUrl = SITE_URL . '/api/iris-payment-return.php?order=' . urlencode($order_number);
+                $hookUrl     = SITE_URL . '/api/iris-payment-callback.php?id=' . urlencode($order_number) . '&token=' . $token;
+
+                $paymentLink = $iris->register([
+                    'currency'    => 'EUR',
+                    'amountEur'   => $total,
+                    'name'        => 'Поръчка ' . $order_number,
+                    'description' => SITE_NAME_BG . ' — поръчка ' . $order_number,
+                    'orderId'     => $order_number,
+                    'redirectUrl' => $redirectUrl,
+                    'hookUrl'     => $hookUrl,
+                    'lang'        => $order_lang,
+                ]);
+
+                header('Location: ' . $paymentLink);
+                exit;
+            } catch (Throwable $e) {
+                error_log('IRIS register error: ' . $e->getMessage());
                 header('Location: /checkout/payment-failed/?order=' . urlencode($order_number) . '&err=' . urlencode($e->getMessage()));
                 exit;
             }
@@ -777,13 +814,21 @@ $subtotal  = $cart_info['subtotal'];
       $total    = $subtotal + $shipping;
     ?>
 
-    <?php require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php'; ?>
+    <?php
+      require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
+      require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/IRISPayment.php';
+      // Build the list of available payment methods (order = display order).
+      $pay_methods = [];
+      if (DSKBankPayment::isEnabled()) $pay_methods['card'] = ['💳', 'Плащане с карта', 'Visa / Mastercard през DSK Bank'];
+      if (IRISPayment::isEnabled())    $pay_methods['iris'] = ['🏦', 'Банков превод (Pay by Bank)', 'Директно от сметката ви през IRIS'];
+      $pay_methods['cod'] = ['💵', 'Наложен платеж', 'Плащане при доставка'];
+      $pay_default = array_key_first($pay_methods);
+    ?>
 
     <form method="POST" id="confirmForm">
       <?= csrf_field() ?>
       <input type="hidden" name="action" value="confirm">
       <input type="hidden" name="lang" value="<?= h($lang) ?>">
-      <input type="hidden" name="payment_method" value="card">
       <input type="hidden" name="donation_amount" id="donationAmountHidden" value="0">
 
       <h2 style="margin-bottom:1.5rem;">3. Преглед и потвърждение</h2>
@@ -889,9 +934,25 @@ $subtotal  = $cart_info['subtotal'];
         </div>
       </div>
 
+      <!-- Payment method -->
+      <fieldset style="border:none;padding:0;margin:0 0 1.5rem;">
+        <legend style="font-size:.85rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.75rem;padding:0;">Начин на плащане</legend>
+        <?php foreach ($pay_methods as $pm => $info): ?>
+        <label style="display:flex;align-items:center;gap:.75rem;padding:1rem 1.25rem;border:2px solid var(--border);border-radius:var(--radius-lg);cursor:pointer;margin-bottom:.6rem;">
+          <input type="radio" name="payment_method" value="<?= $pm ?>" <?= $pm === $pay_default ? 'checked' : '' ?>
+                 style="width:1.1rem;height:1.1rem;accent-color:var(--teal);">
+          <span aria-hidden="true" style="font-size:1.3rem;line-height:1;"><?= $info[0] ?></span>
+          <span>
+            <span style="display:block;font-weight:600;"><?= h($info[1]) ?></span>
+            <span style="display:block;font-size:.85rem;color:var(--text-muted);"><?= h($info[2]) ?></span>
+          </span>
+        </label>
+        <?php endforeach; ?>
+      </fieldset>
+
       <div style="display:flex;gap:1rem;align-items:center;">
         <button type="submit" class="btn btn--primary" style="padding:.9rem 2rem;font-size:1rem;">
-          💳 Продължи към плащане с карта
+          Потвърди поръчката →
         </button>
         <a href="/checkout/?step=2" style="font-size:.9rem;color:var(--text-muted);">← Промени доставката</a>
       </div>

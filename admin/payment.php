@@ -104,6 +104,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $saved = true;
         }
 
+        if ($section === 'iris') {
+            if (!empty($_POST['iris_merchant_key'])) setting_set('iris_merchant_key', trim($_POST['iris_merchant_key']));
+            if (!empty($_POST['iris_iban']))         setting_set('iris_iban', trim($_POST['iris_iban']));
+            setting_set('iris_test_mode', isset($_POST['iris_test_mode']) ? '1' : '0');
+            setting_set('iris_enabled',   isset($_POST['iris_enabled'])   ? '1' : '0');
+            $saved = true;
+        }
+
         // ── Test credentials ──────────────────────────────────────────────────
         if ($section === 'dskbank_test') {
             $merchant = setting_get('dsk_merchant');
@@ -283,6 +291,79 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </tr>
   </table>
   <?php endif; ?>
+</section>
+
+<!-- ── IRIS Pay by Bank ─────────────────────────────────────────────────────── -->
+<section class="admin-card" style="margin-bottom:2rem;">
+  <h2 class="admin-card__title">IRIS Pay by Bank (банков превод)</h2>
+  <p class="admin-meta" style="margin-bottom:1.25rem;">
+    Плащане директно от банковата сметка на клиента (open banking). Регистрирайте се в
+    <a href="https://www.irisbgsf.com" target="_blank" rel="noopener">IRIS Solutions</a>
+    и въведете Merchant Key и IBAN на получателя.<br>
+    Поддържани валути: BGN, RON, EUR. Тестова среда: <code>payperclick.infn.dev</code> — Продукционна: <code>paybyclick.irispay.bg</code>
+  </p>
+
+  <form method="post">
+    <?= csrf_field() ?>
+    <input type="hidden" name="section" value="iris">
+
+    <div class="admin-form-grid">
+      <label>Merchant Key
+        <div style="position:relative;">
+          <input type="password" name="iris_merchant_key" value="<?= h(current_val('iris_merchant_key')) ?>"
+                 placeholder="xxxxxxxx-xxxx-xxxx-…" style="padding-right:4.5rem;width:100%;box-sizing:border-box;">
+          <button type="button" onclick="togglePwd(this)" class="pwd-toggle">Покажи</button>
+        </div>
+      </label>
+      <label>IBAN на получателя
+        <input type="text" name="iris_iban" value="<?= h(current_val('iris_iban')) ?>" placeholder="BG..">
+      </label>
+    </div>
+
+    <div style="margin-top:1rem;display:flex;flex-direction:column;gap:.6rem;">
+      <label class="admin-checkbox">
+        <input type="checkbox" name="iris_enabled" value="1"
+               <?= setting_get('iris_enabled', '0') === '1' ? 'checked' : '' ?>>
+        Активирай банков превод при checkout
+      </label>
+      <label class="admin-checkbox">
+        <input type="checkbox" name="iris_test_mode" value="1"
+               <?= setting_get('iris_test_mode', '1') === '1' ? 'checked' : '' ?>>
+        Тестова среда (payperclick.infn.dev)
+      </label>
+    </div>
+
+    <div style="margin-top:1.25rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+      <button type="submit" class="btn btn--primary">Запази</button>
+      <?php if (setting_is_set('iris_merchant_key')): ?>
+        <span class="badge badge--published">Конфигуриран</span>
+      <?php else: ?>
+        <span class="badge badge--draft">Не е конфигуриран</span>
+      <?php endif; ?>
+      <?php if (setting_get('iris_enabled', '0') === '1'): ?>
+        <span class="badge badge--published">Активен</span>
+      <?php else: ?>
+        <span class="badge badge--draft">Неактивен</span>
+      <?php endif; ?>
+    </div>
+  </form>
+
+  <hr style="border:none;border-top:1px solid var(--border);margin:1.5rem 0;">
+  <h3 style="font-size:.95rem;font-weight:600;margin-bottom:.5rem;">Callback URLs</h3>
+  <p class="admin-meta">
+    IRIS получава тези адреси автоматично при всяко плащане — не е нужна ръчна конфигурация.
+    Callback-ът се удостоверява с уникален токен за всяка поръчка.
+  </p>
+  <table style="font-size:.85rem;border-collapse:collapse;width:100%;">
+    <tr>
+      <td style="padding:.4rem .75rem .4rem 0;color:var(--text-muted);white-space:nowrap;">Callback (hookUrl)</td>
+      <td><code><?= h(SITE_URL) ?>/api/iris-payment-callback.php</code></td>
+    </tr>
+    <tr>
+      <td style="padding:.4rem .75rem .4rem 0;color:var(--text-muted);white-space:nowrap;">Return (redirectUrl)</td>
+      <td><code><?= h(SITE_URL) ?>/api/iris-payment-return.php</code></td>
+    </tr>
+  </table>
 </section>
 
 <!-- ── TinyMCE ─────────────────────────────────────────────────────────────────── -->

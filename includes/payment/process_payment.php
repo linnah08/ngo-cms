@@ -7,6 +7,55 @@
  * api/payment-callback.php (server-to-server).
  */
 
+/**
+ * Send the "payment received" emails for a now-paid order.
+ * Shared by the DSK Bank and IRIS Pay flows. Caller is responsible for the
+ * actual paid DB transition (and for only calling this once per order).
+ */
+function notify_order_paid(array $order): void
+{
+    if ($order['type'] === 'donation') {
+        $items   = json_decode($order['items'] ?? '[]', true) ?? [];
+        $don     = $items[0] ?? [];
+        $reference = $order['customer_name'] . ' — дарение';
+        send_mail(
+            $order['customer_email'],
+            'Благодарим за вашето дарение!',
+            render_email('donation-confirmation-customer', [
+                'donor_name'       => $order['customer_name'],
+                'amount_eur'       => (float)$order['total_eur'],
+                'donation_message' => $order['donation_message'] ?? '',
+                'reference'        => $reference,
+            ])
+        );
+        send_mail(
+            SITE_EMAIL,
+            'Ново дарение — ' . $order['customer_name'] . ' — ' . number_format((float)$order['total_eur'], 2) . '€',
+            render_email('donation-notification-admin', [
+                'donor_name'       => $order['customer_name'],
+                'donor_email'      => $order['customer_email'],
+                'amount_eur'       => (float)$order['total_eur'],
+                'donation_message' => $order['donation_message'] ?? '',
+                'order_number'     => $order['order_number'],
+            ])
+        );
+    } else {
+        send_mail(
+            $order['customer_email'],
+            render_email_subject('order-confirmation-customer', $order['lang'] ?? 'bg', ['order_number' => $order['order_number'], 'customer_name' => $order['customer_name']]),
+            render_email('order-confirmation-customer', ['order' => $order])
+        );
+        send_mail(
+            SITE_EMAIL,
+            'Нова поръчка #' . $order['order_number'],
+            render_email('order-notification-admin', [
+                'order'     => $order,
+                'admin_url' => SITE_URL . '/admin/order-view.php?id=' . $order['id'],
+            ])
+        );
+    }
+}
+
 function process_dsk_result(PDO $pdo, array $order, string $dskOrderId, array $status): void
 {
     $orderStatus = (int)($status['orderStatus'] ?? -1);
@@ -23,47 +72,7 @@ function process_dsk_result(PDO $pdo, array $order, string $dskOrderId, array $s
         if ($order['payment_status'] !== 'paid') {
             $pdo->prepare("UPDATE orders SET payment_status = 'paid', status = 'confirmed', updated_at = NOW() WHERE id = ?")
                 ->execute([$order['id']]);
-
-            if ($order['type'] === 'donation') {
-                $items   = json_decode($order['items'] ?? '[]', true) ?? [];
-                $don     = $items[0] ?? [];
-                $reference = $order['customer_name'] . ' — дарение';
-                send_mail(
-                    $order['customer_email'],
-                    'Благодарим за вашето дарение!',
-                    render_email('donation-confirmation-customer', [
-                        'donor_name'       => $order['customer_name'],
-                        'amount_eur'       => (float)$order['total_eur'],
-                        'donation_message' => $order['donation_message'] ?? '',
-                        'reference'        => $reference,
-                    ])
-                );
-                send_mail(
-                    SITE_EMAIL,
-                    'Ново дарение — ' . $order['customer_name'] . ' — ' . number_format((float)$order['total_eur'], 2) . '€',
-                    render_email('donation-notification-admin', [
-                        'donor_name'       => $order['customer_name'],
-                        'donor_email'      => $order['customer_email'],
-                        'amount_eur'       => (float)$order['total_eur'],
-                        'donation_message' => $order['donation_message'] ?? '',
-                        'order_number'     => $order['order_number'],
-                    ])
-                );
-            } else {
-                send_mail(
-                    $order['customer_email'],
-                    render_email_subject('order-confirmation-customer', $order['lang'] ?? 'bg', ['order_number' => $order['order_number'], 'customer_name' => $order['customer_name']]),
-                    render_email('order-confirmation-customer', ['order' => $order])
-                );
-                send_mail(
-                    SITE_EMAIL,
-                    'Нова поръчка #' . $order['order_number'],
-                    render_email('order-notification-admin', [
-                        'order'     => $order,
-                        'admin_url' => SITE_URL . '/admin/order-view.php?id=' . $order['id'],
-                    ])
-                );
-            }
+            notify_order_paid($order);
         }
     } elseif ($orderStatus === 3) {
         // Declined
