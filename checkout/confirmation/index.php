@@ -100,10 +100,10 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
         <?php else: ?>
           <li>Адрес: <?= h($order['delivery_address'] . ', ' . $order['delivery_city']) ?></li>
         <?php endif; ?>
-        <?php if ($order['payment_method'] === 'card'): ?>
-          <li>Платихте с карта — поръчката е потвърдена.</li>
+        <?php if ($order['payment_status'] === 'paid'): ?>
+          <li>Плащането е получено — поръчката е потвърдена.</li>
         <?php else: ?>
-          <li>Плащате с наложен платеж при получаване.</li>
+          <li>Очакваме потвърждение на плащането.</li>
         <?php endif; ?>
       </ol>
     </div>

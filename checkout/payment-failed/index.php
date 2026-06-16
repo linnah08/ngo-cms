@@ -56,17 +56,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
         Опитай отново с карта
       </a>
 
-      <div style="color:var(--text-muted);font-size:.9rem;">— или —</div>
-
-      <!-- Switch to COD: POST to a small handler -->
-      <form method="POST" action="/api/payment-switch-cod.php" style="width:100%;">
-        <?= csrf_field() ?>
-        <input type="hidden" name="order_number" value="<?= h($order_number) ?>">
-        <button type="submit" class="btn btn--outline" style="width:100%;justify-content:center;padding:.85rem 1.5rem;font-size:1rem;">
-          Плати с наложен платеж
-        </button>
-      </form>
-
       <a href="/magazin/" style="font-size:.9rem;color:var(--text-muted);">← Към магазина</a>
     </div>
   </div>

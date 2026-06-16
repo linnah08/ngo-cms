@@ -280,19 +280,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        $payment_method = $_POST['payment_method'] ?? 'cod';
-        if (!in_array($payment_method, ['cod', 'card', 'iris'])) $payment_method = 'cod';
         $order_lang_raw = $_POST['lang'] ?? 'bg';
         $order_lang     = in_array($order_lang_raw, ['bg', 'en'], true) ? $order_lang_raw : 'bg';
 
-        // Fall back to COD if the chosen online provider isn't configured/enabled
+        // Online payment only — COD is not offered. Resolve to an enabled provider.
         require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
         require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/IRISPayment.php';
-        if ($payment_method === 'card' && !DSKBankPayment::isEnabled()) {
-            $payment_method = 'cod';
+        $enabled_methods = [];
+        if (DSKBankPayment::isEnabled()) $enabled_methods[] = 'card';
+        if (IRISPayment::isEnabled())    $enabled_methods[] = 'iris';
+
+        $payment_method = $_POST['payment_method'] ?? '';
+        if (!in_array($payment_method, $enabled_methods, true)) {
+            $payment_method = $enabled_methods[0] ?? '';
         }
-        if ($payment_method === 'iris' && !IRISPayment::isEnabled()) {
-            $payment_method = 'cod';
+        if ($payment_method === '') {
+            flash_set('error', 'Онлайн плащането не е налично в момента. Моля свържете се с нас.');
+            header('Location: /cart/');
+            exit;
         }
 
         update_cart_from_post();
@@ -822,7 +827,6 @@ $subtotal  = $cart_info['subtotal'];
       $pay_methods = [];
       if (DSKBankPayment::isEnabled()) $pay_methods['card'] = ['💳', 'Плащане с карта', 'Visa / Mastercard през DSK Bank'];
       if (IRISPayment::isEnabled())    $pay_methods['iris'] = ['🏦', 'Банков превод (Pay by Bank)', 'Директно от сметката ви през IRIS'];
-      $pay_methods['cod'] = ['💵', 'Наложен платеж', 'Плащане при доставка'];
       $pay_default = array_key_first($pay_methods);
     ?>
 
@@ -938,6 +942,11 @@ $subtotal  = $cart_info['subtotal'];
       <!-- Payment method -->
       <fieldset style="border:none;padding:0;margin:0 0 1.5rem;">
         <legend style="font-size:.85rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.75rem;padding:0;">Начин на плащане</legend>
+        <?php if (empty($pay_methods)): ?>
+        <p style="padding:1rem 1.25rem;border:2px solid var(--border);border-radius:var(--radius-lg);color:#c0392b;">
+          Онлайн плащането не е налично в момента. Моля свържете се с нас.
+        </p>
+        <?php endif; ?>
         <?php foreach ($pay_methods as $pm => $info): ?>
         <label style="display:flex;align-items:center;gap:.75rem;padding:1rem 1.25rem;border:2px solid var(--border);border-radius:var(--radius-lg);cursor:pointer;margin-bottom:.6rem;">
           <input type="radio" name="payment_method" value="<?= $pm ?>" <?= $pm === $pay_default ? 'checked' : '' ?>
