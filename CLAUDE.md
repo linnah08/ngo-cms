@@ -54,7 +54,9 @@ For large features touching DB, logic, UI, and tests: plan as parallel subagent 
 
 ## Database Migrations
 
-- All ALTER TABLE migrations MUST be idempotent (use `IF NOT EXISTS` / `IF EXISTS` guards) to avoid 500 errors on partial production runs.
+- **Engines differ: production is MariaDB 10.5, local dev is MySQL 9.x.** Write SQL portable to BOTH.
+- **Do NOT use `ADD COLUMN IF NOT EXISTS` / `DROP COLUMN IF EXISTS` on `ALTER TABLE`** — that is MariaDB-only and is a hard 1064 syntax error on MySQL, which halts `migrate.php` (it bit 026). `CREATE TABLE IF NOT EXISTS` is fine on both.
+- Idempotency comes from the runner, not the SQL: `migrate.php` tracks applied files in `_migrations` and ignores "Duplicate column" / "already exists" errors. So write plain DDL (`ADD COLUMN images JSON ...`); a re-run on a DB that already has the column is skipped safely.
 - Test migrations against a production-like schema snapshot before deploying.
 
 ---
