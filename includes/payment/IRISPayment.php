@@ -69,8 +69,8 @@ class IRISPayment
 
         $payload = [
             'currency'    => $currency,
-            'name'        => mb_substr((string)($args['name'] ?? ''), 0, 34),
-            'description' => mb_substr((string)($args['description'] ?? ''), 0, 240),
+            'name'        => mb_substr($this->sanitizeText((string)($args['name'] ?? '')), 0, 34),
+            'description' => mb_substr($this->sanitizeText((string)($args['description'] ?? '')), 0, 240),
             'sum'         => round((float)$args['amountEur'], 2),
             'toIban'      => $this->iban,
             'orderId'     => (string)$args['orderId'],
@@ -108,6 +108,26 @@ class IRISPayment
     }
 
     // ── Internal ────────────────────────────────────────────────────────────────
+
+    /**
+     * Reduce free text to the restricted (SEPA-like) charset IRIS / the bank
+     * remittance field accept — IRIS rejects Cyrillic etc. with
+     * "unsupportedCharacters". Transliterates to Latin, then strips anything
+     * outside [A-Za-z0-9] and the allowed punctuation ( / - ? : ( ) . , ' + space ).
+     */
+    private function sanitizeText(string $s): string
+    {
+        if (function_exists('transliterator_transliterate')) {
+            $t = transliterator_transliterate('Any-Latin; Latin-ASCII', $s);
+            if (is_string($t)) $s = $t;
+        } else {
+            $t = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
+            if ($t !== false) $s = $t;
+        }
+        $s = preg_replace("/[^A-Za-z0-9 \\/\\-?:().,'+]/", ' ', $s);
+        $s = preg_replace('/\s+/', ' ', $s);
+        return trim($s);
+    }
 
     private function request(string $method, string $path, ?array $payload = null): array
     {
