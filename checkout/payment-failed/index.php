@@ -38,8 +38,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     <h1 style="color:#c0392b;"><?= $lang === 'bg' ? 'Плащането не бе успешно' : 'Payment failed' ?></h1>
     <p style="color:var(--text-muted);">
       <?= $lang === 'bg'
-          ? 'Поръчка <strong>#' . h($order['order_number']) . '</strong> е запазена. Можете да опитате отново или да изберете друг начин на плащане.'
-          : 'Order <strong>#' . h($order['order_number']) . '</strong> is saved. You can try again or choose a different payment method.' ?>
+          ? 'Поръчка <strong>#' . h($order['order_number']) . '</strong> е запазена. Можете да опитате плащането отново.'
+          : 'Order <strong>#' . h($order['order_number']) . '</strong> is saved. You can try the payment again.' ?>
     </p>
     <?php if ($err_msg): ?>
     <p style="font-size:.85rem;color:#c0392b;margin-top:.5rem;"><?= h($err_msg) ?></p>
@@ -51,10 +51,17 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
   <div class="container" style="max-width:480px;text-align:center;">
     <div style="display:flex;flex-direction:column;gap:1rem;align-items:center;">
 
+<?php if ($order['payment_method'] === 'iris'): ?>
+      <a href="/api/iris-payment-return.php?retry=1&order=<?= urlencode($order_number) ?>"
+         class="btn btn--primary" style="width:100%;justify-content:center;padding:.85rem 1.5rem;font-size:1rem;">
+        Опитай отново с банков превод
+      </a>
+<?php else: ?>
       <a href="/api/payment-return.php?retry=1&order=<?= urlencode($order_number) ?>"
          class="btn btn--primary" style="width:100%;justify-content:center;padding:.85rem 1.5rem;font-size:1rem;">
         Опитай отново с карта
       </a>
+<?php endif; ?>
 
       <a href="/magazin/" style="font-size:.9rem;color:var(--text-muted);">← Към магазина</a>
     </div>
