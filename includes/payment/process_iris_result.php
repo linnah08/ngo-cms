@@ -1,36 +1,59 @@
 <?php
 /**
- * IRIS Pay result processor — marks an order paid after a *verified* callback.
+ * IRIS Pay result processor.
  *
- * IRIS provides no status-query API, so authenticity is established by the
- * per-order capability token, which api/iris-payment-callback.php checks BEFORE
- * calling this. Amount integrity is guaranteed by registration: the customer can
- * only have paid the exact `sum` we registered for this order, so there is no
- * separate amount to re-verify here.
+ * Called from api/iris-payment-callback.php with the AUTHORITATIVE status fetched
+ * via IRISPayment::getStatus() — never with the (untrusted) callback status param.
+ * Marks the order paid only if IRIS reports CONFIRMED for the exact amount and
+ * recipient IBAN we registered; cancels on FAILED; leaves WAITING pending.
  *
- * Reuses notify_order_paid() from process_payment.php for the paid emails,
- * so shop/donation orders are notified identically to the DSK Bank flow.
+ * Reuses notify_order_paid() from process_payment.php so shop/donation orders are
+ * notified identically to the DSK Bank flow.
  */
 require_once __DIR__ . '/process_payment.php';
 
-function process_iris_result(PDO $pdo, array $order): void
+function process_iris_result(PDO $pdo, array $order, array $status): void
 {
-    if ($order['payment_status'] === 'paid') {
-        return; // idempotent — duplicate callback for an already-paid order
-    }
+    $state = strtoupper((string)($status['status'] ?? ''));
 
-    // Conditional update: only transitions a still-pending order. Combined with
-    // the rowCount() check below, this makes the paid emails fire exactly once
-    // even if IRIS sends concurrent/duplicate callbacks.
-    $stmt = $pdo->prepare(
-        "UPDATE orders SET payment_status = 'paid', status = 'confirmed', updated_at = NOW()
-         WHERE id = ? AND payment_status = 'pending'"
-    );
-    $stmt->execute([$order['id']]);
+    if ($state === 'CONFIRMED') {
+        if ($order['payment_status'] === 'paid') {
+            return; // idempotent — already processed
+        }
 
-    if ($stmt->rowCount() > 0) {
-        $order['payment_status'] = 'paid';
-        $order['status']         = 'confirmed';
-        notify_order_paid($order);
+        // Integrity checks against what IRIS actually settled.
+        $paidSum  = (float)($status['sum'] ?? 0);
+        $expected = (float)$order['total_eur'];
+        if (abs($paidSum - $expected) > 0.01) {
+            error_log("iris: amount mismatch for order {$order['order_number']} — paid {$paidSum}, expected {$expected}");
+            return;
+        }
+
+        $ourIban  = preg_replace('/\s+/', '', setting_get('iris_iban', ''));
+        $recvIban = preg_replace('/\s+/', '', (string)($status['receiverIban'] ?? ''));
+        if ($ourIban !== '' && $recvIban !== '' && strcasecmp($recvIban, $ourIban) !== 0) {
+            error_log("iris: receiver IBAN mismatch for order {$order['order_number']} — got {$recvIban}");
+            return;
+        }
+
+        // Conditional update + rowCount guard => paid emails fire exactly once,
+        // even under concurrent/duplicate callbacks.
+        $stmt = $pdo->prepare(
+            "UPDATE orders SET payment_status = 'paid', status = 'confirmed', updated_at = NOW()
+             WHERE id = ? AND payment_status = 'pending'"
+        );
+        $stmt->execute([$order['id']]);
+
+        if ($stmt->rowCount() > 0) {
+            $order['payment_status'] = 'paid';
+            $order['status']         = 'confirmed';
+            notify_order_paid($order);
+        }
+    } elseif ($state === 'FAILED') {
+        $pdo->prepare(
+            "UPDATE orders SET status = 'cancelled', updated_at = NOW()
+             WHERE id = ? AND payment_status = 'pending'"
+        )->execute([$order['id']]);
     }
+    // WAITING (or anything else) → leave the order pending.
 }

@@ -300,7 +300,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     Плащане директно от банковата сметка на клиента (open banking). Регистрирайте се в
     <a href="https://www.irisbgsf.com" target="_blank" rel="noopener">IRIS Solutions</a>
     и въведете Merchant Key и IBAN на получателя.<br>
-    Поддържани валути: BGN, RON, EUR. Тестова среда: <code>payperclick.infn.dev</code> — Продукционна: <code>paybyclick.irispay.bg</code>
+    Поддържани валути: EUR, RON. Тестова среда: <code>dev.paybyclick.irispay.bg</code> — Продукционна: <code>paybyclick.irispay.bg</code>
   </p>
 
   <form method="post">
@@ -329,7 +329,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       <label class="admin-checkbox">
         <input type="checkbox" name="iris_test_mode" value="1"
                <?= setting_get('iris_test_mode', '1') === '1' ? 'checked' : '' ?>>
-        Тестова среда (payperclick.infn.dev)
+        Тестова среда (dev.paybyclick.irispay.bg)
       </label>
     </div>
 

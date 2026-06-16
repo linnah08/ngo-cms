@@ -432,13 +432,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 $iris  = new IRISPayment();
                 $token = bin2hex(random_bytes(32));
-                $pdo->prepare('UPDATE orders SET iris_callback_token = ? WHERE id = ?')
-                    ->execute([$token, $order_id]);
 
                 $redirectUrl = SITE_URL . '/api/iris-payment-return.php?order=' . urlencode($order_number);
                 $hookUrl     = SITE_URL . '/api/iris-payment-callback.php?id=' . urlencode($order_number) . '&token=' . $token;
 
-                $paymentLink = $iris->register([
+                $result = $iris->register([
                     'currency'    => 'EUR',
                     'amountEur'   => $total,
                     'name'        => 'Поръчка ' . $order_number,
@@ -449,7 +447,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'lang'        => $order_lang,
                 ]);
 
-                header('Location: ' . $paymentLink);
+                $pdo->prepare('UPDATE orders SET iris_payment_hash = ?, iris_callback_token = ? WHERE id = ?')
+                    ->execute([$result['paymentHash'], $token, $order_id]);
+
+                header('Location: ' . $result['paymentLink']);
                 exit;
             } catch (Throwable $e) {
                 error_log('IRIS register error: ' . $e->getMessage());
