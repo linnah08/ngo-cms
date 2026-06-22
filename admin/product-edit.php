@@ -3,6 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
 
 admin_require_shop();
 
@@ -49,111 +50,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ? $_POST['type']
         : 'standard';
 
+    // Build the print-type variant structure (colours, sizes, print-area clamp,
+    // per-size dims, size-guide). See includes/products.php for the rules + tests.
     $variants_json = null;
+    $sizes = [];
+    $size_guide_image = '';
     if ($prod_type === 'print') {
-        $colour_names     = $_POST['colour_name']     ?? [];
-        $colour_labels_bg = $_POST['colour_label_bg'] ?? [];
-        $colour_labels_en = $_POST['colour_label_en'] ?? [];
-        $colour_mockups   = $_POST['colour_mockup']   ?? [];
-        $colours = [];
-        foreach ($colour_names as $i => $cname) {
-            $cname = trim($cname);
-            if ($cname === '') continue;
-            if (!preg_match('/^[a-zA-Z0-9#\-]{1,32}$/', $cname)) continue;
-            $colours[] = [
-                'name'     => $cname,
-                'label_bg' => trim($colour_labels_bg[$i] ?? ''),
-                'label_en' => trim($colour_labels_en[$i] ?? ''),
-                'mockup'   => trim($colour_mockups[$i]   ?? ''),
-            ];
-        }
-        $sizes = array_values(array_intersect($_POST['sizes'] ?? [], ['S','M','L','XL','XXL']));
-        $print_area = [
-            'x' => min(1.0, max(0.0, (float)($_POST['pa_x'] ?? 28) / 100)),
-            'y' => min(1.0, max(0.0, (float)($_POST['pa_y'] ?? 18) / 100)),
-            'w' => min(1.0, max(0.0, (float)($_POST['pa_w'] ?? 44) / 100)),
-            'h' => min(1.0, max(0.0, (float)($_POST['pa_h'] ?? 50) / 100)),
-        ];
-        // Per-size dimensions (half-chest width × body length in cm)
-        $size_dims  = [];
-        $raw_dims_w = $_POST['size_dim_w'] ?? [];
-        $raw_dims_h = $_POST['size_dim_h'] ?? [];
-        foreach (array_keys($raw_dims_w) as $sz) {
-            $sz = trim((string)$sz);
-            if ($sz === '') continue;
-            $w = round((float)($raw_dims_w[$sz] ?? 0), 1);
-            $h = round((float)($raw_dims_h[$sz] ?? 0), 1);
-            if ($w > 0 && $h > 0) $size_dims[$sz] = ['w' => $w, 'h' => $h];
-        }
-        // Preserve existing size_guide if no new one was provided
         $existing_vdata   = json_decode($product['variants'] ?? '{}', true) ?? [];
-        $size_guide_image = trim($_POST['size_guide_filename'] ?? '') ?: ($existing_vdata['size_guide'] ?? '');
-        $variants_json = json_encode([
-            'colours'    => $colours,
-            'sizes'      => $sizes,
-            'print_area' => $print_area,
-            'custom'     => !empty($_POST['custom_orders']),
-            'size_guide' => $size_guide_image,
-            'size_dims'  => $size_dims,
-        ], JSON_UNESCAPED_UNICODE);
+        $print            = product_build_print_variants($_POST, $existing_vdata);
+        $sizes            = $print['sizes'];        // used by validation below
+        $size_guide_image = $print['size_guide'];   // used by validation below
+        $variants_json    = json_encode($print, JSON_UNESCAPED_UNICODE);
     }
 
     $variant_attributes_json = null;
-    $submitted_variants = []; // will be processed after DB save to get product id
+    $submitted_variants = []; // processed after DB save (needs the product id)
     if ($prod_type === 'variant') {
-        $raw_attrs = $_POST['variant_attributes'] ?? [];
-        $clean_attrs = [];
-        foreach ($raw_attrs as $a) {
-            $a = trim((string)$a);
-            if ($a !== '' && mb_strlen($a) <= 64) $clean_attrs[] = $a;
-        }
-        $variant_attributes_json = json_encode($clean_attrs, JSON_UNESCAPED_UNICODE);
-
-        // Parse variant rows from POST
-        $vr_ids      = $_POST['pv_id']       ?? [];
-        $vr_labels   = $_POST['pv_label_bg'] ?? [];
-        $vr_labels_en= $_POST['pv_label_en'] ?? [];
-        $vr_images   = $_POST['pv_images']   ?? []; // JSON per row: {"images":[...],"primary":"..."}
-        $vr_stocks   = $_POST['pv_stock']    ?? [];
-        $vr_attrs    = $_POST['pv_attrs']    ?? []; // JSON strings per row
-
+        $variant_attributes_json = json_encode(
+            product_clean_variant_attributes($_POST['variant_attributes'] ?? []),
+            JSON_UNESCAPED_UNICODE
+        );
+        // Inject the gallery-image existence check so the parser stays pure.
         $products_dir = $_SERVER['DOCUMENT_ROOT'] . '/assets/images/products/';
-
-        foreach (array_keys($vr_labels) as $i) {
-            $lbl = trim($vr_labels[$i] ?? '');
-            if ($lbl === '') continue;
-            $row_attrs = json_decode($vr_attrs[$i] ?? '{}', true);
-            if (!is_array($row_attrs)) $row_attrs = [];
-
-            // Parse + sanitise the variant gallery
-            $gal     = json_decode($vr_images[$i] ?? '', true);
-            $images  = [];
-            $primary = '';
-            if (is_array($gal)) {
-                foreach ((array)($gal['images'] ?? []) as $f) {
-                    $f = basename(trim((string)$f));
-                    if ($f !== '' && preg_match('/^[A-Za-z0-9._-]+$/', $f)
-                        && !in_array($f, $images, true) && is_file($products_dir . $f)) {
-                        $images[] = $f;
-                    }
-                    if (count($images) >= 8) break;
-                }
-                $primary = basename(trim((string)($gal['primary'] ?? '')));
-            }
-            if ($primary === '' || !in_array($primary, $images, true)) {
-                $primary = $images[0] ?? '';
-            }
-
-            $submitted_variants[] = [
-                'id'       => (int)($vr_ids[$i] ?? 0),
-                'label_bg' => $lbl,
-                'label_en' => trim($vr_labels_en[$i] ?? ''),
-                'image'    => $primary,
-                'images'   => $images,
-                'stock'    => max(0, (int)($vr_stocks[$i] ?? 0)),
-                'attrs'    => $row_attrs,
-            ];
-        }
+        $submitted_variants = product_parse_variant_rows(
+            $_POST,
+            static fn(string $f): bool => is_file($products_dir . $f)
+        );
     }
 
     // Validate
@@ -166,8 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Добавете поне един вариант.';
     }
 
-    $slug_raw = $slug_input ?: ($name_en ?: $name_bg);
-    $slug_val = slug($slug_raw);
+    $slug_val = product_compute_slug($slug_input, $name_en, $name_bg);
     if (!$slug_val) $errors[] = 'Невалиден slug.';
 
     if (!$errors) {

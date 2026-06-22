@@ -3,30 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/ai_keywords.php';
-
-/**
- * Convert HTML to plain text, turning <strong>/<b> into Unicode bold sans-serif.
- * Used for pre-filling social textareas from article content.
- */
-function _html_to_social_text(string $html): string {
-    static $bold_map = null;
-    if ($bold_map === null) {
-        $bold_map = [];
-        foreach (range('A', 'Z') as $c) $bold_map[$c] = mb_chr(0x1D5D4 + (ord($c) - ord('A')));
-        foreach (range('a', 'z') as $c) $bold_map[$c] = mb_chr(0x1D5EE + (ord($c) - ord('a')));
-        foreach (range('0', '9') as $c) $bold_map[$c] = mb_chr(0x1D7EC + (ord($c) - ord('0')));
-    }
-    // Replace <strong>/<b> content with Unicode bold
-    $html = preg_replace_callback(
-        '/<(?:strong|b)(?:\s[^>]*)?>(.+?)<\/(?:strong|b)>/is',
-        function ($m) use ($bold_map) {
-            $inner = strip_tags($m[1]);
-            return strtr($inner, $bold_map);
-        },
-        $html
-    );
-    return html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-}
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/articles.php';
 
 $slug_param = basename(str_replace(['..', "\0"], '', $_GET['slug'] ?? ''));
 $lang_param = ($_GET['lang'] ?? 'bg') === 'en' ? 'en' : 'bg';
@@ -58,10 +35,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $status  = in_array($_POST['status'] ?? '', ['published','draft']) ? $_POST['status'] : 'draft';
     $date    = $_POST['date'] ?? date('Y-m-d');
     $tags    = array_values(array_filter(array_map('trim', explode(',', $_POST['tags'] ?? ''))));
-    // Sanitise the user-supplied slug (allow Cyrillic — strip only path-unsafe chars).
-    $new_slug = slug(str_replace(['..', "\0", '/'], '', trim($_POST['slug'] ?? '')))
-             ?: slug($title)
-             ?: 'article-' . date('YmdHis');
 
     // ── EN fields (optional) ───────────────────────────────────────────────────
     $title_en   = trim($_POST['title_en']   ?? '');
@@ -69,12 +42,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $excerpt_en = trim($_POST['excerpt_en']  ?? '');
     $has_en     = $title_en !== '' || $content_en !== '';
 
-    // EN slug: explicit override > derived from EN title > ascii of BG title
-    $slug_en_input   = slug(str_replace(['..', "\0", '/'], '', trim($_POST['slug_en'] ?? '')));
-    $new_slug_en     = $slug_en_input !== ''
-        ? $slug_en_input
-        : (($title_en !== '') ? slug($title_en) : ascii_slug($title));
-    if (!$new_slug_en) $new_slug_en = $new_slug;
+    // Derive both slugs (BG keeps its language; EN prefers override/EN title).
+    // See includes/articles.php::article_compute_slugs for the rules + unit tests.
+    $slugs       = article_compute_slugs($_POST['slug'] ?? '', $_POST['slug_en'] ?? '', $title, $title_en);
+    $new_slug    = $slugs['bg'];
+    $new_slug_en = $slugs['en'];
     // Where the EN file currently lives (may differ from BG slug after migration)
     $slug_en_current = $is_new ? null : ($article['slug_en'] ?? $slug_param);
 
@@ -133,51 +105,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (file_exists($old_en)) unlink($old_en);
         }
 
-        // Save BG article (preserve social metadata)
-        $data = [
-            'title'              => $title,
-            'slug'               => $new_slug,
-            'slug_en'            => $new_slug_en,
-            'date'               => $date,
-            'author'             => $author,
-            'status'             => $status,
-            'excerpt'            => $excerpt,
-            'image'              => $image,
-            'tags'               => $tags,
-            'content'            => $content,
-            'linkedin_text'        => $article['linkedin_text']        ?? '',
-            'linkedin_url'         => $article['linkedin_url']         ?? '',
-            'linkedin_posted_at'   => $article['linkedin_posted_at']   ?? '',
-            'linkedin_scheduled_at'=> $article['linkedin_scheduled_at']?? '',
-            'linkedin_due_at'      => $article['linkedin_due_at']      ?? '',
-            'buffer_post_id'       => $article['buffer_post_id']       ?? '',
-            'social_text'          => $article['social_text']          ?? '',
-            'fb_text'              => $article['fb_text']              ?? '',
-            'insta_text'           => $article['insta_text']           ?? '',
-            'fb_buffer_post_id'    => $article['fb_buffer_post_id']    ?? '',
-            'fb_scheduled_at'      => $article['fb_scheduled_at']      ?? '',
-            'fb_due_at'            => $article['fb_due_at']            ?? '',
-            'insta_buffer_post_id' => $article['insta_buffer_post_id'] ?? '',
-            'insta_scheduled_at'   => $article['insta_scheduled_at']   ?? '',
-            'insta_due_at'         => $article['insta_due_at']         ?? '',
-        ];
+        // Save BG article (preserves social metadata from $article)
+        $data = article_build_bg_data([
+            'title'   => $title,   'slug'    => $new_slug, 'slug_en' => $new_slug_en,
+            'date'    => $date,    'author'  => $author,   'status'  => $status,
+            'excerpt' => $excerpt, 'image'   => $image,    'tags'    => $tags,
+            'content' => $content,
+        ], $article);
         $dir_bg = ARTICLES_PATH . '/bg';
         if (!is_dir($dir_bg)) mkdir($dir_bg, 0755, true);
         save_json($dir_bg . '/' . $new_slug . '.json', $data);
 
         // Save EN article (if any EN field provided)
         if ($has_en) {
-            $data_en = [
-                'title'   => $title_en ?: $title,
-                'slug'    => $new_slug_en,
-                'date'    => $date,
-                'author'  => $author,
-                'status'  => $status,
-                'excerpt' => $excerpt_en,
-                'image'   => $image,
-                'tags'    => $tags,
+            $data_en = article_build_en_data([
+                'title'   => $title_en ?: $title, 'slug'    => $new_slug_en,
+                'date'    => $date,    'author'  => $author,   'status'  => $status,
+                'excerpt' => $excerpt_en, 'image' => $image,   'tags'    => $tags,
                 'content' => $content_en,
-            ];
+            ]);
             $dir_en = ARTICLES_PATH . '/en';
             if (!is_dir($dir_en)) mkdir($dir_en, 0755, true);
             save_json($dir_en . '/' . $new_slug_en . '.json', $data_en);
@@ -432,7 +378,7 @@ $default_social_at = date('Y-m-d\TH:i', strtotime('+1 day 11:00'));
       } elseif (!empty($article['social_text'])) {
           echo h($article['social_text']);
       } else {
-          $_soc_body = _html_to_social_text($article['content'] ?? '');
+          $_soc_body = html_to_social_text($article['content'] ?? '');
           echo h(trim(($article['title'] ?? '') . ($_soc_body ? "\n\n" . $_soc_body : '')));
       }
     ?></textarea>
@@ -557,7 +503,7 @@ $default_social_at = date('Y-m-d\TH:i', strtotime('+1 day 11:00'));
         } else {
             $_li_title = ($article_en['title'] ?? '') ?: ($article['title'] ?? '');
             $_li_raw   = ($article_en['content'] ?? '') ?: ($article['content'] ?? '');
-            $_li_body  = _html_to_social_text($_li_raw);
+            $_li_body  = html_to_social_text($_li_raw);
             echo h(trim($_li_title . ($_li_body ? "\n\n" . $_li_body : '')));
         }
       ?></textarea>

@@ -212,15 +212,37 @@
     if (overlay.style.display !== 'none' && e.key === 'Escape') closeModal(false);
   });
 
+  /* Submit a form on behalf of a clicked button, preserving that button's
+     name/value. Plain form.submit() drops the submitter, so a clicked
+     <button name="action" value="delete"> would post with no action — the
+     form handler would then silently do nothing. requestSubmit(btn) keeps it;
+     fall back to injecting a hidden field for very old browsers. */
+  function submitWith(form, btn) {
+    form.dataset.confirm = '';
+    if (btn && btn.name && typeof form.requestSubmit === 'function') {
+      form.requestSubmit(btn);
+      return;
+    }
+    if (btn && btn.name) {
+      var hid = document.createElement('input');
+      hid.type = 'hidden';
+      hid.name = btn.name;
+      hid.value = btn.value;
+      form.appendChild(hid);
+    }
+    form.submit();
+  }
+
   /* Intercept forms with data-confirm */
   document.addEventListener('submit', function (e) {
     var form = e.target;
     var msg  = form.dataset.confirm;
     if (!msg) return;
     e.preventDefault();
+    var submitter = e.submitter;
     var ok = form.dataset.confirmOk;
     showConfirm(msg, ok).then(function (confirmed) {
-      if (confirmed) { form.dataset.confirm = ''; form.submit(); }
+      if (confirmed) { submitWith(form, submitter); }
     });
   }, true);
 
@@ -236,7 +258,7 @@
     showConfirm(msg, ok).then(function (confirmed) {
       if (!confirmed) return;
       var form = el.closest('form');
-      if (form) { el.dataset.confirm = ''; form.submit(); }
+      if (form) { submitWith(form, el); }
       else if (el.href) { location.href = el.href; }
     });
   }, true);
