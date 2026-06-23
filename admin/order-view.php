@@ -7,6 +7,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/email-templates.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DocumentGenerator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/TicketGenerator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_shipping.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_view.php';
 
 admin_require_shop();
 
@@ -44,12 +45,7 @@ if ($is_ticket) {
     $ps->execute([$order['order_number']]);
     $ticket_pledge = $ps->fetch() ?: null;
     if ($ticket_pledge) {
-        $decoded = json_decode($ticket_pledge['ticket_path'] ?? '', true);
-        if (is_array($decoded)) {
-            $ticket_paths = $decoded;
-        } elseif (!empty($ticket_pledge['ticket_path'])) {
-            $ticket_paths = [$ticket_pledge['ticket_path']];
-        }
+        $ticket_paths = order_ticket_paths($ticket_pledge['ticket_path'] ?? null);
     }
 }
 
@@ -77,8 +73,7 @@ $docs_by_type  = array_column($existing_docs, null, 'type');
 
 // Determine which document types are applicable
 $has_physical   = $order['type'] === 'physical';
-$has_donation   = $order['type'] === 'donation'
-    || count(array_filter($items, fn($i) => ($i['type'] ?? '') === 'donation')) > 0;
+$has_donation   = order_has_donation($order['type'], $items);
 $invoice_data   = json_decode($order['invoice_data'] ?? 'null', true);
 $is_b2b         = !empty($invoice_data['needs_invoice']);
 
@@ -563,17 +558,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
                       $ordered_size = $item['size'] ?? '';
                       $pvars_v   = $_print_variants[(int)($item['product_id'] ?? 0)] ?? [];
                       $sdims     = $pvars_v['size_dims'][$ordered_size] ?? null;
-                      if ($sdims && ($sdims['w'] ?? 0) > 0) {
-                          $dw_cm   = round($pos_v['scale'] * $sdims['w'], 1);
-                          $dh_cm   = round($pos_v['scale'] * $ar * $sdims['h'], 1);
-                          $left_cm = round(max(0, $pos_v['x'] - $pos_v['scale'] / 2) * $sdims['w'], 1);
-                          $top_cm  = round(max(0, $pos_v['y'] - ($pos_v['scale'] * $ar) / 2) * $sdims['h'], 1);
-                          $spec_str = "{$dw_cm} × {$dh_cm} cm · {$left_cm} cm от ляво · {$top_cm} cm от горе"
-                                    . ($ordered_size ? " · Размер: {$ordered_size}" : '');
-                      } else {
-                          $spec_str = 'Добавете размери на тениската в продукта за да изчислим cm'
-                                    . ($ordered_size ? " · Размер: {$ordered_size}" : '');
-                      }
+                      // cm placement maths extracted to includes/order_view.php (tested).
+                      $spec_str  = order_print_spec($pos_v, $ar, $sdims, $ordered_size);
                   }
                 ?>
                 <div style="margin-top:.35rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">

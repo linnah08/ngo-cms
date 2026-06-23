@@ -24,6 +24,7 @@
         <testsuite name="AdminLogic">
             <file>tests/Admin/ArticleSaveLogicTest.php</file>
             <file>tests/Admin/ProductSaveLogicTest.php</file>
+            <file>tests/Admin/OrderViewLogicTest.php</file>
         </testsuite>
     </testsuites>
 </phpunit>
