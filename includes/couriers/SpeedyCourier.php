@@ -310,6 +310,39 @@ class SpeedyCourier
     }
 
     /**
+     * Map an order row (+ parcel options) to the createShipment() input array.
+     *
+     * Pure: no API, no DB — extracted so the delivery-type handling is unit-testable.
+     * Crucially BOTH 'office' and 'apt' (Speedy automat / parcel machine) are
+     * pickup-point deliveries identified by courier_office_code via pickupOfficeId;
+     * only a true 'door' order uses the city/street address. Treating 'apt' as
+     * 'door' sends an empty street and Speedy rejects the recipient address.
+     *
+     * @param array  $order       Order row (delivery_type, delivery_city,
+     *                             delivery_address, courier_office_code, customer_*).
+     * @param float  $weight      Parcel weight (kg).
+     * @param int    $packCount   Number of parcels.
+     * @param string $description Shipment contents description.
+     */
+    public static function shipmentInputFromOrder(array $order, float $weight, int $packCount, string $description): array
+    {
+        $deliveryType = ($order['delivery_type'] ?? '') ?: 'door';
+        $isPickup     = in_array($deliveryType, ['office', 'apt'], true);
+
+        return [
+            'weight'           => $weight,
+            'pack_count'       => $packCount,
+            'description'      => $description,
+            'receiver_name'    => $order['customer_name']  ?? '',
+            'receiver_phone'   => $order['customer_phone'] ?? '',
+            'receiver_city'    => $order['delivery_city']    ?? '',
+            'receiver_address' => $order['delivery_address'] ?? '',
+            'receiver_office'  => $isPickup ? (int)($order['courier_office_code'] ?? 0) : null,
+            'delivery_type'    => $isPickup ? $deliveryType : 'door',
+        ];
+    }
+
+    /**
      * Create a shipment (товарителница).
      *
      * @param  array $order {

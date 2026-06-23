@@ -264,26 +264,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $weight     = max(0.1, (float)($_POST['weight']     ?? 1.0));
                 $pack_count = max(1,   (int)  ($_POST['pack_count'] ?? 1));
-                $delivery_type = $order['delivery_type'] === 'office' ? 'office' : 'door';
 
                 $desc = implode(', ', array_map(
                     fn($i) => ($i['name_bg'] ?? '') . ' x' . ($i['quantity'] ?? 1),
                     $items
                 ));
 
-                $result = $speedy->createShipment([
-                    'weight'           => $weight,
-                    'pack_count'       => $pack_count,
-                    'description'      => $desc ?: 'Поръчка #' . $order['order_number'],
-                    'receiver_name'    => $order['customer_name'],
-                    'receiver_phone'   => $order['customer_phone'],
-                    'receiver_city'    => $order['delivery_city'] ?? '',
-                    'receiver_address' => $order['delivery_address'] ?? '',
-                    'receiver_office'  => $order['delivery_type'] === 'office'
-                                         ? (int)$order['courier_office_code']
-                                         : null,
-                    'delivery_type'    => $delivery_type,
-                ]);
+                // delivery_type 'apt' (Speedy automat) maps to the office/pickup
+                // path just like 'office' — see SpeedyCourier::shipmentInputFromOrder.
+                $result = $speedy->createShipment(SpeedyCourier::shipmentInputFromOrder(
+                    $order, $weight, $pack_count, $desc ?: 'Поръчка #' . $order['order_number']
+                ));
 
                 $shipment_id = $result['shipment_number'];
                 if (!$shipment_id) throw new RuntimeException('Speedy не върна номер на пратката.');
