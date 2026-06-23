@@ -25,6 +25,7 @@
             <file>tests/Admin/ArticleSaveLogicTest.php</file>
             <file>tests/Admin/ProductSaveLogicTest.php</file>
             <file>tests/Admin/OrderViewLogicTest.php</file>
+            <file>tests/Admin/PagesAdminLogicTest.php</file>
         </testsuite>
     </testsuites>
 </phpunit>

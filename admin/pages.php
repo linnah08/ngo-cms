@@ -2,6 +2,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pages_admin.php';
 $active_nav = 'pages';
 
 admin_require_login();
@@ -119,17 +120,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: /admin/pages.php?page=home&saved=1'); exit;
 
     } elseif ($section === 'impact_delete') {
-        $items = load_json(IMPACT_FILE);
-        $idx   = (int)($_POST['item_index'] ?? -1);
-        foreach ($items as $i => &$_p) {
-            if (!isset($_p['order'])) $_p['order'] = $i;
-        }
-        unset($_p);
-        usort($items, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
-        if ($idx >= 0 && $idx < count($items)) {
-            array_splice($items, $idx, 1);
-            foreach ($items as $i => &$p) { $p['order'] = $i; }
-            unset($p);
+        $items = pages_list_delete(load_json(IMPACT_FILE), (int)($_POST['item_index'] ?? -1));
+        if ($items !== null) {
             save_json(IMPACT_FILE, $items);
             flash_set('success', 'Записът е изтрит.');
         }
@@ -137,34 +129,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
 
     } elseif ($section === 'impact_save') {
-        $items = load_json(IMPACT_FILE);
-        foreach ($items as $i => &$_p) {
-            if (!isset($_p['order'])) $_p['order'] = $i;
-        }
-        unset($_p);
-        usort($items, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
-
-        $idx = $_POST['item_index'] ?? 'new';
-
         $item = [
             'number'   => trim($_POST['impact_number']   ?? ''),
             'label_bg' => trim($_POST['impact_label_bg'] ?? ''),
             'label_en' => trim($_POST['impact_label_en'] ?? ''),
         ];
-
-        if ($idx === 'new') {
-            $max_order     = empty($items) ? -1 : max(array_column($items, 'order'));
-            $item['order'] = $max_order + 1;
-            $items[]       = $item;
-        } else {
-            $idx = (int)$idx;
-            if ($idx >= 0 && $idx < count($items)) {
-                $item['order'] = $items[$idx]['order'];
-                $items[$idx]   = $item;
-            }
-        }
-
-        usort($items, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
+        $items = pages_list_upsert(load_json(IMPACT_FILE), $_POST['item_index'] ?? 'new', $item);
         save_json(IMPACT_FILE, $items);
         header('Location: /admin/pages.php?page=impact&saved=1');
         exit;
@@ -219,18 +189,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: /admin/pages.php?page=about&saved=1'); exit;
 
     } elseif ($section === 'team_delete') {
-        $pages  = load_json(CONTENT_PATH . '/pages.json');
-        $team   = $pages['about']['team'] ?? [];
-        $idx    = (int)($_POST['team_index'] ?? -1);
-        foreach ($team as $i => &$_p) {
-            if (!isset($_p['order'])) $_p['order'] = $i;
-        }
-        unset($_p);
-        usort($team, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
-        if ($idx >= 0 && $idx < count($team)) {
-            array_splice($team, $idx, 1);
-            foreach ($team as $i => &$p) { $p['order'] = $i; }
-            unset($p);
+        $pages = load_json(CONTENT_PATH . '/pages.json');
+        $team  = pages_list_delete($pages['about']['team'] ?? [], (int)($_POST['team_index'] ?? -1));
+        if ($team !== null) {
             $pages['about']['team'] = $team;
             save_json(CONTENT_PATH . '/pages.json', $pages);
             flash_set('success', 'Членът е изтрит.');
@@ -239,17 +200,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
 
     } elseif ($section === 'team_save') {
-        $pages  = load_json(CONTENT_PATH . '/pages.json');
-        $team   = $pages['about']['team'] ?? [];
-        foreach ($team as $i => &$_p) {
-            if (!isset($_p['order'])) $_p['order'] = $i;
-        }
-        unset($_p);
-        usort($team, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
+        $pages = load_json(CONTENT_PATH . '/pages.json');
 
-        $idx = $_POST['team_index'] ?? 'new';
-
-        // Handle file upload
+        // Handle file upload (kept in the controller — the list maths is pure).
         $photo = trim($_POST['member_photo_current'] ?? '');
         if (
             !empty($_FILES['member_photo_file']['tmp_name']) &&
@@ -275,38 +228,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'bio_en'  => trim($_POST['member_bio_en']  ?? ''),
         ];
 
-        if ($idx === 'new') {
-            $max_order       = empty($team) ? -1 : max(array_column($team, 'order'));
-            $member['order'] = $max_order + 1;
-            $team[]          = $member;
-        } else {
-            $idx = (int)$idx;
-            if ($idx >= 0 && $idx < count($team)) {
-                $member['order'] = $team[$idx]['order'];
-                $team[$idx]      = $member;
-            }
-        }
-
-        usort($team, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
-        $pages['about']['team'] = $team;
+        $pages['about']['team'] = pages_list_upsert($pages['about']['team'] ?? [], $_POST['team_index'] ?? 'new', $member);
         save_json(CONTENT_PATH . '/pages.json', $pages);
         header('Location: /admin/pages.php?page=about&saved=1');
         exit;
 
     } elseif ($section === 'projects_delete') {
         $pages   = load_json(CONTENT_PATH . '/pages.json');
-        $idx     = (int)($_POST['proj_index'] ?? -1);
-        $current = $pages['projects'] ?? [];
-        foreach ($current as $i => &$_p) {
-            if (!isset($_p['order'])) $_p['order'] = $i;
-        }
-        unset($_p);
-        usort($current, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
-        if ($idx >= 0 && $idx < count($current)) {
-            array_splice($current, $idx, 1);
-            // Re-assign sequential order values
-            foreach ($current as $i => &$p) { $p['order'] = $i; }
-            unset($p);
+        $current = pages_list_delete($pages['projects'] ?? [], (int)($_POST['proj_index'] ?? -1));
+        if ($current !== null) {
             $pages['projects'] = $current;
             save_json(CONTENT_PATH . '/pages.json', $pages);
             flash_set('success', 'Проектът е изтрит.');
@@ -315,21 +245,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
 
     } elseif ($section === 'projects_save') {
-        $pages   = load_json(CONTENT_PATH . '/pages.json');
-        $current = $pages['projects'] ?? [];
-        // Assign order defaults before any modification
-        foreach ($current as $i => &$_p) {
-            if (!isset($_p['order'])) $_p['order'] = $i;
-        }
-        unset($_p);
-        usort($current, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
-
-        $idx = $_POST['proj_index'] ?? 'new';
+        $pages = load_json(CONTENT_PATH . '/pages.json');
 
         $images = json_decode($_POST['proj_images'] ?? '[]', true);
         if (!is_array($images)) $images = [];
 
-        // File upload
+        // File upload (kept in the controller — the list maths is pure).
         if (
             !empty($_FILES['proj_image_file']['tmp_name']) &&
             $_FILES['proj_image_file']['error'] === UPLOAD_ERR_OK
@@ -353,20 +274,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'images'   => $images,
         ];
 
-        if ($idx === 'new') {
-            $max_order = empty($current) ? -1 : max(array_column($current, 'order'));
-            $project['order'] = $max_order + 1;
-            $current[] = $project;
-        } else {
-            $idx = (int)$idx;
-            if ($idx >= 0 && $idx < count($current)) {
-                $project['order'] = $current[$idx]['order'];
-                $current[$idx]    = $project;
-            }
-        }
-
-        usort($current, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
-        $pages['projects'] = $current;
+        $pages['projects'] = pages_list_upsert($pages['projects'] ?? [], $_POST['proj_index'] ?? 'new', $project);
         save_json(CONTENT_PATH . '/pages.json', $pages);
         header('Location: /admin/pages.php?page=projects&saved=1');
         exit;
@@ -383,17 +291,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } elseif ($section === 'way_delete') {
         $pages = load_json(CONTENT_PATH . '/pages.json');
-        $ways  = $pages['how_to_help']['ways'] ?? [];
-        $idx   = (int)($_POST['way_index'] ?? -1);
-        foreach ($ways as $i => &$_p) {
-            if (!isset($_p['order'])) $_p['order'] = $i;
-        }
-        unset($_p);
-        usort($ways, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
-        if ($idx >= 0 && $idx < count($ways)) {
-            array_splice($ways, $idx, 1);
-            foreach ($ways as $i => &$p) { $p['order'] = $i; }
-            unset($p);
+        $ways  = pages_list_delete($pages['how_to_help']['ways'] ?? [], (int)($_POST['way_index'] ?? -1));
+        if ($ways !== null) {
             $pages['how_to_help']['ways'] = $ways;
             save_json(CONTENT_PATH . '/pages.json', $pages);
             flash_set('success', 'Начинът е изтрит.');
@@ -403,36 +302,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } elseif ($section === 'way_save') {
         $pages = load_json(CONTENT_PATH . '/pages.json');
-        $ways  = $pages['how_to_help']['ways'] ?? [];
-        foreach ($ways as $i => &$_p) {
-            if (!isset($_p['order'])) $_p['order'] = $i;
-        }
-        unset($_p);
-        usort($ways, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
-
-        $idx = $_POST['way_index'] ?? 'new';
-
         $way = [
             'title'    => trim($_POST['way_title']    ?? ''),
             'title_en' => trim($_POST['way_title_en'] ?? ''),
             'text'     => trim($_POST['way_text']     ?? ''),
             'text_en'  => trim($_POST['way_text_en']  ?? ''),
         ];
-
-        if ($idx === 'new') {
-            $max_order    = empty($ways) ? -1 : max(array_column($ways, 'order'));
-            $way['order'] = $max_order + 1;
-            $ways[]       = $way;
-        } else {
-            $idx = (int)$idx;
-            if ($idx >= 0 && $idx < count($ways)) {
-                $way['order'] = $ways[$idx]['order'];
-                $ways[$idx]   = $way;
-            }
-        }
-
-        usort($ways, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
-        $pages['how_to_help']['ways'] = $ways;
+        $pages['how_to_help']['ways'] = pages_list_upsert($pages['how_to_help']['ways'] ?? [], $_POST['way_index'] ?? 'new', $way);
         save_json(CONTENT_PATH . '/pages.json', $pages);
         header('Location: /admin/pages.php?page=how_to_help&saved=1');
         exit;
