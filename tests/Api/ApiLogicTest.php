@@ -351,4 +351,66 @@ final class ApiLogicTest extends TestCase
             : '/checkout/confirmation/?order=' . urlencode($order_number);
         $this->assertStringContainsString(urlencode($order_number), $confirm_url);
     }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // admin/api/error-alerts.php — bearer-token auth
+    // (groundwork for a future AI auto-fix routine; GET-only poll endpoint)
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Replicates the Authorization header parsing in admin/api/error-alerts.php.
+     */
+    private function extractBearerToken(string $authHeader): string
+    {
+        if (preg_match('/^Bearer\s+(.+)$/i', trim($authHeader), $m)) {
+            return trim($m[1]);
+        }
+        return '';
+    }
+
+    public function test_bearer_token_extracted_from_valid_header(): void
+    {
+        $this->assertSame('abc123', $this->extractBearerToken('Bearer abc123'));
+    }
+
+    public function test_bearer_token_extraction_is_case_insensitive(): void
+    {
+        $this->assertSame('abc123', $this->extractBearerToken('bearer abc123'));
+    }
+
+    public function test_bearer_token_extraction_rejects_missing_prefix(): void
+    {
+        $this->assertSame('', $this->extractBearerToken('abc123'));
+    }
+
+    public function test_bearer_token_extraction_rejects_empty_header(): void
+    {
+        $this->assertSame('', $this->extractBearerToken(''));
+    }
+
+    public function test_auth_denies_when_configured_token_is_empty(): void
+    {
+        // Replicates the guard: an unset API token means the feature is off,
+        // never "any token is valid".
+        $configuredToken = '';
+        $providedToken   = 'anything';
+        $allowed = $configuredToken !== '' && hash_equals($configuredToken, $providedToken);
+        $this->assertFalse($allowed);
+    }
+
+    public function test_auth_allows_matching_token(): void
+    {
+        $configuredToken = str_repeat('a', 64);
+        $providedToken   = str_repeat('a', 64);
+        $allowed = $configuredToken !== '' && hash_equals($configuredToken, $providedToken);
+        $this->assertTrue($allowed);
+    }
+
+    public function test_auth_denies_mismatched_token(): void
+    {
+        $configuredToken = str_repeat('a', 64);
+        $providedToken   = str_repeat('b', 64);
+        $allowed = $configuredToken !== '' && hash_equals($configuredToken, $providedToken);
+        $this->assertFalse($allowed);
+    }
 }

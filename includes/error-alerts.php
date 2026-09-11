@@ -108,3 +108,34 @@ function error_alert_send_immediate(array $row, string $email): void
         error_log('error_alert_send_immediate: ' . $e->getMessage());
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Groundwork for a future hourly AI auto-fix routine (admin/api/error-alerts.php).
+// That routine does not exist yet — this only exposes read access to captured
+// errors plus the bearer token it would authenticate with. No status/outcome
+// tracking columns exist on error_alerts, so there is nothing here yet for a
+// routine to claim/mark-fixed; that lands together with the routine itself.
+// ─────────────────────────────────────────────────────────────────────────
+
+function error_alert_list_recent(int $limit = 30): array
+{
+    error_alert_ensure_table();
+    $limit = max(1, min(200, $limit));
+    $stmt = get_pdo()->prepare(
+        "SELECT * FROM error_alerts ORDER BY created_at DESC LIMIT {$limit}"
+    );
+    $stmt->execute();
+    return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+}
+
+function error_alert_api_token(): string
+{
+    return setting_get('error_alert_api_token');
+}
+
+function error_alert_generate_api_token(): string
+{
+    $token = bin2hex(random_bytes(32));
+    setting_set('error_alert_api_token', $token);
+    return $token;
+}

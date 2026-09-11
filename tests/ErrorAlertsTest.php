@@ -105,6 +105,45 @@ final class ErrorAlertsTest extends TestCase
         setting_set('error_alert_last_hash_at', '');
     }
 
+    // ── AI auto-fix groundwork: polling API support ─────────────────────────
+    // (No ai_status/outcome tracking here — that lands with the routine itself.)
+
+    public function testListRecentReturnsRowsNewestFirst(): void
+    {
+        self::$pdo->prepare(
+            "INSERT INTO error_alerts (error_class, message, file, line, created_at) VALUES ('TestCapture', 'Recent 1', '/f.php', 1, ?)"
+        )->execute([date('Y-m-d H:i:s', time() - 60)]);
+        $olderId = (int) self::$pdo->lastInsertId();
+
+        self::$pdo->prepare(
+            "INSERT INTO error_alerts (error_class, message, file, line, created_at) VALUES ('TestCapture', 'Recent 2', '/f.php', 2, ?)"
+        )->execute([date('Y-m-d H:i:s')]);
+        $newerId = (int) self::$pdo->lastInsertId();
+
+        $recent = error_alert_list_recent(50);
+        $ids    = array_column($recent, 'id');
+
+        $this->assertContains($olderId, $ids);
+        $this->assertContains($newerId, $ids);
+        $this->assertLessThan(array_search($olderId, $ids), array_search($newerId, $ids));
+    }
+
+    public function testListRecentClampsLimit(): void
+    {
+        $recent = error_alert_list_recent(9999);
+        $this->assertLessThanOrEqual(200, count($recent));
+    }
+
+    public function testGenerateApiTokenIsUniqueAndPersists(): void
+    {
+        $token1 = error_alert_generate_api_token();
+        $this->assertSame($token1, error_alert_api_token());
+
+        $token2 = error_alert_generate_api_token();
+        $this->assertNotSame($token1, $token2);
+        $this->assertSame($token2, error_alert_api_token());
+    }
+
     public static function tearDownAfterClass(): void
     {
         if (!isset(self::$pdo)) return;
@@ -112,5 +151,6 @@ final class ErrorAlertsTest extends TestCase
         setting_set('error_alert_enabled',   '0');
         setting_set('error_alert_email',     '');
         setting_set('error_alert_frequency', 'immediate');
+        setting_set('error_alert_api_token', '');
     }
 }
