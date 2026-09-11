@@ -42,8 +42,15 @@ try {
     // Silently skip — comments are non-critical
 }
 
-$flash_success = flash_get('comment_success');
-$flash_error   = flash_get('comment_error');
+$flash_success = false;
+$flash_error   = '';
+foreach (flash_get() as $f) {
+    if ($f['type'] === 'comment_success') {
+        $flash_success = true;
+    } elseif ($f['type'] === 'comment_error') {
+        $flash_error = $f['message'];
+    }
+}
 
 $label_title    = $is_en ? 'Comments'                         : 'Коментари';
 $label_name     = $is_en ? 'Your name'                        : 'Вашето име';
@@ -126,6 +133,8 @@ $label_none     = $is_en ? 'No comments yet. Be the first!'  : 'Все още н
         <textarea name="content" required minlength="5" maxlength="2000" rows="5"
                   style="width:100%;box-sizing:border-box;padding:.6rem .85rem;border:1px solid var(--border);border-radius:var(--radius);font-size:.95rem;resize:vertical;font-family:inherit;"></textarea>
       </div>
+
+      <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/turnstile-widget.php'; ?>
 
       <div>
         <button type="submit" class="btn btn--primary"><?= $label_submit ?></button>

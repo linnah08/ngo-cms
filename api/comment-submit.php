@@ -1,6 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/spam_filter.php';
 start_session();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -25,6 +26,13 @@ if (!empty($_POST['website'])) {
     exit;
 }
 
+// ── Turnstile ─────────────────────────────────────────────────────────────────
+if (turnstile_is_configured() && !turnstile_verify($_POST['cf-turnstile-response'] ?? '', $_SERVER['REMOTE_ADDR'] ?? '')) {
+    flash_set('comment_success', '1');
+    header('Location: ' . $back . '#comments');
+    exit;
+}
+
 $name    = trim($_POST['author_name']  ?? '');
 $email   = trim($_POST['author_email'] ?? '');
 $content = trim($_POST['content']      ?? '');
@@ -42,6 +50,13 @@ if (mb_strlen($content) > 2000)
 
 if ($errors) {
     flash_set('comment_error', implode(' ', $errors));
+    header('Location: ' . $back . '#comments');
+    exit;
+}
+
+// ── Content blocklist ─────────────────────────────────────────────────────────
+if (spam_content_is_blocked($content)) {
+    flash_set('comment_success', '1');
     header('Location: ' . $back . '#comments');
     exit;
 }
