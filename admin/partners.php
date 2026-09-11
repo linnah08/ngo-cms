@@ -72,6 +72,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         save_json(PARTNERS_FILE, $partners);
         header('Location: /admin/partners.php?deleted=1');
         exit;
+
+    } elseif ($action === 'bulk_toggle') {
+        $ids = array_values(array_filter(array_map('strval', (array)($_POST['ids'] ?? []))));
+        if ($ids) {
+            $allActive = true;
+            foreach ($partners as $p) {
+                if (in_array($p['id'], $ids, true) && !($p['active'] ?? true)) { $allActive = false; break; }
+            }
+            $newActive = !$allActive;
+            foreach ($partners as &$p) {
+                if (in_array($p['id'], $ids, true)) { $p['active'] = $newActive; }
+            }
+            unset($p);
+            save_json(PARTNERS_FILE, $partners);
+        }
+        header('Location: /admin/partners.php?toggled=1');
+        exit;
+
+    } elseif ($action === 'bulk_delete') {
+        $ids = array_values(array_filter(array_map('strval', (array)($_POST['ids'] ?? []))));
+        if ($ids) {
+            $partners = array_values(array_filter($partners, fn($p) => !in_array($p['id'], $ids, true)));
+            save_json(PARTNERS_FILE, $partners);
+        }
+        header('Location: /admin/partners.php?deleted=1');
+        exit;
     }
 }
 
@@ -93,15 +119,17 @@ $partners = load_json(PARTNERS_FILE);
   <table class="admin-table" style="table-layout:fixed;width:100%;">
     <colgroup>
       <col style="width:3%;">
-      <col style="width:12%;">
-      <col style="width:25%;">
-      <col style="width:30%;">
-      <col style="width:15%;">
+      <col style="width:4%;">
+      <col style="width:10%;">
+      <col style="width:23%;">
+      <col style="width:27%;">
+      <col style="width:14%;">
       <col style="width:15%;">
     </colgroup>
     <thead>
       <tr>
         <th style="width:30px;"></th>
+        <th style="overflow:hidden;"><input type="checkbox" id="select-all" aria-label="Избери всички" style="cursor:pointer;width:16px;height:16px;"></th>
         <th style="overflow:hidden;">Лого</th>
         <th data-sort style="overflow:hidden;">Име</th>
         <th data-sort style="overflow:hidden;">URL</th>
@@ -113,6 +141,12 @@ $partners = load_json(PARTNERS_FILE);
       <?php foreach ($partners as $partner): ?>
         <tr draggable="true" data-id="<?= h($partner['id']) ?>">
           <td class="drag-handle" title="Влачете за пренареждане" style="cursor:grab;color:var(--text-muted);">&#8942;</td>
+          <td style="text-align:center;vertical-align:middle;">
+            <input type="checkbox" class="row-cb"
+                   value="<?= h($partner['id']) ?>"
+                   data-active="<?= ($partner['active'] ?? true) ? '1' : '0' ?>"
+                   style="cursor:pointer;width:16px;height:16px;">
+          </td>
           <td>
             <?php if (!empty($partner['logo'])): ?>
               <img src="<?= h($partner['logo']) ?>" alt="<?= h($partner['name']) ?>"
@@ -156,6 +190,114 @@ $partners = load_json(PARTNERS_FILE);
     </tbody>
   </table>
 </div>
+
+<?php if (!empty($partners)): ?>
+<div id="bulk-bar" style="
+  position:fixed;bottom:0;left:0;right:0;
+  background:#1a1a2e;color:#fff;
+  padding:1rem 2rem;
+  display:flex;align-items:center;gap:1rem;
+  transform:translateY(100%);transition:transform 0.2s ease;
+  z-index:1000;box-shadow:0 -2px 8px rgba(0,0,0,0.3);">
+  <span id="bulk-count" style="font-weight:500;">0 избрани</span>
+  <button id="bulk-toggle" type="button" class="btn btn--primary">Активирай</button>
+  <button id="bulk-delete" type="button" class="btn btn--danger">Изтрий</button>
+  <button id="bulk-clear" type="button" class="btn-link" style="color:#aaa;margin-left:auto;">✕ Изчисти</button>
+</div>
+
+<form id="form-bulk-toggle" method="POST" action="/admin/partners.php" style="display:none;">
+  <?= csrf_field() ?>
+  <input type="hidden" name="action" value="bulk_toggle">
+</form>
+
+<form id="form-bulk-delete" method="POST" action="/admin/partners.php" style="display:none;">
+  <?= csrf_field() ?>
+  <input type="hidden" name="action" value="bulk_delete">
+</form>
+
+<script>
+(function () {
+    var selectAll = document.getElementById('select-all');
+    var bulkBar   = document.getElementById('bulk-bar');
+    var countEl   = document.getElementById('bulk-count');
+    var toggleBtn = document.getElementById('bulk-toggle');
+    var deleteBtn = document.getElementById('bulk-delete');
+    var clearBtn  = document.getElementById('bulk-clear');
+    var formToggle = document.getElementById('form-bulk-toggle');
+    var formDelete = document.getElementById('form-bulk-delete');
+
+    function getCheckboxes() {
+        return Array.from(document.querySelectorAll('.row-cb'));
+    }
+
+    function getSelected() {
+        return getCheckboxes().filter(function (cb) { return cb.checked; });
+    }
+
+    function updateToolbar() {
+        var selected = getSelected();
+        var count    = selected.length;
+
+        countEl.textContent = count + ' избрани';
+        bulkBar.style.transform = count > 0 ? 'translateY(0)' : 'translateY(100%)';
+
+        var allActive = selected.length > 0 && selected.every(function (cb) { return cb.dataset.active === '1'; });
+        toggleBtn.textContent = allActive ? 'Деактивирай' : 'Активирай';
+
+        var all = getCheckboxes();
+        selectAll.indeterminate = count > 0 && count < all.length;
+        selectAll.checked       = all.length > 0 && count === all.length;
+    }
+
+    function injectIds(form, selected) {
+        form.querySelectorAll('input[name="ids[]"]').forEach(function (el) { el.remove(); });
+        selected.forEach(function (cb) {
+            var input = document.createElement('input');
+            input.type  = 'hidden';
+            input.name  = 'ids[]';
+            input.value = cb.value;
+            form.appendChild(input);
+        });
+    }
+
+    selectAll.addEventListener('change', function () {
+        getCheckboxes().forEach(function (cb) { cb.checked = selectAll.checked; });
+        updateToolbar();
+    });
+
+    getCheckboxes().forEach(function (cb) {
+        cb.addEventListener('change', updateToolbar);
+    });
+
+    toggleBtn.addEventListener('click', function () {
+        var selected = getSelected();
+        if (!selected.length) return;
+        injectIds(formToggle, selected);
+        formToggle.submit();
+    });
+
+    deleteBtn.addEventListener('click', function () {
+        var selected = getSelected();
+        if (!selected.length) return;
+        _adminConfirm(
+            'Изтриване на ' + selected.length + ' партньора. Продължавате?',
+            'Изтрий'
+        ).then(function (confirmed) {
+            if (!confirmed) return;
+            injectIds(formDelete, selected);
+            formDelete.submit();
+        });
+    });
+
+    clearBtn.addEventListener('click', function () {
+        getCheckboxes().forEach(function (cb) { cb.checked = false; });
+        selectAll.checked       = false;
+        selectAll.indeterminate = false;
+        updateToolbar();
+    });
+})();
+</script>
+<?php endif; ?>
 
 <!-- Add partner -->
 <h2 style="margin-bottom:1.5rem;">Добавяне на партньор</h2>
