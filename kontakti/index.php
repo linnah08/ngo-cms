@@ -3,6 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/spam_filter.php';
 
 $page_title       = 'Контакти';
 $page_description = 'Свържете се с ' . SITE_NAME_BG . '.';
@@ -48,11 +49,22 @@ $pdo->exec("
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) {
         $error = 'Невалидна заявка.';
+    } elseif (!empty($_POST['website'])) {
+        // Honeypot tripped — pretend success without saving anything.
+        $sent = true;
     } else {
         $name    = sanitize($_POST['name']    ?? '');
         $email   = sanitize($_POST['email']   ?? '');
         $topic   = sanitize($_POST['topic']   ?? '');
         $message = sanitize($_POST['message'] ?? '');
+        $ip      = $_SERVER['REMOTE_ADDR'] ?? '';
+
+        $rate_limit_stmt = $pdo->prepare("
+            SELECT COUNT(*) FROM contact_submissions
+            WHERE ip = ? AND created_at > DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+        ");
+        $rate_limit_stmt->execute([$ip]);
+        $rate_limited = (int)$rate_limit_stmt->fetchColumn() > 0;
 
         if (!$name || !$email || !$topic || !$message) {
             $error = 'Моля попълнете всички полета.';
@@ -60,12 +72,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Невалиден имейл адрес.';
         } elseif (!in_array($topic, $_topics, true)) {
             $error = 'Моля изберете валидна тема.';
+        } elseif (
+            $rate_limited
+            || spam_content_is_blocked($message)
+            || (turnstile_is_configured() && !turnstile_verify($_POST['cf-turnstile-response'] ?? '', $ip))
+        ) {
+            // Any spam signal — pretend success without saving or emailing.
+            $sent = true;
         } else {
             // Save to DB
             $pdo->prepare("
                 INSERT INTO contact_submissions (name, email, topic, message, ip, lang)
                 VALUES (?, ?, ?, ?, ?, 'bg')
-            ")->execute([$name, $email, $topic, $message, $_SERVER['REMOTE_ADDR'] ?? '']);
+            ")->execute([$name, $email, $topic, $message, $ip]);
 
             // Send email notification
             $subject = '[Контакт] ' . $topic . ' — ' . $name;
@@ -140,6 +159,11 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
           <?php endif; ?>
           <form method="POST" action="/kontakti/">
             <?= csrf_field() ?>
+            <!-- Honeypot: hidden from humans, filled by bots -->
+            <div style="display:none;" aria-hidden="true">
+              <label for="website">Website</label>
+              <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+            </div>
             <div class="form-group">
               <label for="name">Имена</label>
               <input type="text" id="name" name="name"
@@ -166,6 +190,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
               <label for="message">Съобщение</label>
               <textarea id="message" name="message" required><?= h($_POST['message'] ?? '') ?></textarea>
             </div>
+            <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/turnstile-widget.php'; ?>
             <button type="submit" class="btn btn--primary">Изпрати съобщение</button>
           </form>
         <?php endif; ?>
