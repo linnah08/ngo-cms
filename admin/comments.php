@@ -5,6 +5,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/auth.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/spam_filter.php';
 admin_require_editorial();
 
 $pdo = get_pdo();
@@ -60,26 +61,168 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Comment moderation
     $id = (int)($_POST['id'] ?? 0);
-    if ($id > 0 && in_array($post_action, ['approve', 'reject', 'delete'])) {
+    if ($id > 0 && in_array($post_action, ['approve', 'reject', 'delete', 'spam'], true)) {
+        $qs = array_filter($_GET);
         if ($post_action === 'delete') {
             $pdo->prepare('DELETE FROM comments WHERE id = ?')->execute([$id]);
+        } elseif ($post_action === 'spam') {
+            $domains = spam_mark_comments_as_spam($pdo, [$id]);
+            $qs['spam_marked'] = '1';
+            if ($domains) {
+                start_session();
+                $_SESSION['spam_candidate_domains'] = $domains;
+                $qs['spam_review'] = '1';
+            }
         } else {
             $status = $post_action === 'approve' ? 'approved' : 'rejected';
             $pdo->prepare('UPDATE comments SET status = ? WHERE id = ?')->execute([$status, $id]);
         }
-        header('Location: /admin/comments.php?' . http_build_query(array_filter($_GET)));
+        header('Location: /admin/comments.php?' . http_build_query($qs));
         exit;
     }
 
     // Contact submission status
     $csub_id = (int)($_POST['csub_id'] ?? 0);
-    if ($csub_id > 0 && in_array($post_action, ['csub_read', 'csub_archive', 'csub_delete'])) {
+    if ($csub_id > 0 && in_array($post_action, ['csub_read', 'csub_archive', 'csub_delete', 'csub_spam'], true)) {
+        $qs = array_filter($_GET);
         if ($post_action === 'csub_delete') {
             $pdo->prepare('DELETE FROM contact_submissions WHERE id = ?')->execute([$csub_id]);
+        } elseif ($post_action === 'csub_spam') {
+            $domains = spam_mark_contacts_as_spam($pdo, [$csub_id]);
+            $qs['spam_marked'] = '1';
+            if ($domains) {
+                start_session();
+                $_SESSION['spam_candidate_domains'] = $domains;
+                $qs['spam_review'] = '1';
+            }
         } else {
             $status = $post_action === 'csub_read' ? 'read' : 'archived';
             $pdo->prepare('UPDATE contact_submissions SET status = ? WHERE id = ?')->execute([$status, $csub_id]);
         }
+        header('Location: /admin/comments.php?' . http_build_query($qs));
+        exit;
+    }
+
+    // Bulk mark as spam — comments
+    if ($post_action === 'bulk_spam_comments') {
+        $ids = array_values(array_filter(array_map('intval', (array)($_POST['ids'] ?? [])), fn($v) => $v > 0));
+        $qs  = array_filter($_GET);
+        if ($ids) {
+            $domains = spam_mark_comments_as_spam($pdo, $ids);
+            $qs['spam_marked'] = (string)count($ids);
+            if ($domains) {
+                start_session();
+                $_SESSION['spam_candidate_domains'] = $domains;
+                $qs['spam_review'] = '1';
+            }
+        }
+        header('Location: /admin/comments.php?' . http_build_query($qs));
+        exit;
+    }
+
+    // Bulk approve — comments
+    if ($post_action === 'bulk_approve_comments') {
+        $ids = array_values(array_filter(array_map('intval', (array)($_POST['ids'] ?? [])), fn($v) => $v > 0));
+        $qs  = array_filter($_GET);
+        if ($ids) {
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $pdo->prepare("UPDATE comments SET status = 'approved' WHERE id IN ($placeholders)")->execute($ids);
+        }
+        header('Location: /admin/comments.php?' . http_build_query($qs));
+        exit;
+    }
+
+    // Bulk reject — comments
+    if ($post_action === 'bulk_reject_comments') {
+        $ids = array_values(array_filter(array_map('intval', (array)($_POST['ids'] ?? [])), fn($v) => $v > 0));
+        $qs  = array_filter($_GET);
+        if ($ids) {
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $pdo->prepare("UPDATE comments SET status = 'rejected' WHERE id IN ($placeholders)")->execute($ids);
+        }
+        header('Location: /admin/comments.php?' . http_build_query($qs));
+        exit;
+    }
+
+    // Bulk delete — comments
+    if ($post_action === 'bulk_delete_comments') {
+        $ids = array_values(array_filter(array_map('intval', (array)($_POST['ids'] ?? [])), fn($v) => $v > 0));
+        $qs  = array_filter($_GET);
+        if ($ids) {
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $pdo->prepare("DELETE FROM comments WHERE id IN ($placeholders)")->execute($ids);
+        }
+        header('Location: /admin/comments.php?' . http_build_query($qs));
+        exit;
+    }
+
+    // Bulk mark as spam — contacts
+    if ($post_action === 'bulk_spam_contacts') {
+        $ids = array_values(array_filter(array_map('intval', (array)($_POST['ids'] ?? [])), fn($v) => $v > 0));
+        $qs  = array_filter($_GET);
+        if ($ids) {
+            $domains = spam_mark_contacts_as_spam($pdo, $ids);
+            $qs['spam_marked'] = (string)count($ids);
+            if ($domains) {
+                start_session();
+                $_SESSION['spam_candidate_domains'] = $domains;
+                $qs['spam_review'] = '1';
+            }
+        }
+        header('Location: /admin/comments.php?' . http_build_query($qs));
+        exit;
+    }
+
+    // Bulk mark as read — contacts
+    if ($post_action === 'bulk_read_contacts') {
+        $ids = array_values(array_filter(array_map('intval', (array)($_POST['ids'] ?? [])), fn($v) => $v > 0));
+        $qs  = array_filter($_GET);
+        if ($ids) {
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $pdo->prepare("UPDATE contact_submissions SET status = 'read' WHERE id IN ($placeholders)")->execute($ids);
+        }
+        header('Location: /admin/comments.php?' . http_build_query($qs));
+        exit;
+    }
+
+    // Bulk archive — contacts
+    if ($post_action === 'bulk_archive_contacts') {
+        $ids = array_values(array_filter(array_map('intval', (array)($_POST['ids'] ?? [])), fn($v) => $v > 0));
+        $qs  = array_filter($_GET);
+        if ($ids) {
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $pdo->prepare("UPDATE contact_submissions SET status = 'archived' WHERE id IN ($placeholders)")->execute($ids);
+        }
+        header('Location: /admin/comments.php?' . http_build_query($qs));
+        exit;
+    }
+
+    // Bulk delete — contacts
+    if ($post_action === 'bulk_delete_contacts') {
+        $ids = array_values(array_filter(array_map('intval', (array)($_POST['ids'] ?? [])), fn($v) => $v > 0));
+        $qs  = array_filter($_GET);
+        if ($ids) {
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $pdo->prepare("DELETE FROM contact_submissions WHERE id IN ($placeholders)")->execute($ids);
+        }
+        header('Location: /admin/comments.php?' . http_build_query($qs));
+        exit;
+    }
+
+    // Confirm extracted domains → add to blocklist
+    if ($post_action === 'confirm_spam_domains') {
+        $checked = $_POST['domains'] ?? [];
+        if ($checked) spam_blocklist_add($checked);
+        start_session();
+        unset($_SESSION['spam_candidate_domains']);
+        header('Location: /admin/comments.php?' . http_build_query(array_filter($_GET)));
+        exit;
+    }
+
+    // Dismiss the domain-review banner without adding anything
+    if ($post_action === 'dismiss_spam_review') {
+        start_session();
+        unset($_SESSION['spam_candidate_domains']);
         header('Location: /admin/comments.php?' . http_build_query(array_filter($_GET)));
         exit;
     }
@@ -88,14 +231,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
+// ── Pending domain-review banner (populated by a bulk/single spam mark) ───────
+$spam_candidate_domains = [];
+if (!empty($_GET['spam_review'])) {
+    start_session();
+    $spam_candidate_domains = $_SESSION['spam_candidate_domains'] ?? [];
+}
+
 // ── Source toggle: comments | contacts | both ──────────────────────────────────
 $source = in_array($_GET['source'] ?? '', ['comments', 'contacts', 'both']) ? $_GET['source'] : 'both';
 
 // ── Comment filter ─────────────────────────────────────────────────────────────
-$comment_filter = in_array($_GET['filter'] ?? '', ['pending', 'approved', 'rejected']) ? $_GET['filter'] : 'pending';
+$comment_filter = in_array($_GET['filter'] ?? '', ['pending', 'approved', 'rejected', 'spam']) ? $_GET['filter'] : 'pending';
 
 // ── Contact submission filter ──────────────────────────────────────────────────
-$contact_filter = in_array($_GET['cfilter'] ?? '', ['new', 'read', 'archived']) ? $_GET['cfilter'] : 'new';
+$contact_filter = in_array($_GET['cfilter'] ?? '', ['new', 'read', 'archived', 'spam']) ? $_GET['cfilter'] : 'new';
 
 // Load comments
 $comments = [];
@@ -156,6 +306,34 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   </div>
 <?php endif; ?>
 
+<?php if (!empty($_GET['spam_marked'])): ?>
+  <div style="background:#e6f4ea;border:1px solid #a8d5b0;color:#2d6a35;border-radius:6px;padding:.75rem 1rem;margin-bottom:1.5rem;font-size:.9rem;">
+    ✓ <?= (int)$_GET['spam_marked'] ?> маркирани като спам.
+  </div>
+<?php endif; ?>
+
+<?php if ($spam_candidate_domains): ?>
+  <div class="admin-card" style="padding:1.25rem;margin-bottom:1.75rem;border-color:#f0c4c0;">
+    <p style="margin:0 0 .75rem;font-weight:600;">
+      Намерени линкове в маркирания спам — да ги добавя ли към блокирания списък?
+    </p>
+    <form method="POST">
+      <?= csrf_field() ?>
+      <div style="display:flex;flex-direction:column;gap:.4rem;margin-bottom:1rem;">
+        <?php foreach ($spam_candidate_domains as $d): ?>
+          <label style="font-size:.9rem;">
+            <input type="checkbox" name="domains[]" value="<?= h($d) ?>" checked> <?= h($d) ?>
+          </label>
+        <?php endforeach; ?>
+      </div>
+      <div style="display:flex;gap:.75rem;">
+        <button type="submit" name="action" value="confirm_spam_domains" class="btn btn--primary" style="font-size:.85rem;">Добави в спам филтъра</button>
+        <button type="submit" name="action" value="dismiss_spam_review" class="btn btn--outline" style="font-size:.85rem;">Пропусни</button>
+      </div>
+    </form>
+  </div>
+<?php endif; ?>
+
 <!-- ── Source toggle ──────────────────────────────────────────────────────────── -->
 <div style="display:flex;gap:.5rem;margin-bottom:1.75rem;flex-wrap:wrap;">
   <?php
@@ -177,7 +355,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <h2 style="font-size:1rem;font-weight:600;margin-bottom:1rem;">Коментари към статии</h2>
   <div style="display:flex;gap:.5rem;margin-bottom:1.25rem;border-bottom:1px solid var(--border);">
     <?php
-    $ctabs = ['pending' => 'Чакащи', 'approved' => 'Одобрени', 'rejected' => 'Отхвърлени'];
+    $ctabs = ['pending' => 'Чакащи', 'approved' => 'Одобрени', 'rejected' => 'Отхвърлени', 'spam' => 'Спам'];
     foreach ($ctabs as $key => $label):
       $count  = (int)($comment_counts[$key] ?? 0);
       $active = $comment_filter === $key;
@@ -193,6 +371,24 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <?php endforeach; ?>
   </div>
 
+  <form id="commentsBulkForm" method="POST" style="margin-bottom:1rem;">
+    <?= csrf_field() ?>
+    <div id="commentsBulkBar" style="display:none;align-items:center;gap:.75rem;flex-wrap:wrap;background:var(--warm-grey);border:1px solid var(--border);border-radius:8px;padding:.6rem 1rem;">
+      <span id="commentsBulkCount" style="font-size:.875rem;font-weight:600;white-space:nowrap;"></span>
+      <button type="submit" name="action" value="bulk_approve_comments" class="btn btn--primary" style="font-size:.82rem;padding:.35rem .85rem;">✓ Одобри</button>
+      <button type="submit" name="action" value="bulk_reject_comments" class="btn btn--outline" style="font-size:.82rem;padding:.35rem .85rem;color:#c0392b;border-color:#c0392b;">✗ Отхвърли</button>
+      <button type="submit" name="action" value="bulk_spam_comments" class="btn btn--outline" style="font-size:.82rem;padding:.35rem .85rem;color:#c0392b;border-color:#c0392b;">🚫 Маркирай като спам</button>
+      <button type="submit" name="action" value="bulk_delete_comments" class="btn btn--outline" style="font-size:.82rem;padding:.35rem .85rem;color:#c0392b;border-color:#c0392b;"
+              data-confirm="Изтриване на избраните коментари — сигурни ли сте?" data-confirm-ok="Изтрий">Изтрий</button>
+      <button type="button" onclick="spamClearAll('comments')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.875rem;">✕ Откажи</button>
+    </div>
+  </form>
+  <?php if (!empty($comments)): ?>
+    <label style="display:inline-flex;align-items:center;gap:.4rem;font-size:.82rem;color:var(--text-muted);margin-bottom:.75rem;cursor:pointer;">
+      <input type="checkbox" id="commentsCheckAll" onchange="spamToggleAll('comments', this)"> Избери всички
+    </label>
+  <?php endif; ?>
+
   <?php if (empty($comments)): ?>
     <p style="color:var(--text-muted);font-size:.9rem;">Няма коментари в тази категория.</p>
   <?php else: ?>
@@ -203,6 +399,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
             <div style="flex:1;min-width:0;">
               <div style="display:flex;align-items:baseline;gap:.75rem;margin-bottom:.4rem;flex-wrap:wrap;">
+                <input type="checkbox" name="ids[]" value="<?= (int)$c['id'] ?>" form="commentsBulkForm"
+                       class="comments-row-check" onchange="spamUpdateBar('comments')">
                 <strong><?= h($c['author_name']) ?></strong>
                 <span style="font-size:.82rem;color:var(--text-muted);"><?= h($c['author_email']) ?></span>
                 <span style="font-size:.78rem;color:var(--text-muted);"><?= h($c['created_at']) ?></span>
@@ -227,6 +425,10 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
                   <button type="submit" name="action" value="reject"
                           class="btn btn--outline" style="font-size:.82rem;padding:.35rem .85rem;white-space:nowrap;color:#c0392b;border-color:#c0392b;">✗ Отхвърли</button>
                 <?php endif; ?>
+                <?php if ($c['status'] !== 'spam'): ?>
+                  <button type="submit" name="action" value="spam"
+                          class="btn btn--outline" style="font-size:.82rem;padding:.35rem .85rem;white-space:nowrap;color:#c0392b;border-color:#c0392b;">🚫 Спам</button>
+                <?php endif; ?>
                 <button type="submit" name="action" value="delete"
                         class="btn btn--outline" style="font-size:.82rem;padding:.35rem .85rem;white-space:nowrap;"
                         data-confirm="Изтриване на коментар — сигурни ли сте?" data-confirm-ok="Изтрий">Изтрий</button>
@@ -246,7 +448,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <h2 style="font-size:1rem;font-weight:600;margin-bottom:1rem;">Съобщения от контактната форма</h2>
   <div style="display:flex;gap:.5rem;margin-bottom:1.25rem;border-bottom:1px solid var(--border);">
     <?php
-    $ctabs2 = ['new' => 'Нови', 'read' => 'Прочетени', 'archived' => 'Архивирани'];
+    $ctabs2 = ['new' => 'Нови', 'read' => 'Прочетени', 'archived' => 'Архивирани', 'spam' => 'Спам'];
     foreach ($ctabs2 as $key => $label):
       $count  = (int)($contact_counts[$key] ?? 0);
       $active = $contact_filter === $key;
@@ -262,6 +464,24 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <?php endforeach; ?>
   </div>
 
+  <form id="contactsBulkForm" method="POST" style="margin-bottom:1rem;">
+    <?= csrf_field() ?>
+    <div id="contactsBulkBar" style="display:none;align-items:center;gap:.75rem;flex-wrap:wrap;background:var(--warm-grey);border:1px solid var(--border);border-radius:8px;padding:.6rem 1rem;">
+      <span id="contactsBulkCount" style="font-size:.875rem;font-weight:600;white-space:nowrap;"></span>
+      <button type="submit" name="action" value="bulk_read_contacts" class="btn btn--primary" style="font-size:.82rem;padding:.35rem .85rem;">✓ Прочетено</button>
+      <button type="submit" name="action" value="bulk_archive_contacts" class="btn btn--outline" style="font-size:.82rem;padding:.35rem .85rem;">Архивирай</button>
+      <button type="submit" name="action" value="bulk_spam_contacts" class="btn btn--outline" style="font-size:.82rem;padding:.35rem .85rem;color:#c0392b;border-color:#c0392b;">🚫 Маркирай като спам</button>
+      <button type="submit" name="action" value="bulk_delete_contacts" class="btn btn--outline" style="font-size:.82rem;padding:.35rem .85rem;color:#c0392b;border-color:#c0392b;"
+              data-confirm="Изтриване на избраните съобщения — сигурни ли сте?" data-confirm-ok="Изтрий">Изтрий</button>
+      <button type="button" onclick="spamClearAll('contacts')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.875rem;">✕ Откажи</button>
+    </div>
+  </form>
+  <?php if (!empty($contacts)): ?>
+    <label style="display:inline-flex;align-items:center;gap:.4rem;font-size:.82rem;color:var(--text-muted);margin-bottom:.75rem;cursor:pointer;">
+      <input type="checkbox" id="contactsCheckAll" onchange="spamToggleAll('contacts', this)"> Избери всички
+    </label>
+  <?php endif; ?>
+
   <?php if (empty($contacts)): ?>
     <p style="color:var(--text-muted);font-size:.9rem;">Няма съобщения в тази категория.</p>
   <?php else: ?>
@@ -271,6 +491,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
             <div style="flex:1;min-width:0;">
               <div style="display:flex;align-items:baseline;gap:.75rem;margin-bottom:.5rem;flex-wrap:wrap;">
+                <input type="checkbox" name="ids[]" value="<?= (int)$cs['id'] ?>" form="contactsBulkForm"
+                       class="contacts-row-check" onchange="spamUpdateBar('contacts')">
                 <strong><?= h($cs['name']) ?></strong>
                 <a href="mailto:<?= h($cs['email']) ?>" style="font-size:.82rem;color:var(--teal);"><?= h($cs['email']) ?></a>
                 <span style="font-size:.78rem;color:var(--text-muted);"><?= h($cs['created_at']) ?></span>
@@ -292,6 +514,10 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
                 <?php if ($cs['status'] !== 'archived'): ?>
                   <button type="submit" name="action" value="csub_archive"
                           class="btn btn--outline" style="font-size:.82rem;padding:.35rem .85rem;white-space:nowrap;">Архивирай</button>
+                <?php endif; ?>
+                <?php if ($cs['status'] !== 'spam'): ?>
+                  <button type="submit" name="action" value="csub_spam"
+                          class="btn btn--outline" style="font-size:.82rem;padding:.35rem .85rem;white-space:nowrap;color:#c0392b;border-color:#c0392b;">🚫 Спам</button>
                 <?php endif; ?>
                 <button type="submit" name="action" value="csub_delete"
                         class="btn btn--outline" style="font-size:.82rem;padding:.35rem .85rem;white-space:nowrap;"
@@ -329,5 +555,31 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </div>
   </form>
 </div>
+
+<script>
+function spamToggleAll(scope, cb) {
+    document.querySelectorAll('.' + scope + '-row-check').forEach(c => c.checked = cb.checked);
+    spamUpdateBar(scope);
+}
+function spamUpdateBar(scope) {
+    const boxes   = document.querySelectorAll('.' + scope + '-row-check');
+    const checked = document.querySelectorAll('.' + scope + '-row-check:checked');
+    const bar     = document.getElementById(scope + 'BulkBar');
+    const checkAll = document.getElementById(scope + 'CheckAll');
+    if (checkAll) checkAll.checked = boxes.length > 0 && checked.length === boxes.length;
+    if (checked.length > 0) {
+        bar.style.display = 'flex';
+        document.getElementById(scope + 'BulkCount').textContent = checked.length + ' избрани';
+    } else {
+        bar.style.display = 'none';
+    }
+}
+function spamClearAll(scope) {
+    document.querySelectorAll('.' + scope + '-row-check').forEach(c => c.checked = false);
+    const checkAll = document.getElementById(scope + 'CheckAll');
+    if (checkAll) checkAll.checked = false;
+    document.getElementById(scope + 'BulkBar').style.display = 'none';
+}
+</script>
 
 <?php require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-footer.php'; ?>

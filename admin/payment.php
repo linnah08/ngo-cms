@@ -112,6 +112,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $saved = true;
         }
 
+        if ($section === 'spam_filter') {
+            if (!empty($_POST['turnstile_site_key']))   setting_set('turnstile_site_key', trim($_POST['turnstile_site_key']));
+            if (!empty($_POST['turnstile_secret_key'])) setting_set('turnstile_secret_key', trim($_POST['turnstile_secret_key']));
+            setting_set('turnstile_enabled', isset($_POST['turnstile_enabled']) ? '1' : '0');
+
+            $blocklist_lines = array_values(array_filter(array_map('trim', explode("\n", $_POST['spam_blocklist'] ?? ''))));
+            setting_set('spam_blocklist', implode("\n", $blocklist_lines));
+            $saved = true;
+        }
+
         // ── Test credentials ──────────────────────────────────────────────────
         if ($section === 'dskbank_test') {
             $merchant = setting_get('dsk_merchant');
@@ -512,6 +522,69 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       <span style="color:var(--text-muted);">Не е конфигуриран</span>
     <?php endif; ?>
   </div>
+</section>
+
+<!-- ── Spam filter ────────────────────────────────────────────────────────────── -->
+<section class="admin-card" style="margin-bottom:2rem;">
+  <h2 class="admin-card__title">Спам филтър (Cloudflare Turnstile + блокирани думи)</h2>
+  <p class="admin-meta" style="margin-bottom:1.25rem;">
+    Turnstile е безплатна, невидима защита срещу ботове. Вземете безплатен Site key и Secret key от
+    <a href="https://dash.cloudflare.com/?to=/:account/turnstile" target="_blank" rel="noopener">dash.cloudflare.com → Turnstile</a>
+    (нужен е само безплатен Cloudflare акаунт).<br>
+    Прилага се за контактната форма и коментарите под статиите.
+  </p>
+
+  <form method="post">
+    <?= csrf_field() ?>
+    <input type="hidden" name="section" value="spam_filter">
+
+    <div class="admin-form-grid">
+      <label>Site key
+        <input type="text" name="turnstile_site_key" value="<?= h(current_val('turnstile_site_key')) ?>" placeholder="0x4AAAAAAA...">
+      </label>
+      <label>Secret key
+        <div style="position:relative;">
+          <input type="password" name="turnstile_secret_key" value="<?= h(current_val('turnstile_secret_key')) ?>"
+                 placeholder="0x4AAAAAAA…" style="padding-right:4.5rem;width:100%;box-sizing:border-box;">
+          <button type="button" onclick="togglePwd(this)" class="pwd-toggle">Покажи</button>
+        </div>
+      </label>
+    </div>
+
+    <div style="margin-top:1rem;">
+      <label class="admin-checkbox">
+        <input type="checkbox" name="turnstile_enabled" value="1"
+               <?= setting_get('turnstile_enabled', '0') === '1' ? 'checked' : '' ?>>
+        Активирай проверката при изпращане на формуляри
+      </label>
+    </div>
+
+    <div style="margin-top:1.25rem;">
+      <label>Блокирани думи/фрази — по една на ред
+        <textarea name="spam_blocklist" rows="6"
+                  style="width:100%;font-size:.88rem;line-height:1.6;font-family:inherit;resize:vertical;box-sizing:border-box;margin-top:.4rem;"
+                  placeholder="casino&#10;seo services"><?= h(setting_get('spam_blocklist')) ?></textarea>
+      </label>
+      <p class="admin-meta" style="margin-top:.4rem;">
+        Съобщение, съдържащо някоя от тези думи (без значение на главни/малки букви), или съдържащо 3 или повече линка,
+        се отхвърля автоматично — подателят вижда обичайното потвърждение, но нищо не се записва.
+      </p>
+    </div>
+
+    <div style="margin-top:1.25rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+      <button type="submit" class="btn btn--primary">Запази</button>
+      <?php if (setting_is_set('turnstile_site_key')): ?>
+        <span class="badge badge--published">Конфигуриран</span>
+      <?php else: ?>
+        <span class="badge badge--draft">Не е конфигуриран</span>
+      <?php endif; ?>
+      <?php if (setting_get('turnstile_enabled', '0') === '1'): ?>
+        <span class="badge badge--published">Активен</span>
+      <?php else: ?>
+        <span class="badge badge--draft">Неактивен</span>
+      <?php endif; ?>
+    </div>
+  </form>
 </section>
 
 <script>
