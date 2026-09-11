@@ -117,14 +117,17 @@ function newsletter_format_articles(array $articles, string $lang): string
             }
         } else {
             // ── Article card ──────────────────────────────────────────────────
-            $html .= '<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">' . "\n";
+            // Percentage-based columns (not fixed px) so this can never overflow the
+            // container on a narrow phone screen; .nl-card-img/.nl-card-body get a
+            // stacking media query from email_wrap() as a progressive enhancement.
+            $html .= '<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:20px;">' . "\n";
             $html .= '<tr>' . "\n";
             if ($img) {
-                $html .= '<td width="120" valign="top" style="padding-right:16px;">';
-                $html .= '<img src="' . $img . '" width="120" alt="" style="border-radius:4px;display:block;">';
+                $html .= '<td class="nl-card-img" width="30%" valign="top" style="max-width:120px;padding-right:16px;">';
+                $html .= '<img src="' . $img . '" alt="" style="width:100%;max-width:120px;border-radius:4px;display:block;">';
                 $html .= '</td>' . "\n";
             }
-            $html .= '<td valign="top">' . "\n";
+            $html .= '<td class="nl-card-body" valign="top">' . "\n";
             $html .= '<h3 style="color:#0387A5;margin:0 0 6px;font-size:16px;line-height:1.4;">' . $title . '</h3>' . "\n";
             if ($excerpt) {
                 $html .= '<p style="margin:0 0 10px;font-size:14px;color:#4a4640;line-height:1.6;">' . $excerpt . '</p>' . "\n";

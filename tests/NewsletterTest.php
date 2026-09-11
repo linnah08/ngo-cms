@@ -187,4 +187,36 @@ final class NewsletterTest extends TestCase
         $this->assertArrayHasKey('en',    $counts);
         $this->assertSame($counts['total'], $counts['bg'] + $counts['en']);
     }
+
+    // ── Mobile-safe article cards ──────────────────────────────────────────────
+
+    public function test_secondary_article_card_uses_percentage_width_not_fixed_pixels(): void
+    {
+        if (!function_exists('newsletter_format_articles')) {
+            require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
+        }
+        $articles = [
+            ['slug' => 'first',  'title' => 'First',  'excerpt' => 'E1', 'image' => '/img/a.jpg'],
+            ['slug' => 'second', 'title' => 'Second', 'excerpt' => 'E2', 'image' => '/img/b.jpg'],
+        ];
+        $html = newsletter_format_articles($articles, 'bg');
+
+        // The image column must scale with the container (percentage width), never
+        // a hard pixel width — a fixed px column can't shrink on a narrow phone
+        // screen and overflows the email wrapper's overflow:hidden, clipping the
+        // rest of the card.
+        $this->assertStringNotContainsString('width="120"', $html);
+        $this->assertStringContainsString('nl-card-img', $html);
+        $this->assertStringContainsString('nl-card-body', $html);
+    }
+
+    public function test_email_wrap_defines_mobile_stacking_media_query(): void
+    {
+        if (!function_exists('email_wrap')) {
+            require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
+        }
+        $html = email_wrap('<p>x</p>');
+        $this->assertStringContainsString('@media only screen and (max-width:480px)', $html);
+        $this->assertStringContainsString('.nl-card-img', $html);
+    }
 }

@@ -30,6 +30,13 @@ function email_wrap(string $content): string {
   td{padding:10px 12px;border-top:1px solid #e8ddd5;font-size:14px;}
   .box{background:#e4f0f5;padding:16px;border-radius:6px;margin:16px 0;}
   a{color:#0387A5;}
+  @media only screen and (max-width:480px){
+    .eh{padding:20px !important;}
+    .eb{padding:20px !important;}
+    .nl-card-img{display:block !important;width:100% !important;max-width:100% !important;padding-right:0 !important;padding-bottom:12px !important;}
+    .nl-card-img img{max-width:160px !important;margin:0 auto;}
+    .nl-card-body{display:block !important;width:100% !important;}
+  }
 </style>
 </head>
 <body style="font-family:Arial,sans-serif;background:#f8f6f2;margin:0;padding:20px;color:#1a1916;">
