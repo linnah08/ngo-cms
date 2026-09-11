@@ -15,6 +15,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     $id     = (int)($_POST['id'] ?? 0);
 
+    if ($action === 'reorder') {
+        $ids = array_values(array_filter(
+            array_map('intval', (array)($_POST['ids'] ?? [])),
+            fn($v) => $v > 0
+        ));
+        if (!empty($ids)) {
+            $upd = $pdo->prepare('UPDATE products SET sort_order = ? WHERE id = ?');
+            foreach ($ids as $pos => $pid) {
+                $upd->execute([$pos + 1, $pid]);
+            }
+        }
+        header('Content-Type: application/json');
+        echo json_encode(['ok' => true]);
+        exit;
+    }
+
     if ($action === 'toggle' && $id) {
         $pdo->prepare('UPDATE products SET active = 1 - active WHERE id = ?')->execute([$id]);
         flash_set('success', 'Статусът е обновен.');
@@ -135,7 +151,7 @@ $products = $pdo->query(
                  ELSE p.stock
             END AS effective_stock
      FROM products p
-     ORDER BY p.id DESC"
+     ORDER BY p.sort_order, p.id"
 )->fetchAll();
 
 $review_stats = [];
@@ -165,9 +181,10 @@ try {
 <div class="admin-table-wrap" style="overflow-x:hidden;">
   <table class="admin-table" style="table-layout:fixed;width:100%;">
     <colgroup>
+      <col style="width:3%;">
       <col style="width:4%;">
       <col style="width:6%;">
-      <col style="width:27%;">
+      <col style="width:24%;">
       <col style="width:11%;">
       <col style="width:12%;">
       <col style="width:13%;">
@@ -176,6 +193,7 @@ try {
     </colgroup>
     <thead>
       <tr>
+        <th style="overflow:hidden;" aria-label="Подреждане"></th>
         <th style="overflow:hidden;"><input type="checkbox" id="select-all" aria-label="Избери всички" style="cursor:pointer;width:16px;height:16px;"></th>
         <th style="overflow:hidden;">Снимка</th>
         <th data-sort style="overflow:hidden;">Наименование</th>
@@ -188,7 +206,9 @@ try {
     </thead>
     <tbody>
       <?php foreach ($products as $p): ?>
-      <tr>
+      <tr data-id="<?= (int)$p['id'] ?>">
+        <td class="drag-handle" title="Преместете, за да подредите" aria-label="Преместете, за да подредите"
+            style="text-align:center;vertical-align:middle;cursor:grab;color:var(--text-muted);user-select:none;">⠿</td>
         <td style="text-align:center;vertical-align:middle;">
           <input type="checkbox" class="row-cb"
                  value="<?= (int)$p['id'] ?>"
@@ -431,6 +451,95 @@ try {
         selectAll.checked       = false;
         selectAll.indeterminate = false;
         updateToolbar();
+    });
+})();
+</script>
+
+<div id="reorder-status" role="status" aria-live="polite" style="
+  position:fixed;bottom:1rem;right:1rem;z-index:1100;
+  background:#1a1a2e;color:#fff;padding:.55rem 1rem;border-radius:6px;
+  font-size:.85rem;box-shadow:0 2px 8px rgba(0,0,0,.3);
+  opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s;pointer-events:none;"></div>
+
+<script>
+(function () {
+    const tbody = document.querySelector('.admin-table tbody');
+    if (!tbody) return;
+    const csrf      = <?= json_encode(csrf_token()) ?>;
+    const statusEl  = document.getElementById('reorder-status');
+    let dragRow     = null;
+    let statusTimer = null;
+
+    function flash(msg, ok) {
+        statusEl.textContent   = msg;
+        statusEl.style.background = ok ? '#2d6a35' : '#7b1010';
+        statusEl.style.opacity = '1';
+        statusEl.style.transform = 'translateY(0)';
+        clearTimeout(statusTimer);
+        statusTimer = setTimeout(function () {
+            statusEl.style.opacity = '0';
+            statusEl.style.transform = 'translateY(8px)';
+        }, ok ? 1800 : 4000);
+    }
+
+    function rowAfter(y) {
+        const rows = Array.from(tbody.querySelectorAll('tr:not(.dragging)'));
+        return rows.reduce(function (closest, row) {
+            const box    = row.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, el: row };
+            }
+            return closest;
+        }, { offset: -Infinity, el: null }).el;
+    }
+
+    function persistOrder() {
+        const ids = Array.from(tbody.querySelectorAll('tr')).map(r => r.dataset.id);
+        const body = new URLSearchParams();
+        body.set('action', 'reorder');
+        body.set('csrf_token', csrf);
+        ids.forEach(id => body.append('ids[]', id));
+        fetch(window.location.pathname, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString()
+        })
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(d => flash(d && d.ok ? 'Подредбата е запазена.' : 'Грешка при запазване.', !!(d && d.ok)))
+        .catch(() => flash('Грешка при запазване — опитайте отново.', false));
+    }
+
+    // Only allow dragging when grabbing the handle.
+    tbody.querySelectorAll('tr').forEach(function (row) {
+        const handle = row.querySelector('.drag-handle');
+        if (!handle) return;
+        handle.addEventListener('mousedown', function () { row.draggable = true; });
+        handle.addEventListener('mouseup',   function () { row.draggable = false; });
+
+        row.addEventListener('dragstart', function () {
+            dragRow = row;
+            row.classList.add('dragging');
+            row.style.opacity = '.4';
+        });
+        row.addEventListener('dragend', function () {
+            row.classList.remove('dragging');
+            row.style.opacity = '';
+            row.draggable = false;
+            dragRow = null;
+            persistOrder();
+        });
+    });
+
+    tbody.addEventListener('dragover', function (e) {
+        if (!dragRow) return;
+        e.preventDefault();
+        const after = rowAfter(e.clientY);
+        if (after == null) {
+            tbody.appendChild(dragRow);
+        } else if (after !== dragRow) {
+            tbody.insertBefore(dragRow, after);
+        }
     });
 })();
 </script>

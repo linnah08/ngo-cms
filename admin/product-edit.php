@@ -100,8 +100,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$errors) {
         if ($is_new) {
-            $pdo->prepare('INSERT INTO products (slug,name_bg,name_en,description_bg,description_en,price_eur,stock,active,featured,image,`type`,variants,variant_attributes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
-                ->execute([$slug_val, $name_bg, $name_en, $desc_bg, $desc_en, (float)$price, $stock, $active, $featured, $image_name, $prod_type, $variants_json, $variant_attributes_json]);
+            // New products go to the end of the shop ordering.
+            $next_sort = (int)$pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM products')->fetchColumn();
+            $pdo->prepare('INSERT INTO products (slug,name_bg,name_en,description_bg,description_en,price_eur,stock,active,featured,image,`type`,variants,variant_attributes,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+                ->execute([$slug_val, $name_bg, $name_en, $desc_bg, $desc_en, (float)$price, $stock, $active, $featured, $image_name, $prod_type, $variants_json, $variant_attributes_json, $next_sort]);
             $saved_id = (int)$pdo->lastInsertId();
         } else {
             $pdo->prepare('UPDATE products SET slug=?,name_bg=?,name_en=?,description_bg=?,description_en=?,price_eur=?,stock=?,active=?,featured=?,image=?,`type`=?,variants=?,variant_attributes=? WHERE id=?')

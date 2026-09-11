@@ -633,7 +633,7 @@ $donation_text = $lang === 'bg'
     ? ($pages['shop']['donation_text_bg'] ?? '')
     : ($pages['shop']['donation_text_en'] ?? '');
 
-$products = $pdo->query('SELECT * FROM products WHERE active=1 ORDER BY id')->fetchAll();
+$products = $pdo->query('SELECT * FROM products WHERE active=1 ORDER BY sort_order, id')->fetchAll();
 
 // For variant products, image column is empty — use first active variant's image
 $variant_images = [];
