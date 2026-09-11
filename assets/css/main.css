@@ -298,23 +298,47 @@ p:last-child { margin-bottom: 0; }
 
 .lang-switcher {
   display: flex;
+  align-items: center;
   gap: var(--space-xs);
-  font-size: 0.8rem;
   margin-left: var(--space-md);
 }
 
-.lang-switcher a {
-  padding: 2px 8px;
-  border-radius: var(--radius);
-  color: var(--text-muted);
-  border: 1px solid var(--border);
+/* Mobile-only language switcher lives in the header bar, outside the burger menu */
+.lang-switcher--mobile {
+  display: none;
 }
 
-.lang-switcher a.active,
-.lang-switcher a:hover {
-  background: var(--teal);
-  color: var(--white);
+.lang-switcher__flag {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  line-height: 0;
+  opacity: 0.5;
+  filter: grayscale(60%);
+  transition: opacity 0.15s ease, filter 0.15s ease, transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.lang-switcher__flag img {
+  display: block;
+  width: 26px;
+  height: 16px;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.lang-switcher__flag:hover {
+  opacity: 1;
+  filter: none;
+  transform: translateY(-1px);
+}
+
+.lang-switcher__flag.active {
+  opacity: 1;
+  filter: none;
   border-color: var(--teal);
+  box-shadow: 0 0 0 1px var(--teal);
 }
 
 /* Mobile nav toggle */
@@ -909,8 +933,16 @@ textarea { min-height: 140px; resize: vertical; }
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--white);
+    margin-left: var(--space-sm);
+  }
+
+  /* Surface the language switcher in the header bar so it's visible without
+     opening the burger menu; hide the duplicate inside the collapsed nav. */
+  .lang-switcher--mobile {
+    display: flex;
     margin-left: auto;
   }
+  .nav-lang-item { display: none; }
 
   .nav-toggle[aria-expanded="true"] span:nth-child(1) {
     transform: translateY(7px) rotate(45deg);
@@ -969,7 +1001,7 @@ textarea { min-height: 140px; resize: vertical; }
     border-radius: var(--radius);
   }
 
-  .lang-switcher {
+  .nav-lang-item .lang-switcher {
     margin-left: 0;
     justify-content: flex-start;
     padding: var(--space-md) var(--space-sm);

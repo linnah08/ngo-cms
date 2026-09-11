@@ -67,6 +67,10 @@ $_nav_bg   = $_menus['header']['bg'] ?? [];
 $_nav_en   = $_menus['header']['en'] ?? [];
 $shop_url  = $lang === 'bg' ? '/magazin/' : '/en/shop/';
 $cart_n    = cart_count();
+
+// Language switcher target URLs (shared by the in-nav and mobile switchers)
+$bg_href = $lang === 'bg' ? $current_path : _switch_lang($current_path, 'en');
+$en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
 ?>
 <!DOCTYPE html>
 <html lang="<?= $lang === 'bg' ? 'bg' : 'en' ?>">
@@ -220,6 +224,8 @@ $cart_n    = cart_count();
         <img src="<?= logo_url() ?>" alt="<?= h($site_name) ?>">
       </a>
 
+      <?php $switcher_class = 'lang-switcher--mobile'; require __DIR__ . '/lang-switcher.php'; unset($switcher_class); ?>
+
       <button
         class="nav-toggle"
         id="navToggle"
@@ -259,13 +265,8 @@ $cart_n    = cart_count();
               <?php endif; ?>
             </a>
           </li>
-          <li>
-            <div class="lang-switcher">
-              <a href="<?= $lang === 'bg' ? $current_path : _switch_lang($current_path, 'en') ?>"
-                 class="<?= $lang === 'bg' ? 'active' : '' ?>">БГ</a>
-              <a href="<?= $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg') ?>"
-                 class="<?= $lang === 'en' ? 'active' : '' ?>">EN</a>
-            </div>
+          <li class="nav-lang-item">
+            <?php require __DIR__ . '/lang-switcher.php'; ?>
           </li>
         </ul>
       </nav>
