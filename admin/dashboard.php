@@ -5,9 +5,50 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 $page_title_admin = 'Начало';
 $active_nav       = 'dashboard';
 
-$can_sign = admin_can_sign();
-$can_shop = admin_can_manage_shop();
-$pdo      = get_pdo();
+$can_sign      = admin_can_sign();
+$can_shop      = admin_can_manage_shop();
+$can_editorial = admin_can_editorial();
+$pdo           = get_pdo();
+
+// ── Unified moderation inbox: pending comments, reviews & new contacts ──
+$inbox = [];
+if ($can_editorial) {
+    try {
+        foreach ($pdo->query("SELECT author_name, content, created_at FROM comments WHERE status='pending' ORDER BY created_at DESC")->fetchAll() as $c) {
+            $inbox[] = [
+                'kind' => 'comment', 'icon' => '💬', 'label' => 'Коментар',
+                'who' => $c['author_name'], 'context' => '',
+                'snippet' => $c['content'], 'date' => $c['created_at'],
+                'link' => '/admin/comments.php?source=comments&filter=pending',
+            ];
+        }
+    } catch (Throwable $e) { /* table may not exist */ }
+    try {
+        foreach ($pdo->query("SELECT name, message, created_at FROM contact_submissions WHERE status='new' ORDER BY created_at DESC")->fetchAll() as $m) {
+            $inbox[] = [
+                'kind' => 'contact', 'icon' => '✉', 'label' => 'Контакт',
+                'who' => $m['name'], 'context' => '',
+                'snippet' => $m['message'], 'date' => $m['created_at'],
+                'link' => '/admin/comments.php?source=contacts&cfilter=new',
+            ];
+        }
+    } catch (Throwable $e) { /* table may not exist */ }
+}
+if ($can_shop) {
+    try {
+        foreach ($pdo->query("SELECT r.author_name, r.content, r.created_at, r.product_id, p.name_bg AS product_name
+                              FROM product_reviews r LEFT JOIN products p ON p.id = r.product_id
+                              WHERE r.status='pending' ORDER BY r.created_at DESC")->fetchAll() as $r) {
+            $inbox[] = [
+                'kind' => 'review', 'icon' => '⭐', 'label' => 'Отзив',
+                'who' => $r['author_name'], 'context' => $r['product_name'] ?? ('#' . (int)$r['product_id']),
+                'snippet' => $r['content'], 'date' => $r['created_at'],
+                'link' => '/admin/product-reviews.php?product_id=' . (int)$r['product_id'] . '&filter=pending',
+            ];
+        }
+    } catch (Throwable $e) { /* table may not exist */ }
+}
+usort($inbox, fn($a, $b) => strcmp($b['date'], $a['date'])); // newest first
 
 // ── Unsigned donation certs ───────────────────────────────────────────────────
 $unsigned_certs = [];
@@ -171,12 +212,69 @@ $ch_colors = [
     'li'  => 'background:#e3f2fd;color:#0a66c2;',
 ];
 
+// Relative time in Bulgarian for the inbox.
+if (!function_exists('dash_time_ago')) {
+    function dash_time_ago(string $datetime): string {
+        $ts = strtotime($datetime);
+        if ($ts === false) return '';
+        $diff = time() - $ts;
+        if ($diff < 60)     return 'току-що';
+        if ($diff < 3600)   return 'преди ' . (int)($diff / 60) . ' мин';
+        if ($diff < 86400)  return 'преди ' . (int)($diff / 3600) . ' ч';
+        if ($diff < 172800) return 'вчера';
+        if ($diff < 604800) return 'преди ' . (int)($diff / 86400) . ' дни';
+        return date('d.m.Y', $ts);
+    }
+}
+// Single-line snippet from possibly-HTML text.
+if (!function_exists('dash_snippet')) {
+    function dash_snippet(string $text, int $len = 60): string {
+        $t = trim(preg_replace('/\s+/', ' ', strip_tags($text)));
+        return mb_strimwidth($t, 0, $len, '…');
+    }
+}
+
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 ?>
 
 <div class="admin-page-header">
   <h1>Добре дошли, <?= h($current_user['name'] ?? 'Admin') ?></h1>
 </div>
+
+<?php if ($can_editorial || $can_shop): ?>
+<?php
+  $kind_pill = [
+      'review'  => 'background:#fff4e0;color:#b8860b;',
+      'comment' => 'background:#e8f0fe;color:#1877f2;',
+      'contact' => 'background:#e6f4ea;color:#2d6a35;',
+  ];
+?>
+<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;margin-bottom:.75rem;">
+  <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.6rem;">
+    <h3 style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin:0;flex:1;">Нуждае се от внимание</h3>
+    <?php if ($inbox): ?>
+    <span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:10px;font-size:.67rem;font-weight:700;color:#fff;background:#c0392b;"><?= count($inbox) ?></span>
+    <?php endif; ?>
+  </div>
+  <?php if (!$inbox): ?>
+    <p style="font-size:.78rem;color:var(--text-muted);font-style:italic;margin:0;">Няма нищо за преглед.</p>
+  <?php else: ?>
+    <div style="max-height:240px;overflow-y:auto;">
+    <?php foreach ($inbox as $it): ?>
+      <a href="<?= h($it['link']) ?>"
+         style="display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;border-radius:4px;font-size:.78rem;background:#fff;margin-bottom:.28rem;border:1px solid var(--border);text-decoration:none;color:inherit;"
+         onmouseover="this.style.background='var(--warm-grey)'" onmouseout="this.style.background='#fff'">
+        <span style="<?= $kind_pill[$it['kind']] ?? '' ?>display:inline-flex;align-items:center;gap:.25rem;padding:.1rem .45rem;border-radius:3px;font-size:.68rem;font-weight:700;flex-shrink:0;white-space:nowrap;"><?= $it['icon'] ?> <?= h($it['label']) ?></span>
+        <span style="font-weight:600;flex-shrink:0;max-width:11rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= h($it['who']) ?><?php if ($it['context'] !== ''): ?> · <?= h($it['context']) ?><?php endif; ?></span>
+        <span style="color:var(--text-muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= h(dash_snippet($it['snippet'])) ?></span>
+        <span style="color:var(--text-muted);font-size:.68rem;white-space:nowrap;flex-shrink:0;"><?= h(dash_time_ago($it['date'])) ?></span>
+        <span style="font-size:.68rem;color:var(--teal);font-weight:600;flex-shrink:0;">Виж →</span>
+      </a>
+    <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
 
 <?php if ($can_sign || $can_shop): ?>
 <div style="display:flex;gap:.75rem;margin-bottom:.75rem;align-items:flex-start;">
