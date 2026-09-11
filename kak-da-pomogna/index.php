@@ -49,7 +49,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
       <?php foreach (($help['ways'] ?? []) as $i => $way): ?>
         <div style="padding:2.5rem 0;<?= $i > 0 ? 'border-top:1px solid var(--border);' : '' ?>display:grid;grid-template-columns:200px 1fr;gap:2rem;align-items:start;">
           <h3 style="color:var(--teal);margin:0;"><?= h($way['title']) ?></h3>
-          <div>
+          <div class="rich-text">
             <?= $way['text'] ?>
             <?php $_cta = $_way_ctas[$way['title']] ?? null; ?>
             <?php if ($_cta): ?>

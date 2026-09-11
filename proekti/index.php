@@ -20,7 +20,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
       <?php foreach ($projects as $i => $project): ?>
         <div style="padding:3rem 0;<?= $i > 0 ? 'border-top:1px solid var(--border);' : '' ?>">
           <h2 style="margin-bottom:1.5rem;"><?= h($project['title']) ?></h2>
-          <div style="max-width:800px;"><?= $project['text'] ?></div>
+          <div class="rich-text" style="max-width:800px;"><?= $project['text'] ?></div>
           <?php if (!empty($project['images'])): ?>
             <div style="display:flex;gap:1rem;margin-top:1.5rem;flex-wrap:wrap;">
               <?php foreach ($project['images'] as $img): ?>
