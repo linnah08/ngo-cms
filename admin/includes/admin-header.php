@@ -116,9 +116,15 @@ $current_user = admin_user();
       </a>
       <?php endif; ?>
       <?php if (admin_can_manage_shop()): ?>
+      <?php
+      $pending_reviews = 0;
+      try {
+          $pending_reviews = (int)get_pdo()->query("SELECT COUNT(*) FROM product_reviews WHERE status='pending'")->fetchColumn();
+      } catch (Throwable $e) { /* table may not exist yet */ }
+      ?>
       <a href="/admin/products.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'products' ? 'active' : '' ?>">
-        Продукти
+        Продукти<?php if ($pending_reviews > 0): ?> <span title="Чакащи отзиви" style="background:var(--teal);color:#fff;border-radius:10px;padding:.05rem .4rem;font-size:.72rem;margin-left:.3rem;vertical-align:middle;"><?= $pending_reviews ?></span><?php endif; ?>
       </a>
       <a href="/admin/orders.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'orders' ? 'active' : '' ?>">

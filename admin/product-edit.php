@@ -169,12 +169,26 @@ $lbl_en_badge = '<span style="font-size:.68rem;font-weight:700;background:#dbeaf
 $_tinymce_key = setting_get('tinymce_api_key', 'no-api-key');
 $page_head_extra = '<script src="https://cdn.tiny.cloud/1/' . h($_tinymce_key) . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>';
 
+$review_counts = ['approved' => 0, 'pending' => 0];
+if (!$is_new) {
+    try {
+        $rc = $pdo->prepare("SELECT status, COUNT(*) n FROM product_reviews WHERE product_id = ? GROUP BY status");
+        $rc->execute([$id]);
+        foreach ($rc->fetchAll(PDO::FETCH_KEY_PAIR) as $st => $n) { $review_counts[$st] = (int)$n; }
+    } catch (Throwable $e) { /* table may not exist */ }
+}
+
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 ?>
 
 <div class="admin-page-header">
   <h1><?= h($page_title_admin) ?></h1>
   <div style="display:flex;gap:.75rem;align-items:center;">
+    <?php if (!$is_new): ?>
+      <a href="/admin/product-reviews.php?product_id=<?= (int)$id ?>" class="btn btn--outline">
+        Отзиви (<?= $review_counts['approved'] ?>)<?php if ($review_counts['pending'] > 0): ?> · <?= $review_counts['pending'] ?> чакащи<?php endif; ?> →
+      </a>
+    <?php endif; ?>
     <a href="/admin/products.php" class="btn btn--outline">← Назад</a>
     <button type="submit" id="submitBtn" form="productForm" class="btn btn--primary">Запази</button>
   </div>

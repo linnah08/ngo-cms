@@ -118,6 +118,17 @@ $products = $pdo->query(
      FROM products p
      ORDER BY p.id DESC"
 )->fetchAll();
+
+$review_stats = [];
+try {
+    $review_stats = $pdo->query(
+        "SELECT product_id,
+                AVG(CASE WHEN status='approved' THEN rating END) AS avg_rating,
+                SUM(status='approved') AS approved_count,
+                SUM(status='pending')  AS pending_count
+         FROM product_reviews GROUP BY product_id"
+    )->fetchAll(PDO::FETCH_UNIQUE | PDO::FETCH_ASSOC);
+} catch (Throwable $e) { /* table may not exist yet */ }
 ?>
 
 <div class="admin-page-header">
@@ -136,11 +147,12 @@ $products = $pdo->query(
   <table class="admin-table" style="table-layout:fixed;width:100%;">
     <colgroup>
       <col style="width:4%;">
-      <col style="width:7%;">
-      <col style="width:33%;">
+      <col style="width:6%;">
+      <col style="width:27%;">
+      <col style="width:11%;">
       <col style="width:12%;">
-      <col style="width:14%;">
-      <col style="width:15%;">
+      <col style="width:13%;">
+      <col style="width:12%;">
       <col style="width:15%;">
     </colgroup>
     <thead>
@@ -151,6 +163,7 @@ $products = $pdo->query(
         <th data-sort style="overflow:hidden;">Цена</th>
         <th data-sort style="overflow:hidden;">Наличност</th>
         <th data-sort style="overflow:hidden;">Статус</th>
+        <th style="overflow:hidden;">Отзиви</th>
         <th style="overflow:hidden;">Действия</th>
       </tr>
     </thead>
@@ -194,6 +207,26 @@ $products = $pdo->query(
           <span class="badge <?= $p['active'] ? 'badge--published' : 'badge--draft' ?>">
             <?= $p['active'] ? 'Активен' : 'Неактивен' ?>
           </span>
+        </td>
+        <td style="font-size:.82rem;">
+          <?php $rs = $review_stats[$p['id']] ?? null; ?>
+          <?php if ($rs && (int)$rs['approved_count'] > 0): ?>
+            <a href="/admin/product-reviews.php?product_id=<?= (int)$p['id'] ?>&amp;filter=approved"
+               style="color:inherit;text-decoration:none;white-space:nowrap;">
+              <span style="color:#f5a623;">★</span> <?= number_format((float)$rs['avg_rating'], 1) ?>
+              <span style="color:var(--text-muted);">(<?= (int)$rs['approved_count'] ?>)</span>
+            </a>
+          <?php else: ?>
+            <span style="color:var(--text-muted);">—</span>
+          <?php endif; ?>
+          <?php if ($rs && (int)$rs['pending_count'] > 0): ?>
+            <br>
+            <a href="/admin/product-reviews.php?product_id=<?= (int)$p['id'] ?>&amp;filter=pending"
+               title="Чакащи отзиви"
+               style="display:inline-block;margin-top:.25rem;background:var(--teal);color:#fff;border-radius:10px;padding:.05rem .45rem;font-size:.72rem;text-decoration:none;">
+              ⏳ <?= (int)$rs['pending_count'] ?>
+            </a>
+          <?php endif; ?>
         </td>
         <td>
           <a href="/admin/product-edit.php?id=<?= (int)$p['id'] ?>" class="btn-link">Редакция</a>
