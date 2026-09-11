@@ -52,6 +52,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         </div>
       </div>
 
+      <?php if (!empty($campaign['send_date'])): ?>
+      <div style="background:#fff8e6;border:1px solid #f0dca0;border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.5rem;color:#8b6b1a;font-size:.9rem;">
+        ⏱ Насрочена е за <?= h(date('d.m.Y', strtotime($campaign['send_date']))) ?>. Изпращането отдолу ще я прати сега вместо това.
+      </div>
+      <?php endif; ?>
+
       <?php if (!$campaign['subject_bg'] && !$campaign['subject_en']): ?>
       <div style="background:#fdf0ef;border:1px solid #f0c4c0;border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.5rem;color:#c0392b;font-size:.9rem;">
         ⚠ Кампанията няма тема. Добавете тема преди изпращане.
@@ -87,13 +93,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // ── Phase 2: send ──────────────────────────────────────────────────────────────
 if (!csrf_verify()) { http_response_code(400); exit('Invalid token'); }
 
-if ($campaign['status'] !== 'draft') {
+// Atomically claim the campaign so a manual send can never race the
+// scheduled-send cron into sending the same campaign twice.
+if (!newsletter_claim_for_sending($pdo, $id)) {
     header('Location: /admin/newsletter.php');
     exit;
 }
-
-// Mark as sending before the first email so a crash mid-send is visible
-$pdo->prepare("UPDATE newsletter_campaigns SET status='sending' WHERE id=?")->execute([$id]);
 
 // Fetch all active subscribers
 $stmt = $pdo->prepare("SELECT id, email, name, lang, token FROM newsletter_subscribers WHERE status='active' ORDER BY id ASC");
@@ -149,27 +154,7 @@ foreach ($batches as $batch_num => $batch) {
     flush();
 
     foreach ($batch as $sub) {
-        $lang    = $sub['lang'];
-        $subject = $lang === 'bg' ? $campaign['subject_bg'] : $campaign['subject_en'];
-        if (!$subject) $subject = $campaign['subject_bg'] ?: $campaign['subject_en'];
-
-        $name     = $sub['name'] ?: '';
-        $greeting = $lang === 'bg'
-            ? ('Здравейте' . ($name ? ', ' . $name : '') . ',')
-            : ('Dear '     . ($name ?: 'friend')          . ',');
-
-        $body_raw = $lang === 'bg' ? $campaign['body_bg'] : $campaign['body_en'];
-        $unsub_url = SITE_URL . '/newsletter/unsubscribe.php?token=' . $sub['token'];
-
-        $html = render_newsletter_email($greeting, $body_raw, $unsub_url, $lang);
-
-        // Insert tracking row and inject pixel + link rewrites
-        $track_token = bin2hex(random_bytes(16));
-        $pdo->prepare("INSERT IGNORE INTO newsletter_sends (campaign_id, subscriber_id, token) VALUES (?,?,?)")
-            ->execute([$id, $sub['id'], $track_token]);
-        $html = newsletter_inject_tracking($html, $track_token);
-
-        $ok = send_mail($sub['email'], $subject, $html);
+        $ok = newsletter_send_to_subscriber($pdo, $id, $campaign, $sub);
         $ok ? $sent++ : $failed++;
     }
 

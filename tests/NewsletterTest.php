@@ -219,4 +219,118 @@ final class NewsletterTest extends TestCase
         $this->assertStringContainsString('@media only screen and (max-width:480px)', $html);
         $this->assertStringContainsString('.nl-card-img', $html);
     }
+
+    // ── Scheduled sending ──────────────────────────────────────────────────────
+
+    /** Insert a campaign directly and return its id. */
+    private function insertCampaign(string $status = 'draft', ?string $sendDate = null): int
+    {
+        self::$pdo->prepare("
+            INSERT INTO newsletter_campaigns (subject_bg, subject_en, body_bg, body_en, status, send_date)
+            VALUES ('Test subject', '', '<p>Body</p>', '', ?, ?)
+        ")->execute([$status, $sendDate]);
+        return (int)self::$pdo->lastInsertId();
+    }
+
+    private function deleteCampaign(int $id): void
+    {
+        self::$pdo->prepare("DELETE FROM newsletter_campaigns WHERE id=?")->execute([$id]);
+    }
+
+    public function test_due_campaigns_includes_past_send_date(): void
+    {
+        $this->skipWithoutDb();
+        $id = $this->insertCampaign('draft', date('Y-m-d', strtotime('-1 day')));
+        try {
+            $ids = array_column(newsletter_due_campaigns(self::$pdo), 'id');
+            $this->assertContains($id, $ids);
+        } finally {
+            $this->deleteCampaign($id);
+        }
+    }
+
+    public function test_due_campaigns_includes_todays_send_date(): void
+    {
+        $this->skipWithoutDb();
+        $id = $this->insertCampaign('draft', date('Y-m-d'));
+        try {
+            $ids = array_column(newsletter_due_campaigns(self::$pdo), 'id');
+            $this->assertContains($id, $ids);
+        } finally {
+            $this->deleteCampaign($id);
+        }
+    }
+
+    public function test_due_campaigns_excludes_future_send_date(): void
+    {
+        $this->skipWithoutDb();
+        $id = $this->insertCampaign('draft', date('Y-m-d', strtotime('+1 day')));
+        try {
+            $ids = array_column(newsletter_due_campaigns(self::$pdo), 'id');
+            $this->assertNotContains($id, $ids);
+        } finally {
+            $this->deleteCampaign($id);
+        }
+    }
+
+    public function test_due_campaigns_excludes_draft_with_no_send_date(): void
+    {
+        $this->skipWithoutDb();
+        $id = $this->insertCampaign('draft', null);
+        try {
+            $ids = array_column(newsletter_due_campaigns(self::$pdo), 'id');
+            $this->assertNotContains($id, $ids);
+        } finally {
+            $this->deleteCampaign($id);
+        }
+    }
+
+    public function test_due_campaigns_excludes_already_sent(): void
+    {
+        $this->skipWithoutDb();
+        $id = $this->insertCampaign('sent', date('Y-m-d', strtotime('-1 day')));
+        try {
+            $ids = array_column(newsletter_due_campaigns(self::$pdo), 'id');
+            $this->assertNotContains($id, $ids);
+        } finally {
+            $this->deleteCampaign($id);
+        }
+    }
+
+    public function test_claim_for_sending_succeeds_on_draft(): void
+    {
+        $this->skipWithoutDb();
+        $id = $this->insertCampaign('draft', date('Y-m-d'));
+        try {
+            $this->assertTrue(newsletter_claim_for_sending(self::$pdo, $id));
+            $stmt = self::$pdo->prepare("SELECT status FROM newsletter_campaigns WHERE id=?");
+            $stmt->execute([$id]);
+            $this->assertSame('sending', $stmt->fetchColumn());
+        } finally {
+            $this->deleteCampaign($id);
+        }
+    }
+
+    public function test_claim_for_sending_fails_on_already_sending(): void
+    {
+        $this->skipWithoutDb();
+        $id = $this->insertCampaign('sending', date('Y-m-d'));
+        try {
+            // Simulates the cron and a manual click racing for the same campaign.
+            $this->assertFalse(newsletter_claim_for_sending(self::$pdo, $id));
+        } finally {
+            $this->deleteCampaign($id);
+        }
+    }
+
+    public function test_claim_for_sending_fails_on_sent(): void
+    {
+        $this->skipWithoutDb();
+        $id = $this->insertCampaign('sent', null);
+        try {
+            $this->assertFalse(newsletter_claim_for_sending(self::$pdo, $id));
+        } finally {
+            $this->deleteCampaign($id);
+        }
+    }
 }

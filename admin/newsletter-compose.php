@@ -58,17 +58,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
     $subject_en = trim($_POST['subject_en'] ?? '');
     $body_bg    = $_POST['body_bg'] ?? '';
     $body_en    = $_POST['body_en'] ?? '';
+    $send_date  = trim($_POST['send_date'] ?? '');
+    $send_date  = ($send_date && preg_match('/^\d{4}-\d{2}-\d{2}$/', $send_date)) ? $send_date : null;
 
     if (!$subject_bg && !$subject_en) $errors[] = 'Въведете поне една тема.';
 
     if (!$errors) {
         $as_id = $id;  // autosave key was based on the page-load id (0 for new)
         if ($id && $campaign) {
-            $pdo->prepare("UPDATE newsletter_campaigns SET subject_bg=?,subject_en=?,body_bg=?,body_en=?,status='draft' WHERE id=?")
-                ->execute([$subject_bg, $subject_en, $body_bg, $body_en, $id]);
+            $pdo->prepare("UPDATE newsletter_campaigns SET subject_bg=?,subject_en=?,body_bg=?,body_en=?,send_date=?,status='draft' WHERE id=?")
+                ->execute([$subject_bg, $subject_en, $body_bg, $body_en, $send_date, $id]);
         } else {
-            $pdo->prepare("INSERT INTO newsletter_campaigns (subject_bg,subject_en,body_bg,body_en) VALUES (?,?,?,?)")
-                ->execute([$subject_bg, $subject_en, $body_bg, $body_en]);
+            $pdo->prepare("INSERT INTO newsletter_campaigns (subject_bg,subject_en,body_bg,body_en,send_date) VALUES (?,?,?,?,?)")
+                ->execute([$subject_bg, $subject_en, $body_bg, $body_en, $send_date]);
             $id = (int)$pdo->lastInsertId();
         }
         flash_set('success', 'Кампанията е записана.');
@@ -77,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
     }
 
     // Re-populate for error display
-    $campaign = array_merge($campaign ?? [], compact('subject_bg','subject_en','body_bg','body_en'));
+    $campaign = array_merge($campaign ?? [], compact('subject_bg','subject_en','body_bg','body_en','send_date'));
 }
 
 // Load published articles for picker (both langs)
@@ -167,6 +169,14 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <input type="hidden" name="action" value="save">
     <input type="hidden" name="subject_bg" id="save_subject_bg">
     <input type="hidden" name="subject_en" id="save_subject_en">
+
+    <label style="display:block;margin:0 0 1.5rem;">
+      <span style="font-weight:600;">Насрочи за дата:</span>
+      <input type="date" name="send_date" value="<?= h($campaign['send_date'] ?? '') ?>" style="margin-left:.5rem;padding:.35rem .5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;">
+    </label>
+    <?php if (!empty($campaign['send_date'])): ?>
+    <p style="font-size:.85rem;color:#8b6b1a;margin:-1rem 0 1.5rem;">⏱ Ще бъде изпратена автоматично на <?= h(date('d.m.Y', strtotime($campaign['send_date']))) ?>. Изтрийте датата, за да отмените, или я променете по всяко време, докато е чернова.</p>
+    <?php endif; ?>
 
     <div style="display:grid;gap:1.5rem;">
 
