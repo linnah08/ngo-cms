@@ -93,9 +93,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     </div>
     <?php endif; ?>
 
-    <div style="text-align:center;">
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap;justify-content:center;">
       <a href="/" class="btn btn--primary"><?= $lang === 'bg' ? 'Към началото' : 'Back to home' ?></a>
-      <a href="<?= $lang === 'bg' ? '/kak-da-pomogna/' : '/en/how-to-help/' ?>" class="btn btn--outline" style="margin-left:1rem;">
+      <a href="<?= $lang === 'bg' ? '/kak-da-pomogna/' : '/en/how-to-help/' ?>" class="btn btn--outline">
         <?= $lang === 'bg' ? 'Как още да помогна' : 'Other ways to help' ?>
       </a>
     </div>

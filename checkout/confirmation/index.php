@@ -108,9 +108,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
       </ol>
     </div>
 
-    <div style="text-align:center;">
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap;justify-content:center;">
       <a href="/magazin/" class="btn btn--outline">← Към магазина</a>
-      <a href="/" class="btn btn--primary" style="margin-left:1rem;">Начало</a>
+      <a href="/" class="btn btn--primary">Начало</a>
     </div>
   </div>
 </section>
