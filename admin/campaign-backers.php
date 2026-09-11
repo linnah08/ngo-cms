@@ -33,6 +33,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // Bulk toggle reward_shipped (smart toggle: if all selected are shipped, unship all; otherwise ship all)
+    if ($action === 'bulk_toggle_shipped') {
+        $ids = array_values(array_filter(
+            array_map('intval', (array)($_POST['ids'] ?? [])),
+            fn($v) => $v > 0
+        ));
+        if (!empty($ids)) {
+            $in = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM campaign_pledges WHERE id IN ($in) AND reward_id IS NOT NULL AND reward_shipped = 1");
+            $stmt->execute($ids);
+            $shippedCount = (int)$stmt->fetchColumn();
+            $newShipped   = ($shippedCount === count($ids)) ? 0 : 1;
+            $pdo->prepare("UPDATE campaign_pledges SET reward_shipped = ? WHERE id IN ($in) AND reward_id IS NOT NULL")
+                ->execute(array_merge([$newShipped], $ids));
+        }
+        header('Location: /admin/campaign-backers.php?shipped_ok=1');
+        exit;
+    }
+
     // Resend ticket email
     if ($action === 'resend_ticket') {
         $id = (int)($_POST['pledge_id'] ?? 0);
@@ -266,6 +285,11 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <table style="width:100%;border-collapse:collapse;">
     <thead style="background:#f8f6f2;">
       <tr style="font-size:.78rem;text-transform:uppercase;color:#6b6560;">
+        <?php if ($tab === 'donations'): ?>
+        <th style="padding:.65rem .5rem;text-align:center;font-weight:600;width:2.5rem;">
+          <input type="checkbox" id="select-all" aria-label="Избери всички" style="cursor:pointer;width:16px;height:16px;">
+        </th>
+        <?php endif; ?>
         <th style="padding:.65rem 1rem;text-align:left;font-weight:600;">Дата</th>
         <th style="padding:.65rem 1rem;text-align:left;font-weight:600;">Номер</th>
         <th style="padding:.65rem 1rem;text-align:left;font-weight:600;">Поддръжник</th>
@@ -294,6 +318,16 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         $status_labels = ['paid'=>'Платено','pending'=>'Чакащо','failed'=>'Неуспешно','reversed'=>'Върнато'];
       ?>
       <tr style="border-top:1px solid #f0ede9;" <?= $addr ? 'class="has-addr"' : '' ?>>
+        <?php if ($tab === 'donations'): ?>
+        <td style="padding:.65rem .5rem;text-align:center;vertical-align:middle;">
+          <?php if ($b['reward_id']): ?>
+          <input type="checkbox" class="row-cb"
+                 value="<?= (int)$b['id'] ?>"
+                 data-shipped="<?= $b['reward_shipped'] ? '1' : '0' ?>"
+                 style="cursor:pointer;width:16px;height:16px;">
+          <?php endif; ?>
+        </td>
+        <?php endif; ?>
         <td style="padding:.65rem 1rem;font-size:.82rem;color:#6b6560;"><?= substr($b['created_at'],0,10) ?></td>
         <td style="padding:.65rem 1rem;font-size:.8rem;font-family:monospace;color:#6b6560;"><?= h($b['pledge_number']) ?></td>
         <td style="padding:.65rem 1rem;">
@@ -365,6 +399,97 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   </table>
   <?php endif; ?>
 </div>
+
+<?php if ($tab === 'donations' && !empty($backers)): ?>
+<div id="bulk-bar" style="
+  position:fixed;bottom:0;left:0;right:0;
+  background:#1a1a2e;color:#fff;
+  padding:1rem 2rem;
+  display:flex;align-items:center;gap:1rem;
+  transform:translateY(100%);transition:transform 0.2s ease;
+  z-index:1000;box-shadow:0 -2px 8px rgba(0,0,0,0.3);">
+  <span id="bulk-count" style="font-weight:500;">0 избрани</span>
+  <button id="bulk-toggle-shipped" type="button" class="btn btn--primary">Маркирай като изпратени</button>
+  <button id="bulk-clear" type="button" class="btn-link" style="color:#aaa;margin-left:auto;">✕ Изчисти</button>
+</div>
+
+<form id="form-bulk-toggle-shipped" method="POST" style="display:none;">
+  <?= csrf_field() ?>
+  <input type="hidden" name="action" value="bulk_toggle_shipped">
+</form>
+
+<script>
+(function () {
+    const selectAll = document.getElementById('select-all');
+    const bulkBar    = document.getElementById('bulk-bar');
+    const countEl    = document.getElementById('bulk-count');
+    const toggleBtn  = document.getElementById('bulk-toggle-shipped');
+    const clearBtn   = document.getElementById('bulk-clear');
+    const formToggle = document.getElementById('form-bulk-toggle-shipped');
+
+    if (!selectAll || !bulkBar) return;
+
+    function getCheckboxes() {
+        return Array.from(document.querySelectorAll('.row-cb'));
+    }
+
+    function getSelected() {
+        return getCheckboxes().filter(cb => cb.checked);
+    }
+
+    function updateToolbar() {
+        const selected = getSelected();
+        const count    = selected.length;
+
+        countEl.textContent = count + ' избрани';
+        bulkBar.style.transform = count > 0 ? 'translateY(0)' : 'translateY(100%)';
+
+        const allShipped = selected.length > 0 && selected.every(cb => cb.dataset.shipped === '1');
+        toggleBtn.textContent = allShipped ? 'Маркирай като неизпратени' : 'Маркирай като изпратени';
+
+        const all = getCheckboxes();
+        selectAll.indeterminate = count > 0 && count < all.length;
+        selectAll.checked       = all.length > 0 && count === all.length;
+    }
+
+    function injectIds(form, selected) {
+        form.querySelectorAll('input[name="ids[]"]').forEach(el => el.remove());
+        selected.forEach(function (cb) {
+            const input = document.createElement('input');
+            input.type  = 'hidden';
+            input.name  = 'ids[]';
+            input.value = cb.value;
+            form.appendChild(input);
+        });
+    }
+
+    selectAll.addEventListener('change', function () {
+        getCheckboxes().forEach(function (cb) { cb.checked = selectAll.checked; });
+        updateToolbar();
+    });
+
+    getCheckboxes().forEach(function (cb) {
+        cb.addEventListener('change', updateToolbar);
+    });
+
+    toggleBtn.addEventListener('click', function () {
+        const selected = getSelected();
+        if (!selected.length) return;
+        injectIds(formToggle, selected);
+        formToggle.submit();
+    });
+
+    clearBtn.addEventListener('click', function () {
+        getCheckboxes().forEach(function (cb) { cb.checked = false; });
+        selectAll.checked       = false;
+        selectAll.indeterminate = false;
+        updateToolbar();
+    });
+
+    updateToolbar();
+})();
+</script>
+<?php endif; ?>
 
 <!-- Newsletter to all paid backers -->
 <div style="background:#fff;border:1px solid #e8ddd5;border-radius:8px;padding:1.5rem;">
