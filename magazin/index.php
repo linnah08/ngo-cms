@@ -72,7 +72,7 @@ if ($slug) {
         '@context'    => 'https://schema.org',
         '@type'       => 'Product',
         'name'        => $name,
-        'description' => trim(mb_substr(strip_tags($desc ?? ''), 0, 300)),
+        'description' => trim(mb_substr(html_entity_decode(strip_tags($desc ?? ''), ENT_QUOTES, 'UTF-8'), 0, 300)),
         'image'       => seo_abs_url($_prod_img),
         'sku'         => $p['slug'],
         'brand'       => ['@type' => 'Brand', 'name' => SITE_NAME_EN],
@@ -758,7 +758,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
              data-cms-bg="<?= h($p['description_bg'] ?? '') ?>"
              data-cms-en="<?= h($p['description_en'] ?? '') ?>"
              data-cms-id="<?= $p['id'] ?>">
-            <?= h(strip_tags($desc)) ?>
+            <?= h(html_entity_decode(strip_tags($desc), ENT_QUOTES, 'UTF-8')) ?>
           </p>
           <?php endif; ?>
 
