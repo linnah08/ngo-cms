@@ -234,3 +234,67 @@ function render_newsletter_email(
 
     return email_wrap($inner);
 }
+
+// ── Sending ────────────────────────────────────────────────────────────────────
+
+/**
+ * Render, track, and send one campaign email to one subscriber.
+ * Shared by the manual send page and the scheduled-send cron so there is a
+ * single place that builds the tracking row and calls send_mail().
+ *
+ * @param array $campaign  Row from newsletter_campaigns (needs subject_bg/en, body_bg/en)
+ * @param array $sub       Row from newsletter_subscribers (needs id, email, name, lang, token)
+ */
+function newsletter_send_to_subscriber(\PDO $pdo, int $campaignId, array $campaign, array $sub): bool
+{
+    if (!function_exists('send_mail')) {
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
+    }
+
+    $lang    = $sub['lang'];
+    $subject = $lang === 'bg' ? $campaign['subject_bg'] : $campaign['subject_en'];
+    if (!$subject) $subject = $campaign['subject_bg'] ?: $campaign['subject_en'];
+
+    $name     = $sub['name'] ?: '';
+    $greeting = $lang === 'bg'
+        ? ('Здравейте' . ($name ? ', ' . $name : '') . ',')
+        : ('Dear '     . ($name ?: 'friend')          . ',');
+
+    $body_raw  = $lang === 'bg' ? $campaign['body_bg'] : $campaign['body_en'];
+    $unsub_url = SITE_URL . '/newsletter/unsubscribe.php?token=' . $sub['token'];
+
+    $html = render_newsletter_email($greeting, $body_raw, $unsub_url, $lang);
+
+    $track_token = bin2hex(random_bytes(16));
+    $pdo->prepare("INSERT IGNORE INTO newsletter_sends (campaign_id, subscriber_id, token) VALUES (?,?,?)")
+        ->execute([$campaignId, $sub['id'], $track_token]);
+    $html = newsletter_inject_tracking($html, $track_token);
+
+    return send_mail($sub['email'], $subject, $html);
+}
+
+/**
+ * Draft campaigns whose send_date has arrived — candidates for the scheduled-send cron.
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function newsletter_due_campaigns(\PDO $pdo): array
+{
+    $stmt = $pdo->query(
+        "SELECT * FROM newsletter_campaigns
+         WHERE status = 'draft' AND send_date IS NOT NULL AND send_date <= CURDATE()"
+    );
+    return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+}
+
+/**
+ * Atomically claim a draft campaign for sending, so a manual click and the
+ * scheduled cron can never both send the same campaign. Returns true if this
+ * caller won the claim.
+ */
+function newsletter_claim_for_sending(\PDO $pdo, int $campaignId): bool
+{
+    $stmt = $pdo->prepare("UPDATE newsletter_campaigns SET status='sending' WHERE id=? AND status='draft'");
+    $stmt->execute([$campaignId]);
+    return $stmt->rowCount() === 1;
+}

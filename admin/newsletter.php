@@ -22,6 +22,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($action === 'reset') {
             $pdo->prepare("UPDATE newsletter_campaigns SET status = 'draft' WHERE id = ? AND status = 'sending'")->execute([$campaign_id]);
             flash_set('success', 'Кампанията е върната в чернова.');
+        } elseif ($action === 'unschedule') {
+            $pdo->prepare("UPDATE newsletter_campaigns SET send_date = NULL WHERE id = ? AND status = 'draft'")->execute([$campaign_id]);
+            flash_set('success', 'Насрочването е отменено.');
         }
     }
     header('Location: /admin/newsletter.php');
@@ -102,6 +105,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         </td>
         <td style="padding:.75rem 1rem;text-align:center;">
           <span class="badge <?= $cls ?>"><?= $lbl ?></span>
+          <?php if ($c['status'] === 'draft' && !empty($c['send_date'])): ?>
+            <div style="font-size:.75rem;color:#8b6b1a;margin-top:.25rem;white-space:nowrap;">⏱ <?= h(date('d.m.Y', strtotime($c['send_date']))) ?></div>
+          <?php endif; ?>
         </td>
         <td style="padding:.75rem 1rem;text-align:center;font-size:.9rem;">
           <?= $c['recipient_count'] !== null ? (int)$c['recipient_count'] : '—' ?>
@@ -134,6 +140,15 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
           <div style="display:flex;gap:.4rem;justify-content:flex-end;flex-wrap:wrap;">
             <?php if ($c['status'] === 'draft'): ?>
               <a href="/admin/newsletter-compose.php?id=<?= $c['id'] ?>" class="btn btn--outline" style="font-size:.78rem;padding:.3rem .7rem;">Редактирай</a>
+              <?php if (!empty($c['send_date'])): ?>
+              <form method="POST" style="display:inline;">
+                <?= csrf_field() ?>
+                <input type="hidden" name="campaign_id" value="<?= $c['id'] ?>">
+                <input type="hidden" name="action" value="unschedule">
+                <button class="btn btn--outline" style="font-size:.78rem;padding:.3rem .7rem;"
+                        data-confirm="Отмяна на насрочването?" data-confirm-ok="Отмени">Отмени насрочване</button>
+              </form>
+              <?php endif; ?>
               <a href="/admin/newsletter-send.php?id=<?= $c['id'] ?>" class="btn btn--primary" style="font-size:.78rem;padding:.3rem .7rem;">Изпрати →</a>
             <?php elseif ($c['status'] === 'sending'): ?>
               <span style="font-size:.8rem;color:var(--text-muted);align-self:center;">В процес…</span>
