@@ -193,6 +193,9 @@ $allowed = [
     'shop' => [
         'donation_text' => ['donation_text_bg', 'donation_text_en'],
     ],
+    'donation' => [
+        'title' => ['title', 'title_en'],
+    ],
     'footer' => [
         'tagline'      => ['tagline',      'tagline_en'],
         'social_fb'    => ['social_fb',    'social_fb'],

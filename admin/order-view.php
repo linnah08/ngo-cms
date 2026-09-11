@@ -639,7 +639,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
           Дигитален билет (по имейл)
         <?php else: ?>
           <?php
-            $pm_labels = ['card' => 'Онлайн с карта', 'bank_transfer' => 'Банков превод', 'cod' => 'Наложен платеж'];
+            $pm_labels = ['card' => 'Онлайн с карта', 'bank_transfer' => 'Банков превод', 'cod' => 'Наложен платеж', 'iris' => 'Банков превод (IRIS)'];
             echo h($pm_labels[$order['payment_method'] ?? ''] ?? ucfirst($order['payment_method'] ?? '—'));
           ?>
         <?php endif; ?>

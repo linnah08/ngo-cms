@@ -27,6 +27,7 @@ class InvoiceGenerator extends DocumentGenerator {
             'cod'           => 'В брой',
             'card'          => 'С банкова карта',
             'bank_transfer' => 'Банков превод',
+            'iris'          => 'Банков превод (IRIS Pay by Bank)',
         ];
         $pay_label = $pay_labels[$order['payment_method'] ?? ''] ?? 'В брой / по сметка';
 

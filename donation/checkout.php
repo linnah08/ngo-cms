@@ -4,9 +4,11 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/IRISPayment.php';
 start_session();
 
-$shop_url = ($_POST['_lang'] ?? 'bg') === 'en' ? '/en/shop/' : '/magazin/';
+$order_lang = ($_POST['_lang'] ?? 'bg') === 'en' ? 'en' : 'bg';
+$shop_url   = $order_lang === 'en' ? '/en/shop/' : '/magazin/';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: ' . $shop_url);
@@ -33,7 +35,15 @@ if ($amount > 50000)                            $errors[] = 'Максималн�
 if (!$name)                                     $errors[] = 'Моля въведете вашите имена.';
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Невалиден имейл адрес.';
 
-if (!DSKBankPayment::isEnabled()) {
+$enabled_methods = [];
+if (DSKBankPayment::isEnabled()) $enabled_methods[] = 'card';
+if (IRISPayment::isEnabled())    $enabled_methods[] = 'iris';
+
+$payment_method = $_POST['payment_method'] ?? '';
+if (!in_array($payment_method, $enabled_methods, true)) {
+    $payment_method = $enabled_methods[0] ?? '';
+}
+if ($payment_method === '') {
     flash_set('error', 'Онлайн плащането не е налично в момента. Моля свържете се с нас.');
     header('Location: ' . $shop_url . '#donation');
     exit;
@@ -82,25 +92,61 @@ $pdo->prepare("
     $name, $email, $items_json,
     $amount, 0, $amount,
     $message ?: null,
-    'card', 'pending',
+    $payment_method, 'pending',
     json_encode($invoice_data, JSON_UNESCAPED_UNICODE),
 ]);
 $order_id = $pdo->lastInsertId();
 
-// Register with DSK Bank and redirect to payment page
-try {
-    $dsk       = new DSKBankPayment();
-    $ref       = $order_number . '_' . time();
-    $returnUrl = SITE_URL . '/api/payment-return.php?order=' . urlencode($order_number);
-    $result    = $dsk->register($ref, $amount, $returnUrl);
+if ($payment_method === 'card') {
+    // Register with DSK Bank and redirect to payment page
+    try {
+        $dsk       = new DSKBankPayment();
+        $ref       = $order_number . '_' . time();
+        $returnUrl = SITE_URL . '/api/payment-return.php?order=' . urlencode($order_number);
+        $result    = $dsk->register($ref, $amount, $returnUrl);
 
-    $pdo->prepare('UPDATE orders SET dsk_order_id = ? WHERE id = ?')
-        ->execute([$result['dsk_order_id'], $order_id]);
+        $pdo->prepare('UPDATE orders SET dsk_order_id = ? WHERE id = ?')
+            ->execute([$result['dsk_order_id'], $order_id]);
 
-    header('Location: ' . $result['formUrl']);
-    exit;
-} catch (Throwable $e) {
-    error_log('donation checkout DSK register: ' . $e->getMessage());
-    header('Location: /checkout/payment-failed/?order=' . urlencode($order_number) . '&err=' . urlencode($e->getMessage()));
-    exit;
+        header('Location: ' . $result['formUrl']);
+        exit;
+    } catch (Throwable $e) {
+        error_log('donation checkout DSK register: ' . $e->getMessage());
+        header('Location: /checkout/payment-failed/?order=' . urlencode($order_number) . '&err=' . urlencode($e->getMessage()));
+        exit;
+    }
+}
+
+if ($payment_method === 'iris') {
+    // Register with IRIS Pay by Bank and redirect to the payment link.
+    // The callback token authenticates the server-to-server confirmation;
+    // it goes only in the hookUrl, never in the browser-facing redirectUrl.
+    try {
+        $iris  = new IRISPayment();
+        $token = bin2hex(random_bytes(32));
+
+        $redirectUrl = SITE_URL . '/api/iris-payment-return.php?order=' . urlencode($order_number);
+        $hookUrl     = SITE_URL . '/api/iris-payment-callback.php?id=' . urlencode($order_number) . '&token=' . $token;
+
+        $result = $iris->register([
+            'currency'    => 'EUR',
+            'amountEur'   => $amount,
+            'name'        => 'Дарение ' . $order_number,
+            'description' => SITE_NAME_BG . ' — дарение ' . $order_number,
+            'orderId'     => $order_number,
+            'redirectUrl' => $redirectUrl,
+            'hookUrl'     => $hookUrl,
+            'lang'        => $order_lang,
+        ]);
+
+        $pdo->prepare('UPDATE orders SET iris_payment_hash = ?, iris_callback_token = ? WHERE id = ?')
+            ->execute([$result['paymentHash'], $token, $order_id]);
+
+        header('Location: ' . $result['paymentLink']);
+        exit;
+    } catch (Throwable $e) {
+        error_log('donation checkout IRIS register: ' . $e->getMessage());
+        header('Location: /checkout/payment-failed/?order=' . urlencode($order_number) . '&err=' . urlencode($e->getMessage()));
+        exit;
+    }
 }
