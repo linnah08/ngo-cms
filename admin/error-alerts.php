@@ -13,7 +13,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $action = $_POST['action'] ?? 'save';
 
-    if ($action === 'test') {
+    if ($action === 'generate_token') {
+        $token = error_alert_generate_api_token();
+        flash_set('success', 'Нов API токен: ' . $token . ' — копирай го сега, няма да бъде показан отново.');
+    } elseif ($action === 'test') {
         $email = setting_get('error_alert_email');
         if ($email === '') {
             flash_set('error', 'Добави имейл адрес преди да изпратиш тестово съобщение.');
@@ -60,6 +63,8 @@ $flash     = flash_get();
 
 $doc_root = rtrim($_SERVER['DOCUMENT_ROOT'], '/');
 $cron_cmd = "0 8 * * * php {$doc_root}/admin/send-error-digest.php >> {$doc_root}/logs/error-digest-cron.log 2>&1";
+
+$has_api_token = error_alert_api_token() !== '';
 
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 ?>
@@ -146,6 +151,26 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </p>
   </div>
   <?php endif; ?>
+</div>
+
+<div style="max-width:600px;margin-top:1.5rem;">
+  <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.75rem;">
+    <h2 style="margin:0 0 .5rem;font-size:1.05rem;">AI автоматична поправка (в разработка)</h2>
+    <p style="margin:0 0 1rem;font-size:.85rem;color:var(--text-muted);">
+      Groundwork за бъдещ облачен агент, който да проверява за нови грешки през API-то по-долу. Самият автоматичен агент все още не е свързан — засега токенът само отключва достъпа за четене до последните грешки.
+    </p>
+    <p style="margin:0 0 1.25rem;font-size:.85rem;display:flex;align-items:center;gap:.5rem;">
+      <span style="display:inline-block;width:.6rem;height:.6rem;border-radius:50%;background:<?= $has_api_token ? '#1a7f37' : '#c0392b' ?>;flex-shrink:0;"></span>
+      <?= $has_api_token ? 'API токенът е зададен.' : 'Няма зададен API токен.' ?>
+    </p>
+    <form method="POST" id="tokenForm">
+      <?= csrf_field() ?>
+      <input type="hidden" name="action" value="generate_token">
+      <button type="button" class="btn btn--outline" onclick="_adminConfirm('<?= $has_api_token ? 'Ще генерирам нов токен — старият спира да работи веднага.' : 'Генерирай API токен за четене на грешките?' ?>', 'Генерирай').then(function(ok){ if(ok){ document.getElementById('tokenForm').submit(); } })">
+        <?= $has_api_token ? 'Генерирай нов токен' : 'Генерирай токен' ?>
+      </button>
+    </form>
+  </div>
 </div>
 
 <?php require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-footer.php'; ?>

@@ -148,6 +148,32 @@ function _email_tpl_defaults(): array {
             'outro_en'   => '<p>Check the server logs for more details.</p>',
         ],
 
+        // Groundwork for a future AI auto-fix routine (not implemented in this
+        // repo). Not currently sent by anything; kept ready so a routine can
+        // call render_email('ai-fix-success'|'ai-fix-failed', ['row' => $row])
+        // once it exists.
+        'ai-fix-success' => [
+            'subject_bg' => '[' . (defined('SITE_NAME_BG') ? SITE_NAME_BG : 'Site') . '] ✅ Автоматично поправена грешка — {{error_class}}',
+            'intro_bg'   => '<h2>Грешката е поправена автоматично</h2>'
+                          . '<p>Открита и поправена е грешка в <strong>{{file}}:{{line}}</strong>. Промяната вече е на живо (auto-deploy).</p>',
+            'outro_bg'   => '<p>Провери прикачения commit, ако искаш да видиш точно какво е променено.</p>',
+            'subject_en' => '[' . (defined('SITE_NAME_EN') ? SITE_NAME_EN : 'Site') . '] ✅ Auto-fixed error — {{error_class}}',
+            'intro_en'   => '<h2>Error fixed automatically</h2>'
+                          . '<p>An error was found and fixed in <strong>{{file}}:{{line}}</strong>. The fix is already live (auto-deployed).</p>',
+            'outro_en'   => '<p>Check the linked commit if you want to see exactly what changed.</p>',
+        ],
+
+        'ai-fix-failed' => [
+            'subject_bg' => '[' . (defined('SITE_NAME_BG') ? SITE_NAME_BG : 'Site') . '] ⚠️ Неуспешен опит за автоматична поправка — {{error_class}}',
+            'intro_bg'   => '<h2>Автоматичната поправка не успя</h2>'
+                          . '<p>Опит за поправка на грешка в <strong>{{file}}:{{line}}</strong> не успя. Нищо не е променено на сайта.</p>',
+            'outro_bg'   => '<p>Виж бележките по-долу и известията за грешки в админ панела, за да поправиш ръчно.</p>',
+            'subject_en' => '[' . (defined('SITE_NAME_EN') ? SITE_NAME_EN : 'Site') . '] ⚠️ Auto-fix attempt failed — {{error_class}}',
+            'intro_en'   => '<h2>Automatic fix failed</h2>'
+                          . '<p>An attempt to fix an error in <strong>{{file}}:{{line}}</strong> did not succeed. Nothing was changed on the site.</p>',
+            'outro_en'   => '<p>See the notes below and the error alerts admin page to fix manually.</p>',
+        ],
+
     ];
 }
 

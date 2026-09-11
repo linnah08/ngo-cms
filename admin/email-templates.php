@@ -51,6 +51,14 @@ $templates = [
         'label' => 'Обобщение на грешки (дневно/седмично)',
         'vars'  => ['{{count}}', '{{period}}', '{{from_date}}', '{{to_date}}'],
     ],
+    'ai-fix-success' => [
+        'label' => 'AI автоматична поправка — успех',
+        'vars'  => ['{{error_class}}', '{{file}}', '{{line}}'],
+    ],
+    'ai-fix-failed' => [
+        'label' => 'AI автоматична поправка — неуспех',
+        'vars'  => ['{{error_class}}', '{{file}}', '{{line}}'],
+    ],
 ];
 
 // ── POST: save one template ───────────────────────────────────────────────────

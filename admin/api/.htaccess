@@ -1,0 +1,3 @@
+# Apache/PHP-FPM strips the Authorization header from $_SERVER by default;
+# this endpoint is bearer-token authenticated, so it needs it passed through.
+CGIPassAuth On
