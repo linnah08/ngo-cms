@@ -11,6 +11,10 @@ if (PHP_SAPI !== 'cli') {
     exit('CLI only.');
 }
 
+if (empty($_SERVER['DOCUMENT_ROOT'])) {
+    $_SERVER['DOCUMENT_ROOT'] = dirname(__DIR__);
+}
+
 require_once dirname(__DIR__) . '/config.php';
 require_once dirname(__DIR__) . '/admin/includes/db.php';
 require_once dirname(__DIR__) . '/includes/mailer.php';

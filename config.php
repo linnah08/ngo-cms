@@ -180,6 +180,12 @@ function admin_bar_token_verify(): bool {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Content paths — always relative to document root regardless of subfolder depth
+// CLI (cron/scripts) never sets DOCUMENT_ROOT — self-heal it here so every
+// downstream file that reads $_SERVER['DOCUMENT_ROOT'] directly also works,
+// without each CLI script having to remember to shim it first.
+if (empty($_SERVER['DOCUMENT_ROOT'])) {
+    $_SERVER['DOCUMENT_ROOT'] = __DIR__;
+}
 define('ROOT_PATH',     $_SERVER['DOCUMENT_ROOT']);
 define('CONTENT_PATH',  ROOT_PATH . '/content');
 define('ARTICLES_PATH', CONTENT_PATH . '/articles');
