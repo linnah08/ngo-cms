@@ -1,5 +1,6 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
 $page_title_admin = 'Партньори';
 $active_nav       = 'partners';
 
@@ -33,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (!is_dir($dir)) mkdir($dir, 0755, true);
                     $filename = $id . '.' . $ext;
                     if (move_uploaded_file($_FILES['logo']['tmp_name'], $dir . $filename)) {
+                        image_resize_to_fit($dir . $filename);
                         $logo = '/assets/images/partners/' . $filename;
                     }
                 }

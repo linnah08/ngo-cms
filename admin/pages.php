@@ -3,6 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pages_admin.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
 $active_nav = 'pages';
 
 admin_require_login();
@@ -66,6 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!is_dir($img_dir)) mkdir($img_dir, 0755, true);
                 $filename = 'mission.' . $allowed[$ftype];
                 if (move_uploaded_file($_FILES[$mission_img_key]['tmp_name'], $img_dir . $filename)) {
+                    image_resize_to_fit($img_dir . $filename);
                     $pages['home']['mission_image'] = '/assets/images/pages/' . $filename;
                 }
             }
@@ -79,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         save_json(CONTENT_PATH . '/pages.json', $pages);
-        header('Location: /admin/pages.php?page=home&saved=1'); exit;
+        header('Location: /admin/pages.php?page=home&saved=1&_asclear=page:home'); exit;
 
     } elseif ($section === 'campaign') {
         $url = trim($_POST['campaign_url'] ?? '');
@@ -106,6 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!is_dir($img_dir)) mkdir($img_dir, 0755, true);
                 $filename = 'campaign.' . $allowed[$ftype];
                 if (move_uploaded_file($_FILES[$img_key]['tmp_name'], $img_dir . $filename)) {
+                    image_resize_to_fit($img_dir . $filename);
                     $pages['campaign']['image'] = '/assets/images/pages/' . $filename;
                 }
             }
@@ -117,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         save_json(CONTENT_PATH . '/pages.json', $pages);
-        header('Location: /admin/pages.php?page=home&saved=1'); exit;
+        header('Location: /admin/pages.php?page=home&saved=1&_asclear=page:campaign-text'); exit;
 
     } elseif ($section === 'impact_delete') {
         $items = pages_list_delete(load_json(IMPACT_FILE), (int)($_POST['item_index'] ?? -1));
@@ -165,6 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (!is_dir($dir)) mkdir($dir, 0755, true);
                     $filename = $id . '.' . $ext;
                     if (move_uploaded_file($_FILES[$file_key]['tmp_name'], $dir . $filename)) {
+                        image_resize_to_fit($dir . $filename);
                         $indexed[$id]['image'] = '/assets/images/centres/' . $filename;
                     }
                 }
@@ -186,7 +190,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pages['about']['title_en'] = trim($_POST['about_title_en'] ?? '');
         $pages['about']['intro_en'] = trim($_POST['about_intro_en'] ?? '');
         save_json(CONTENT_PATH . '/pages.json', $pages);
-        header('Location: /admin/pages.php?page=about&saved=1'); exit;
+        header('Location: /admin/pages.php?page=about&saved=1&_asclear=page:about'); exit;
 
     } elseif ($section === 'team_delete') {
         $pages = load_json(CONTENT_PATH . '/pages.json');
@@ -214,6 +218,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!is_dir($dir)) mkdir($dir, 0755, true);
                 $filename = 'member-' . uniqid() . '.' . $ext;
                 if (move_uploaded_file($_FILES['member_photo_file']['tmp_name'], $dir . $filename)) {
+                    image_resize_to_fit($dir . $filename);
                     $photo = '/assets/images/team/' . $filename;
                 }
             }
@@ -230,7 +235,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $pages['about']['team'] = pages_list_upsert($pages['about']['team'] ?? [], $_POST['team_index'] ?? 'new', $member);
         save_json(CONTENT_PATH . '/pages.json', $pages);
-        header('Location: /admin/pages.php?page=about&saved=1');
+        header('Location: /admin/pages.php?page=about&saved=1&_asclear=page:team:' . (int)($_POST['team_index'] ?? 0));
         exit;
 
     } elseif ($section === 'projects_delete') {
@@ -261,6 +266,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!is_dir($dir)) mkdir($dir, 0755, true);
                 $filename = 'project-' . uniqid() . '.' . $ext;
                 if (move_uploaded_file($_FILES['proj_image_file']['tmp_name'], $dir . $filename)) {
+                    image_resize_to_fit($dir . $filename);
                     $images[] = '/assets/images/projects/' . $filename;
                 }
             }
@@ -276,7 +282,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $pages['projects'] = pages_list_upsert($pages['projects'] ?? [], $_POST['proj_index'] ?? 'new', $project);
         save_json(CONTENT_PATH . '/pages.json', $pages);
-        header('Location: /admin/pages.php?page=projects&saved=1');
+        header('Location: /admin/pages.php?page=projects&saved=1&_asclear=page:project:' . (int)($_POST['proj_index'] ?? 0));
         exit;
 
     } elseif ($section === 'how_to_help') {
@@ -310,7 +316,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
         $pages['how_to_help']['ways'] = pages_list_upsert($pages['how_to_help']['ways'] ?? [], $_POST['way_index'] ?? 'new', $way);
         save_json(CONTENT_PATH . '/pages.json', $pages);
-        header('Location: /admin/pages.php?page=how_to_help&saved=1');
+        header('Location: /admin/pages.php?page=how_to_help&saved=1&_asclear=page:way:' . (int)($_POST['way_index'] ?? 0));
         exit;
 
     } elseif ($section === 'shop') {
@@ -318,7 +324,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pages['shop']['donation_text_bg'] = trim($_POST['donation_text_bg'] ?? '');
         $pages['shop']['donation_text_en'] = trim($_POST['donation_text_en'] ?? '');
         save_json(CONTENT_PATH . '/pages.json', $pages);
-        header('Location: /admin/pages.php?page=shop&saved=1'); exit;
+        header('Location: /admin/pages.php?page=shop&saved=1&_asclear=page:shop'); exit;
 
     } elseif ($section === 'legal') {
         $pages = load_json(CONTENT_PATH . '/pages.json');
@@ -329,7 +335,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pages['legal'][$key . '_en']  = $_POST['legal_content_en'] ?? '';
             save_json(CONTENT_PATH . '/pages.json', $pages);
             $legal_page_map = ['privacy' => 'legal_privacy', 'legal_info' => 'legal_info', 'terms' => 'legal_terms'];
-            header('Location: /admin/pages.php?page=' . $legal_page_map[$key] . '&saved=1'); exit;
+            $legal_as_map   = ['privacy' => 'legal-privacy', 'legal_info' => 'legal-info', 'terms' => 'legal-terms'];
+            header('Location: /admin/pages.php?page=' . $legal_page_map[$key] . '&saved=1&_asclear=page:' . $legal_as_map[$key]); exit;
         }
 
     } elseif ($section === 'deepl') {

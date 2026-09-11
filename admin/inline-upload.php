@@ -1,6 +1,7 @@
 <?php
 // admin/inline-upload.php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
 header('Content-Type: application/json');
 
 function upload_json(array $data): never {
@@ -54,5 +55,7 @@ $dest     = $dest_dir . '/' . $filename;
 if (!move_uploaded_file($file['tmp_name'], $dest)) {
     upload_json(['ok' => false, 'error' => 'upload failed']);
 }
+
+image_resize_to_fit($dest);
 
 upload_json(['ok' => true, 'path' => '/' . $dir . '/' . $filename]);

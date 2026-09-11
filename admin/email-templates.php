@@ -69,7 +69,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         setting_set('email_tpl_' . $save_key, json_encode($data, JSON_UNESCAPED_UNICODE));
         flash_set('success', 'Шаблонът е запазен.');
     }
-    header('Location: /admin/email-templates.php?tpl=' . urlencode($save_key));
+    header('Location: /admin/email-templates.php?tpl=' . urlencode($save_key)
+         . '&_asclear=' . urlencode('email-template:' . $save_key));
     exit;
 }
 

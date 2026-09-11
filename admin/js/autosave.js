@@ -1,6 +1,15 @@
 (function () {
   'use strict';
 
+  // Clear a draft only after the server confirms a successful save. The success
+  // redirect carries ?_asclear=<key>; we reach it only when the POST actually
+  // landed, so a slow / failed / aborted save can never wipe the draft first.
+  // (autosave.js is loaded on every admin page, including the redirect targets.)
+  try {
+    var _clearKey = new URLSearchParams(window.location.search).get('_asclear');
+    if (_clearKey) localStorage.removeItem('autosave:' + _clearKey);
+  } catch (e) {}
+
   window.initAutosave = function (cfg) {
     // cfg: { key: string, formId: string, tinyIds: string[] }
     var storageKey = 'autosave:' + cfg.key;
@@ -49,10 +58,12 @@
       tinymce.on('AddEditor', function (e) { hookEditor(e.editor); });
     }
 
-    // Clear draft on submit so a successful save never re-offers a stale draft
+    // On submit, persist the very latest content instead of deleting the draft.
+    // The draft is cleared only once the server confirms the save (via the
+    // ?_asclear= handler above), so a failed or slow submit keeps a safety copy.
     form.addEventListener('submit', function () {
       clearTimeout(timer);
-      try { localStorage.removeItem(storageKey); } catch (e) {}
+      save();
     });
 
     // Restore banner — shown if a draft exists for this key

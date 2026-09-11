@@ -3,6 +3,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
 header('Content-Type: application/json');
 
 function add_json(array $d): never { echo json_encode($d); exit; }
@@ -28,6 +29,7 @@ function _inline_add_upload(string $field, string $dir): string {
     if (!is_dir($dest_dir)) mkdir($dest_dir, 0755, true);
     $name = bin2hex(random_bytes(8)) . '.' . $ext;
     if (!move_uploaded_file($_FILES[$field]['tmp_name'], $dest_dir . '/' . $name)) return '';
+    image_resize_to_fit($dest_dir . '/' . $name);
     return $dir . '/' . $name;
 }
 

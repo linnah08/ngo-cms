@@ -62,6 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
     if (!$subject_bg && !$subject_en) $errors[] = 'Въведете поне една тема.';
 
     if (!$errors) {
+        $as_id = $id;  // autosave key was based on the page-load id (0 for new)
         if ($id && $campaign) {
             $pdo->prepare("UPDATE newsletter_campaigns SET subject_bg=?,subject_en=?,body_bg=?,body_en=?,status='draft' WHERE id=?")
                 ->execute([$subject_bg, $subject_en, $body_bg, $body_en, $id]);
@@ -71,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
             $id = (int)$pdo->lastInsertId();
         }
         flash_set('success', 'Кампанията е записана.');
-        header('Location: /admin/newsletter.php');
+        header('Location: /admin/newsletter.php?_asclear=' . urlencode('newsletter:' . $as_id));
         exit;
     }
 

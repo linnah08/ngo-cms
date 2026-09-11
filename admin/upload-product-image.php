@@ -3,6 +3,7 @@
 // The main product form never includes the file, so post_max_size is never hit.
 ob_start(); // catch any stray output so the JSON response stays clean
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
 admin_require_shop();
 
 header('Content-Type: application/json');
@@ -54,5 +55,7 @@ if (!move_uploaded_file($_FILES['image']['tmp_name'], $dir . $filename)) {
     echo json_encode(['error' => 'Грешка при запис на файла.']);
     exit;
 }
+
+image_resize_to_fit($dir . $filename);
 
 echo json_encode(['filename' => $filename]);

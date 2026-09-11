@@ -148,7 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         flash_set('success', 'Продуктът е запазен.');
-        header('Location: /admin/products.php');
+        header('Location: /admin/products.php?_asclear=' . urlencode('product:' . ($id ?: 'new')));
         exit;
     }
 

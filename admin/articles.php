@@ -58,6 +58,9 @@ if (is_dir($articles_dir)) {
 <?php if (!empty($_GET['deleted'])): ?>
   <div class="admin-alert admin-alert--success" style="margin-bottom:1.5rem;">Статията е изтрита.</div>
 <?php endif; ?>
+<?php if (!empty($_GET['image_error'])): ?>
+  <div class="admin-alert admin-alert--error" style="margin-bottom:1.5rem;">Снимката не бе запазена: <?= h($_GET['image_error']) ?></div>
+<?php endif; ?>
 
 <?php if (empty($articles)): ?>
   <p style="color:var(--text-muted);">Няма статии. <a href="/admin/article-edit.php">Създайте първата</a>.</p>

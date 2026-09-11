@@ -132,7 +132,7 @@
         if (!cropper) { finish(null); return; }
         var keepAlpha = (file.type === 'image/png' || file.type === 'image/webp');
         var canvas = cropper.getCroppedCanvas({
-          maxWidth: 4000, maxHeight: 4000,
+          maxWidth: 2000, maxHeight: 2000,
           imageSmoothingEnabled: true, imageSmoothingQuality: 'high',
           fillColor: keepAlpha ? 'transparent' : '#fff'
         });
@@ -144,7 +144,7 @@
           var base = (file.name || 'image').replace(/\.[^.]+$/, '');
           var out = new File([blob], base + '.' + outExt, { type: outType });
           finish(out);
-        }, outType, 0.9);
+        }, outType, 0.82);
       });
       footer.appendChild(cancelBtn);
       footer.appendChild(okBtn);

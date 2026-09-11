@@ -6,6 +6,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/auth.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
 admin_require_admin();
 
 $_tinymce_key    = setting_get('tinymce_api_key', 'no-api-key');
@@ -91,6 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!isset($allowed[$ftype])) continue;
                 $name = 'photo_' . time() . '_' . $i . '.' . $allowed[$ftype];
                 if (move_uploaded_file($tmp, $img_dir . $name)) {
+                    image_resize_to_fit($img_dir . $name);
                     $photos[] = '/assets/images/campaign/' . $name;
                 }
             }
@@ -209,7 +211,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($errors)) {
-        header('Location: /admin/campaign.php' . ($saved ? '?saved=1' : ''));
+        header('Location: /admin/campaign.php' . ($saved ? '?saved=1&_asclear=campaign' : ''));
         exit;
     }
 }

@@ -4,6 +4,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/ai_keywords.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/articles.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
 
 $slug_param = basename(str_replace(['..', "\0"], '', $_GET['slug'] ?? ''));
 $lang_param = ($_GET['lang'] ?? 'bg') === 'en' ? 'en' : 'bg';
@@ -53,7 +54,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$title) {
         $error = 'Заглавието е задължително.';
     } else {
-        $image = $article['image'] ?? '';
+        $image       = $article['image'] ?? '';
+        // Image problems never block saving the article text — a rejected or
+        // failed upload only shows a separate warning and keeps the old image.
+        $image_error = '';
 
         // Handle image upload / removal
         // New upload always takes priority; remove only clears when no new file is provided
@@ -66,12 +70,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!is_dir($img_dir)) mkdir($img_dir, 0755, true);
                 $filename = ascii_slug($new_slug) . '-' . time() . '.' . $ext;
                 if (move_uploaded_file($_FILES['image']['tmp_name'], $img_dir . $filename)) {
+                    image_resize_to_fit($img_dir . $filename);
                     $image = '/assets/images/articles/' . $filename;
                 } else {
-                    $error = 'Неуспешен запис на снимката. Проверете правата на директорията.';
+                    $image_error = 'Неуспешен запис на снимката. Проверете правата на директорията.';
                 }
             } else {
-                $error = 'Позволени са само JPEG, PNG и WebP изображения.';
+                $image_error = 'Позволени са само JPEG, PNG и WebP изображения.';
             }
         } elseif (!empty($_POST['remove_image'])) {
             $image = '';
@@ -86,12 +91,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 UPLOAD_ERR_FORM_SIZE => 'Снимката е прекалено голяма.',
                 UPLOAD_ERR_PARTIAL   => 'Снимката е качена само частично. Опитайте отново.',
             ];
-            $error = $codes[$_FILES['image']['error']] ?? 'Грешка при качване на снимката (код ' . $_FILES['image']['error'] . ').';
+            $image_error = $codes[$_FILES['image']['error']] ?? 'Грешка при качване на снимката (код ' . $_FILES['image']['error'] . ').';
         }
-
-        if ($error) {
-            // Upload or validation error — stop here so the user sees the message.
-        } else {
 
         // If editing and BG slug changed, delete old BG + EN files
         if (!$is_new && $slug_param !== $new_slug) {
@@ -129,10 +130,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             save_json($dir_en . '/' . $new_slug_en . '.json', $data_en);
         }
 
-        header('Location: /admin/articles.php?saved=1');
+        $as_key = 'article:' . ($is_new ? 'new' : $slug_param);
+        $redirect = '/admin/articles.php?saved=1&_asclear=' . urlencode($as_key);
+        if ($image_error !== '') {
+            // Image problems never block saving the article text — surface the
+            // warning as a separate banner instead of losing the whole save.
+            $redirect .= '&image_error=' . urlencode($image_error);
+        }
+        header('Location: ' . $redirect);
         exit;
-
-        } // end !$error
     }
 }
 
