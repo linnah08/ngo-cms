@@ -20,6 +20,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'delete
     exit;
 }
 
+// Handle bulk delete
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'bulk_delete') {
+    if (!csrf_verify()) { http_response_code(400); exit('Invalid token'); }
+    $ids = array_values(array_filter(array_map(
+        fn($raw) => basename(str_replace(['..', "\0"], '', (string)$raw)),
+        (array)($_POST['ids'] ?? [])
+    ), fn($s) => $s !== ''));
+
+    foreach ($ids as $slug) {
+        // Same per-slug delete logic as the single-row delete above.
+        $bg = ARTICLES_PATH . '/bg/' . $slug . '.json';
+        $en = ARTICLES_PATH . '/en/' . $slug . '.json';
+        if (file_exists($bg)) unlink($bg);
+        if (file_exists($en)) unlink($en);
+    }
+    flash_set('success', 'Избраните статии са изтрити.');
+    header('Location: /admin/articles.php');
+    exit;
+}
+
+// Handle bulk publish/unpublish (smart toggle, mirrors products.php bulk_toggle)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'bulk_publish') {
+    if (!csrf_verify()) { http_response_code(400); exit('Invalid token'); }
+    $ids = array_values(array_filter(array_map(
+        fn($raw) => basename(str_replace(['..', "\0"], '', (string)$raw)),
+        (array)($_POST['ids'] ?? [])
+    ), fn($s) => $s !== ''));
+
+    if (!empty($ids)) {
+        // If every selected article is currently published, switch them all
+        // to draft; otherwise publish all of them.
+        $allPublished = true;
+        foreach ($ids as $slug) {
+            $bg   = ARTICLES_PATH . '/bg/' . $slug . '.json';
+            $data = file_exists($bg) ? load_json($bg) : [];
+            if (($data['status'] ?? '') !== 'published') { $allPublished = false; break; }
+        }
+        $newStatus = $allPublished ? 'draft' : 'published';
+
+        foreach ($ids as $slug) {
+            $bg = ARTICLES_PATH . '/bg/' . $slug . '.json';
+            if (!file_exists($bg)) continue;
+            $data           = load_json($bg);
+            $data['status'] = $newStatus;
+            save_json($bg, $data);
+
+            // Date, author, image and status are shared between BG and EN —
+            // keep that in sync here too.
+            $en = ARTICLES_PATH . '/en/' . $slug . '.json';
+            if (file_exists($en)) {
+                $en_data           = load_json($en);
+                $en_data['status'] = $newStatus;
+                save_json($en, $en_data);
+            }
+        }
+    }
+    flash_set('success', 'Статусите са обновени.');
+    header('Location: /admin/articles.php');
+    exit;
+}
+
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
 $articles_dir = ARTICLES_PATH . '/bg';
@@ -37,6 +98,32 @@ if (is_dir($articles_dir)) {
         }
     }
     usort($articles, fn($a, $b) => strcmp($b['date'] ?? '', $a['date'] ?? ''));
+}
+
+// Status filter + free-text search — everything is in-memory since articles
+// are JSON files, not DB rows.
+$status_filter_raw = is_string($_GET['status'] ?? null) ? $_GET['status'] : 'all';
+$status_filter     = in_array($status_filter_raw, ['all', 'published', 'draft'], true)
+    ? $status_filter_raw : 'all';
+$search = trim(is_string($_GET['q'] ?? null) ? $_GET['q'] : '');
+
+$status_counts = ['all' => count($articles), 'published' => 0, 'draft' => 0];
+foreach ($articles as $a) {
+    $status_counts[($a['status'] ?? '') === 'published' ? 'published' : 'draft']++;
+}
+
+if ($status_filter !== 'all') {
+    $articles = array_values(array_filter(
+        $articles,
+        fn($a) => (($a['status'] ?? '') === 'published' ? 'published' : 'draft') === $status_filter
+    ));
+}
+if ($search !== '') {
+    $needle   = mb_strtolower($search);
+    $articles = array_values(array_filter(
+        $articles,
+        fn($a) => str_contains(mb_strtolower($a['title'] ?? ''), $needle)
+    ));
 }
 ?>
 
@@ -61,22 +148,56 @@ if (is_dir($articles_dir)) {
 <?php if (!empty($_GET['image_error'])): ?>
   <div class="admin-alert admin-alert--error" style="margin-bottom:1.5rem;">Снимката не бе запазена: <?= h($_GET['image_error']) ?></div>
 <?php endif; ?>
+<?php foreach (flash_get() as $_flash): ?>
+  <div class="admin-alert admin-alert--<?= h($_flash['type']) ?>" style="margin-bottom:1.5rem;"><?= h($_flash['message']) ?></div>
+<?php endforeach; ?>
+
+<!-- Search -->
+<form method="GET" style="margin-bottom:1rem;display:flex;gap:.5rem;max-width:520px;">
+  <input type="hidden" name="status" value="<?= h($status_filter) ?>">
+  <input type="search" name="q" value="<?= h($search) ?>" placeholder="Търси по заглавие…"
+         style="flex:1;padding:.5rem .75rem;border:1px solid var(--border);border-radius:8px;font-size:.9rem;font-family:inherit;">
+  <button type="submit" class="btn btn--primary" style="padding:.5rem 1rem;font-size:.9rem;">Търси</button>
+  <?php if ($search !== ''): ?>
+    <a href="?status=<?= h($status_filter) ?>" class="btn btn--outline" style="padding:.5rem 1rem;font-size:.9rem;">Изчисти</a>
+  <?php endif; ?>
+</form>
+
+<!-- Status filter -->
+<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.5rem;">
+  <?php $status_pill_labels = ['all' => 'Всички', 'published' => 'Публикувани', 'draft' => 'Чернови'];
+  foreach ($status_pill_labels as $val => $label): ?>
+    <a href="?status=<?= $val ?>&q=<?= urlencode($search) ?>"
+       style="padding:.35rem .9rem;border-radius:20px;font-size:.85rem;text-decoration:none;
+         <?= $status_filter === $val ? 'background:var(--teal);color:#fff;' : 'background:var(--warm-grey);color:var(--text);' ?>">
+      <?= $label ?> (<?= (int)$status_counts[$val] ?>)
+    </a>
+  <?php endforeach; ?>
+</div>
 
 <?php if (empty($articles)): ?>
-  <p style="color:var(--text-muted);">Няма статии. <a href="/admin/article-edit.php">Създайте първата</a>.</p>
+  <p style="color:var(--text-muted);">
+    <?php if ($search !== '' || $status_filter !== 'all'): ?>
+      Няма статии, отговарящи на филтъра.
+    <?php else: ?>
+      Няма статии. <a href="/admin/article-edit.php">Създайте първата</a>.
+    <?php endif; ?>
+  </p>
 <?php else: ?>
   <div class="admin-table-wrap" style="overflow-x:hidden;">
     <table class="admin-table" style="table-layout:fixed;width:100%;">
       <colgroup>
-        <col style="width:38%;">
-        <col style="width:13%;">
-        <col style="width:16%;">
+        <col style="width:4%;">
+        <col style="width:34%;">
         <col style="width:12%;">
-        <col style="width:8%;">
-        <col style="width:13%;">
+        <col style="width:15%;">
+        <col style="width:11%;">
+        <col style="width:7%;">
+        <col style="width:17%;">
       </colgroup>
       <thead>
         <tr>
+          <th style="overflow:hidden;"><input type="checkbox" id="select-all" aria-label="Избери всички" style="cursor:pointer;width:16px;height:16px;"></th>
           <th data-sort style="overflow:hidden;">Заглавие</th>
           <th data-sort style="overflow:hidden;">Дата</th>
           <th data-sort style="overflow:hidden;">Автор</th>
@@ -88,6 +209,12 @@ if (is_dir($articles_dir)) {
       <tbody>
         <?php foreach ($articles as $article): ?>
           <tr data-slug="<?= h($article['slug']) ?>">
+            <td style="text-align:center;vertical-align:middle;">
+              <input type="checkbox" class="row-cb"
+                     value="<?= h($article['slug']) ?>"
+                     data-published="<?= ($article['status'] ?? '') === 'published' ? '1' : '0' ?>"
+                     style="cursor:pointer;width:16px;height:16px;">
+            </td>
             <td><strong><?= h($article['title'] ?? '—') ?></strong></td>
             <td><?= h($article['date'] ?? '—') ?></td>
             <td><?= h($article['author'] ?? '—') ?></td>
@@ -126,6 +253,111 @@ if (is_dir($articles_dir)) {
       </tbody>
     </table>
   </div>
+
+  <!-- Bulk action bar -->
+  <div id="bulk-bar" style="
+    position:fixed;bottom:0;left:0;right:0;
+    background:#1a1a2e;color:#fff;
+    padding:1rem 2rem;
+    display:flex;align-items:center;gap:1rem;
+    transform:translateY(100%);transition:transform 0.2s ease;
+    z-index:1000;box-shadow:0 -2px 8px rgba(0,0,0,0.3);">
+    <span id="bulk-count" style="font-weight:500;">0 избрани</span>
+    <button id="bulk-toggle" type="button" class="btn btn--primary">Публикувай</button>
+    <button id="bulk-delete" type="button" class="btn btn--danger">Изтрий</button>
+    <button id="bulk-clear" type="button" class="btn-link" style="color:#aaa;margin-left:auto;">✕ Изчисти</button>
+  </div>
+
+  <form id="form-bulk-publish" method="POST" action="/admin/articles.php?action=bulk_publish" style="display:none;">
+    <?= csrf_field() ?>
+  </form>
+
+  <form id="form-bulk-delete" method="POST" action="/admin/articles.php?action=bulk_delete" style="display:none;">
+    <?= csrf_field() ?>
+  </form>
+
+  <script>
+  (function () {
+      const selectAll  = document.getElementById('select-all');
+      const bulkBar    = document.getElementById('bulk-bar');
+      const countEl    = document.getElementById('bulk-count');
+      const toggleBtn  = document.getElementById('bulk-toggle');
+      const deleteBtn  = document.getElementById('bulk-delete');
+      const clearBtn   = document.getElementById('bulk-clear');
+      const formToggle = document.getElementById('form-bulk-publish');
+      const formDelete = document.getElementById('form-bulk-delete');
+
+      function getCheckboxes() {
+          return Array.from(document.querySelectorAll('.row-cb'));
+      }
+
+      function getSelected() {
+          return getCheckboxes().filter(cb => cb.checked);
+      }
+
+      function updateToolbar() {
+          const selected = getSelected();
+          const count    = selected.length;
+
+          countEl.textContent = count + ' избрани';
+          bulkBar.style.transform = count > 0 ? 'translateY(0)' : 'translateY(100%)';
+
+          const allPublished = selected.length > 0 && selected.every(cb => cb.dataset.published === '1');
+          toggleBtn.textContent = allPublished ? 'Направи чернова' : 'Публикувай';
+
+          const all = getCheckboxes();
+          selectAll.indeterminate = count > 0 && count < all.length;
+          selectAll.checked       = all.length > 0 && count === all.length;
+      }
+
+      function injectIds(form, selected) {
+          form.querySelectorAll('input[name="ids[]"]').forEach(el => el.remove());
+          selected.forEach(function (cb) {
+              const input = document.createElement('input');
+              input.type  = 'hidden';
+              input.name  = 'ids[]';
+              input.value = cb.value;
+              form.appendChild(input);
+          });
+      }
+
+      selectAll.addEventListener('change', function () {
+          getCheckboxes().forEach(function (cb) { cb.checked = selectAll.checked; });
+          updateToolbar();
+      });
+
+      getCheckboxes().forEach(function (cb) {
+          cb.addEventListener('change', updateToolbar);
+      });
+
+      toggleBtn.addEventListener('click', function () {
+          const selected = getSelected();
+          if (!selected.length) return;
+          injectIds(formToggle, selected);
+          formToggle.submit();
+      });
+
+      deleteBtn.addEventListener('click', function () {
+          const selected = getSelected();
+          if (!selected.length) return;
+          _adminConfirm(
+              'Изтриване на ' + selected.length + ' статии. Това не може да се отмени. Продължавате?',
+              'Изтрий'
+          ).then(function (confirmed) {
+              if (!confirmed) return;
+              injectIds(formDelete, selected);
+              formDelete.submit();
+          });
+      });
+
+      clearBtn.addEventListener('click', function () {
+          getCheckboxes().forEach(function (cb) { cb.checked = false; });
+          selectAll.checked       = false;
+          selectAll.indeterminate = false;
+          updateToolbar();
+      });
+  })();
+  </script>
 <?php endif; ?>
 
 <?php if ($deepl_ready): ?>
