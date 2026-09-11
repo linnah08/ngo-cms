@@ -76,6 +76,7 @@ final class DonationCertTest extends TestCase
             ['card',          'Банкова карта'],
             ['bank_transfer', 'Банков превод'],
             ['cod',           'В брой'],
+            ['iris',          'IRIS'],
         ];
     }
 

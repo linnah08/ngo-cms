@@ -32,7 +32,7 @@ class InlineSaveTest extends TestCase
 
     private function is_allowed_section(string $section): bool
     {
-        $allowed_sections = ['home', 'campaign', 'shop', 'footer', 'menus'];
+        $allowed_sections = ['home', 'campaign', 'shop', 'donation', 'footer', 'menus'];
         return in_array($section, $allowed_sections, true);
     }
 
@@ -42,6 +42,7 @@ class InlineSaveTest extends TestCase
             'home'     => ['hero_title', 'hero_text', 'mission_title', 'mission_text'],
             'campaign' => ['title', 'text', 'cta'],
             'shop'     => ['donation_text'],
+            'donation' => ['title'],
             'footer'   => ['tagline', 'social_fb', 'social_ig'],
         ];
         return isset($allowed[$section]) && in_array($field, $allowed[$section], true);
@@ -54,7 +55,7 @@ class InlineSaveTest extends TestCase
 
     public function test_known_sections_allowed(): void
     {
-        foreach (['home', 'campaign', 'shop', 'footer', 'menus'] as $section) {
+        foreach (['home', 'campaign', 'shop', 'donation', 'footer', 'menus'] as $section) {
             $this->assertTrue($this->is_allowed_section($section), "$section must be allowed");
         }
     }
@@ -95,6 +96,18 @@ class InlineSaveTest extends TestCase
 
         $saved = json_decode(file_get_contents($this->pagesPath), true);
         $this->assertSame('<p>Помогни ни</p>', $saved['shop']['donation_text_bg']);
+    }
+
+    public function test_saves_donation_page_title(): void
+    {
+        $pages = load_json(CONTENT_PATH . '/pages.json');
+        $pages['donation']['title']    = 'Подкрепи ни';
+        $pages['donation']['title_en'] = 'Support us';
+        save_json(CONTENT_PATH . '/pages.json', $pages);
+
+        $saved = json_decode(file_get_contents($this->pagesPath), true);
+        $this->assertSame('Подкрепи ни', $saved['donation']['title']);
+        $this->assertSame('Support us',  $saved['donation']['title_en']);
     }
 
     public function test_saves_menus_header_label(): void

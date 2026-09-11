@@ -35,7 +35,9 @@ if (!$order || $order['payment_method'] !== 'iris') {
     exit;
 }
 
-$confirm_url = '/checkout/confirmation/?order=' . urlencode($order_number);
+$confirm_url = $order['type'] === 'donation'
+    ? '/donation/confirmation/?order=' . urlencode($order_number)
+    : '/checkout/confirmation/?order=' . urlencode($order_number);
 $failed_url  = '/checkout/payment-failed/?order=' . urlencode($order_number);
 
 // ── Retry: re-register the same order with IRIS ──────────────────────────────

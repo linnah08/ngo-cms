@@ -23,6 +23,7 @@ class ReceiptGenerator extends DocumentGenerator {
             'cod'           => 'Наложен платеж',
             'card'          => 'Банкова карта',
             'bank_transfer' => 'Банков превод',
+            'iris'          => 'Банков превод (IRIS Pay by Bank)',
         ];
         $pay_label = $pay_labels[$order['payment_method'] ?? ''] ?? 'В брой';
 

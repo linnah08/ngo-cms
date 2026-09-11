@@ -68,10 +68,12 @@ class DonationCertGenerator extends DocumentGenerator {
             'cod'           => 'Cash',
             'card'          => 'Bank card',
             'bank_transfer' => 'Bank transfer',
+            'iris'          => 'Bank transfer (IRIS Pay by Bank)',
         ] : [
             'cod'           => 'В брой',
             'card'          => 'Банкова карта',
             'bank_transfer' => 'Банков превод',
+            'iris'          => 'Банков превод (IRIS Pay by Bank)',
         ];
         $pay_label = $pay_labels[$order['payment_method'] ?? 'card'] ?? ($en ? 'Bank card' : 'Банкова карта');
 

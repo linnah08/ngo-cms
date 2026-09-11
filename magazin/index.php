@@ -633,6 +633,22 @@ $donation_text = $lang === 'bg'
     ? ($pages['shop']['donation_text_bg'] ?? '')
     : ($pages['shop']['donation_text_en'] ?? '');
 
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/IRISPayment.php';
+$_donation_pay_methods = [];
+if (DSKBankPayment::isEnabled()) {
+    $_donation_pay_methods['card'] = $lang === 'bg'
+        ? ['💳', 'Плащане с карта', 'Visa / Mastercard през DSK Bank']
+        : ['💳', 'Card payment', 'Visa / Mastercard via DSK Bank'];
+}
+if (IRISPayment::isEnabled()) {
+    $_donation_pay_methods['iris'] = $lang === 'bg'
+        ? ['🏦', 'Банков превод (Pay by Bank)', 'Директно от сметката ви през IRIS']
+        : ['🏦', 'Bank transfer (Pay by Bank)', 'Directly from your bank account via IRIS'];
+}
+$_donation_pay_default = array_key_first($_donation_pay_methods);
+
 $products = $pdo->query('SELECT * FROM products WHERE active=1 ORDER BY sort_order, id')->fetchAll();
 
 // For variant products, image column is empty — use first active variant's image
@@ -840,8 +856,13 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
       <span class="section-label" style="color:rgba(255,255,255,.7);">
         <?= $lang === 'bg' ? 'Дарение' : 'Donation' ?>
       </span>
-      <h2 style="color:#fff;margin-bottom:1rem;">
-        <?= $lang === 'bg' ? 'Направи дарение' : 'Make a donation' ?>
+      <h2 style="color:#fff;margin-bottom:1rem;"
+          data-cms-field="title"
+          data-cms-section="donation"
+          data-cms-type="text"
+          data-cms-bg="<?= h($pages['donation']['title'] ?? '') ?>"
+          data-cms-en="<?= h($pages['donation']['title_en'] ?? '') ?>">
+        <?= h($lang === 'bg' ? ($pages['donation']['title'] ?: 'Направи дарение') : ($pages['donation']['title_en'] ?: 'Make a donation')) ?>
       </h2>
       <div style="color:rgba(255,255,255,.85);margin-bottom:2rem;"
            data-cms-field="donation_text"
@@ -936,6 +957,33 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
           </div>
         </div>
       </div>
+
+      <!-- Payment method -->
+      <fieldset style="border:none;padding:0;margin:0 0 1.5rem;">
+        <legend style="font-weight:600;font-size:.875rem;display:block;margin-bottom:.5rem;padding:0;">
+          <?= $lang === 'bg' ? 'Начин на плащане' : 'Payment method' ?>
+        </legend>
+        <?php if (empty($_donation_pay_methods)): ?>
+        <p style="padding:.85rem 1rem;border:2px solid var(--border);border-radius:var(--radius);color:#c0392b;font-size:.9rem;">
+          <?= $lang === 'bg'
+                ? 'Онлайн плащането не е налично в момента. Моля свържете се с нас.'
+                : 'Online payment is not available right now. Please get in touch with us.' ?>
+        </p>
+        <?php endif; ?>
+        <div style="display:flex;flex-direction:column;gap:.6rem;">
+          <?php foreach ($_donation_pay_methods as $_pm => $_info): ?>
+          <label style="display:flex;align-items:center;gap:.65rem;padding:.75rem 1rem;border:2px solid var(--border);border-radius:var(--radius);cursor:pointer;font-size:.9rem;">
+            <input type="radio" name="payment_method" value="<?= $_pm ?>" <?= $_pm === $_donation_pay_default ? 'checked' : '' ?>
+                   style="width:1.05rem;height:1.05rem;accent-color:var(--teal);">
+            <span aria-hidden="true" style="font-size:1.2rem;line-height:1;"><?= $_info[0] ?></span>
+            <span>
+              <span style="display:block;font-weight:600;"><?= h($_info[1]) ?></span>
+              <span style="display:block;font-size:.8rem;color:var(--text-muted);"><?= h($_info[2]) ?></span>
+            </span>
+          </label>
+          <?php endforeach; ?>
+        </div>
+      </fieldset>
 
       <button type="submit" class="btn btn--primary" style="width:100%;justify-content:center;margin-top:1rem;">
         <?= $lang === 'bg' ? 'Дари сега' : 'Donate now' ?>
