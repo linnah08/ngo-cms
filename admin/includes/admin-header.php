@@ -28,7 +28,7 @@ $current_user = admin_user();
     menubar: false,
     promotion: false,
     branding: false,
-    plugins: 'lists link hr code emoticons anchor image table charmap wordcount autoresize',
+    plugins: 'lists link code emoticons anchor image table charmap wordcount autoresize',
     min_height: 120,
     toolbar: 'bold italic underline strikethrough | fontsize | blocks | bullist numlist | link unlink anchor | image table | charmap emoticons | hr removeformat | code',
     toolbar_mode: 'wrap',
