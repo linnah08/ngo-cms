@@ -48,6 +48,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($action === 'bulk_feature') {
+        $ids = array_values(array_filter(
+            array_map('intval', (array)($_POST['ids'] ?? [])),
+            fn($v) => $v > 0
+        ));
+        if (!empty($ids)) {
+            $in = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM products WHERE id IN ($in) AND featured = 1");
+            $stmt->execute($ids);
+            $featuredCount = (int)$stmt->fetchColumn();
+            $newFeatured   = ($featuredCount === count($ids)) ? 0 : 1;
+            $pdo->prepare("UPDATE products SET featured = ? WHERE id IN ($in)")
+                ->execute(array_merge([$newFeatured], $ids));
+        }
+        flash_set('success', 'Началната страница е обновена.');
+        header('Location: /admin/products.php');
+        exit;
+    }
+
     if ($action === 'bulk_delete') {
         $ids = array_values(array_filter(
             array_map('intval', (array)($_POST['ids'] ?? [])),
@@ -174,6 +193,7 @@ try {
           <input type="checkbox" class="row-cb"
                  value="<?= (int)$p['id'] ?>"
                  data-active="<?= $p['active'] ? '1' : '0' ?>"
+                 data-featured="<?= !empty($p['featured']) ? '1' : '0' ?>"
                  style="cursor:pointer;width:16px;height:16px;">
         </td>
         <td style="width:60px;">
@@ -207,6 +227,17 @@ try {
           <span class="badge <?= $p['active'] ? 'badge--published' : 'badge--draft' ?>">
             <?= $p['active'] ? 'Активен' : 'Неактивен' ?>
           </span>
+          <?php if (!empty($p['featured']) && $p['active']): ?>
+            <br>
+            <span class="badge" style="margin-top:.35rem;background:#fff3cd;color:#856404;white-space:nowrap;" title="Показва се на началната страница">
+              ★ Начало
+            </span>
+          <?php elseif (!empty($p['featured'])): ?>
+            <br>
+            <span class="badge" style="margin-top:.35rem;background:#f0f0f0;color:#888;white-space:nowrap;" title="Маркиран е за началната страница, но няма да се показва, докато продуктът е неактивен">
+              ★ Начало (скрит, неактивен)
+            </span>
+          <?php endif; ?>
         </td>
         <td style="font-size:.82rem;">
           <?php $rs = $review_stats[$p['id']] ?? null; ?>
@@ -265,6 +296,7 @@ try {
   z-index:1000;box-shadow:0 -2px 8px rgba(0,0,0,0.3);">
   <span id="bulk-count" style="font-weight:500;">0 избрани</span>
   <button id="bulk-toggle" type="button" class="btn btn--primary">Активирай</button>
+  <button id="bulk-feature" type="button" class="btn btn--outline" style="background:transparent;color:#fff;border-color:#fff;">Покажи на началната</button>
   <button id="bulk-delete" type="button" class="btn btn--danger">Изтрий</button>
   <button id="bulk-hard-delete" type="button" class="btn btn--danger"
           style="background:#7b1010;">Изтрий завинаги</button>
@@ -274,6 +306,11 @@ try {
 <form id="form-bulk-toggle" method="POST" style="display:none;">
   <?= csrf_field() ?>
   <input type="hidden" name="action" value="bulk_toggle">
+</form>
+
+<form id="form-bulk-feature" method="POST" style="display:none;">
+  <?= csrf_field() ?>
+  <input type="hidden" name="action" value="bulk_feature">
 </form>
 
 <form id="form-bulk-delete" method="POST" style="display:none;">
@@ -292,9 +329,11 @@ try {
     const bulkBar    = document.getElementById('bulk-bar');
     const countEl    = document.getElementById('bulk-count');
     const toggleBtn  = document.getElementById('bulk-toggle');
+    const featureBtn = document.getElementById('bulk-feature');
     const deleteBtn  = document.getElementById('bulk-delete');
     const clearBtn   = document.getElementById('bulk-clear');
     const formToggle     = document.getElementById('form-bulk-toggle');
+    const formFeature     = document.getElementById('form-bulk-feature');
     const formDelete     = document.getElementById('form-bulk-delete');
     const hardDeleteBtn  = document.getElementById('bulk-hard-delete');
     const formHardDelete = document.getElementById('form-bulk-hard-delete');
@@ -316,6 +355,9 @@ try {
 
         const allActive = selected.length > 0 && selected.every(cb => cb.dataset.active === '1');
         toggleBtn.textContent = allActive ? 'Деактивирай' : 'Активирай';
+
+        const allFeatured = selected.length > 0 && selected.every(cb => cb.dataset.featured === '1');
+        featureBtn.textContent = allFeatured ? 'Скрий от началната' : 'Покажи на началната';
 
         const all = getCheckboxes();
         selectAll.indeterminate = count > 0 && count < all.length;
@@ -347,6 +389,13 @@ try {
         if (!selected.length) return;
         injectIds(formToggle, selected);
         formToggle.submit();
+    });
+
+    featureBtn.addEventListener('click', function () {
+        const selected = getSelected();
+        if (!selected.length) return;
+        injectIds(formFeature, selected);
+        formFeature.submit();
     });
 
     deleteBtn.addEventListener('click', function () {

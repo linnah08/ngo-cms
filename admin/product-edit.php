@@ -17,7 +17,7 @@ $ok     = false;
 $product = [
     'id' => 0, 'slug' => '', 'name_bg' => '', 'name_en' => '',
     'description_bg' => '', 'description_en' => '',
-    'price_eur' => '', 'stock' => 0, 'active' => 1, 'image' => '',
+    'price_eur' => '', 'stock' => 0, 'active' => 1, 'featured' => 0, 'image' => '',
     'type' => 'standard', 'variants' => null,
 ];
 if (!$is_new) {
@@ -42,6 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $price      = $_POST['price_eur']           ?? '';
     $stock      = (int)($_POST['stock']         ?? 0);
     $active     = isset($_POST['active']) ? 1 : 0;
+    $featured   = isset($_POST['featured']) ? 1 : 0;
     $slug_input = trim($_POST['slug']           ?? '');
     // Image was uploaded separately via AJAX; filename arrives in a plain field
     $image_name = trim($_POST['image_filename'] ?? '') ?: $product['image'];
@@ -99,12 +100,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$errors) {
         if ($is_new) {
-            $pdo->prepare('INSERT INTO products (slug,name_bg,name_en,description_bg,description_en,price_eur,stock,active,image,`type`,variants,variant_attributes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
-                ->execute([$slug_val, $name_bg, $name_en, $desc_bg, $desc_en, (float)$price, $stock, $active, $image_name, $prod_type, $variants_json, $variant_attributes_json]);
+            $pdo->prepare('INSERT INTO products (slug,name_bg,name_en,description_bg,description_en,price_eur,stock,active,featured,image,`type`,variants,variant_attributes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
+                ->execute([$slug_val, $name_bg, $name_en, $desc_bg, $desc_en, (float)$price, $stock, $active, $featured, $image_name, $prod_type, $variants_json, $variant_attributes_json]);
             $saved_id = (int)$pdo->lastInsertId();
         } else {
-            $pdo->prepare('UPDATE products SET slug=?,name_bg=?,name_en=?,description_bg=?,description_en=?,price_eur=?,stock=?,active=?,image=?,`type`=?,variants=?,variant_attributes=? WHERE id=?')
-                ->execute([$slug_val, $name_bg, $name_en, $desc_bg, $desc_en, (float)$price, $stock, $active, $image_name, $prod_type, $variants_json, $variant_attributes_json, $id]);
+            $pdo->prepare('UPDATE products SET slug=?,name_bg=?,name_en=?,description_bg=?,description_en=?,price_eur=?,stock=?,active=?,featured=?,image=?,`type`=?,variants=?,variant_attributes=? WHERE id=?')
+                ->execute([$slug_val, $name_bg, $name_en, $desc_bg, $desc_en, (float)$price, $stock, $active, $featured, $image_name, $prod_type, $variants_json, $variant_attributes_json, $id]);
             $saved_id = $id;
         }
 
@@ -157,7 +158,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'name_bg' => $name_bg, 'name_en' => $name_en,
         'description_bg' => $desc_bg, 'description_en' => $desc_en,
         'price_eur' => $price, 'stock' => $stock,
-        'active' => $active, 'slug' => $slug_val,
+        'active' => $active, 'featured' => $featured, 'slug' => $slug_val,
         'image' => $image_name,
         'type' => $prod_type, 'variants' => $variants_json,
         'variant_attributes' => $variant_attributes_json,
@@ -242,6 +243,13 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <label class="admin-checkbox" style="align-self:flex-end;padding-bottom:.5rem;">
       <input type="checkbox" name="active" value="1" <?= $product['active'] ? 'checked' : '' ?>>
       Активен (видим в магазина)
+    </label>
+  </div>
+
+  <div style="margin-top:.75rem;">
+    <label class="admin-checkbox">
+      <input type="checkbox" name="featured" value="1" <?= !empty($product['featured']) ? 'checked' : '' ?>>
+      Показвай на началната страница
     </label>
   </div>
 
