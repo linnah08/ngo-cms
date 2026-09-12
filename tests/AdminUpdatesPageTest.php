@@ -24,6 +24,8 @@ final class AdminUpdatesPageTest extends TestCase
     private static string $base;
     /** @var resource|null */
     private static $serverProc = null;
+    /** @var array<int,resource> */
+    private static array $serverPipes = [];
     private static bool $serverReady = false;
 
     private static string $adminEmail    = 'test.updates.admin@example.test';
@@ -45,7 +47,15 @@ final class AdminUpdatesPageTest extends TestCase
         $port      = 8000 + random_int(100, 900);
         self::$base = "http://127.0.0.1:{$port}";
 
-        $descriptors = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        // stdout/stderr are redirected to files rather than pipes: a pipe nobody
+        // drains fills its OS buffer once the built-in server has logged enough
+        // requests, which then blocks the server process on write() forever —
+        // and proc_close() blocks right along with it waiting for the process
+        // to exit. Files have no such ceiling.
+        $logDir = sys_get_temp_dir();
+        $outLog = tempnam($logDir, 'om_updates_srv_out_');
+        $errLog = tempnam($logDir, 'om_updates_srv_err_');
+        $descriptors = [1 => ['file', $outLog, 'w'], 2 => ['file', $errLog, 'w']];
         $proc = proc_open(
             [PHP_BINARY, '-S', "127.0.0.1:{$port}", '-t', self::$root],
             $descriptors,
@@ -54,8 +64,6 @@ final class AdminUpdatesPageTest extends TestCase
         );
         if (is_resource($proc)) {
             self::$serverProc = $proc;
-            stream_set_blocking($pipes[1], false);
-            stream_set_blocking($pipes[2], false);
         }
 
         // Poll until the built-in server responds (or give up after ~3s).
@@ -117,8 +125,19 @@ final class AdminUpdatesPageTest extends TestCase
         }
 
         if (is_resource(self::$serverProc)) {
-            proc_terminate(self::$serverProc);
-            proc_close(self::$serverProc);
+            $status = proc_get_status(self::$serverProc);
+            proc_terminate(self::$serverProc, 9); // SIGKILL — no graceful shutdown to wait on
+            // Reap without proc_close()'s indefinite wait: poll briefly, then
+            // give up. The child (and OS) clean up on their own regardless;
+            // this just keeps a stuck child from ever hanging the test run.
+            for ($i = 0; $i < 20; $i++) {
+                $st = proc_get_status(self::$serverProc);
+                if (!$st['running']) break;
+                usleep(50_000);
+            }
+            if (!empty($status['pid'])) {
+                @exec('kill -9 ' . (int) $status['pid'] . ' 2>/dev/null');
+            }
         }
     }
 
