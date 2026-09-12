@@ -27,6 +27,8 @@ final class AdminUpdatesPageTest extends TestCase
     /** @var array<int,resource> */
     private static array $serverPipes = [];
     private static bool $serverReady = false;
+    /** @var string[] Temp files the server's stdout/stderr are redirected to. */
+    private static array $serverLogs = [];
 
     private static string $adminEmail    = 'test.updates.admin@example.test';
     private static string $adminPassword = 'AdminUpdatesTest_Admin_42!';
@@ -55,6 +57,7 @@ final class AdminUpdatesPageTest extends TestCase
         $logDir = sys_get_temp_dir();
         $outLog = tempnam($logDir, 'om_updates_srv_out_');
         $errLog = tempnam($logDir, 'om_updates_srv_err_');
+        self::$serverLogs = [$outLog, $errLog];
         $descriptors = [1 => ['file', $outLog, 'w'], 2 => ['file', $errLog, 'w']];
         $proc = proc_open(
             [PHP_BINARY, '-S', "127.0.0.1:{$port}", '-t', self::$root],
@@ -138,6 +141,10 @@ final class AdminUpdatesPageTest extends TestCase
             if (!empty($status['pid'])) {
                 @exec('kill -9 ' . (int) $status['pid'] . ' 2>/dev/null');
             }
+        }
+
+        foreach (self::$serverLogs as $log) {
+            @unlink($log);
         }
     }
 
