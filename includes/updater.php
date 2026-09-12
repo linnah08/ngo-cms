@@ -137,7 +137,6 @@ function updater_check_latest(bool $force = false, ?callable $httpFetcher = null
         'update_available' => false,
         'notes'            => '',
         'zip_url'          => null,
-        'checksums_url'    => null,
         'error'            => null,
     ];
 
@@ -177,26 +176,26 @@ function updater_check_latest(bool $force = false, ?callable $httpFetcher = null
                 return $result;
             }
 
-            $zipUrl       = null;
-            $checksumsUrl = null;
+            // The conflict-detection baseline is the checksums.json that shipped
+            // inside this install's own zip, never a separately downloaded one —
+            // so only the zip asset is needed here.
+            $zipUrl = null;
             foreach ((array) ($data['assets'] ?? []) as $asset) {
                 $name = (string) ($asset['name'] ?? '');
                 $dl   = (string) ($asset['browser_download_url'] ?? '');
                 if ($dl === '') continue;
-                if ($checksumsUrl === null && $name === 'checksums.json') {
-                    $checksumsUrl = $dl;
-                } elseif ($zipUrl === null && str_ends_with(strtolower($name), '.zip')) {
+                if (str_ends_with(strtolower($name), '.zip')) {
                     $zipUrl = $dl;
+                    break;
                 }
             }
 
             $cached = [
-                'fetched_at'    => time(),
-                'no_release'    => false,
-                'tag_name'      => (string) $data['tag_name'],
-                'notes'         => (string) ($data['body'] ?? ''),
-                'zip_url'       => $zipUrl,
-                'checksums_url' => $checksumsUrl,
+                'fetched_at' => time(),
+                'no_release' => false,
+                'tag_name'   => (string) $data['tag_name'],
+                'notes'      => (string) ($data['body'] ?? ''),
+                'zip_url'    => $zipUrl,
             ];
         }
 
@@ -216,7 +215,6 @@ function updater_check_latest(bool $force = false, ?callable $httpFetcher = null
     $result['latest_version']   = $latest;
     $result['notes']            = (string) ($cached['notes'] ?? '');
     $result['zip_url']          = $cached['zip_url'] ?? null;
-    $result['checksums_url']    = $cached['checksums_url'] ?? null;
     $result['update_available'] = updater_version_needs_update($result['local_version'], $latest);
 
     return $result;

@@ -102,7 +102,6 @@ final class UpdaterTest extends TestCase
         $this->assertSame('99.0.0', $result['latest_version']);
         $this->assertTrue($result['update_available']);
         $this->assertSame('https://example.test/release.zip', $result['zip_url']);
-        $this->assertSame('https://example.test/checksums.json', $result['checksums_url']);
         $this->assertSame('Release notes here.', $result['notes']);
     }
 
