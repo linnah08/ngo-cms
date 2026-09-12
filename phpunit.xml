@@ -21,6 +21,12 @@
         <testsuite name="Http">
             <file>tests/HttpTest.php</file>
         </testsuite>
+        <testsuite name="Updater">
+            <file>tests/UpdaterTest.php</file>
+        </testsuite>
+        <testsuite name="AdminUpdatesPage">
+            <file>tests/AdminUpdatesPageTest.php</file>
+        </testsuite>
         <testsuite name="AdminLogic">
             <file>tests/Admin/ArticleSaveLogicTest.php</file>
             <file>tests/Admin/ProductSaveLogicTest.php</file>

@@ -187,6 +187,33 @@ if (empty($_SERVER['DOCUMENT_ROOT'])) {
     $_SERVER['DOCUMENT_ROOT'] = __DIR__;
 }
 define('ROOT_PATH',     $_SERVER['DOCUMENT_ROOT']);
+
+// ── Maintenance mode (self-update in progress) ────────────────────────────────
+// includes/updater.php drops a `.maintenance` flag file at the repo root while
+// a self-update is being applied. config.php is required by every single page
+// in the app, so this check is deliberately a plain, standalone file_exists()
+// rather than a call into updater.php (which may not be loaded yet, and isn't
+// needed for a check this simple) — a mistake here would break the whole site,
+// not just this feature. It is a strict no-op whenever `.maintenance` is
+// absent, which is the case for every request today.
+if (PHP_SAPI !== 'cli' && file_exists(ROOT_PATH . '/.maintenance')) {
+    $_om_maint_uri = $_SERVER['REQUEST_URI'] ?? '/';
+    $_om_is_admin  = $_om_maint_uri === '/admin' || str_starts_with($_om_maint_uri, '/admin/');
+    if (!$_om_is_admin) {
+        http_response_code(503);
+        header('Retry-After: 120');
+        echo '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+           . '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
+           . '<title>Site update in progress</title></head>'
+           . '<body style="font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:4rem 1rem;">'
+           . '<h1>We\'ll be right back</h1>'
+           . '<p>We\'re applying an update, back in a few minutes.</p>'
+           . '</body></html>';
+        exit;
+    }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 define('CONTENT_PATH',  ROOT_PATH . '/content');
 define('ARTICLES_PATH', CONTENT_PATH . '/articles');
 define('PARTNERS_FILE', CONTENT_PATH . '/partners.json');

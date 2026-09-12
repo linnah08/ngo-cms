@@ -25,6 +25,58 @@ jobs:
       - name: Install production dependencies
         run: composer install --no-dev --optimize-autoloader --no-interaction
 
+      - name: Stamp VERSION
+        run: |
+          REF="${GITHUB_REF_NAME:-}"
+          if [[ "$REF" == v* ]]; then
+            VER="${REF#v}"
+          else
+            VER="0.0.0-dev"
+          fi
+          echo "$VER" > VERSION
+          echo "Stamped VERSION: $VER"
+
+      - name: Generate checksums.json
+        run: |
+          cat > /tmp/gen-checksums.php <<'PHP'
+          <?php
+          // Hashes every file that will end up in the release ZIP, so a future
+          // self-update (includes/updater.php) can detect locally-customized
+          // files by diffing live file hashes against this baseline before
+          // overwriting anything. Exclusions here MUST stay in sync with the
+          // `zip -x` list in the "Build ZIP" step below — the checksums must
+          // describe exactly what's in the zip.
+          $root        = getcwd();
+          $dirPrefixes = ['.git', '.github', 'tests', 'node_modules', '.githooks'];
+          $exactFiles  = ['phpunit.xml', 'playwright.config.js', 'package.json', 'package-lock.json', 'deploy.php'];
+
+          function should_exclude(string $rel, array $dirPrefixes, array $exactFiles): bool {
+              if (in_array($rel, $exactFiles, true)) return true;
+              if (str_ends_with($rel, '.zip')) return true;
+              if (str_starts_with(basename($rel), '.phpunit')) return true;
+              foreach ($dirPrefixes as $p) {
+                  if ($rel === $p || str_starts_with($rel, $p . '/')) return true;
+              }
+              return false;
+          }
+
+          $checksums = [];
+          $it = new RecursiveIteratorIterator(
+              new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+              RecursiveIteratorIterator::LEAVES_ONLY
+          );
+          foreach ($it as $file) {
+              if (!$file->isFile()) continue;
+              $rel = ltrim(substr($file->getPathname(), strlen($root)), '/');
+              if (should_exclude($rel, $dirPrefixes, $exactFiles)) continue;
+              $checksums[$rel] = hash_file('sha256', $file->getPathname());
+          }
+          ksort($checksums);
+          file_put_contents($root . '/checksums.json', json_encode($checksums, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+          fwrite(STDERR, 'Generated checksums.json with ' . count($checksums) . " entries\n");
+          PHP
+          php /tmp/gen-checksums.php
+
       - name: Build ZIP
         run: |
           ZIP="ngo-platform-${GITHUB_REF_NAME:-manual}.zip"

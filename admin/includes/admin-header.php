@@ -168,6 +168,10 @@ $current_user = admin_user();
          class="admin-nav__link <?= ($active_nav ?? '') === 'error-alerts' ? 'active' : '' ?>">
         Известия за грешки
       </a>
+      <a href="/admin/updates.php"
+         class="admin-nav__link <?= ($active_nav ?? '') === 'updates' ? 'active' : '' ?>">
+        Обновления
+      </a>
       <?php if (admin_can_sign()): ?>
       <a href="/admin/signature.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'signature' ? 'active' : '' ?>">

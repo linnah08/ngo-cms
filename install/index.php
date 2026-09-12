@@ -228,20 +228,27 @@ if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // Run migrations (migrate.php reads the db.config.php we just wrote).
+        // migrate.php defines run_migrations() and only auto-runs itself when
+        // invoked directly via the CLI, so it must be called explicitly here.
+        require_once $ROOT . '/migrate.php';
         ob_start();
-        require $ROOT . '/migrate.php';
+        $migration_result = run_migrations();
         $migrate_output = ob_get_clean();
 
-        // Create the first admin.
-        try {
-            $n = (int) $pdo->query('SELECT COUNT(*) FROM admin_users')->fetchColumn();
-            if ($n === 0) {
-                $pdo->prepare('INSERT INTO admin_users (name, email, password_hash, role) VALUES (?,?,?,\'admin\')')
-                    ->execute([$admin_name, $admin_email, password_hash($admin_pass, PASSWORD_DEFAULT)]);
+        if (!$migration_result['success']) {
+            $errors[] = 'Database setup failed: ' . ($migration_result['error'] ?? 'unknown error');
+        } else {
+            // Create the first admin.
+            try {
+                $n = (int) $pdo->query('SELECT COUNT(*) FROM admin_users')->fetchColumn();
+                if ($n === 0) {
+                    $pdo->prepare('INSERT INTO admin_users (name, email, password_hash, role) VALUES (?,?,?,\'admin\')')
+                        ->execute([$admin_name, $admin_email, password_hash($admin_pass, PASSWORD_DEFAULT)]);
+                }
+                $success = true;
+            } catch (Throwable $ex) {
+                $errors[] = 'Migrations ran but admin creation failed: ' . $ex->getMessage();
             }
-            $success = true;
-        } catch (Throwable $ex) {
-            $errors[] = 'Migrations ran but admin creation failed: ' . $ex->getMessage();
         }
     }
 }
