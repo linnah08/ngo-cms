@@ -17,6 +17,7 @@
  * A couple of small pure helpers are also exposed for testability:
  *   - updater_version_needs_update(string $local, string $latest): bool
  *   - updater_diff_conflicts(array $oldChecksums, array $newFiles, callable $liveHasher): array
+ *   - updater_owner_files_to_keep(array $newFiles, callable $liveHasher): array
  */
 
 if (!defined('UPDATER_GITHUB_REPO')) {
@@ -376,6 +377,34 @@ function updater_files_to_apply(array $newFiles): array
     return array_values(array_filter($newFiles, static fn(string $r) => !str_starts_with($r, 'install/')));
 }
 
+/**
+ * Files the site owner replaces from the admin (Admin → Организация uploads the
+ * logo and regenerates the favicon). The release ships placeholders at these
+ * paths, but an existing live copy is always the owner's and is never
+ * overwritten — even on a first self-update with no checksums.json baseline,
+ * when conflict detection is otherwise off.
+ */
+function updater_owner_files(): array
+{
+    return ['assets/images/logo.png', 'assets/images/favicon.png'];
+}
+
+/**
+ * The subset of $newFiles that are owner files with a live copy — kept as they
+ * are, and not reported as "skipped" (keeping them is expected, not a conflict).
+ */
+function updater_owner_files_to_keep(array $newFiles, callable $liveHasher): array
+{
+    $owner = array_flip(updater_owner_files());
+    $keep  = [];
+    foreach ($newFiles as $path) {
+        if (isset($owner[$path]) && $liveHasher($path) !== null) {
+            $keep[] = $path;
+        }
+    }
+    return $keep;
+}
+
 // ── Backup ─────────────────────────────────────────────────────────────────────
 
 function updater_zip_available(): bool
@@ -584,6 +613,8 @@ function updater_apply(): array
             }
             return $hashes;
         };
+        $keptSet  = array_flip(updater_owner_files_to_keep($newFiles, $liveHasher));
+        $newFiles = array_values(array_filter($newFiles, static fn($rel) => !isset($keptSet[$rel])));
         $skipped = $oldChecksums === [] ? [] : updater_diff_conflicts($oldChecksums, $newFiles, $liveHasher);
         $skippedSet = array_flip($skipped);
 

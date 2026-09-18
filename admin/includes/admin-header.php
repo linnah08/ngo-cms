@@ -159,6 +159,10 @@ $current_user = admin_user();
          class="admin-nav__link <?= ($active_nav ?? '') === 'couriers' ? 'active' : '' ?>">
         Куриери
       </a>
+      <a href="/admin/organisation.php"
+         class="admin-nav__link <?= ($active_nav ?? '') === 'organisation' ? 'active' : '' ?>">
+        Организация
+      </a>
       <a href="/admin/payment.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'payment' ? 'active' : '' ?>">
         Плащания

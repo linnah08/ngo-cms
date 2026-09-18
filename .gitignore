@@ -39,6 +39,7 @@ package-lock.json
 # Admin-editable content files — server is source of truth, git reset must not overwrite these
 /content/pages.json
 /content/menus.json
+/content/organisation.json
 
 # MCP server configuration with credentials
 .mcp.json

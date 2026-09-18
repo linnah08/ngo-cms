@@ -33,6 +33,8 @@ For a non-technical setup on shared cPanel hosting:
    organisation's name, contact details and an admin login, and click **Инсталирай**.
 5. When it finishes, delete the `install/` folder (File Manager → select →
    Delete). Log in at `your-site.org/admin/`.
+6. To change the organisation's name, contacts, bank account, colours or logo
+   later, open **Организация** in the admin menu — no files need editing.
 
 That's it — no git, composer, SSH or database setup required.
 

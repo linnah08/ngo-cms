@@ -78,11 +78,18 @@ register_shutdown_function(function(): void {
 // IDs, feature toggles) live in site.config.php. Copy site.config.example.php to
 // site.config.php and edit it — that is the single file an adopter rebrands.
 // The example is loaded as a fallback so a fresh clone still boots.
+//
+// Values changed later in Admin → Организация live in content/organisation.json
+// and are defined first, so they win over site.config.php (see
+// includes/organisation.php).
+require_once __DIR__ . '/includes/organisation.php';
+$_org_predefined = org_define_overrides(org_load_overrides());
 if (file_exists(__DIR__ . '/site.config.php')) {
-    require_once __DIR__ . '/site.config.php';
+    org_require_config(__DIR__ . '/site.config.php', $_org_predefined);
 } elseif (file_exists(__DIR__ . '/site.config.example.php')) {
-    require_once __DIR__ . '/site.config.example.php';
+    org_require_config(__DIR__ . '/site.config.example.php', $_org_predefined);
 }
+unset($_org_predefined);
 
 // Visual theme presets (brand_themes() / current_theme()).
 require_once __DIR__ . '/includes/themes.php';
