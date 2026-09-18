@@ -295,8 +295,8 @@ function updater_rrmdir(string $dir): void
  * file introduced by the release) or no live file (nothing to conflict with)
  * is never skipped.
  *
- * $liveHasher: callable(string $relativePath): ?string — current sha256 of
- * the live file, or null if it doesn't exist.
+ * $liveHasher: callable(string $relativePath): string|array|null — sha256 of
+ * the live file (or several acceptable hashes of it), null if it doesn't exist.
  */
 function updater_diff_conflicts(array $oldChecksums, array $newFiles, callable $liveHasher): array
 {
@@ -305,15 +305,75 @@ function updater_diff_conflicts(array $oldChecksums, array $newFiles, callable $
         if (!array_key_exists($path, $oldChecksums)) {
             continue; // no baseline — new file, not a conflict
         }
-        $liveHash = $liveHasher($path);
-        if ($liveHash === null) {
+        $liveHashes = $liveHasher($path);
+        if ($liveHashes === null) {
             continue; // nothing live to conflict with
         }
-        if (!hash_equals((string) $oldChecksums[$path], (string) $liveHash)) {
+        $matches = false;
+        foreach ((array) $liveHashes as $h) {
+            if (hash_equals((string) $oldChecksums[$path], (string) $h)) { $matches = true; break; }
+        }
+        if (!$matches) {
             $skipped[] = $path;
         }
     }
     return $skipped;
+}
+
+// ── Host-managed blocks ───────────────────────────────────────────────────────
+// cPanel writes its own blocks into .htaccess (e.g. the PHP version handler
+// added by MultiPHP Manager, which the install guide tells every adopter to
+// use). Those aren't adopter customizations: without this, every such site
+// would be warned on every update and never receive .htaccess updates.
+
+/** The "BEGIN cPanel-generated … END cPanel-generated" blocks in $content. */
+function updater_host_blocks(string $content): array
+{
+    preg_match_all('/^[^\n]*BEGIN cPanel-generated[^\n]*\n.*?^[^\n]*END cPanel-generated[^\n]*(?:\n|$)/ms', $content, $m);
+    return $m[0];
+}
+
+/**
+ * $content with its host blocks removed, as a few candidates because the
+ * blank line cPanel puts around a block varies. Empty if there are none.
+ */
+function updater_strip_host_blocks(string $content): array
+{
+    $blocks = updater_host_blocks($content);
+    if ($blocks === []) return [];
+    $afterBlank = $bare = $beforeBlank = $content;
+    foreach ($blocks as $blk) {
+        $afterBlank  = str_replace("\n" . $blk, '', $afterBlank);
+        $bare        = str_replace($blk, '', $bare);
+        $beforeBlank = str_replace($blk . "\n", '', $beforeBlank);
+    }
+    return array_values(array_unique([$afterBlank, $bare, $beforeBlank]));
+}
+
+/** New release content with the site's host blocks carried over. */
+function updater_merge_host_blocks(string $newContent, array $blocks): string
+{
+    foreach ($blocks as $blk) {
+        if (str_contains($newContent, $blk)) continue;
+        $newContent = rtrim($newContent, "\n") . "\n\n" . rtrim($blk, "\n") . "\n";
+    }
+    return $newContent;
+}
+
+/** Whether host blocks are honoured for this path. */
+function updater_is_host_managed(string $rel): bool
+{
+    return basename($rel) === '.htaccess';
+}
+
+/**
+ * Release files to write onto a live site. install/ is left out: the site is
+ * already installed, and re-creating the wizard would undo the adopter's
+ * "delete the install folder" step on every update.
+ */
+function updater_files_to_apply(array $newFiles): array
+{
+    return array_values(array_filter($newFiles, static fn(string $r) => !str_starts_with($r, 'install/')));
 }
 
 // ── Backup ─────────────────────────────────────────────────────────────────────
@@ -508,13 +568,21 @@ function updater_apply(): array
             if (is_array($decoded)) $oldChecksums = $decoded;
         }
 
-        $newFiles = updater_list_files($stagingDir);
+        $newFiles = updater_files_to_apply(updater_list_files($stagingDir));
 
         // (e) Diff + apply — skip any file the adopter customized.
         $root       = updater_root();
-        $liveHasher = static function (string $rel) use ($root): ?string {
+        $liveHasher = static function (string $rel) use ($root): ?array {
             $p = $root . '/' . $rel;
-            return is_file($p) ? hash_file('sha256', $p) : null;
+            if (!is_file($p)) return null;
+            $content = (string) file_get_contents($p);
+            $hashes  = [hash('sha256', $content)];
+            if (updater_is_host_managed($rel)) {
+                foreach (updater_strip_host_blocks($content) as $stripped) {
+                    $hashes[] = hash('sha256', $stripped);
+                }
+            }
+            return $hashes;
         };
         $skipped = $oldChecksums === [] ? [] : updater_diff_conflicts($oldChecksums, $newFiles, $liveHasher);
         $skippedSet = array_flip($skipped);
@@ -527,7 +595,12 @@ function updater_apply(): array
             if (!is_dir($dstDir) && !@mkdir($dstDir, 0755, true) && !is_dir($dstDir)) {
                 throw new RuntimeException("Could not create directory for: {$rel}");
             }
-            if (!@copy($src, $dst)) {
+            $blocks = (updater_is_host_managed($rel) && is_file($dst))
+                ? updater_host_blocks((string) file_get_contents($dst)) : [];
+            $written = $blocks === []
+                ? @copy($src, $dst)
+                : @file_put_contents($dst, updater_merge_host_blocks((string) file_get_contents($src), $blocks)) !== false;
+            if (!$written) {
                 throw new RuntimeException("Could not write file: {$rel}");
             }
         }

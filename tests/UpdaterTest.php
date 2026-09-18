@@ -192,6 +192,66 @@ final class UpdaterTest extends TestCase
 
     // ── updater_is_maintenance_mode() ───────────────────────────────────────────
 
+    // ── cPanel-managed .htaccess blocks ─────────────────────────────────────
+
+    /** Exactly what MultiPHP Manager appended to the test site's .htaccess. */
+    private const CPANEL_HANDLER = "# php -- BEGIN cPanel-generated handler, do not edit\n"
+        . "# Set the \u{201C}ea-php83\u{201D} package as the default \u{201C}PHP\u{201D} programming language.\n"
+        . "<IfModule mime_module>\n"
+        . "  AddHandler application/x-httpd-ea-php83___lsphp .php .php8 .phtml\n"
+        . "</IfModule>\n"
+        . "# php -- END cPanel-generated handler, do not edit\n";
+
+    public function test_cpanel_handler_block_is_not_a_customization(): void
+    {
+        $shipped = "Options -Indexes\nRewriteEngine On\n";
+        $live    = $shipped . "\n" . self::CPANEL_HANDLER;
+
+        $hashes = array_map(fn($c) => hash('sha256', $c), updater_strip_host_blocks($live));
+        $this->assertContains(hash('sha256', $shipped), $hashes);
+
+        $skipped = updater_diff_conflicts(['.htaccess' => hash('sha256', $shipped)], ['.htaccess'],
+            fn() => array_merge([hash('sha256', $live)], $hashes));
+        $this->assertSame([], $skipped);
+    }
+
+    public function test_real_edit_alongside_cpanel_block_is_still_a_customization(): void
+    {
+        $shipped = "Options -Indexes\nRewriteEngine On\n";
+        $live    = $shipped . "Redirect 301 /old /new\n\n" . self::CPANEL_HANDLER;
+
+        $hashes  = array_map(fn($c) => hash('sha256', $c), updater_strip_host_blocks($live));
+        $skipped = updater_diff_conflicts(['.htaccess' => hash('sha256', $shipped)], ['.htaccess'],
+            fn() => array_merge([hash('sha256', $live)], $hashes));
+        $this->assertSame(['.htaccess'], $skipped);
+    }
+
+    public function test_cpanel_block_is_carried_into_new_htaccess_and_stays_strippable(): void
+    {
+        $newRelease = "Options -Indexes\nRewriteEngine On\n# new rule\n";
+        $merged     = updater_merge_host_blocks($newRelease, [self::CPANEL_HANDLER]);
+
+        $this->assertStringContainsString('AddHandler application/x-httpd-ea-php83', $merged);
+        // Next update must still recognise the file as unedited.
+        $this->assertContains($newRelease, updater_strip_host_blocks($merged));
+        // Merging twice doesn't duplicate the block.
+        $this->assertSame($merged, updater_merge_host_blocks($merged, [self::CPANEL_HANDLER]));
+    }
+
+    public function test_file_without_host_blocks_has_no_stripped_variants(): void
+    {
+        $this->assertSame([], updater_strip_host_blocks("Options -Indexes\n"));
+        $this->assertTrue(updater_is_host_managed('.htaccess'));
+        $this->assertTrue(updater_is_host_managed('admin/.htaccess'));
+        $this->assertFalse(updater_is_host_managed('config.php'));
+    }
+
+    public function test_install_folder_is_never_written_by_an_update(): void
+    {
+        $files = ['config.php', 'install/index.php', 'admin/install-notes.php', 'installer.php'];
+        $this->assertSame(['config.php', 'admin/install-notes.php', 'installer.php'], updater_files_to_apply($files));
+    }
+
     public function test_is_maintenance_mode_reflects_flag_file(): void
     {
         // Sanity-check against the real flag file without ever leaving it set —
