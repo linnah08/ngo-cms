@@ -27,6 +27,9 @@
         <testsuite name="AdminUpdatesPage">
             <file>tests/AdminUpdatesPageTest.php</file>
         </testsuite>
+        <testsuite name="AdminProductEditPage">
+            <file>tests/Admin/ProductEditNullFieldsHttpTest.php</file>
+        </testsuite>
         <testsuite name="MailerSmtp">
             <file>tests/MailerSmtpTest.php</file>
         </testsuite>

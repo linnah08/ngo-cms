@@ -258,7 +258,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <div class="admin-form-grid" style="margin-top:1.5rem;">
     <label style="display:flex;flex-direction:column;gap:.35rem;font-size:.875rem;font-weight:600;"><span>Описание <?= $lbl_bg_badge ?></span>
       <textarea id="descBg" name="description_bg" rows="6"
-                style="padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;font-family:inherit;resize:vertical;"><?= h($product['description_bg']) ?></textarea>
+                style="padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;font-family:inherit;resize:vertical;"><?= h($product['description_bg'] ?? '') ?></textarea>
     </label>
     <div style="display:flex;flex-direction:column;gap:.35rem;font-size:.875rem;font-weight:600;">
       <?php if ($deepl_ready): ?>
@@ -270,7 +270,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <span>Description <?= $lbl_en_badge ?></span>
       <?php endif; ?>
       <textarea id="descEn" name="description_en" rows="6"
-                style="padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;font-family:inherit;resize:vertical;"><?= h($product['description_en']) ?></textarea>
+                style="padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;font-family:inherit;resize:vertical;"><?= h($product['description_en'] ?? '') ?></textarea>
     </div>
   </div>
 
@@ -278,12 +278,12 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <label style="font-size:.875rem;font-weight:600;display:block;margin-bottom:.5rem;">Снимка</label>
     <div id="imagePreview" style="margin-bottom:.75rem;<?= $product['image'] ? '' : 'display:none;' ?>">
       <img id="previewImg"
-           src="<?= $product['image'] ? '/assets/images/products/' . h($product['image']) : '' ?>"
+           src="<?= $product['image'] ? '/assets/images/products/' . h($product['image'] ?? '') : '' ?>"
            alt="" style="height:100px;border-radius:6px;border:1px solid var(--border);">
-      <div id="previewName" style="font-size:.8rem;color:var(--text-muted);margin-top:.25rem;"><?= h($product['image']) ?></div>
+      <div id="previewName" style="font-size:.8rem;color:var(--text-muted);margin-top:.25rem;"><?= h($product['image'] ?? '') ?></div>
     </div>
     <!-- hidden field carries the filename to the main form POST -->
-    <input type="hidden" name="image_filename" id="imageFilename" value="<?= h($product['image']) ?>">
+    <input type="hidden" name="image_filename" id="imageFilename" value="<?= h($product['image'] ?? '') ?>">
     <input type="file" id="imageInput" accept="image/jpeg,image/png,image/webp,image/gif" data-om-crop>
     <button type="button" class="btn btn--outline"
             style="margin-top:.5rem;font-size:.82rem;"
