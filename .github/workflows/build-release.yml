@@ -47,7 +47,7 @@ jobs:
           // `zip -x` list in the "Build ZIP" step below — the checksums must
           // describe exactly what's in the zip.
           $root        = getcwd();
-          $dirPrefixes = ['.git', '.github', 'tests', 'node_modules', '.githooks'];
+          $dirPrefixes = ['.git', '.github', 'tests', 'node_modules', '.githooks', 'relay'];
           $exactFiles  = ['phpunit.xml', 'playwright.config.js', 'package.json', 'package-lock.json', 'deploy.php'];
 
           function should_exclude(string $rel, array $dirPrefixes, array $exactFiles): bool {
@@ -83,7 +83,8 @@ jobs:
           zip -rq "$ZIP" . \
             -x ".git/*" ".github/*" "tests/*" "node_modules/*" \
                "*.zip" ".phpunit*" "phpunit.xml" "playwright.config.js" \
-               "package.json" "package-lock.json" ".githooks/*" "deploy.php"
+               "package.json" "package-lock.json" ".githooks/*" "deploy.php" \
+               "relay/*"
           echo "ZIP=$ZIP" >> "$GITHUB_ENV"
 
       - name: Attach to the release (tag builds)

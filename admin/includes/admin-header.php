@@ -172,6 +172,10 @@ $current_user = admin_user();
          class="admin-nav__link <?= ($active_nav ?? '') === 'updates' ? 'active' : '' ?>">
         Обновления
       </a>
+      <a href="/admin/email-settings.php"
+         class="admin-nav__link <?= ($active_nav ?? '') === 'email-settings' ? 'active' : '' ?>">
+        Имейл
+      </a>
       <?php if (admin_can_sign()): ?>
       <a href="/admin/signature.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'signature' ? 'active' : '' ?>">
@@ -179,6 +183,10 @@ $current_user = admin_user();
       </a>
       <?php endif; ?>
       <?php endif; ?>
+      <a href="/admin/support.php"
+         class="admin-nav__link <?= ($active_nav ?? '') === 'support' ? 'active' : '' ?>">
+        Поддръжка
+      </a>
     </nav>
 
     <div class="admin-sidebar__footer">
@@ -196,7 +204,11 @@ $current_user = admin_user();
       <button class="admin-hamburger" id="adminHamburger" aria-label="Toggle menu">
         <span></span><span></span><span></span>
       </button>
-      <div class="admin-topbar__title"><?= h($page_title_admin ?? '') ?></div>
+      <div class="admin-topbar__title" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= h($page_title_admin ?? '') ?></div>
+      <?php if (($active_nav ?? '') !== 'support'): ?>
+      <a href="/admin/support.php?from=<?= h(rawurlencode($_SERVER['REQUEST_URI'] ?? '')) ?>"
+         style="font-size:.85rem;line-height:1.2;color:var(--text-muted);text-decoration:none;text-align:right;flex-shrink:1;">Докладвай проблем</a>
+      <?php endif; ?>
       <a href="/admin/logout.php" class="admin-topbar__logout">Изход</a>
     </div>
 

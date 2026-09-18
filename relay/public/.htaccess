@@ -1,0 +1,16 @@
+# Support relay document root: only ticket.php is reachable.
+Options -Indexes
+
+<IfModule mod_authz_core.c>
+    Require all denied
+    <Files "ticket.php">
+        Require all granted
+    </Files>
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order deny,allow
+    Deny from all
+    <Files "ticket.php">
+        Allow from all
+    </Files>
+</IfModule>

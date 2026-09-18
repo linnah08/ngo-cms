@@ -1,6 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 
 $page_title_admin = 'Начало';
 $active_nav       = 'dashboard';
@@ -9,6 +10,12 @@ $can_sign      = admin_can_sign();
 $can_shop      = admin_can_manage_shop();
 $can_editorial = admin_can_editorial();
 $pdo           = get_pdo();
+
+// ── Mail transport check: warn admins when no way to send email is configured ──
+$mail_not_configured = false;
+if (admin_is_admin()) {
+    try { $mail_not_configured = mail_transport() === 'none'; } catch (Throwable $e) { error_log('dashboard mail_transport: ' . $e->getMessage()); }
+}
 
 // ── Unified moderation inbox: pending comments, reviews & new contacts ──
 $inbox = [];
@@ -240,6 +247,17 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 <div class="admin-page-header">
   <h1>Добре дошли, <?= h($current_user['name'] ?? 'Admin') ?></h1>
 </div>
+
+<?php if ($mail_not_configured): ?>
+<div role="alert" style="display:flex;flex-wrap:wrap;align-items:center;gap:.75rem 1rem;background:#fdf0ef;border:1px solid #f0c4c0;border-left:4px solid #c0392b;border-radius:8px;padding:.9rem 1.1rem;margin-bottom:.75rem;color:#7a2318;">
+  <div style="flex:1 1 320px;min-width:0;font-size:.9rem;line-height:1.5;">
+    <strong style="display:block;color:#c0392b;margin-bottom:.15rem;">Сайтът не изпраща имейли</strong>
+    Писмата за забравена парола, потвържденията на поръчки и съобщенията от формата за контакт не достигат до никого,
+    защото не е настроен имейл сървър.
+  </div>
+  <a href="/admin/email-settings.php" style="flex:0 0 auto;display:inline-block;background:#c0392b;color:#fff;text-decoration:none;font-weight:600;font-size:.85rem;padding:.55rem 1rem;border-radius:6px;">Настрой имейла</a>
+</div>
+<?php endif; ?>
 
 <?php if ($can_editorial || $can_shop): ?>
 <?php

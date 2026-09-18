@@ -1,0 +1,6 @@
+/config.php
+/installs.json
+/installs.json.lock
+/installs.json.tmp.*
+/data/
+/public/relay-root.php

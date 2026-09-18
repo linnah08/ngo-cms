@@ -27,6 +27,15 @@
         <testsuite name="AdminUpdatesPage">
             <file>tests/AdminUpdatesPageTest.php</file>
         </testsuite>
+        <testsuite name="MailerSmtp">
+            <file>tests/MailerSmtpTest.php</file>
+        </testsuite>
+        <testsuite name="Support">
+            <file>tests/SupportTest.php</file>
+        </testsuite>
+        <testsuite name="Relay">
+            <directory>tests/Relay</directory>
+        </testsuite>
         <testsuite name="AdminLogic">
             <file>tests/Admin/ArticleSaveLogicTest.php</file>
             <file>tests/Admin/ProductSaveLogicTest.php</file>
