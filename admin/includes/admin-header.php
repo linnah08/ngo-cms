@@ -12,6 +12,21 @@ $current_user = admin_user();
   <title><?= h($page_title_admin ?? 'Admin') ?> — <?= h(SITE_NAME_BG) ?> Admin</title>
   <link rel="stylesheet" href="/assets/css/main.css">
   <link rel="stylesheet" href="/admin/assets/admin.css">
+  <?php /* Phone layout: stack the pages' inline multi-column grids (BG/EN field pairs,
+           sidebar + editor) so nothing forces sideways scrolling at 375px. Inline here,
+           not in admin.css, because admin.css may be stale-cached on the server. */ ?>
+  <style>
+  @media (max-width: 600px) {
+    .admin-content [style*="grid-template-columns:1fr 1fr;"],
+    .admin-content [style*="grid-template-columns:1fr 1fr 1fr;"],
+    .admin-content [style*="grid-template-columns:repeat(3,1fr)"],
+    .admin-content [style*="grid-template-columns:260px 1fr"],
+    .admin-content [style*="grid-template-columns:1fr 320px"],
+    .admin-content [style*="grid-template-columns:1fr 340px"] {
+      grid-template-columns: minmax(0, 1fr) !important;
+    }
+  }
+  </style>
   <?= $page_head_extra ?? '' ?>
   <script>
   window._sessionExpiresAt = <?= ($current_user['time'] ?? 0) + ADMIN_SESSION_HOURS * 3600 ?>;
@@ -199,7 +214,8 @@ $current_user = admin_user();
     </div>
   </aside>
 
-  <main class="admin-main">
+  <?php /* min-width:0 lets this flex item shrink to the viewport instead of growing to fit its widest child (inline because admin.css may be stale-cached) */ ?>
+  <main class="admin-main" style="min-width:0;">
     <div class="admin-topbar">
       <button class="admin-hamburger" id="adminHamburger" aria-label="Toggle menu">
         <span></span><span></span><span></span>

@@ -130,7 +130,7 @@ foreach ($sections as $key => $title):
   </div>
 
   <div style="margin-top:1.25rem;">
-    <button type="submit" class="btn btn--primary">Запази — <?= h($title) ?></button>
+    <button type="submit" class="btn btn--primary" style="white-space:normal;text-align:left;">Запази — <?= h($title) ?></button>
   </div>
 </form>
 

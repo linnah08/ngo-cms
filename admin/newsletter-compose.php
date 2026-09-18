@@ -91,7 +91,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
 <div class="admin-page-header">
   <h1><?= $id ? 'Редактирай кампания' : 'Нова кампания' ?></h1>
-  <div style="display:flex;gap:.75rem;align-items:center;">
+  <div style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;">
     <a href="/admin/newsletter.php" class="btn btn--outline">← Назад</a>
     <button type="submit" form="saveForm" class="btn btn--primary" onclick="syncSubjectsAndSave()">Запази чернова</button>
   </div>

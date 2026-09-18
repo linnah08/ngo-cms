@@ -84,7 +84,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <a href="/admin/products.php" class="btn btn--outline">← Към продуктите</a>
 </div>
 
-<div style="display:flex;gap:.5rem;margin-bottom:1.5rem;">
+<div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1.5rem;">
   <?php foreach (['pending' => 'Чакащи', 'approved' => 'Одобрени', 'rejected' => 'Отхвърлени'] as $k => $lbl): ?>
     <a href="?<?= h(http_build_query(array_filter(['product_id' => $product_id, 'filter' => $k]))) ?>"
        class="btn <?= $filter === $k ? 'btn--primary' : 'btn--outline' ?>" style="font-size:.85rem;">

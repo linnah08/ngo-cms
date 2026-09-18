@@ -353,7 +353,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 <!-- ── Comments section ───────────────────────────────────────────────────────── -->
 <div style="margin-bottom:2.5rem;">
   <h2 style="font-size:1rem;font-weight:600;margin-bottom:1rem;">Коментари към статии</h2>
-  <div style="display:flex;gap:.5rem;margin-bottom:1.25rem;border-bottom:1px solid var(--border);">
+  <div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1.25rem;border-bottom:1px solid var(--border);">
     <?php
     $ctabs = ['pending' => 'Чакащи', 'approved' => 'Одобрени', 'rejected' => 'Отхвърлени', 'spam' => 'Спам'];
     foreach ($ctabs as $key => $label):
@@ -446,7 +446,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 <!-- ── Contact submissions section ───────────────────────────────────────────── -->
 <div style="margin-bottom:2.5rem;">
   <h2 style="font-size:1rem;font-weight:600;margin-bottom:1rem;">Съобщения от контактната форма</h2>
-  <div style="display:flex;gap:.5rem;margin-bottom:1.25rem;border-bottom:1px solid var(--border);">
+  <div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1.25rem;border-bottom:1px solid var(--border);">
     <?php
     $ctabs2 = ['new' => 'Нови', 'read' => 'Прочетени', 'archived' => 'Архивирани', 'spam' => 'Спам'];
     foreach ($ctabs2 as $key => $label):

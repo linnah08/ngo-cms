@@ -123,7 +123,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         </div>
       </div>
 
-      <div style="display:flex;gap:.75rem;align-items:center;margin-top:1.5rem;">
+      <div style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;margin-top:1.5rem;">
         <button type="submit" class="btn btn--primary">Запази</button>
         <button type="submit" form="testForm" class="btn btn--outline">Изпрати тестов имейл</button>
       </div>

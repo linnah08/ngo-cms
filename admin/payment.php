@@ -367,11 +367,11 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <table style="font-size:.85rem;border-collapse:collapse;width:100%;">
     <tr>
       <td style="padding:.4rem .75rem .4rem 0;color:var(--text-muted);white-space:nowrap;">Callback (hookUrl)</td>
-      <td><code><?= h(SITE_URL) ?>/api/iris-payment-callback.php</code></td>
+      <td style="overflow-wrap:anywhere;"><code><?= h(SITE_URL) ?>/api/iris-payment-callback.php</code></td>
     </tr>
     <tr>
       <td style="padding:.4rem .75rem .4rem 0;color:var(--text-muted);white-space:nowrap;">Return (redirectUrl)</td>
-      <td><code><?= h(SITE_URL) ?>/api/iris-payment-return.php</code></td>
+      <td style="overflow-wrap:anywhere;"><code><?= h(SITE_URL) ?>/api/iris-payment-return.php</code></td>
     </tr>
   </table>
 </section>

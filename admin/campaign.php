@@ -280,7 +280,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:.75rem;">
   <h1 style="margin:0;font-size:1.4rem;">Кампания</h1>
-  <div style="display:flex;gap:.75rem;">
+  <div style="display:flex;flex-wrap:wrap;gap:.75rem;">
     <a href="/campaign/" target="_blank" class="btn btn--secondary" style="font-size:.85rem;">↗ Виж публичната страница</a>
     <a href="/admin/campaign-backers.php" class="btn btn--secondary" style="font-size:.85rem;">Поддръжници →</a>
   </div>

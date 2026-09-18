@@ -268,7 +268,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <a href="?tab=tickets&status=<?= h($filter) ?>" style="padding:.4rem .9rem;border-radius:20px;font-size:.85rem;text-decoration:none;font-weight:600;
     <?= $tab === 'tickets' ? 'background:#0387A5;color:#fff;' : 'background:#f0ede9;color:#444;' ?>">Билети</a>
 </div>
-<div style="display:flex;gap:.5rem;margin-bottom:1.25rem;">
+<div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1.25rem;">
   <?php foreach (['paid'=>'Платени','pending'=>'Чакащи','failed'=>'Неуспешни','all'=>'Всички'] as $s => $lbl): ?>
   <a href="?tab=<?= h($tab) ?>&status=<?= $s ?>" style="padding:.4rem .9rem;border-radius:20px;font-size:.85rem;text-decoration:none;
     <?= $filter === $s ? 'background:#555;color:#fff;' : 'background:#f0ede9;color:#444;' ?>">

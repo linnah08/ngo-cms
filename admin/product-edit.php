@@ -186,7 +186,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
 <div class="admin-page-header">
   <h1><?= h($page_title_admin) ?></h1>
-  <div style="display:flex;gap:.75rem;align-items:center;">
+  <div style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;">
     <?php if (!$is_new): ?>
       <a href="/admin/product-reviews.php?product_id=<?= (int)$id ?>" class="btn btn--outline">
         Отзиви (<?= $review_counts['approved'] ?>)<?php if ($review_counts['pending'] > 0): ?> · <?= $review_counts['pending'] ?> чакащи<?php endif; ?> →

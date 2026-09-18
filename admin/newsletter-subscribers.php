@@ -133,7 +133,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       &nbsp;=&nbsp; <strong><?= $counts['total'] ?></strong>
     </span>
   </div>
-  <div style="display:flex;gap:.75rem;">
+  <div style="display:flex;flex-wrap:wrap;gap:.75rem;">
     <a href="/admin/newsletter-import.php" class="btn btn--outline" style="font-size:.85rem;">↓ Импорт от клиенти</a>
     <a href="/admin/newsletter.php" class="btn btn--outline" style="font-size:.85rem;">← Кампании</a>
   </div>
