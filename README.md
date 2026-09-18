@@ -28,9 +28,9 @@ For a non-technical setup on shared cPanel hosting:
    [Releases](../../releases) page (it already includes all dependencies).
 2. In cPanel open **File Manager**, go to your domain's folder (e.g.
    `public_html`), click **Upload**, choose the ZIP, then **Extract** it there.
-3. **Open your website** in a browser. The setup wizard launches automatically.
-4. Pick **“Create a new database”**, fill in your organisation's name, contact
-   details and an admin login, and click **Install**.
+3. **Open your website** in a browser. The setup wizard (in Bulgarian) launches automatically.
+4. Pick **“Създай нова база данни”** (create a new database), fill in your
+   organisation's name, contact details and an admin login, and click **Инсталирай**.
 5. When it finishes, delete the `install/` folder (File Manager → select →
    Delete). Log in at `your-site.org/admin/`.
 

@@ -52,7 +52,7 @@ function uapi(string $module, string $func, array $args): array {
     $raw  = run_argv($argv);
     $json = json_decode($raw, true);
     $res  = $json['result'] ?? null;
-    if (!is_array($res)) return ['ok' => false, 'errors' => ['Unexpected response: ' . substr($raw, 0, 300)], 'data' => null];
+    if (!is_array($res)) return ['ok' => false, 'errors' => ['Неочакван отговор от cPanel: ' . substr($raw, 0, 300)], 'data' => null];
     return [
         'ok'     => ((int) ($res['status'] ?? 0)) === 1,
         'errors' => $res['errors'] ?? [],
@@ -93,6 +93,8 @@ function make_favicon(string $src, string $dest, int $size = 64): void {
     imagedestroy($im);
 }
 
+$theme_labels_bg = ['classic' => 'Класически', 'friendly' => 'Приветлив', 'modern' => 'Модерен', 'editorial' => 'Списание'];
+
 $errors  = [];
 $success = false;
 $created_db_info = null;
@@ -121,7 +123,7 @@ if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $brand_accent  = preg_match('/^#[0-9a-fA-F]{6}$/', $p('brand_accent'))  ? $p('brand_accent')  : '#04ADBF';
 
     // Admin
-    $admin_name  = $p('admin_name') ?: 'Administrator';
+    $admin_name  = $p('admin_name') ?: 'Администратор';
     $admin_email = $p('admin_email');
     // Trim to match the login form, which trims the password before verifying.
     $admin_pass  = trim((string) ($_POST['admin_password'] ?? ''));
@@ -134,18 +136,18 @@ if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $db_pass = (string) ($_POST['db_pass'] ?? '');
 
     // Validate org + admin
-    if ($name_bg === '')                                    $errors[] = 'Site name (BG) is required.';
-    if ($name_en === '')                                    $errors[] = 'Site name (EN) is required.';
-    if (!filter_var($site_url, FILTER_VALIDATE_URL))        $errors[] = 'A valid site URL is required.';
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL))         $errors[] = 'A valid organisation email is required.';
-    if (!filter_var($admin_email, FILTER_VALIDATE_EMAIL))   $errors[] = 'A valid admin email is required.';
-    if (strlen($admin_pass) < 8)                            $errors[] = 'Admin password must be at least 8 characters.';
+    if ($name_bg === '')                                    $errors[] = 'Моля, въведете името на организацията на български.';
+    if ($name_en === '')                                    $errors[] = 'Моля, въведете името на организацията на английски.';
+    if (!filter_var($site_url, FILTER_VALIDATE_URL))        $errors[] = 'Моля, въведете правилен адрес на сайта, например https://vashata-organizacia.bg';
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL))         $errors[] = 'Моля, въведете правилен имейл за контакт.';
+    if (!filter_var($admin_email, FILTER_VALIDATE_EMAIL))   $errors[] = 'Моля, въведете правилен имейл за вход на администратора.';
+    if (strlen($admin_pass) < 8)                            $errors[] = 'Паролата за вход трябва да е поне 8 знака.';
 
     // Optionally create the database on cPanel.
     if (!$errors && $db_mode === 'create' && cpanel_available()) {
         $suffix = strtolower(preg_replace('/[^a-z0-9]/i', '', $p('db_suffix')));
         if ($suffix === '' || strlen($suffix) > 12) {
-            $errors[] = 'Database name must be 1–12 letters/digits.';
+            $errors[] = 'Краткото име на базата данни трябва да е от 1 до 12 латински букви или цифри.';
         } else {
             $prefix  = get_current_user();              // cPanel account user
             $db_name = $prefix . '_' . $suffix;
@@ -154,21 +156,21 @@ if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $db_host = 'localhost';
 
             $r1 = uapi('Mysql', 'create_database', ['name' => $db_name]);
-            if (!$r1['ok']) $errors[] = 'Create database: ' . implode('; ', (array) $r1['errors']);
+            if (!$r1['ok']) $errors[] = 'Не успяхме да създадем базата данни. Техническа информация: ' . implode('; ', (array) $r1['errors']);
 
             if (!$errors) {
                 $r2 = uapi('Mysql', 'create_user', ['name' => $db_user, 'password' => $db_pass]);
-                if (!$r2['ok']) $errors[] = 'Create DB user: ' . implode('; ', (array) $r2['errors']);
+                if (!$r2['ok']) $errors[] = 'Не успяхме да създадем потребител за базата данни. Техническа информация: ' . implode('; ', (array) $r2['errors']);
             }
             if (!$errors) {
                 $r3 = uapi('Mysql', 'set_privileges_on_database',
                     ['user' => $db_user, 'database' => $db_name, 'privileges' => 'ALL PRIVILEGES']);
-                if (!$r3['ok']) $errors[] = 'Grant privileges: ' . implode('; ', (array) $r3['errors']);
+                if (!$r3['ok']) $errors[] = 'Не успяхме да дадем права на потребителя. Техническа информация: ' . implode('; ', (array) $r3['errors']);
             }
             if (!$errors) $created_db_info = ['name' => $db_name, 'user' => $db_user, 'pass' => $db_pass];
         }
     } elseif (!$errors && $db_mode !== 'create') {
-        if ($db_name === '' || $db_user === '') $errors[] = 'Database name and user are required.';
+        if ($db_name === '' || $db_user === '') $errors[] = 'Моля, въведете име на базата данни и потребител.';
     }
 
     // Test the DB connection.
@@ -179,7 +181,7 @@ if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 $db_user, $db_pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
             );
         } catch (PDOException $ex) {
-            $errors[] = 'Could not connect to the database: ' . $ex->getMessage();
+            $errors[] = 'Не успяхме да се свържем с базата данни. Проверете името, потребителя и паролата. Техническа информация: ' . $ex->getMessage();
         }
     }
 
@@ -236,7 +238,7 @@ if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $migrate_output = ob_get_clean();
 
         if (!$migration_result['success']) {
-            $errors[] = 'Database setup failed: ' . ($migration_result['error'] ?? 'unknown error');
+            $errors[] = 'Не успяхме да създадем таблиците в базата данни. Техническа информация: ' . ($migration_result['error'] ?? 'неизвестна грешка');
         } else {
             // Create the first admin.
             try {
@@ -247,7 +249,7 @@ if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $success = true;
             } catch (Throwable $ex) {
-                $errors[] = 'Migrations ran but admin creation failed: ' . $ex->getMessage();
+                $errors[] = 'Таблиците са създадени, но администраторът не можа да бъде добавен. Техническа информация: ' . $ex->getMessage();
             }
         }
     }
@@ -257,11 +259,11 @@ if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
 $v = fn(string $k, string $d = '') => e((string) ($_POST[$k] ?? $d));
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="bg">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Install — NGO platform</title>
+<title>Инсталиране на сайта</title>
 <style>
   :root { --teal:#0387A5; --border:#e2e0db; --bg:#f8f6f2; --text:#1a1916; --muted:#6b6560; }
   * { box-sizing: border-box; }
@@ -298,112 +300,115 @@ $v = fn(string $k, string $d = '') => e((string) ($_POST[$k] ?? $d));
 <body>
 <div class="wrap">
   <div class="card">
-    <h1>Install your NGO site</h1>
-    <p class="sub">Fill this in once. It writes your configuration, creates the database tables, and your admin login.</p>
+    <h1>Инсталиране на сайта</h1>
+    <p class="sub">Попълнете формата веднъж. Тя записва настройките на сайта, създава базата данни и вашия профил за вход в администраторския панел.</p>
 
 <?php if ($already): ?>
     <div class="alert alert-error">
-      This site is already installed (<code>site.config.php</code> exists). For security, delete the
-      <code>install/</code> directory. To reconfigure, edit <code>site.config.php</code> directly.
+      Сайтът вече е инсталиран. От съображения за сигурност изтрийте папката <code>install</code>
+      от File Manager в cPanel. Администраторският панел е на адрес <a href="/admin/">/admin/</a>.
     </div>
 <?php elseif ($success): ?>
     <div class="alert alert-ok">
-      <strong>Installation complete.</strong><br>
-      Your site is live at <a href="<?= e($_POST['site_url'] ?? '/') ?>"><?= e($_POST['site_url'] ?? '/') ?></a>
-      and you can log in at <a href="/admin/">/admin/</a>.
+      <strong>Инсталирането завърши успешно.</strong><br>
+      Сайтът ви работи на адрес <a href="<?= e($_POST['site_url'] ?? '/') ?>"><?= e($_POST['site_url'] ?? '/') ?></a>.
+      Влезте в администраторския панел на <a href="/admin/">/admin/</a>.
 <?php if ($created_db_info): ?>
-      <br><br>A database was created for you:<br>
-      name <code><?= e($created_db_info['name']) ?></code>,
-      user <code><?= e($created_db_info['user']) ?></code>,
-      password <code><?= e($created_db_info['pass']) ?></code><br>
-      (saved in <code>db.config.php</code>).
+      <br><br>Създадена е база данни:<br>
+      име <code><?= e($created_db_info['name']) ?></code>,
+      потребител <code><?= e($created_db_info['user']) ?></code>,
+      парола <code><?= e($created_db_info['pass']) ?></code><br>
+      Те вече са запазени в настройките на сайта — не е нужно да ги пазите отделно.
 <?php endif; ?>
-      <br><br><strong>Now delete the <code>install/</code> directory.</strong>
+      <br><br><strong>Сега изтрийте папката <code>install</code> от File Manager в cPanel.</strong>
     </div>
 <?php else: ?>
 <?php if ($errors): ?>
     <div class="alert alert-error"><?= implode('<br>', array_map('e', $errors)) ?></div>
 <?php endif; ?>
     <form method="post" enctype="multipart/form-data">
-      <h2>1. Database</h2>
+      <h2>1. База данни</h2>
 <?php if (cpanel_available()): ?>
       <div class="radio">
-        <label><input type="radio" name="db_mode" value="create" <?= ($v('db_mode','create')==='create')?'checked':'' ?> onclick="dbMode('create')"> Create a new database (cPanel)</label>
-        <label><input type="radio" name="db_mode" value="existing" <?= ($v('db_mode')==='existing')?'checked':'' ?> onclick="dbMode('existing')"> Use existing credentials</label>
+        <label><input type="radio" name="db_mode" value="create" <?= ($v('db_mode','create')==='create')?'checked':'' ?> onclick="dbMode('create')"> Създай нова база данни (препоръчително)</label>
+        <label><input type="radio" name="db_mode" value="existing" <?= ($v('db_mode')==='existing')?'checked':'' ?> onclick="dbMode('existing')"> Имам вече създадена база данни</label>
       </div>
       <div id="db-create">
-        <label>Database name suffix</label>
-        <input type="text" name="db_suffix" value="<?= $v('db_suffix') ?>" placeholder="e.g. site" maxlength="12">
-        <div class="hint">A database and user named <code><?= e(get_current_user()) ?>_&lt;suffix&gt;</code> will be created with a generated password.</div>
+        <label>Кратко име на базата данни</label>
+        <input type="text" name="db_suffix" value="<?= $v('db_suffix') ?>" placeholder="напр. site" maxlength="12">
+        <div class="hint">Само латински букви и цифри, до 12 знака. Ще бъдат създадени база данни и потребител с име <code><?= e(get_current_user()) ?>_…</code> и автоматично генерирана парола.</div>
       </div>
 <?php else: ?>
       <input type="hidden" name="db_mode" value="existing">
 <?php endif; ?>
       <div id="db-existing">
         <div class="row">
-          <div><label>DB host</label><input type="text" name="db_host" value="<?= $v('db_host','localhost') ?>"></div>
-          <div><label>DB name</label><input type="text" name="db_name" value="<?= $v('db_name') ?>"></div>
+          <div><label>Сървър на базата данни</label><input type="text" name="db_host" value="<?= $v('db_host','localhost') ?>"></div>
+          <div><label>Име на базата данни</label><input type="text" name="db_name" value="<?= $v('db_name') ?>"></div>
         </div>
         <div class="row">
-          <div><label>DB user</label><input type="text" name="db_user" value="<?= $v('db_user') ?>"></div>
-          <div><label>DB password</label><input type="password" name="db_pass"></div>
+          <div><label>Потребител</label><input type="text" name="db_user" value="<?= $v('db_user') ?>"></div>
+          <div><label>Парола</label><input type="password" name="db_pass"></div>
         </div>
+        <div class="hint">Сървърът обикновено е <code>localhost</code>. Името на базата и потребителят включват префикса, който cPanel добавя — например <code>akaunt_site</code>.</div>
       </div>
 
-      <h2>2. Organisation</h2>
+      <h2>2. Организация</h2>
       <div class="row">
-        <div><label>Site name (Bulgarian)</label><input type="text" name="site_name_bg" value="<?= $v('site_name_bg') ?>" required></div>
-        <div><label>Site name (English)</label><input type="text" name="site_name_en" value="<?= $v('site_name_en') ?>" required></div>
+        <div><label>Име на организацията (на български)</label><input type="text" name="site_name_bg" value="<?= $v('site_name_bg') ?>" required></div>
+        <div><label>Име на организацията (на английски)</label><input type="text" name="site_name_en" value="<?= $v('site_name_en') ?>" required></div>
       </div>
-      <label>Public site URL</label>
+      <label>Адрес на сайта</label>
       <input type="url" name="site_url" value="<?= $v('site_url', $guess_url) ?>" required>
-      <div class="hint">No trailing slash. All emails and payment callbacks derive from this.</div>
+      <div class="hint">Пълният адрес с <code>https://</code>, без наклонена черта накрая. Използва се във всички имейли и плащания.</div>
       <div class="row">
-        <div><label>Contact email</label><input type="email" name="site_email" value="<?= $v('site_email') ?>" required></div>
-        <div><label>Contact phone</label><input type="text" name="site_phone" value="<?= $v('site_phone') ?>"></div>
+        <div><label>Имейл за контакт</label><input type="email" name="site_email" value="<?= $v('site_email') ?>" required></div>
+        <div><label>Телефон за контакт</label><input type="text" name="site_phone" value="<?= $v('site_phone') ?>"></div>
       </div>
       <div class="row">
-        <div><label>IBAN (for donations)</label><input type="text" name="site_iban" value="<?= $v('site_iban') ?>"></div>
+        <div><label>IBAN (за дарения)</label><input type="text" name="site_iban" value="<?= $v('site_iban') ?>"></div>
         <div><label>BIC</label><input type="text" name="site_bic" value="<?= $v('site_bic') ?>"></div>
       </div>
-      <label>Bank name</label>
+      <label>Име на банката</label>
       <input type="text" name="site_bank_name" value="<?= $v('site_bank_name') ?>">
+      <div class="hint">Банковата сметка се показва на дарителите. Попълнете я сега, ако я имате под ръка.</div>
 
-      <h2>3. Branding</h2>
-      <label>Style</label>
+      <h2>3. Визия</h2>
+      <label>Стил</label>
       <div class="themes">
         <?php foreach (brand_themes() as $tk => $tv): ?>
         <label class="theme-card">
           <input type="radio" name="brand_theme" value="<?= e($tk) ?>" <?= ($v('brand_theme','classic')===$tk)?'checked':'' ?> onchange="pickTheme('<?= e($tk) ?>')">
           <span class="sw" style="background:<?= e($tv['primary']) ?>"></span>
-          <span style="font-family:'<?= e($tv['font']) ?>',sans-serif;"><?= e($tv['label']) ?></span>
+          <span style="font-family:'<?= e($tv['font']) ?>',sans-serif;"><?= e($theme_labels_bg[$tk] ?? $tv['label']) ?></span>
         </label>
         <?php endforeach; ?>
       </div>
-      <div class="hint">Pick a look (font + shape). The colours below default to the style; tweak them if you like.</div>
+      <div class="hint">Изберете визия (шрифт и форма). Цветовете по-долу се попълват според стила — можете да ги промените.</div>
       <div class="row">
-        <div><label>Primary colour</label><input type="color" name="brand_primary" value="<?= $v('brand_primary','#0387A5') ?>" style="height:44px;padding:3px;"></div>
-        <div><label>Accent colour</label><input type="color" name="brand_accent" value="<?= $v('brand_accent','#04ADBF') ?>" style="height:44px;padding:3px;"></div>
+        <div><label>Основен цвят</label><input type="color" name="brand_primary" value="<?= $v('brand_primary','#0387A5') ?>" style="height:44px;padding:3px;"></div>
+        <div><label>Допълнителен цвят</label><input type="color" name="brand_accent" value="<?= $v('brand_accent','#04ADBF') ?>" style="height:44px;padding:3px;"></div>
       </div>
-      <label>Logo <span style="font-weight:400;color:var(--muted);">(optional — PNG / JPG / WebP)</span></label>
+      <label>Лого <span style="font-weight:400;color:var(--muted);">(по желание — PNG, JPG или WebP)</span></label>
       <input type="file" name="logo" accept="image/png,image/jpeg,image/webp">
-      <div class="hint">Leave empty to keep a neutral placeholder; you can upload one later from the admin panel.</div>
+      <div class="hint">Ако го оставите празно, ще се покаже неутрално лого. За да смените логото по-късно, свържете се с поддръжката.</div>
 
-      <h2>4. Administrator account</h2>
+      <h2>4. Администратор</h2>
       <div class="row">
-        <div><label>Your name</label><input type="text" name="admin_name" value="<?= $v('admin_name') ?>"></div>
-        <div><label>Admin email</label><input type="email" name="admin_email" value="<?= $v('admin_email') ?>" required></div>
+        <div><label>Вашето име</label><input type="text" name="admin_name" value="<?= $v('admin_name') ?>"></div>
+        <div><label>Имейл за вход</label><input type="email" name="admin_email" value="<?= $v('admin_email') ?>" required></div>
       </div>
-      <label>Admin password</label>
+      <label>Парола за вход</label>
       <input type="password" name="admin_password" required>
-      <div class="hint">At least 8 characters.</div>
+      <div class="hint">Поне 8 знака. Запишете я на сигурно място.</div>
 
-      <button type="submit">Install</button>
+      <button type="submit">Инсталирай</button>
     </form>
     <script>
       function dbMode(m){
-        document.getElementById('db-create').style.display   = (m==='create')   ? '' : 'none';
-        document.getElementById('db-existing').style.display = (m==='existing') ? '' : 'none';
+        var c = document.getElementById('db-create'), x = document.getElementById('db-existing');
+        if (c) c.style.display = (m==='create')   ? '' : 'none';
+        if (x) x.style.display = (m==='existing') ? '' : 'none';
       }
       dbMode(document.querySelector('input[name=db_mode]:checked')?.value || 'existing');
       var THEMES = <?= json_encode(array_map(fn($t) => ['p' => $t['primary'], 'a' => $t['accent']], brand_themes())) ?>;
