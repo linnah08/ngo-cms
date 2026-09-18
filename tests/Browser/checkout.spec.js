@@ -45,7 +45,7 @@ test('adding a product to the cart shows it in the cart', async ({ page }) => {
   await expect(page.locator('a[href="/checkout/"]')).toBeVisible();
 });
 
-test('full checkout flow: shop → cart → checkout → confirmation', async ({ page }) => {
+test('full checkout flow: shop → cart → checkout → payment hand-off', async ({ page }) => {
   // ── 1. Add product to cart ────────────────────────────────────────────────
   await addFirstAvailableProductToCart(page);
   await expect(page.locator('a[href="/checkout/"]')).toBeVisible();
@@ -85,25 +85,21 @@ test('full checkout flow: shop → cart → checkout → confirmation', async ({
   await page.click('button[type="submit"]');
   await page.waitForURL('**/checkout/?step=3**');
 
-  // ── 5. Step 3: Review & confirm ───────────────────────────────────────────
-  // Switch payment to COD (cash on delivery) so we don't trigger card redirect
-  await page.evaluate(() => {
-    const pmField = document.querySelector('input[name="payment_method"]');
-    if (pmField) pmField.value = 'cod';
-  });
+  // ── 5. Step 3: Review & confirm → payment hand-off ────────────────────────
+  // Checkout is online-payment only (cash on delivery was removed), so the
+  // order leaves for the bank's payment page. The confirmation page needs a
+  // real gateway callback and can't be reached here.
+  const siteHost = new URL(page.url()).host;
+  await Promise.all([
+    page.waitForURL(u => u.host !== siteHost || u.pathname.startsWith('/cart'),
+                    { timeout: 15000, waitUntil: 'commit' }),
+    page.click('button[type="submit"]'),
+  ]);
 
-  // Confirm the order
-  await page.click('button[type="submit"]');
-
-  // ── 6. Confirmation page ──────────────────────────────────────────────────
-  await page.waitForURL('**/checkout/confirmation/**', { timeout: 15000 });
-
-  // Order number format: OM-YYYYMMDD-XXXX
-  const url = page.url();
-  expect(url).toMatch(/order=OM-\d{8}-[A-F0-9]{4}/i);
-
-  // Page body should contain the order number
-  await expect(page.locator('body')).toContainText('OM-');
+  // ── 6. No provider configured → visible explanation, never a silent failure
+  if (new URL(page.url()).host === siteHost) {
+    await expect(page.locator('body')).toContainText('Онлайн плащането не е налично');
+  }
 });
 
 test('empty cart redirects to shop', async ({ page }) => {
