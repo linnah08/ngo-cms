@@ -19,15 +19,10 @@ require_once dirname(__DIR__) . '/order_stock.php';
 /**
  * Minutes after checkout before a still-pending order counts as unpaid, per
  * payment method. Only methods listed here get the badge, the emails, the
- * 24h auto-cancel and the dashboard/retry handling.
- *
- * IRIS ('iris' => 120) is deliberately left out for now: on oddminds.org, IRIS
- * payments that customers did make have never been recorded as paid (every
- * IRIS order June–Aug 2026 stayed 'pending' although delivered), so the
- * automation would email and cancel paying customers. Add it back once
- * process_iris_result() reliably marks confirmed IRIS payments as paid.
+ * 24h auto-cancel and the dashboard/retry handling. IRIS gets longer because
+ * bank transfers can take a while to confirm.
  */
-const UNPAID_AFTER_MINUTES = ['card' => 60];
+const UNPAID_AFTER_MINUTES = ['card' => 60, 'iris' => 120];
 
 /** Minutes after checkout before an unpaid order is cancelled and restocked. */
 const UNPAID_CANCEL_AFTER_MINUTES = 24 * 60;

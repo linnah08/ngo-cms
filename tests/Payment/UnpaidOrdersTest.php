@@ -124,13 +124,12 @@ final class UnpaidOrdersTest extends TestCase
         $this->assertTrue(order_is_unpaid($o, 60));
     }
 
-    public function testIrisIsLeftOutOfTheAutomationForNow(): void
+    public function testIrisOrderBecomesUnpaidAfterTwoHours(): void
     {
-        // IRIS payments aren't reliably recorded as paid yet — see UNPAID_AFTER_MINUTES.
         $o = ['type' => 'physical', 'status' => 'new', 'payment_method' => 'iris', 'payment_status' => 'pending'];
-        $this->assertFalse(order_is_unpaid($o, 10 * 24 * 60));
-        $this->assertFalse(order_is_unpaid(['status' => 'cancelled'] + $o, 10));
-        $this->assertFalse(order_can_retry_payment($o));
+        $this->assertFalse(order_is_unpaid($o, 119));
+        $this->assertTrue(order_is_unpaid($o, 120));
+        $this->assertTrue(order_can_retry_payment($o));
     }
 
     public function testDeclinedOrderIsUnpaidImmediately(): void
@@ -217,13 +216,14 @@ final class UnpaidOrdersTest extends TestCase
         $this->assertStringContainsString('/api/payment-return.php?retry=1', $this->sent[0]['html']);
     }
 
-    public function testIrisOrderIsNeverEmailed(): void
+    public function testIrisEmailLinksBackToIris(): void
     {
         $this->requireDb();
-        $order = $this->insertOrder(5, ['payment_method' => 'iris', 'status' => 'cancelled']);
+        $order = $this->insertOrder(5, ['payment_method' => 'iris', 'lang' => 'en']);
 
-        $this->assertFalse(send_payment_failed_email(self::$pdo, $order, $this->mailer()));
-        $this->assertCount(0, $this->sent);
+        $this->assertTrue(send_payment_failed_email(self::$pdo, $order, $this->mailer()));
+        $this->assertStringContainsString('Try again', $this->sent[0]['html']);
+        $this->assertStringContainsString('/api/iris-payment-return.php?retry=1', $this->sent[0]['html']);
     }
 
     public function testDonationEmailTalksAboutTheDonation(): void
@@ -258,12 +258,13 @@ final class UnpaidOrdersTest extends TestCase
 
     // ── which orders the cron picks ──────────────────────────────────────────
 
-    public function testCronEmailsCardAfterOneHourAndNeverTouchesIris(): void
+    public function testCronEmailsCardAfterOneHourAndIrisAfterTwo(): void
     {
         $this->requireDb();
         $card_young = $this->insertOrder(30);
         $card_due   = $this->insertOrder(61);
-        $iris_old   = $this->insertOrder(121, ['payment_method' => 'iris']);
+        $iris_young = $this->insertOrder(90, ['payment_method' => 'iris']);
+        $iris_due   = $this->insertOrder(121, ['payment_method' => 'iris']);
         $iris_day   = $this->insertOrder(25 * 60, ['payment_method' => 'iris']);
         $cod        = $this->insertOrder(300, ['payment_method' => 'cod']);
 
@@ -271,8 +272,9 @@ final class UnpaidOrdersTest extends TestCase
 
         $this->assertContains($card_due['order_number'], $due);
         $this->assertNotContains($card_young['order_number'], $due);
-        $this->assertNotContains($iris_old['order_number'], $due);
-        $this->assertNotContains($iris_day['order_number'], $this->dueNumbers('to_cancel'));
+        $this->assertContains($iris_due['order_number'], $due);
+        $this->assertNotContains($iris_young['order_number'], $due);
+        $this->assertContains($iris_day['order_number'], $this->dueNumbers('to_cancel'));
         $this->assertNotContains($cod['order_number'], $due);
     }
 
