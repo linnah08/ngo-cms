@@ -36,7 +36,7 @@ function process_iris_result(PDO $pdo, array $order, array $status): void
             return;
         }
 
-        unpaid_order_reinstate_for_late_payment($pdo, $order);
+        order_reinstate_for_late_payment($pdo, $order);
 
         // Conditional update + rowCount guard => paid emails fire exactly once,
         // even under concurrent/duplicate callbacks.

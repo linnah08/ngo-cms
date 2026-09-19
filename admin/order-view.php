@@ -110,6 +110,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Невалиден статус.';
         } elseif ($new_status === 'shipped' && !$tracking) {
             $errors[] = 'Въведете номер за проследяване преди да маркирате като изпратена.';
+        } elseif (!($stock_change = order_stock_on_status_change($pdo, $order, $new_status))['ok']) {
+            // Reopening a cancelled order whose items were put back, but they're no longer in stock.
+            $errors[] = $stock_change['message'];
         } else {
             $pdo->prepare('UPDATE orders SET status=?, tracking_number=?, notes=?, updated_at=NOW() WHERE id=?')
                 ->execute([$new_status, $tracking ?: null, $notes ?: null, $id]);
@@ -188,7 +191,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = ?');
             $stmt->execute([$id]);
             $order = $stmt->fetch();
-            $success = $success ?: 'Поръчката е обновена.';
+            $success = $success ?: trim('Поръчката е обновена. ' . $stock_change['message']);
         }
     }
 
@@ -1140,6 +1143,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <div style="margin-top:1.5rem;font-size:.8rem;color:var(--text-muted);line-height:1.8;">
       Създадена: <?= h(substr($order['created_at'], 0, 16)) ?><br>
       Обновена: <?= h(substr($order['updated_at'], 0, 16)) ?><br>
+      <?php if ($order['stock_returned_at']): ?>
+      Продуктите върнати в наличност: <?= h(substr($order['stock_returned_at'], 0, 16)) ?><br>
+      <?php endif; ?>
       Плащане: <?= h(payment_method_label($order['payment_method'])) ?> — <?= h($order['payment_status']) ?>
     </div>
 

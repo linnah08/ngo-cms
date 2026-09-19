@@ -71,7 +71,7 @@ function process_dsk_result(PDO $pdo, array $order, string $dskOrderId, array $s
     if ($orderStatus === 2 || $orderStatus === 1) {
         // Paid (deposited or pre-auth approved)
         if ($order['payment_status'] !== 'paid') {
-            unpaid_order_reinstate_for_late_payment($pdo, $order);
+            order_reinstate_for_late_payment($pdo, $order);
             $pdo->prepare("UPDATE orders SET payment_status = 'paid', status = 'confirmed', updated_at = NOW() WHERE id = ?")
                 ->execute([$order['id']]);
             notify_order_paid($order);

@@ -21,9 +21,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($action === 'delete') {
             $pdo->prepare("DELETE FROM orders WHERE id IN ($placeholders)")->execute($ids);
-        } elseif (in_array($action, ['new','confirmed','shipped','delivered','cancelled'])) {
-            $pdo->prepare("UPDATE orders SET status=?, updated_at=NOW() WHERE id IN ($placeholders)")
-                ->execute(array_merge([$action], $ids));
+        } elseif (in_array($action, ['new','confirmed','shipped','delivered','cancelled'], true)) {
+            // One by one so each order's stock moves with its status (cancel → back in stock,
+            // reopen → taken out again). Orders that can't be reopened for lack of stock are skipped.
+            $sel = $pdo->prepare('SELECT * FROM orders WHERE id = ?');
+            $upd = $pdo->prepare('UPDATE orders SET status=?, updated_at=NOW() WHERE id=?');
+            $problems = [];
+            foreach ($ids as $oid) {
+                $sel->execute([$oid]);
+                if (!$o = $sel->fetch()) continue;
+                $change = order_stock_on_status_change($pdo, $o, $action);
+                if (!$change['ok']) { $problems[] = $change['message']; continue; }
+                $upd->execute([$action, $oid]);
+            }
+            if ($problems) flash_set('error', implode(' ', $problems));
         }
     }
 
@@ -76,6 +87,10 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <a href="/admin/manual-cert.php" class="btn btn--outline">+ Сертификат за дарение</a>
   </div>
 </div>
+
+<?php foreach (flash_get() as $_flash): ?>
+  <div class="admin-alert admin-alert--<?= h($_flash['type']) ?>" style="margin-bottom:1.5rem;"><?= h($_flash['message']) ?></div>
+<?php endforeach; ?>
 
 <!-- Filters -->
 <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.5rem;">

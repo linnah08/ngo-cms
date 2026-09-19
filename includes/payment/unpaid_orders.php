@@ -13,6 +13,7 @@
  * Covers shop orders ('physical') and donations. Cron entry point:
  * cron/unpaid-orders-cron.php.
  */
+require_once dirname(__DIR__) . '/order_stock.php';
 
 /** Minutes after checkout before a still-pending order counts as unpaid, per payment method. */
 const UNPAID_AFTER_MINUTES = ['card' => 60, 'iris' => 120];
@@ -103,7 +104,7 @@ function send_payment_failed_email(PDO $pdo, array $order, ?callable $mailer = n
     $claim = $pdo->prepare(
         "UPDATE orders SET payment_failed_email_at = NOW()
          WHERE id = ? AND payment_failed_email_at IS NULL
-           AND payment_status = 'pending' AND unpaid_cancelled_at IS NULL"
+           AND payment_status = 'pending' AND unpaid_cancelled_at IS NULL AND stock_returned_at IS NULL"
     );
     $claim->execute([$order['id']]);
     if ($claim->rowCount() === 0) return false;
@@ -138,31 +139,6 @@ function send_payment_failed_email(PDO $pdo, array $order, ?callable $mailer = n
 }
 
 /**
- * Change stock for every product line of an order (+1 = put back, -1 = take out).
- * Mirrors the decrement done at checkout. Donation lines are skipped.
- */
-function unpaid_order_adjust_stock(PDO $pdo, array $order, int $direction): void
-{
-    $items = is_string($order['items'] ?? null) ? json_decode($order['items'], true) : ($order['items'] ?? []);
-    foreach ((array)$items as $item) {
-        if (($item['type'] ?? '') === 'donation') continue;
-        $product_id = (int)($item['product_id'] ?? 0);
-        $qty        = (int)($item['quantity'] ?? 0);
-        if ($product_id <= 0 || $qty <= 0) continue;
-
-        $variant_id = (int)($item['variant_id'] ?? 0);
-        $expr = $direction > 0 ? 'stock + ?' : 'GREATEST(stock - ?, 0)';
-        if ($variant_id > 0) {
-            $pdo->prepare("UPDATE product_variants SET stock = $expr WHERE id = ? AND product_id = ?")
-                ->execute([$qty, $variant_id, $product_id]);
-        } else {
-            $pdo->prepare("UPDATE products SET stock = $expr WHERE id = ?")
-                ->execute([$qty, $product_id]);
-        }
-    }
-}
-
-/**
  * Cancel an order that stayed unpaid for 24h and put its items back in stock.
  * Safe to call repeatedly — restocks at most once.
  *
@@ -175,42 +151,20 @@ function cancel_unpaid_order(PDO $pdo, array $order): bool
         $stmt = $pdo->prepare(
             "UPDATE orders SET status = 'cancelled', unpaid_cancelled_at = NOW(), updated_at = NOW()
              WHERE id = ? AND payment_status = 'pending' AND unpaid_cancelled_at IS NULL
-               AND status IN ('new', 'cancelled')"
+               AND stock_returned_at IS NULL AND status IN ('new', 'cancelled')"
         );
         $stmt->execute([$order['id']]);
         if ($stmt->rowCount() === 0) {
             $pdo->commit();
             return false;
         }
-        if (($order['type'] ?? '') === 'physical') {
-            unpaid_order_adjust_stock($pdo, $order, +1);
-        }
+        order_return_stock($pdo, $order);
         $pdo->commit();
         return true;
     } catch (Throwable $e) {
         $pdo->rollBack();
         throw $e;
     }
-}
-
-/**
- * A payment that lands after the order was auto-cancelled (e.g. the shopper
- * opened the bank page just before the 24h mark) is still real money: take the
- * items back out of stock and clear the auto-cancel marker. Call right before
- * marking the order paid.
- */
-function unpaid_order_reinstate_for_late_payment(PDO $pdo, array $order): void
-{
-    if (empty($order['unpaid_cancelled_at'])) return;
-
-    $stmt = $pdo->prepare('UPDATE orders SET unpaid_cancelled_at = NULL WHERE id = ? AND unpaid_cancelled_at IS NOT NULL');
-    $stmt->execute([$order['id']]);
-    if ($stmt->rowCount() === 0) return;
-
-    if (($order['type'] ?? '') === 'physical') {
-        unpaid_order_adjust_stock($pdo, $order, -1);
-    }
-    error_log("unpaid-orders: order {$order['order_number']} was paid after being auto-cancelled — stock taken back out, please check it");
 }
 
 /**
@@ -223,7 +177,7 @@ function unpaid_orders_due(PDO $pdo): array
     $types   = "'" . implode("','", UNPAID_ORDER_TYPES) . "'";
     $methods = "'" . implode("','", array_keys(UNPAID_AFTER_MINUTES)) . "'";
     $base    = "payment_status = 'pending' AND type IN ($types) AND payment_method IN ($methods)"
-             . " AND unpaid_cancelled_at IS NULL AND status IN ('new', 'cancelled')"
+             . " AND unpaid_cancelled_at IS NULL AND stock_returned_at IS NULL AND status IN ('new', 'cancelled')"
              . ' AND created_at > NOW() - INTERVAL ' . UNPAID_CRON_LOOKBACK_MINUTES . ' MINUTE';
 
     $by_age = [];

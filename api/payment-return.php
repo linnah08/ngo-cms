@@ -40,9 +40,9 @@ if (isset($_GET['retry'])) {
         header('Location: ' . $confirm_url);
         exit;
     }
-    // Auto-cancelled after 24h unpaid: items are back in stock, so the order
-    // can't be paid any more — the shopper needs to order again.
-    if (!empty($order['unpaid_cancelled_at'])) {
+    // Cancelled (automatically after 24h unpaid, or by an admin) and its items
+    // are back in stock, so it can't be paid any more — the shopper orders again.
+    if (!empty($order['unpaid_cancelled_at']) || !empty($order['stock_returned_at'])) {
         header('Location: ' . $failed_url . '&expired=1');
         exit;
     }

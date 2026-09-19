@@ -32,7 +32,7 @@ if ($order['payment_status'] === 'paid') {
 // This page is reached from the bank / our payment endpoints, not a language-prefixed URL,
 // so the order's own language decides the text.
 $lang    = ($order['lang'] ?? 'bg') === 'en' ? 'en' : 'bg';
-$expired = !empty($order['unpaid_cancelled_at']);
+$expired = !empty($order['unpaid_cancelled_at']) || !empty($order['stock_returned_at']);
 $is_iris = $order['payment_method'] === 'iris';
 
 $retry_url = ($is_iris ? '/api/iris-payment-return.php' : '/api/payment-return.php')
@@ -46,7 +46,7 @@ $t = $lang === 'en' ? [
         : 'Order <strong>#' . h($order['order_number']) . '</strong> is saved. You can try the payment again.',
     'expired'    => $is_donation
         ? 'This donation was not completed in time. Please start a new donation.'
-        : 'Order <strong>#' . h($order['order_number']) . '</strong> was not paid within 24 hours and has been cancelled. Please place a new order.',
+        : 'Order <strong>#' . h($order['order_number']) . '</strong> has been cancelled and can no longer be paid. Please place a new order.',
     'retry'      => $is_iris ? 'Try again with bank transfer' : 'Try again with card',
     'back'       => '← Back to the shop',
 ] : [
@@ -56,7 +56,7 @@ $t = $lang === 'en' ? [
         : 'Поръчка <strong>#' . h($order['order_number']) . '</strong> е запазена. Можете да опитате плащането отново.',
     'expired'    => $is_donation
         ? 'Дарението не беше завършено навреме. Моля, направете ново дарение.'
-        : 'Поръчка <strong>#' . h($order['order_number']) . '</strong> не беше платена в рамките на 24 часа и е отменена. Моля, направете нова поръчка.',
+        : 'Поръчка <strong>#' . h($order['order_number']) . '</strong> е отменена и вече не може да бъде платена. Моля, направете нова поръчка.',
     'retry'      => $is_iris ? 'Опитай отново с банков превод' : 'Опитай отново с карта',
     'back'       => '← Към магазина',
 ];

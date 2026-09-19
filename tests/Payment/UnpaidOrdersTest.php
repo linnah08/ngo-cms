@@ -323,6 +323,20 @@ final class UnpaidOrdersTest extends TestCase
         $this->assertNotContains($order['order_number'], $this->dueNumbers('to_cancel'));
     }
 
+    public function testManuallyCancelledOrderIsNotEmailedOrCancelledAgain(): void
+    {
+        $this->requireDb();
+        $pid   = $this->insertProduct(0);
+        $order = $this->insertOrder(90, ['items' => json_encode([['product_id' => $pid, 'quantity' => 1]])]);
+        order_stock_on_status_change(self::$pdo, $order, 'cancelled');
+        self::$pdo->prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?")->execute([$order['id']]);
+
+        $this->assertNotContains($order['order_number'], $this->dueNumbers('to_email'));
+        $this->assertFalse(send_payment_failed_email(self::$pdo, $this->reload((int)$order['id']), $this->mailer()));
+        $this->assertFalse(cancel_unpaid_order(self::$pdo, $this->reload((int)$order['id'])));
+        $this->assertSame(1, $this->stock('products', $pid));
+    }
+
     public function testNoEmailAfterAutoCancel(): void
     {
         $this->requireDb();
@@ -341,11 +355,13 @@ final class UnpaidOrdersTest extends TestCase
         $this->assertSame(2, $this->stock('products', $pid));
 
         $order = $this->reload((int)$order['id']);
-        unpaid_order_reinstate_for_late_payment(self::$pdo, $order);
-        unpaid_order_reinstate_for_late_payment(self::$pdo, $order); // idempotent
+        order_reinstate_for_late_payment(self::$pdo, $order);
+        order_reinstate_for_late_payment(self::$pdo, $order); // idempotent
 
         $this->assertSame(0, $this->stock('products', $pid));
-        $this->assertNull($this->reload((int)$order['id'])['unpaid_cancelled_at']);
+        $fresh = $this->reload((int)$order['id']);
+        $this->assertNull($fresh['unpaid_cancelled_at']);
+        $this->assertNull($fresh['stock_returned_at']);
     }
 
     // ── admin filter matches the badge ───────────────────────────────────────
