@@ -79,7 +79,10 @@ class IRISPayment
             'lang'        => in_array(($args['lang'] ?? 'bg'), ['bg', 'en', 'ro', 'el', 'hr'], true) ? $args['lang'] : 'bg',
         ];
 
-        $resp = $this->request('POST', '/backend/payment/external/' . $this->merchantKey, $payload);
+        // The merchant key can contain characters that aren't valid in a URL path
+        // (e.g. ^ $ @ =); unencoded, IRIS's server rejects the request with a bare
+        // "HTTP 400 Bad Request" page before our payload is even read.
+        $resp = $this->request('POST', '/backend/payment/external/' . rawurlencode($this->merchantKey), $payload);
 
         // IRIS returns {message: "..."} on error, {paymentLink, paymentHash, ...} on success.
         if (!empty($resp['message'])) {
@@ -129,7 +132,7 @@ class IRISPayment
         return trim($s);
     }
 
-    private function request(string $method, string $path, ?array $payload = null): array
+    protected function request(string $method, string $path, ?array $payload = null): array
     {
         $ch = curl_init($this->host . $path);
         $opts = [

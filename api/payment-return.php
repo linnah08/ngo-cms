@@ -59,7 +59,7 @@ if (isset($_GET['retry'])) {
         exit;
     } catch (Throwable $e) {
         error_log('payment-return retry: ' . $e->getMessage());
-        header('Location: ' . $failed_url . '&err=' . urlencode($e->getMessage()));
+        header('Location: ' . $failed_url . '&err=1');
         exit;
     }
 }

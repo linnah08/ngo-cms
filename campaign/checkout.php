@@ -164,6 +164,6 @@ try {
     exit;
 } catch (Throwable $e) {
     error_log('campaign/checkout: DSK register failed: ' . $e->getMessage());
-    header('Location: /campaign/payment-failed/?pledge=' . urlencode($pledge_number) . '&err=' . urlencode($e->getMessage()));
+    header('Location: /campaign/payment-failed/?pledge=' . urlencode($pledge_number) . '&err=1');
     exit;
 }

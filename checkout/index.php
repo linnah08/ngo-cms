@@ -261,7 +261,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     header('Location: ' . $result['formUrl']);
                 } catch (Throwable $e) {
                     error_log('checkout/pledge DSK register failed: ' . $e->getMessage());
-                    header('Location: /campaign/payment-failed/?pledge=' . urlencode($pledge_number) . '&err=' . urlencode($e->getMessage()));
+                    header('Location: /campaign/payment-failed/?pledge=' . urlencode($pledge_number) . '&err=1');
                 }
                 exit;
             }
@@ -425,7 +425,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             } catch (Throwable $e) {
                 error_log('DSK Bank register error: ' . $e->getMessage());
-                header('Location: /checkout/payment-failed/?order=' . urlencode($order_number) . '&err=' . urlencode($e->getMessage()));
+                header('Location: /checkout/payment-failed/?order=' . urlencode($order_number) . '&err=1');
                 exit;
             }
         }
@@ -459,7 +459,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             } catch (Throwable $e) {
                 error_log('IRIS register error: ' . $e->getMessage());
-                header('Location: /checkout/payment-failed/?order=' . urlencode($order_number) . '&err=' . urlencode($e->getMessage()));
+                header('Location: /checkout/payment-failed/?order=' . urlencode($order_number) . '&err=1');
                 exit;
             }
         }

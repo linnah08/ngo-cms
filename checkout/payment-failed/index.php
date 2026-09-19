@@ -4,7 +4,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 start_session();
 
 $order_number = trim($_GET['order'] ?? '');
-$err_msg      = trim($_GET['err']   ?? '');
+// Set when the bank page couldn't be opened. Only a flag — the technical reason is
+// in the server log, never shown to the customer.
+$bank_error   = !empty($_GET['err']);
 
 if (!preg_match('/^OM-\d{8}-[A-F0-9]{4}$/i', $order_number)) {
     header('Location: /');
@@ -47,6 +49,7 @@ $t = $lang === 'en' ? [
     'expired'    => $is_donation
         ? 'This donation was not completed in time. Please start a new donation.'
         : 'Order <strong>#' . h($order['order_number']) . '</strong> has been cancelled and can no longer be paid. Please place a new order.',
+    'bank_error' => 'We couldn’t open the bank’s payment page. Please try again in a moment.',
     'retry'      => $is_iris ? 'Try again with bank transfer' : 'Try again with card',
     'back'       => '← Back to the shop',
 ] : [
@@ -57,6 +60,7 @@ $t = $lang === 'en' ? [
     'expired'    => $is_donation
         ? 'Дарението не беше завършено навреме. Моля, направете ново дарение.'
         : 'Поръчка <strong>#' . h($order['order_number']) . '</strong> е отменена и вече не може да бъде платена. Моля, направете нова поръчка.',
+    'bank_error' => 'Не успяхме да отворим страницата за плащане на банката. Моля, опитайте отново след малко.',
     'retry'      => $is_iris ? 'Опитай отново с банков превод' : 'Опитай отново с карта',
     'back'       => '← Към магазина',
 ];
@@ -72,8 +76,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     <p style="color:var(--text-muted);">
       <?= $expired ? $t['expired'] : $t['saved'] ?>
     </p>
-    <?php if ($err_msg && !$expired): ?>
-    <p style="font-size:.85rem;color:#c0392b;margin-top:.5rem;"><?= h($err_msg) ?></p>
+    <?php if ($bank_error && !$expired): ?>
+    <p style="font-size:.9rem;color:#c0392b;margin-top:.5rem;"><?= h($t['bank_error']) ?></p>
     <?php endif; ?>
   </div>
 </section>

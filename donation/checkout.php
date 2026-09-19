@@ -112,7 +112,7 @@ if ($payment_method === 'card') {
         exit;
     } catch (Throwable $e) {
         error_log('donation checkout DSK register: ' . $e->getMessage());
-        header('Location: /checkout/payment-failed/?order=' . urlencode($order_number) . '&err=' . urlencode($e->getMessage()));
+        header('Location: /checkout/payment-failed/?order=' . urlencode($order_number) . '&err=1');
         exit;
     }
 }
@@ -146,7 +146,7 @@ if ($payment_method === 'iris') {
         exit;
     } catch (Throwable $e) {
         error_log('donation checkout IRIS register: ' . $e->getMessage());
-        header('Location: /checkout/payment-failed/?order=' . urlencode($order_number) . '&err=' . urlencode($e->getMessage()));
+        header('Location: /checkout/payment-failed/?order=' . urlencode($order_number) . '&err=1');
         exit;
     }
 }
