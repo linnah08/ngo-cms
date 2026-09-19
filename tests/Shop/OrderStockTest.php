@@ -175,6 +175,26 @@ final class OrderStockTest extends TestCase
         $this->assertNotNull($this->reload((int)$order['id'])['stock_returned_at']);
     }
 
+    public function testPreorderLinesCanGoNegativeLikeCheckout(): void
+    {
+        $this->requireDb();
+        // Pre-ordered 3 with nothing on the shelf: checkout left stock at -3.
+        $pid   = $this->insertProduct(-3);
+        $order = $this->insertOrder('new', [['product_id' => $pid, 'quantity' => 3, 'preorder' => true]]);
+
+        $this->changeStatus($order, 'cancelled');
+        $this->assertSame(0, $this->stock('products', $pid));
+
+        // Reopening is never blocked for a pre-order and goes back below zero.
+        $this->assertTrue($this->changeStatus($this->reload((int)$order['id']), 'new')['ok']);
+        $this->assertSame(-3, $this->stock('products', $pid));
+
+        // A late payment doesn't stop a pre-order line at zero either.
+        $this->changeStatus($this->reload((int)$order['id']), 'cancelled');
+        order_reinstate_for_late_payment(self::$pdo, $this->reload((int)$order['id']));
+        $this->assertSame(-3, $this->stock('products', $pid));
+    }
+
     public function testCancellingShippedOrderLeavesStockAlone(): void
     {
         $this->requireDb();

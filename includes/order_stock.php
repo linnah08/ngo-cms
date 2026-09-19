@@ -10,12 +10,16 @@
  * stock moves at most once in each direction no matter how often the status
  * flips. Only product lines with a product_id count — donation add-ons and
  * manual-invoice lines never touched stock.
+ *
+ * Pre-order lines mirror checkout: their stock may go negative (that's the
+ * oversold-demand figure), so taking them out again is never blocked or
+ * stopped at zero.
  */
 
 /**
  * Product lines of an order that hold stock.
  *
- * @return list<array{product_id:int, variant_id:int, quantity:int, name:string}>
+ * @return list<array{product_id:int, variant_id:int, quantity:int, name:string, preorder:bool}>
  */
 function order_stock_lines(array $order): array
 {
@@ -37,6 +41,7 @@ function order_stock_lines(array $order): array
             'variant_id' => (int)($item['variant_id'] ?? 0),
             'quantity'   => $quantity,
             'name'       => $name,
+            'preorder'   => !empty($item['preorder']),
         ];
     }
     return $lines;
@@ -109,6 +114,17 @@ function order_take_stock_again(PDO $pdo, array $order, bool $allow_short = fals
         $short = [];
         foreach ($lines as $l) {
             $q = $l['quantity'];
+            if ($l['preorder']) {
+                // Same as checkout: pre-order stock is allowed to go negative.
+                if ($l['variant_id'] > 0) {
+                    $pdo->prepare('UPDATE product_variants SET stock = stock - ? WHERE id = ? AND product_id = ?')
+                        ->execute([$q, $l['variant_id'], $l['product_id']]);
+                } else {
+                    $pdo->prepare('UPDATE products SET stock = stock - ? WHERE id = ?')
+                        ->execute([$q, $l['product_id']]);
+                }
+                continue;
+            }
             if ($l['variant_id'] > 0) {
                 $stmt = $allow_short
                     ? $pdo->prepare('UPDATE product_variants SET stock = GREATEST(stock - ?, 0) WHERE id = ? AND product_id = ?')
