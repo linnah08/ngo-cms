@@ -2,7 +2,7 @@
 /**
  * Unpaid online orders cron (card / IRIS) — see includes/payment/unpaid_orders.php.
  *   - emails the shopper once when the payment is overdue (card 1h, IRIS 2h),
- *   - cancels the order and puts its items back in stock after 24h unpaid.
+ *   - cancels the order and puts its items back in stock after 3 days unpaid.
  *
  * Schedule + exact command: Admin → Автоматични задачи (includes/scheduled_jobs.php).
  *

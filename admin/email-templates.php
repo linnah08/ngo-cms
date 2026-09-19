@@ -41,7 +41,7 @@ $templates = [
     ],
     'order-payment-failed-customer' => [
         'label' => 'Неуспешно плащане на поръчка',
-        'vars'  => ['{{customer_name}}', '{{order_number}}'],
+        'vars'  => ['{{customer_name}}', '{{order_number}}', '{{cancel_date}}', '{{cancel_days}}'],
     ],
     'donation-payment-failed-customer' => [
         'label' => 'Неуспешно плащане на дарение',

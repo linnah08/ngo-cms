@@ -3,7 +3,7 @@
  * Stock held by shop orders.
  *
  * Checkout takes items out of stock when the order is placed. When an order is
- * cancelled (by an admin or automatically after 24h unpaid) the items go back;
+ * cancelled (by an admin or automatically after 3 days unpaid) the items go back;
  * if a cancelled order is reopened or paid late they are taken out again.
  *
  * orders.stock_returned_at records that the items are back on the shelf, so

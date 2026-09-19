@@ -265,7 +265,7 @@ final class UnpaidOrdersTest extends TestCase
         $card_due   = $this->insertOrder(61);
         $iris_young = $this->insertOrder(90, ['payment_method' => 'iris']);
         $iris_due   = $this->insertOrder(121, ['payment_method' => 'iris']);
-        $iris_day   = $this->insertOrder(25 * 60, ['payment_method' => 'iris']);
+        $iris_day   = $this->insertOrder(73 * 60, ['payment_method' => 'iris']);
         $cod        = $this->insertOrder(300, ['payment_method' => 'cod']);
 
         $due = $this->dueNumbers('to_email');
@@ -313,9 +313,41 @@ final class UnpaidOrdersTest extends TestCase
         $this->assertCount(0, array_filter($this->sent, fn($m) => $m['to'] === $order['customer_email']));
     }
 
-    // ── 24h cancel + restock ─────────────────────────────────────────────────
+    // ── 3-day cancel + restock ─────────────────────────────────────────────────
 
-    public function testCancelAfter24hPutsItemsBackInStockOnce(): void
+    public function testDeadlineIsThreeDaysAfterCheckout(): void
+    {
+        $this->assertSame(3, unpaid_cancel_days());
+        $this->assertSame('22.09.2026 08:09', unpaid_cancel_deadline(['created_at' => '2026-09-19 08:09:56']));
+    }
+
+    public function testOrderOnDayTwoIsEmailedButNotCancelled(): void
+    {
+        $this->requireDb();
+        $order = $this->insertOrder(25 * 60);
+
+        $this->assertContains($order['order_number'], $this->dueNumbers('to_email'));
+        $this->assertNotContains($order['order_number'], $this->dueNumbers('to_cancel'));
+    }
+
+    public function testEmailTellsTheShopperTheDeadline(): void
+    {
+        $this->requireDb();
+        $bg = $this->insertOrder(5);
+        $en = $this->insertOrder(5, ['lang' => 'en']);
+
+        send_payment_failed_email(self::$pdo, $bg, $this->mailer());
+        send_payment_failed_email(self::$pdo, $en, $this->mailer());
+
+        $this->assertStringContainsString('до <strong>' . unpaid_cancel_deadline($bg) . '</strong>', $this->sent[0]['html']);
+        $this->assertStringContainsString('3 дни', $this->sent[0]['html']);
+        $this->assertStringContainsString('until <strong>' . unpaid_cancel_deadline($en) . '</strong>', $this->sent[1]['html']);
+        $this->assertStringContainsString('3 days', $this->sent[1]['html']);
+        $this->assertStringNotContainsString('24 часа', $this->sent[0]['html']);
+        $this->assertStringNotContainsString('24 hours', $this->sent[1]['html']);
+    }
+
+    public function testCancelAfterThreeDaysPutsItemsBackInStockOnce(): void
     {
         $this->requireDb();
         $simple  = $this->insertProduct(5);
@@ -326,7 +358,7 @@ final class UnpaidOrdersTest extends TestCase
             ['product_id' => $variant_product, 'variant_id' => $variant, 'quantity' => 3, 'subtotal_eur' => 30.0],
             ['type' => 'donation', 'amount_eur' => 5.0, 'subtotal_eur' => 5.0],
         ]);
-        $order = $this->insertOrder(25 * 60, ['items' => $items]);
+        $order = $this->insertOrder(73 * 60, ['items' => $items]);
 
         $this->assertContains($order['order_number'], $this->dueNumbers('to_cancel'));
         $this->assertTrue(cancel_unpaid_order(self::$pdo, $order));
@@ -339,11 +371,11 @@ final class UnpaidOrdersTest extends TestCase
         $this->assertNotNull($fresh['unpaid_cancelled_at']);
     }
 
-    public function testDeclinedOrderIsStillRestockedAfter24h(): void
+    public function testDeclinedOrderIsStillRestockedAfterThreeDays(): void
     {
         $this->requireDb();
         $pid   = $this->insertProduct(0);
-        $order = $this->insertOrder(25 * 60, [
+        $order = $this->insertOrder(73 * 60, [
             'status' => 'cancelled',
             'items'  => json_encode([['product_id' => $pid, 'quantity' => 1]]),
         ]);
@@ -355,7 +387,7 @@ final class UnpaidOrdersTest extends TestCase
     public function testShippedOrderIsNeverAutoCancelled(): void
     {
         $this->requireDb();
-        $order = $this->insertOrder(25 * 60, ['status' => 'shipped']);
+        $order = $this->insertOrder(73 * 60, ['status' => 'shipped']);
 
         $this->assertFalse(cancel_unpaid_order(self::$pdo, $order));
         $this->assertNotContains($order['order_number'], $this->dueNumbers('to_cancel'));
@@ -378,7 +410,7 @@ final class UnpaidOrdersTest extends TestCase
     public function testNoEmailAfterAutoCancel(): void
     {
         $this->requireDb();
-        $order = $this->insertOrder(25 * 60);
+        $order = $this->insertOrder(73 * 60);
         cancel_unpaid_order(self::$pdo, $order);
 
         $this->assertFalse(send_payment_failed_email(self::$pdo, $this->reload((int)$order['id']), $this->mailer()));
@@ -388,7 +420,7 @@ final class UnpaidOrdersTest extends TestCase
     {
         $this->requireDb();
         $pid   = $this->insertProduct(0);
-        $order = $this->insertOrder(25 * 60, ['items' => json_encode([['product_id' => $pid, 'quantity' => 2]])]);
+        $order = $this->insertOrder(73 * 60, ['items' => json_encode([['product_id' => $pid, 'quantity' => 2]])]);
         cancel_unpaid_order(self::$pdo, $order);
         $this->assertSame(2, $this->stock('products', $pid));
 

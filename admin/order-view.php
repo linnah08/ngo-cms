@@ -509,7 +509,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <?php if ($order['unpaid_cancelled_at']): ?>
       Поръчката е отменена автоматично на <?= h(substr($order['unpaid_cancelled_at'], 0, 16)) ?><?= $order['type'] === 'physical' ? ' и продуктите са върнати в наличност' : '' ?>. Не я изпращайте.
     <?php else: ?>
-      Не изпращайте, докато плащането не пристигне. Ако остане неплатена 24 часа след създаването, ще бъде отменена автоматично<?= $order['type'] === 'physical' ? ' и продуктите ще се върнат в наличност' : '' ?>.
+      Не изпращайте, докато плащането не пристигне. Ако остане неплатена до <strong><?= h(unpaid_cancel_deadline($order)) ?></strong>, ще бъде отменена автоматично<?= $order['type'] === 'physical' ? ' и продуктите ще се върнат в наличност' : '' ?>.
     <?php endif; ?>
   </div>
 <?php endif; ?>

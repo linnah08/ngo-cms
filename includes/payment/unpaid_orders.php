@@ -8,7 +8,7 @@
  *   - decides when such an order counts as "unpaid" (admin badge/filter),
  *   - emails the shopper once that the payment didn't go through, with a
  *     "try again" link (on decline right away, on abandon via cron),
- *   - auto-cancels the order after 24h unpaid and puts its items back in stock.
+ *   - auto-cancels the order after 3 days unpaid and puts its items back in stock.
  *
  * Covers shop orders ('physical') and donations. Cron entry point:
  * cron/unpaid-orders-cron.php.
@@ -19,13 +19,16 @@ require_once dirname(__DIR__) . '/order_stock.php';
 /**
  * Minutes after checkout before a still-pending order counts as unpaid, per
  * payment method. Only methods listed here get the badge, the emails, the
- * 24h auto-cancel and the dashboard/retry handling. IRIS gets longer because
+ * 3-day auto-cancel and the dashboard/retry handling. IRIS gets longer because
  * bank transfers can take a while to confirm.
  */
 const UNPAID_AFTER_MINUTES = ['card' => 60, 'iris' => 120];
 
-/** Minutes after checkout before an unpaid order is cancelled and restocked. */
-const UNPAID_CANCEL_AFTER_MINUTES = 24 * 60;
+/**
+ * Minutes after checkout before an unpaid order is cancelled and restocked.
+ * The shopper's email states this deadline (see unpaid_cancel_deadline()).
+ */
+const UNPAID_CANCEL_AFTER_MINUTES = 3 * 24 * 60;
 
 /**
  * Orders older than this are never touched by the cron. Keeps the first run
@@ -33,7 +36,7 @@ const UNPAID_CANCEL_AFTER_MINUTES = 24 * 60;
  * have dealt with by hand. The cron runs far more often than this window, so
  * every new order passes through it.
  */
-const UNPAID_CRON_LOOKBACK_MINUTES = 3 * 24 * 60;
+const UNPAID_CRON_LOOKBACK_MINUTES = 5 * 24 * 60;   // must stay longer than UNPAID_CANCEL_AFTER_MINUTES
 
 const UNPAID_ORDER_TYPES = ['physical', 'donation'];
 
@@ -81,6 +84,19 @@ function payment_method_label(?string $method): string
         'bank_transfer' => 'Банков превод',
         'cod'           => 'Наложен платеж',
     ][$method ?? ''] ?? ($method ? ucfirst($method) : '—');
+}
+
+/** Whole days the shopper has to finish paying before the order is cancelled. */
+function unpaid_cancel_days(): int
+{
+    return intdiv(UNPAID_CANCEL_AFTER_MINUTES, 24 * 60);
+}
+
+/** When this order will be auto-cancelled if still unpaid, e.g. "22.09.2026 08:09". */
+function unpaid_cancel_deadline(array $order): string
+{
+    $created = strtotime((string)($order['created_at'] ?? '')) ?: time();
+    return date('d.m.Y H:i', $created + UNPAID_CANCEL_AFTER_MINUTES * 60);
 }
 
 /** Public link that sends the shopper back to the bank for the same order. */
@@ -147,6 +163,8 @@ function send_payment_failed_email(PDO $pdo, array $order, ?callable $mailer = n
         'customer_name' => $order['customer_name'],
         'order_number'  => $order['order_number'],
         'amount_eur'    => number_format((float)$order['total_eur'], 2, '.', ''),
+        'cancel_date'   => unpaid_cancel_deadline($order),
+        'cancel_days'   => unpaid_cancel_days(),
     ]);
     $html = render_email('payment-failed-customer', ['order' => $order, 'tpl' => $tpl]);
 
@@ -167,7 +185,7 @@ function send_payment_failed_email(PDO $pdo, array $order, ?callable $mailer = n
 }
 
 /**
- * Cancel an order that stayed unpaid for 24h and put its items back in stock.
+ * Cancel an order that stayed unpaid for 3 days and put its items back in stock.
  * Safe to call repeatedly — restocks at most once.
  *
  * @return bool true when the order was cancelled by this call
@@ -220,7 +238,7 @@ function unpaid_orders_due(PDO $pdo): array
         . ' AND (' . implode(' OR ', $by_age) . ') ORDER BY created_at'
     )->fetchAll();
 
-    // Unpaid for 24h → cancel and put the items back in stock.
+    // Unpaid for 3 days → cancel and put the items back in stock.
     $to_cancel = $pdo->query(
         "SELECT * FROM orders WHERE $base"
         . ' AND created_at <= NOW() - INTERVAL ' . UNPAID_CANCEL_AFTER_MINUTES . ' MINUTE ORDER BY created_at'
@@ -231,7 +249,7 @@ function unpaid_orders_due(PDO $pdo): array
 
 /**
  * Cron job: email shoppers whose online payment is overdue, then cancel and
- * restock orders unpaid for 24h.
+ * restock orders unpaid for 3 days.
  *
  * @param callable|null $mailer  see send_payment_failed_email()
  * @param callable|null $refresh fn(PDO, array $order): void — asks the bank for the

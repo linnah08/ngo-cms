@@ -98,14 +98,14 @@ function _email_tpl_defaults(): array {
             'intro_bg'   => '<h2>Плащането не беше завършено</h2>'
                           . '<p>Здравейте, {{customer_name}},</p>'
                           . '<p>Не получихме плащането за вашата поръчка <strong>{{order_number}}</strong>. Възможно е плащането да е било отказано или страницата на банката да е била затворена преди края.</p>'
-                          . '<p>Поръчката е запазена. Можете да опитате отново с бутона по-долу.</p>',
-            'outro_bg'   => '<p>Ако поръчката остане неплатена 24 часа, тя ще бъде отменена автоматично. Ако вече сте платили, не е нужно да правите нищо.</p>',
+                          . '<p>Поръчката е запазена до <strong>{{cancel_date}}</strong>. Имате {{cancel_days}} дни да я завършите с бутона по-долу, след това тя ще бъде отменена автоматично.</p>',
+            'outro_bg'   => '<p>Ако вече сте платили, не е нужно да правите нищо.</p>',
             'subject_en' => 'The payment for order {{order_number}} was not completed',
             'intro_en'   => '<h2>Payment not completed</h2>'
                           . '<p>Hello {{customer_name}},</p>'
                           . '<p>We did not receive the payment for your order <strong>{{order_number}}</strong>. The payment may have been declined, or the bank page was closed before it finished.</p>'
-                          . '<p>Your order is saved. You can try again with the button below.</p>',
-            'outro_en'   => '<p>If the order stays unpaid for 24 hours, it will be cancelled automatically. If you have already paid, there is nothing more you need to do.</p>',
+                          . '<p>Your order is saved until <strong>{{cancel_date}}</strong>. You have {{cancel_days}} days to complete it with the button below; after that it will be cancelled automatically.</p>',
+            'outro_en'   => '<p>If you have already paid, there is nothing more you need to do.</p>',
         ],
 
         'donation-payment-failed-customer' => [

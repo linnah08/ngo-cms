@@ -189,7 +189,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
             <span class="badge <?= $sclass ?>"><?= h($slabel) ?></span>
             <?php if (order_is_unpaid($o, (int)$o['age_minutes'])): ?>
               <br><span class="badge" style="margin-top:2px;background:#fdecea;color:#b42318;border:1px solid #f5c2c0;font-weight:600;"
-                        title="Клиентът не е платил<?= $o['unpaid_cancelled_at'] ? ' — отменена автоматично след 24 ч., продуктите са върнати в наличност' : '' ?>">
+                        title="Клиентът не е платил<?= $o['unpaid_cancelled_at'] ? ' — отменена автоматично след ' . unpaid_cancel_days() . ' дни, продуктите са върнати в наличност' : '' ?>">
                 Неплатена
               </span>
             <?php elseif ($o['type'] === 'donation' || isset(UNPAID_AFTER_MINUTES[$o['payment_method'] ?? ''])): ?>
