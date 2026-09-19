@@ -5,6 +5,7 @@
  * Must respond with HTTP 200.
  */
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/payment_errors.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
@@ -36,7 +37,7 @@ try {
 
     process_dsk_result($pdo, $order, $dsk_order_id, $status);
 } catch (Throwable $e) {
-    error_log('payment-callback: ' . $e->getMessage());
+    payment_error_report('Известието от DSK не можа да бъде обработено', (string)($order['order_number'] ?? ''), $e);
     http_response_code(500);
     exit('error');
 }

@@ -11,6 +11,7 @@
  * Must respond HTTP 200 on success.
  */
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/payment_errors.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
@@ -40,7 +41,7 @@ if (!$order || empty($order['iris_callback_token']) || empty($order['iris_paymen
 
 // ── Authenticate the caller: constant-time token comparison ──────────────────
 if (!hash_equals((string)$order['iris_callback_token'], (string)$token)) {
-    error_log('iris-callback: token mismatch for order ' . $order_number);
+    payment_error_report('Известие за IRIS плащане с невалиден ключ — възможен опит за измама', $order_number, 'callback token mismatch');
     http_response_code(403);
     exit('forbidden');
 }
@@ -51,7 +52,7 @@ try {
     $status = $iris->getStatus($order['iris_payment_hash']);
     process_iris_result($pdo, $order, $status);
 } catch (Throwable $e) {
-    error_log('iris-callback: ' . $e->getMessage());
+    payment_error_report('Известието от IRIS не можа да бъде обработено', $order_number, $e);
     http_response_code(500);
     exit('error');
 }

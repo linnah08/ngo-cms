@@ -3,6 +3,7 @@
  * Campaign pledge checkout — validates form, inserts pledge, redirects to DSK Bank.
  */
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/payment_errors.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
@@ -120,7 +121,7 @@ try {
     ]);
     $pledge_id = (int)$pdo->lastInsertId();
 } catch (Throwable $e) {
-    error_log('campaign/checkout: insert pledge failed: ' . $e->getMessage());
+    payment_error_report('Подкрепата за кампания не можа да бъде записана', '', $e);
     $_SESSION['campaign_error'] = 'Техническа грешка. Моля, опитайте отново.';
     header('Location: /campaign/');
     exit;
@@ -145,7 +146,7 @@ if (!$is_ticket && $reward_id > 0) {
 
 // ── Register with DSK Bank ────────────────────────────────────────────────────
 if (!DSKBankPayment::isEnabled()) {
-    error_log('campaign/checkout: DSK Bank not configured');
+    payment_error_report('Плащането с карта не е настроено — подкрепа за кампания не може да бъде платена', $pledge_number, 'DSK Bank not configured');
     $_SESSION['campaign_error'] = 'Плащанията не са конфигурирани. Моля, свържете се с нас.';
     header('Location: /campaign/');
     exit;
@@ -163,7 +164,7 @@ try {
     header('Location: ' . $result['formUrl']);
     exit;
 } catch (Throwable $e) {
-    error_log('campaign/checkout: DSK register failed: ' . $e->getMessage());
+    payment_error_report('DSK не създаде плащане (подкрепа за кампания)', $pledge_number, $e);
     header('Location: /campaign/payment-failed/?pledge=' . urlencode($pledge_number) . '&err=1');
     exit;
 }

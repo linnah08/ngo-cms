@@ -13,6 +13,7 @@
  * Covers shop orders ('physical') and donations. Cron entry point:
  * cron/unpaid-orders-cron.php.
  */
+require_once __DIR__ . '/payment_errors.php';
 require_once dirname(__DIR__) . '/order_stock.php';
 
 /**
@@ -251,7 +252,7 @@ function run_unpaid_orders_job(PDO $pdo, ?callable $mailer = null, ?callable $re
         try {
             $refresh($pdo, $order);
         } catch (Throwable $e) {
-            error_log("unpaid-orders: status refresh failed for {$order['order_number']}: " . $e->getMessage());
+            payment_error_report('Автоматичната проверка не можа да попита банката за статуса', $order['order_number'], $e);
         }
         $reload->execute([$order['id']]);
         $fresh = $reload->fetch();

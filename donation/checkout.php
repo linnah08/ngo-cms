@@ -1,5 +1,6 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/payment_errors.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
@@ -111,7 +112,7 @@ if ($payment_method === 'card') {
         header('Location: ' . $result['formUrl']);
         exit;
     } catch (Throwable $e) {
-        error_log('donation checkout DSK register: ' . $e->getMessage());
+        payment_error_report('DSK не създаде плащане с карта (дарение)', $order_number, $e);
         header('Location: /checkout/payment-failed/?order=' . urlencode($order_number) . '&err=1');
         exit;
     }
@@ -145,7 +146,7 @@ if ($payment_method === 'iris') {
         header('Location: ' . $result['paymentLink']);
         exit;
     } catch (Throwable $e) {
-        error_log('donation checkout IRIS register: ' . $e->getMessage());
+        payment_error_report('IRIS не създаде плащане (дарение)', $order_number, $e);
         header('Location: /checkout/payment-failed/?order=' . urlencode($order_number) . '&err=1');
         exit;
     }

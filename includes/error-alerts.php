@@ -23,7 +23,11 @@ function error_alert_ensure_table(): void
     $ensured = true;
 }
 
-function error_alert_capture(string $error_class, string $message, string $file, int $line): void
+/**
+ * @param bool $force_immediate email now even when alerts are set to a digest
+ *                              (used for payment errors — money is involved)
+ */
+function error_alert_capture(string $error_class, string $message, string $file, int $line, bool $force_immediate = false): void
 {
     try {
         if (!function_exists('get_pdo')) {
@@ -55,7 +59,7 @@ function error_alert_capture(string $error_class, string $message, string $file,
         $sel->execute([$id]);
         $row = $sel->fetch(\PDO::FETCH_ASSOC);
 
-        if (setting_get('error_alert_frequency', 'immediate') === 'immediate') {
+        if ($force_immediate || setting_get('error_alert_frequency', 'immediate') === 'immediate') {
             error_alert_send_immediate($row, $email);
         }
     } catch (\Throwable $e) {

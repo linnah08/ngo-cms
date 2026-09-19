@@ -4,6 +4,7 @@
  * Customer lands here after paying (or cancelling) on the bank page.
  */
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/payment_errors.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
@@ -60,7 +61,7 @@ if (isset($_GET['retry'])) {
         header('Location: ' . $result['formUrl']);
         exit;
     } catch (Throwable $e) {
-        error_log('campaign-payment-return retry: ' . $e->getMessage());
+        payment_error_report('„Опитай отново“ за подкрепа не успя — DSK не създаде плащане', $pledge_number, $e);
         header('Location: /campaign/payment-failed/?pledge=' . urlencode($pledge_number));
         exit;
     }
@@ -79,7 +80,7 @@ try {
     $status = $dsk->getStatus($dsk_order_id);
     process_campaign_dsk_result($pdo, $pledge, $dsk_order_id, $status);
 } catch (Throwable $e) {
-    error_log('campaign-payment-return: ' . $e->getMessage());
+    payment_error_report('Статусът на плащането за подкрепа не можа да бъде проверен', $pledge_number, $e);
     header('Location: /campaign/payment-failed/?pledge=' . urlencode($pledge_number));
     exit;
 }

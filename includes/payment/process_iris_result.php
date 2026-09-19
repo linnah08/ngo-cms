@@ -10,6 +10,7 @@
  * Reuses notify_order_paid() from process_payment.php so shop/donation orders are
  * notified identically to the DSK Bank flow.
  */
+require_once __DIR__ . '/payment_errors.php';
 require_once __DIR__ . '/process_payment.php';
 
 function process_iris_result(PDO $pdo, array $order, array $status): void
@@ -25,14 +26,14 @@ function process_iris_result(PDO $pdo, array $order, array $status): void
         $paidSum  = (float)($status['sum'] ?? 0);
         $expected = (float)$order['total_eur'];
         if (abs($paidSum - $expected) > 0.01) {
-            error_log("iris: amount mismatch for order {$order['order_number']} — paid {$paidSum}, expected {$expected}");
+            payment_error_report('IRIS потвърди плащане с различна сума — поръчката НЕ е отбелязана като платена', $order['order_number'], "платено {$paidSum} €, очаквано {$expected} €");
             return;
         }
 
         $ourIban  = preg_replace('/\s+/', '', setting_get('iris_iban', ''));
         $recvIban = preg_replace('/\s+/', '', (string)($status['receiverIban'] ?? ''));
         if ($ourIban !== '' && $recvIban !== '' && strcasecmp($recvIban, $ourIban) !== 0) {
-            error_log("iris: receiver IBAN mismatch for order {$order['order_number']} — got {$recvIban}");
+            payment_error_report('IRIS потвърди плащане към друга сметка — поръчката НЕ е отбелязана като платена', $order['order_number'], "получател {$recvIban}");
             return;
         }
 

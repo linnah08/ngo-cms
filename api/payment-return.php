@@ -4,6 +4,7 @@
  * Also handles the "Try again" retry flow: ?retry=1&order=...
  */
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/payment_errors.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
@@ -58,7 +59,7 @@ if (isset($_GET['retry'])) {
         header('Location: ' . $result['formUrl']);
         exit;
     } catch (Throwable $e) {
-        error_log('payment-return retry: ' . $e->getMessage());
+        payment_error_report('„Опитай отново“ с карта не успя — DSK не създаде плащане', $order_number, $e);
         header('Location: ' . $failed_url . '&err=1');
         exit;
     }
@@ -83,7 +84,7 @@ try {
     $status = $dsk->getStatus($dsk_order_id);
     process_dsk_result($pdo, $order, $dsk_order_id, $status);
 } catch (Throwable $e) {
-    error_log('payment-return: ' . $e->getMessage());
+    payment_error_report('Статусът на плащането с карта не можа да бъде проверен при връщане от DSK', $order_number, $e);
     header('Location: ' . $failed_url);
     exit;
 }

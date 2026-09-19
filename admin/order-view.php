@@ -1,5 +1,6 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/payment_errors.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
@@ -168,7 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         render_email('order-cancelled-customer', ['order' => $order, 'tpl' => $tpl])
                     );
                 } catch (Throwable $e) {
-                    error_log('Refund failed for order ' . $id . ': ' . $e->getMessage());
+                    payment_error_report('Автоматичното връщане на парите при отмяна не успя — върнете сумата ръчно в DSK', $order['order_number'], $e);
                     $success = 'Поръчката е отменена, но автоматичното връщане на сумата не успя. Моля, обработете го ръчно в DSK Bank.';
                 }
             }

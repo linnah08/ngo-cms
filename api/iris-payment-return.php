@@ -12,6 +12,7 @@
  * customer back to the bank.
  */
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/payment_errors.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
@@ -76,7 +77,7 @@ if (isset($_GET['retry'])) {
         header('Location: ' . $result['paymentLink']);
         exit;
     } catch (Throwable $e) {
-        error_log('iris-payment-return retry: ' . $e->getMessage());
+        payment_error_report('„Опитай отново“ с IRIS не успя — IRIS не създаде плащане', $order_number, $e);
         header('Location: ' . $failed_url . '&err=1');
         exit;
     }
@@ -99,7 +100,7 @@ try {
         if ($state === 'FAILED')    { header('Location: ' . $failed_url);  exit; }
     }
 } catch (Throwable $e) {
-    error_log('iris-payment-return: ' . $e->getMessage());
+    payment_error_report('Статусът на IRIS плащането не можа да бъде проверен при връщане от IRIS', $order_number, $e);
 }
 
 // WAITING / unknown — the callback will settle it; confirmation shows pending.
