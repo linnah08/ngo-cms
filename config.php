@@ -128,15 +128,27 @@ if (session_status() === PHP_SESSION_NONE) {
 // A separate HMAC-signed cookie (om_admin_tok) lets subdomains (e.g. sub.example.org)
 // know an admin is logged in without sharing the session cookie (which would
 // cause session interference between the main site and subdomains).
-// The token is set on login and cleared on logout; it is ONLY used to decide
-// whether to render the read-only admin bar, never to authorise writes.
+// The token is set on login and cleared on logout. It shows the admin bar AND
+// authorises inline edits (admin/inline-save.php), so its key must stay secret.
 
 define('ADMIN_BAR_COOKIE', 'om_admin_tok');
 define('ADMIN_BAR_TTL',    8 * 3600); // matches ADMIN_SESSION_HOURS
 
-function _admin_bar_secret(): string {
-    // Derive a stable secret from constants that are always defined.
-    return hash('sha256', SITE_NAME_EN . SITE_PHONE . SITE_IBAN);
+/**
+ * HMAC key for the admin-bar cookie, derived from the random
+ * SETTINGS_ENCRYPTION_KEY in db.config.php. Never derive it from anything shown
+ * on the site: admin/inline-save.php accepts this cookie as login, so a
+ * guessable key lets anyone forge it and edit content. Returns null when no
+ * key is configured — the token is then never issued or accepted.
+ */
+function _admin_bar_secret(): ?string {
+    if (!defined('SETTINGS_ENCRYPTION_KEY') && is_file(__DIR__ . '/db.config.php')) {
+        require_once __DIR__ . '/db.config.php';
+    }
+    if (!defined('SETTINGS_ENCRYPTION_KEY') || strlen((string) SETTINGS_ENCRYPTION_KEY) < 16) {
+        return null;
+    }
+    return hash_hmac('sha256', 'admin-bar-token', (string) SETTINGS_ENCRYPTION_KEY);
 }
 
 function _admin_bar_domain(): string {
@@ -145,9 +157,11 @@ function _admin_bar_domain(): string {
 }
 
 function admin_bar_token_set(): void {
+    $secret  = _admin_bar_secret();
+    if ($secret === null) return;
     $exp     = time() + ADMIN_BAR_TTL;
     $payload = $exp . '|admin';
-    $sig     = hash_hmac('sha256', $payload, _admin_bar_secret());
+    $sig     = hash_hmac('sha256', $payload, $secret);
     $value   = $payload . '|' . $sig;
     $domain  = _admin_bar_domain();
     setcookie(ADMIN_BAR_COOKIE, $value, [
@@ -180,8 +194,10 @@ function admin_bar_token_verify(): bool {
     if (count($parts) !== 3) return false;
     [$exp, $role, $sig] = $parts;
     if ((int)$exp < time()) return false;
+    $secret   = _admin_bar_secret();
+    if ($secret === null) return false;
     $payload  = $exp . '|' . $role;
-    $expected = hash_hmac('sha256', $payload, _admin_bar_secret());
+    $expected = hash_hmac('sha256', $payload, $secret);
     return hash_equals($expected, $sig);
 }
 // ─────────────────────────────────────────────────────────────────────────────
