@@ -12,6 +12,8 @@ require_once $root . '/includes/settings.php';
 require_once $root . '/includes/mailer.php';
 require_once $root . '/includes/email-templates.php';
 require_once $root . '/includes/error-alerts.php';
+require_once $root . '/includes/scheduled_jobs.php';
+scheduled_job_track('error_digest');
 
 if (setting_get('error_alert_enabled') !== '1') {
     echo "Alerts disabled — nothing to do.\n";

@@ -90,6 +90,7 @@ function article_build_bg_data(array $f, array $existing = []): array {
         'image'   => $f['image'],
         'tags'    => $f['tags'],
         'content' => $f['content'],
+        'scheduled' => article_scheduled_flag($f),
     ];
     foreach ($carry as $k) {
         $data[$k] = $existing[$k] ?? '';
@@ -112,5 +113,31 @@ function article_build_en_data(array $f): array {
         'image'   => $f['image'],
         'tags'    => $f['tags'],
         'content' => $f['content'],
+        'scheduled' => article_scheduled_flag($f),
     ];
+}
+
+/** The stored `scheduled` flag: only a draft can be scheduled. */
+function article_scheduled_flag(array $f): bool {
+    return ($f['status'] ?? '') === 'draft' && !empty($f['scheduled']);
+}
+
+/**
+ * Whether a draft is set to publish itself on its date (admin/publish-scheduled.php).
+ *
+ * Articles saved with the „Публикувай автоматично на тази дата“ checkbox carry an
+ * explicit `scheduled` flag. Older drafts don't: for those, the editor used to
+ * fill the date with the day of saving, so only a date later than the file's
+ * last save ($mtime) can have been chosen on purpose. Anything else is an
+ * ordinary draft and is never published automatically.
+ */
+function article_is_scheduled(array $a, ?int $mtime = null): bool {
+    if (($a['status'] ?? '') !== 'draft' || empty($a['date']) || !is_string($a['date'])) return false;
+    if (array_key_exists('scheduled', $a)) return $a['scheduled'] === true;
+    return $mtime !== null && $a['date'] > date('Y-m-d', $mtime);
+}
+
+/** A scheduled draft whose date has arrived. */
+function article_due_for_publish(array $a, ?int $mtime, string $today): bool {
+    return article_is_scheduled($a, $mtime) && $a['date'] <= $today;
 }

@@ -13,6 +13,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/articles.php';
 admin_require_admin();
 
 header('Content-Type: application/json; charset=UTF-8');
@@ -63,6 +64,7 @@ $en_data = [
     'image'   => $article['image']  ?? '',
     'tags'    => $article['tags']   ?? [],
     'content' => $content ?: '',
+    'scheduled' => article_is_scheduled($article, @filemtime($bg_file) ?: null),
 ];
 
 $en_dir = ARTICLES_PATH . '/en';

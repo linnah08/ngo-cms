@@ -117,7 +117,7 @@ final class ArticleSaveLogicTest extends TestCase
             'image' => '/i.jpg', 'tags' => ['t'], 'content' => '<p>en</p>',
         ]);
         $this->assertSame(
-            ['title', 'slug', 'date', 'author', 'status', 'excerpt', 'image', 'tags', 'content'],
+            ['title', 'slug', 'date', 'author', 'status', 'excerpt', 'image', 'tags', 'content', 'scheduled'],
             array_keys($data)
         );
         $this->assertSame('EN T', $data['title']);

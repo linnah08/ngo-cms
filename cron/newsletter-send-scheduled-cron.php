@@ -5,13 +5,7 @@
  * Finds draft campaigns whose send_date <= today and sends them, using the
  * same logic as the manual "Изпрати сега" flow. Run via cron — CLI only.
  *
- * CRON SETUP (run once on the server):
- *   crontab -e
- *   Add this line (adjust path to match server):
- *   0 9 * * * /usr/local/bin/php /path/to/site/cron/newsletter-send-scheduled-cron.php >> /path/to/logs/newsletter-send-scheduled.log 2>&1
- *
- *   If the server is in UTC, use 0 6 * * * instead (06:00 UTC = 09:00 EEST / 07:00 EET).
- *   Check server timezone with: php -r "echo date_default_timezone_get();"
+ * Schedule + exact command: Admin → Автоматични задачи (includes/scheduled_jobs.php).
  */
 
 // Ensure CLI only
@@ -28,6 +22,8 @@ require_once dirname(__DIR__) . '/config.php';
 require_once dirname(__DIR__) . '/admin/includes/db.php';
 require_once dirname(__DIR__) . '/includes/newsletter.php';
 require_once dirname(__DIR__) . '/includes/mailer.php';
+require_once dirname(__DIR__) . '/includes/scheduled_jobs.php';
+scheduled_job_track('newsletter_scheduled');
 
 $pdo          = get_pdo();
 $sent_total   = 0;

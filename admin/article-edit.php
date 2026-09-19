@@ -34,7 +34,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $excerpt = trim($_POST['excerpt']  ?? '');
     $author  = trim($_POST['author']   ?? $current['name'] ?? '');
     $status  = in_array($_POST['status'] ?? '', ['published','draft']) ? $_POST['status'] : 'draft';
-    $date    = $_POST['date'] ?? date('Y-m-d');
+    $date    = is_string($_POST['date'] ?? null) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['date']) ? $_POST['date'] : date('Y-m-d');
+    $scheduled = $status === 'draft' && !empty($_POST['scheduled']);
     $tags    = array_values(array_filter(array_map('trim', explode(',', $_POST['tags'] ?? ''))));
 
     // ── EN fields (optional) ───────────────────────────────────────────────────
@@ -111,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'title'   => $title,   'slug'    => $new_slug, 'slug_en' => $new_slug_en,
             'date'    => $date,    'author'  => $author,   'status'  => $status,
             'excerpt' => $excerpt, 'image'   => $image,    'tags'    => $tags,
-            'content' => $content,
+            'content' => $content, 'scheduled' => $scheduled,
         ], $article);
         $dir_bg = ARTICLES_PATH . '/bg';
         if (!is_dir($dir_bg)) mkdir($dir_bg, 0755, true);
@@ -123,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'title'   => $title_en ?: $title, 'slug'    => $new_slug_en,
                 'date'    => $date,    'author'  => $author,   'status'  => $status,
                 'excerpt' => $excerpt_en, 'image' => $image,   'tags'    => $tags,
-                'content' => $content_en,
+                'content' => $content_en, 'scheduled' => $scheduled,
             ]);
             $dir_en = ARTICLES_PATH . '/en';
             if (!is_dir($dir_en)) mkdir($dir_en, 0755, true);
@@ -152,6 +153,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 $edit_slug    = $article['slug'] ?? '';
 $edit_slug_en = $article['slug_en'] ?? '';
 $edit_date    = $article['date'] ?? date('Y-m-d');
+$edit_scheduled = !$is_new && article_is_scheduled($article, @filemtime(ARTICLES_PATH . '/bg/' . $slug_param . '.json') ?: null);
 $edit_tags    = implode(', ', $article['tags'] ?? []);
 $has_en_version = !empty($article_en);
 $deepl_ready    = deepl_is_configured();
@@ -224,6 +226,15 @@ $claude_ready   = claude_is_configured();
           <option value="published" <?= ($article['status'] ?? '') === 'published' ? 'selected' : '' ?>>Публикувана</option>
           <option value="draft"     <?= ($article['status'] ?? 'draft') === 'draft' ? 'selected' : '' ?>>Чернова</option>
         </select>
+        <label id="scheduledRow" style="display:flex;align-items:flex-start;gap:.5rem;margin-top:.75rem;font-weight:500;text-transform:none;letter-spacing:normal;cursor:pointer;">
+          <input type="checkbox" name="scheduled" id="scheduled" value="1" <?= $edit_scheduled ? 'checked' : '' ?>
+                 <?= ($article['status'] ?? 'draft') === 'published' ? 'disabled' : '' ?> style="margin-top:.2rem;flex-shrink:0;">
+          <span>Публикувай автоматично на тази дата
+            <small id="scheduledHint" style="display:block;font-weight:400;color:var(--text-muted);line-height:1.5;margin-top:.15rem;">
+              Черновата ще се публикува сама сутринта на избраната дата. Без отметка остава чернова, докато не я публикувате ръчно.
+            </small>
+          </span>
+        </label>
       </div>
       <div class="form-group">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.4rem;">
@@ -1164,6 +1175,21 @@ if (translateBtn) {
     });
     liOut.innerHTML = counterSpan('LinkedIn', liEl.value.length, LIMITS.li);
   }
+})();
+</script>
+<script>
+// „Публикувай автоматично“ only applies to drafts.
+(function () {
+  var status = document.getElementById('status'), box = document.getElementById('scheduled');
+  if (!status || !box) return;
+  function sync() {
+    var draft = status.value === 'draft';
+    box.disabled = !draft;
+    if (!draft) box.checked = false;
+    document.getElementById('scheduledRow').style.opacity = draft ? '1' : '.5';
+  }
+  status.addEventListener('change', sync);
+  sync();
 })();
 </script>
 

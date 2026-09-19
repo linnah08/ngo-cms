@@ -1,8 +1,7 @@
 <?php
 /**
  * Monthly orders report cron script.
- * Run via cPanel cron: 0 6 1 * *
- * Command: /usr/local/bin/php /path/to/site/cron/monthly-report-cron.php
+ * Schedule + exact command: Admin → Автоматични задачи (includes/scheduled_jobs.php).
  */
 
 // Ensure CLI only
@@ -19,6 +18,8 @@ require_once dirname(__DIR__) . '/config.php';
 require_once dirname(__DIR__) . '/admin/includes/db.php';
 require_once dirname(__DIR__) . '/includes/mailer.php';
 require_once dirname(__DIR__) . '/includes/reports/monthly-orders.php';
+require_once dirname(__DIR__) . '/includes/scheduled_jobs.php';
+scheduled_job_track('monthly_report');
 
 // Previous calendar month
 $ts    = strtotime('first day of last month');

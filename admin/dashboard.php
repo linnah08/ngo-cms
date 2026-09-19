@@ -2,6 +2,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/articles.php';
 
 $page_title_admin = 'Начало';
 $active_nav       = 'dashboard';
@@ -15,6 +16,15 @@ $pdo           = get_pdo();
 $mail_not_configured = false;
 if (admin_is_admin()) {
     try { $mail_not_configured = mail_transport() === 'none'; } catch (Throwable $e) { error_log('dashboard mail_transport: ' . $e->getMessage()); }
+}
+
+// Scheduled jobs that this site needs but that aren't running (admins only — they fix it in cPanel).
+$job_problems = [];
+if (admin_is_admin()) {
+    try {
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/scheduled_jobs.php';
+        $job_problems = scheduled_jobs_problems();
+    } catch (Throwable $e) { error_log('dashboard scheduled_jobs: ' . $e->getMessage()); }
 }
 
 // ── Unified moderation inbox: pending comments, reviews & new contacts ──
@@ -157,7 +167,7 @@ if (is_dir($articles_dir)) {
         $slug  = $a['slug'] ?? '';
 
         // Website: draft article whose publish date falls in range
-        if (($a['status'] ?? '') === 'draft' && !empty($a['date'])) {
+        if (article_is_scheduled($a, @filemtime($file) ?: null)) {
             $d = $a['date'];
             if (isset($calendar[$d])) {
                 $calendar[$d][] = ['ch' => 'web', 'title' => $title, 'time' => 'публикуване', 'slug' => $slug];
@@ -260,6 +270,27 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     защото не е настроен имейл сървър.
   </div>
   <a href="/admin/email-settings.php" style="flex:0 0 auto;display:inline-block;background:#c0392b;color:#fff;text-decoration:none;font-weight:600;font-size:.85rem;padding:.55rem 1rem;border-radius:6px;">Настрой имейла</a>
+</div>
+<?php endif; ?>
+
+<?php if ($job_problems): ?>
+<div role="alert" style="display:flex;flex-wrap:wrap;align-items:center;gap:.75rem 1rem;background:#fdf0ef;border:1px solid #f0c4c0;border-left:4px solid #c0392b;border-radius:8px;padding:.9rem 1.1rem;margin-bottom:.75rem;color:#7a2318;">
+  <div style="flex:1 1 320px;min-width:0;font-size:.9rem;line-height:1.5;">
+    <strong style="display:block;color:#c0392b;margin-bottom:.15rem;">
+      <?= count($job_problems) === 1 ? 'Една автоматична задача не работи' : count($job_problems) . ' автоматични задачи не работят' ?>
+    </strong>
+    <ul style="margin:.2rem 0 0;padding-left:1.1rem;">
+      <?php foreach ($job_problems as $jk => $p): ?>
+        <li>
+          <a href="/admin/scheduled-jobs.php#job-<?= h($jk) ?>" style="color:inherit;font-weight:600;"><?= h($p['job']['label']) ?></a> —
+          <?= $p['status'] === 'late'
+              ? 'спряла, последно ' . h(scheduled_jobs_ago((int) $p['last'], time()))
+              : 'не е настроена' ?>
+        </li>
+      <?php endforeach; ?>
+    </ul>
+  </div>
+  <a href="/admin/scheduled-jobs.php" style="flex:0 0 auto;display:inline-block;background:#c0392b;color:#fff;text-decoration:none;font-weight:600;font-size:.85rem;padding:.55rem 1rem;border-radius:6px;">Как да <?= count($job_problems) === 1 ? 'я' : 'ги' ?> настроя</a>
 </div>
 <?php endif; ?>
 

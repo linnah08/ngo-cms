@@ -61,8 +61,9 @@ $email_val = setting_get('error_alert_email',     '');
 $freq      = setting_get('error_alert_frequency', 'immediate');
 $flash     = flash_get();
 
-$doc_root = rtrim($_SERVER['DOCUMENT_ROOT'], '/');
-$cron_cmd = "0 8 * * * php {$doc_root}/admin/send-error-digest.php >> {$doc_root}/logs/error-digest-cron.log 2>&1";
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/scheduled_jobs.php';
+$digest_last   = scheduled_job_last_run('error_digest');
+$digest_status = scheduled_job_status(scheduled_jobs()['error_digest']['grace'], $digest_last, scheduled_jobs_tracking_since(), time());
 
 $has_api_token = error_alert_api_token() !== '';
 
@@ -137,13 +138,17 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
   <?php if ($freq === 'daily' || $freq === 'weekly'): ?>
   <div style="background:#e4f0f5;border:1px solid #b3d4e0;border-radius:var(--radius-lg);padding:1.25rem 1.5rem;margin-top:1.5rem;">
-    <p style="margin:0 0 .75rem;font-weight:600;font-size:.9rem;">Настройка на Cron</p>
-    <p style="margin:0 0 .75rem;font-size:.85rem;color:var(--text-muted);">
-      Добави следния ред в crontab на сървъра (чрез <code>crontab -e</code>):
+    <p style="margin:0 0 .5rem;font-weight:600;font-size:.9rem;">Автоматично изпращане</p>
+    <p style="margin:0 0 .75rem;font-size:.85rem;color:<?= in_array($digest_status, ['late', 'missing'], true) ? '#c0392b' : 'var(--text-muted)' ?>;">
+      <?php if ($digest_status === 'ok'): ?>
+        ✅ Работи — последно: <?= h(scheduled_jobs_ago((int) $digest_last, time())) ?>.
+      <?php elseif ($digest_status === 'waiting'): ?>
+        Очакваме първото изпълнение.
+      <?php else: ?>
+        ⚠️ Обобщението не се изпраща, защото автоматичната задача не е настроена или е спряла.
+      <?php endif; ?>
+      <a href="/admin/scheduled-jobs.php#job-error_digest">Как да я настроя →</a>
     </p>
-    <code style="display:block;background:#fff;border:1px solid #b3d4e0;border-radius:6px;padding:.75rem 1rem;font-size:.78rem;word-break:break-all;">
-      <?= h($cron_cmd) ?>
-    </code>
     <p style="margin:.75rem 0 0;font-size:.8rem;color:var(--text-muted);">
       <?= $freq === 'daily'
           ? 'Скриптът се изпълнява всеки ден в 08:00 и изпраща грешките от последните 24 часа.'

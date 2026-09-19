@@ -2,6 +2,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/articles.php';
 $page_title_admin = 'Статии';
 $active_nav       = 'articles';
 admin_require_editorial();
@@ -62,16 +63,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'bulk_p
         foreach ($ids as $slug) {
             $bg = ARTICLES_PATH . '/bg/' . $slug . '.json';
             if (!file_exists($bg)) continue;
-            $data           = load_json($bg);
-            $data['status'] = $newStatus;
+            $data              = load_json($bg);
+            $data['status']    = $newStatus;
+            $data['scheduled'] = false; // a bulk change is a manual decision
             save_json($bg, $data);
 
             // Date, author, image and status are shared between BG and EN —
             // keep that in sync here too.
             $en = ARTICLES_PATH . '/en/' . $slug . '.json';
             if (file_exists($en)) {
-                $en_data           = load_json($en);
-                $en_data['status'] = $newStatus;
+                $en_data              = load_json($en);
+                $en_data['status']    = $newStatus;
+                $en_data['scheduled'] = false;
                 save_json($en, $en_data);
             }
         }
@@ -94,6 +97,7 @@ if (is_dir($articles_dir)) {
             $slug         = basename($file, '.json');
             $data['slug'] = $slug;
             $data['has_en'] = file_exists($en_dir . '/' . $slug . '.json');
+            $data['is_scheduled'] = article_is_scheduled($data, @filemtime($file) ?: null);
             $articles[] = $data;
         }
     }
@@ -222,6 +226,10 @@ if ($search !== '') {
               <span class="badge <?= ($article['status'] ?? '') === 'published' ? 'badge--published' : 'badge--draft' ?>">
                 <?= ($article['status'] ?? '') === 'published' ? 'Публикувана' : 'Чернова' ?>
               </span>
+              <?php if (!empty($article['is_scheduled'])): ?>
+                <span style="display:block;margin-top:.3rem;font-size:.75rem;color:#b45309;white-space:nowrap;"
+                      title="Ще се публикува автоматично на тази дата">⏱ <?= h(date('d.m.Y', strtotime((string) $article['date']))) ?></span>
+              <?php endif; ?>
             </td>
             <td style="text-align:center;" class="en-cell">
               <?php if ($article['has_en']): ?>

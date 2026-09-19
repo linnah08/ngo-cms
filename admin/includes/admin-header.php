@@ -187,6 +187,10 @@ $current_user = admin_user();
          class="admin-nav__link <?= ($active_nav ?? '') === 'error-alerts' ? 'active' : '' ?>">
         Известия за грешки
       </a>
+      <a href="/admin/scheduled-jobs.php"
+         class="admin-nav__link <?= ($active_nav ?? '') === 'scheduled-jobs' ? 'active' : '' ?>">
+        Автоматични задачи
+      </a>
       <a href="/admin/updates.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'updates' ? 'active' : '' ?>">
         Обновления

@@ -4,8 +4,7 @@
  *   - emails the shopper once when the payment is overdue (card 1h, IRIS 2h),
  *   - cancels the order and puts its items back in stock after 24h unpaid.
  *
- * Run via cPanel cron every 15 minutes: *\/15 * * * *
- * Command: /usr/local/bin/php /path/to/site/cron/unpaid-orders-cron.php
+ * Schedule + exact command: Admin → Автоматични задачи (includes/scheduled_jobs.php).
  *
  * Dry run — lists who would be emailed / cancelled (with their payment method)
  * without sending or changing anything:
@@ -28,6 +27,8 @@ require_once dirname(__DIR__) . '/includes/settings.php';
 require_once dirname(__DIR__) . '/includes/mailer.php';
 require_once dirname(__DIR__) . '/includes/payment/DSKBankPayment.php';
 require_once dirname(__DIR__) . '/includes/payment/IRISPayment.php';
+require_once dirname(__DIR__) . '/includes/scheduled_jobs.php';
+scheduled_job_track('unpaid_orders');
 require_once dirname(__DIR__) . '/includes/payment/process_payment.php';
 require_once dirname(__DIR__) . '/includes/payment/process_iris_result.php';
 require_once dirname(__DIR__) . '/includes/payment/unpaid_orders.php';
