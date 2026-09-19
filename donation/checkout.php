@@ -83,12 +83,12 @@ $items_json = json_encode([
 
 $pdo->prepare("
     INSERT INTO orders
-      (order_number,type,status,customer_name,customer_email,items,
+      (order_number,type,status,lang,customer_name,customer_email,items,
        subtotal_eur,shipping_eur,total_eur,donation_message,
        payment_method,payment_status,invoice_data)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 ")->execute([
-    $order_number, 'donation', 'new',
+    $order_number, 'donation', 'new', $order_lang,
     $name, $email, $items_json,
     $amount, 0, $amount,
     $message ?: null,

@@ -1,0 +1,289 @@
+<?php
+/**
+ * Unpaid online orders (card via DSK Bank, bank transfer via IRIS).
+ *
+ * Checkout saves the order *before* sending the shopper to the bank, so an
+ * order stays payment_status='pending' when the shopper abandons the bank page
+ * or the payment is declined. This module:
+ *   - decides when such an order counts as "unpaid" (admin badge/filter),
+ *   - emails the shopper once that the payment didn't go through, with a
+ *     "try again" link (on decline right away, on abandon via cron),
+ *   - auto-cancels the order after 24h unpaid and puts its items back in stock.
+ *
+ * Covers shop orders ('physical') and donations. Cron entry point:
+ * cron/unpaid-orders-cron.php.
+ */
+
+/** Minutes after checkout before a still-pending order counts as unpaid, per payment method. */
+const UNPAID_AFTER_MINUTES = ['card' => 60, 'iris' => 120];
+
+/** Minutes after checkout before an unpaid order is cancelled and restocked. */
+const UNPAID_CANCEL_AFTER_MINUTES = 24 * 60;
+
+/**
+ * Orders older than this are never touched by the cron. Keeps the first run
+ * from cancelling/restocking historic pending orders an admin may already
+ * have dealt with by hand. The cron runs far more often than this window, so
+ * every new order passes through it.
+ */
+const UNPAID_CRON_LOOKBACK_MINUTES = 3 * 24 * 60;
+
+const UNPAID_ORDER_TYPES = ['physical', 'donation'];
+
+/**
+ * True when the order is an online payment that should have been paid by now:
+ * still pending and either declined (status cancelled), already emailed, or
+ * past its method's wait time.
+ */
+function order_is_unpaid(array $order, int $age_minutes): bool
+{
+    if (($order['payment_status'] ?? '') !== 'pending') return false;
+    if (!in_array($order['type'] ?? '', UNPAID_ORDER_TYPES, true)) return false;
+
+    $after = UNPAID_AFTER_MINUTES[$order['payment_method'] ?? ''] ?? null;
+    if ($after === null) return false;
+
+    return ($order['status'] ?? '') === 'cancelled'
+        || !empty($order['payment_failed_email_at'])
+        || $age_minutes >= $after;
+}
+
+/**
+ * SQL condition equivalent to order_is_unpaid(), for the admin "Неплатени"
+ * filter. Only interpolates the constants above — no user data.
+ */
+function unpaid_orders_sql_condition(): string
+{
+    $types = "'" . implode("','", UNPAID_ORDER_TYPES) . "'";
+    $by_age = [];
+    foreach (UNPAID_AFTER_MINUTES as $method => $minutes) {
+        $by_age[] = sprintf("(payment_method = '%s' AND created_at <= NOW() - INTERVAL %d MINUTE)", $method, $minutes);
+    }
+    $methods = "'" . implode("','", array_keys(UNPAID_AFTER_MINUTES)) . "'";
+
+    return "(payment_status = 'pending' AND type IN ($types) AND payment_method IN ($methods)"
+         . " AND (status = 'cancelled' OR payment_failed_email_at IS NOT NULL OR " . implode(' OR ', $by_age) . '))';
+}
+
+/** Plain-language payment method name for the admin. */
+function payment_method_label(?string $method): string
+{
+    return [
+        'card'          => 'Карта (DSK Банк)',
+        'iris'          => 'Банков превод (IRIS)',
+        'bank_transfer' => 'Банков превод',
+        'cod'           => 'Наложен платеж',
+    ][$method ?? ''] ?? ($method ? ucfirst($method) : '—');
+}
+
+/** Public link that sends the shopper back to the bank for the same order. */
+function payment_retry_url(array $order): string
+{
+    $endpoint = ($order['payment_method'] ?? '') === 'iris'
+        ? '/api/iris-payment-return.php'
+        : '/api/payment-return.php';
+    return SITE_URL . $endpoint . '?retry=1&order=' . urlencode((string)$order['order_number']);
+}
+
+/**
+ * Email the shopper that the payment didn't go through — at most once per order.
+ *
+ * The payment_failed_email_at column is claimed atomically before sending, so
+ * duplicate bank callbacks or overlapping cron runs can't send it twice. If the
+ * send fails the claim is released so the next cron run retries.
+ *
+ * @param callable|null $mailer fn(string $to, string $subject, string $html): bool — defaults to send_mail()
+ * @return bool true when an email was sent
+ */
+function send_payment_failed_email(PDO $pdo, array $order, ?callable $mailer = null): bool
+{
+    if (!in_array($order['type'] ?? '', UNPAID_ORDER_TYPES, true)) return false;
+    if (!isset(UNPAID_AFTER_MINUTES[$order['payment_method'] ?? ''])) return false;
+
+    $claim = $pdo->prepare(
+        "UPDATE orders SET payment_failed_email_at = NOW()
+         WHERE id = ? AND payment_failed_email_at IS NULL
+           AND payment_status = 'pending' AND unpaid_cancelled_at IS NULL"
+    );
+    $claim->execute([$order['id']]);
+    if ($claim->rowCount() === 0) return false;
+
+    $lang = ($order['lang'] ?? 'bg') === 'en' ? 'en' : 'bg';
+    $key  = $order['type'] === 'donation' ? 'donation-payment-failed-customer' : 'order-payment-failed-customer';
+    $tpl  = email_tpl_get($key, $lang, [
+        'customer_name' => $order['customer_name'],
+        'order_number'  => $order['order_number'],
+        'amount_eur'    => number_format((float)$order['total_eur'], 2, '.', ''),
+    ]);
+    $html = render_email('payment-failed-customer', [
+        'order'     => $order,
+        'tpl'       => $tpl,
+        'retry_url' => payment_retry_url($order),
+    ]);
+
+    $mailer ??= 'send_mail';
+    $sent = false;
+    try {
+        $sent = (bool)$mailer($order['customer_email'], $tpl['subject'], $html);
+    } catch (Throwable $e) {
+        error_log("payment-failed email for order {$order['order_number']}: " . $e->getMessage());
+    }
+
+    if (!$sent) {
+        error_log("payment-failed email for order {$order['order_number']} was not sent — will retry");
+        $pdo->prepare('UPDATE orders SET payment_failed_email_at = NULL WHERE id = ?')
+            ->execute([$order['id']]);
+    }
+    return $sent;
+}
+
+/**
+ * Change stock for every product line of an order (+1 = put back, -1 = take out).
+ * Mirrors the decrement done at checkout. Donation lines are skipped.
+ */
+function unpaid_order_adjust_stock(PDO $pdo, array $order, int $direction): void
+{
+    $items = is_string($order['items'] ?? null) ? json_decode($order['items'], true) : ($order['items'] ?? []);
+    foreach ((array)$items as $item) {
+        if (($item['type'] ?? '') === 'donation') continue;
+        $product_id = (int)($item['product_id'] ?? 0);
+        $qty        = (int)($item['quantity'] ?? 0);
+        if ($product_id <= 0 || $qty <= 0) continue;
+
+        $variant_id = (int)($item['variant_id'] ?? 0);
+        $expr = $direction > 0 ? 'stock + ?' : 'GREATEST(stock - ?, 0)';
+        if ($variant_id > 0) {
+            $pdo->prepare("UPDATE product_variants SET stock = $expr WHERE id = ? AND product_id = ?")
+                ->execute([$qty, $variant_id, $product_id]);
+        } else {
+            $pdo->prepare("UPDATE products SET stock = $expr WHERE id = ?")
+                ->execute([$qty, $product_id]);
+        }
+    }
+}
+
+/**
+ * Cancel an order that stayed unpaid for 24h and put its items back in stock.
+ * Safe to call repeatedly — restocks at most once.
+ *
+ * @return bool true when the order was cancelled by this call
+ */
+function cancel_unpaid_order(PDO $pdo, array $order): bool
+{
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare(
+            "UPDATE orders SET status = 'cancelled', unpaid_cancelled_at = NOW(), updated_at = NOW()
+             WHERE id = ? AND payment_status = 'pending' AND unpaid_cancelled_at IS NULL
+               AND status IN ('new', 'cancelled')"
+        );
+        $stmt->execute([$order['id']]);
+        if ($stmt->rowCount() === 0) {
+            $pdo->commit();
+            return false;
+        }
+        if (($order['type'] ?? '') === 'physical') {
+            unpaid_order_adjust_stock($pdo, $order, +1);
+        }
+        $pdo->commit();
+        return true;
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        throw $e;
+    }
+}
+
+/**
+ * A payment that lands after the order was auto-cancelled (e.g. the shopper
+ * opened the bank page just before the 24h mark) is still real money: take the
+ * items back out of stock and clear the auto-cancel marker. Call right before
+ * marking the order paid.
+ */
+function unpaid_order_reinstate_for_late_payment(PDO $pdo, array $order): void
+{
+    if (empty($order['unpaid_cancelled_at'])) return;
+
+    $stmt = $pdo->prepare('UPDATE orders SET unpaid_cancelled_at = NULL WHERE id = ? AND unpaid_cancelled_at IS NOT NULL');
+    $stmt->execute([$order['id']]);
+    if ($stmt->rowCount() === 0) return;
+
+    if (($order['type'] ?? '') === 'physical') {
+        unpaid_order_adjust_stock($pdo, $order, -1);
+    }
+    error_log("unpaid-orders: order {$order['order_number']} was paid after being auto-cancelled — stock taken back out, please check it");
+}
+
+/**
+ * Orders the cron would act on right now.
+ *
+ * @return array{to_email: list<array>, to_cancel: list<array>}
+ */
+function unpaid_orders_due(PDO $pdo): array
+{
+    $types   = "'" . implode("','", UNPAID_ORDER_TYPES) . "'";
+    $methods = "'" . implode("','", array_keys(UNPAID_AFTER_MINUTES)) . "'";
+    $base    = "payment_status = 'pending' AND type IN ($types) AND payment_method IN ($methods)"
+             . " AND unpaid_cancelled_at IS NULL AND status IN ('new', 'cancelled')"
+             . ' AND created_at > NOW() - INTERVAL ' . UNPAID_CRON_LOOKBACK_MINUTES . ' MINUTE';
+
+    $by_age = [];
+    foreach (UNPAID_AFTER_MINUTES as $method => $minutes) {
+        $by_age[] = sprintf("(payment_method = '%s' AND created_at <= NOW() - INTERVAL %d MINUTE)", $method, $minutes);
+    }
+
+    // Overdue and not yet emailed (and not yet due for cancelling).
+    $to_email = $pdo->query(
+        "SELECT * FROM orders WHERE $base AND payment_failed_email_at IS NULL"
+        . ' AND created_at > NOW() - INTERVAL ' . UNPAID_CANCEL_AFTER_MINUTES . ' MINUTE'
+        . ' AND (' . implode(' OR ', $by_age) . ') ORDER BY created_at'
+    )->fetchAll();
+
+    // Unpaid for 24h → cancel and put the items back in stock.
+    $to_cancel = $pdo->query(
+        "SELECT * FROM orders WHERE $base"
+        . ' AND created_at <= NOW() - INTERVAL ' . UNPAID_CANCEL_AFTER_MINUTES . ' MINUTE ORDER BY created_at'
+    )->fetchAll();
+
+    return ['to_email' => $to_email, 'to_cancel' => $to_cancel];
+}
+
+/**
+ * Cron job: email shoppers whose online payment is overdue, then cancel and
+ * restock orders unpaid for 24h.
+ *
+ * @param callable|null $mailer  see send_payment_failed_email()
+ * @param callable|null $refresh fn(PDO, array $order): void — asks the bank for the
+ *                               latest status before we act (a lost callback may
+ *                               mean the shopper actually paid). Errors are logged.
+ * @return array{emailed:int, cancelled:int}
+ */
+function run_unpaid_orders_job(PDO $pdo, ?callable $mailer = null, ?callable $refresh = null): array
+{
+    $reload = $pdo->prepare('SELECT * FROM orders WHERE id = ?');
+    $still_pending = function (array $order) use ($pdo, $refresh, $reload): ?array {
+        if (!$refresh) return $order;
+        try {
+            $refresh($pdo, $order);
+        } catch (Throwable $e) {
+            error_log("unpaid-orders: status refresh failed for {$order['order_number']}: " . $e->getMessage());
+        }
+        $reload->execute([$order['id']]);
+        $fresh = $reload->fetch();
+        return ($fresh && $fresh['payment_status'] === 'pending') ? $fresh : null;
+    };
+
+    $due    = unpaid_orders_due($pdo);
+    $result = ['emailed' => 0, 'cancelled' => 0];
+
+    foreach ($due['to_email'] as $order) {
+        if (($order = $still_pending($order)) && send_payment_failed_email($pdo, $order, $mailer)) {
+            $result['emailed']++;
+        }
+    }
+    foreach ($due['to_cancel'] as $order) {
+        if (($order = $still_pending($order)) && cancel_unpaid_order($pdo, $order)) {
+            $result['cancelled']++;
+        }
+    }
+    return $result;
+}

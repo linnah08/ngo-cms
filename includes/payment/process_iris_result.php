@@ -36,6 +36,8 @@ function process_iris_result(PDO $pdo, array $order, array $status): void
             return;
         }
 
+        unpaid_order_reinstate_for_late_payment($pdo, $order);
+
         // Conditional update + rowCount guard => paid emails fire exactly once,
         // even under concurrent/duplicate callbacks.
         $stmt = $pdo->prepare(
@@ -54,6 +56,7 @@ function process_iris_result(PDO $pdo, array $order, array $status): void
             "UPDATE orders SET status = 'cancelled', updated_at = NOW()
              WHERE id = ? AND payment_status = 'pending'"
         )->execute([$order['id']]);
+        send_payment_failed_email($pdo, $order);
     }
     // WAITING (or anything else) → leave the order pending.
 }

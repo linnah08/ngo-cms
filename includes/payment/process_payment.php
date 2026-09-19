@@ -6,6 +6,7 @@
  * Called from api/payment-return.php (browser redirect) and
  * api/payment-callback.php (server-to-server).
  */
+require_once __DIR__ . '/unpaid_orders.php';
 
 /**
  * Send the "payment received" emails for a now-paid order.
@@ -70,6 +71,7 @@ function process_dsk_result(PDO $pdo, array $order, string $dskOrderId, array $s
     if ($orderStatus === 2 || $orderStatus === 1) {
         // Paid (deposited or pre-auth approved)
         if ($order['payment_status'] !== 'paid') {
+            unpaid_order_reinstate_for_late_payment($pdo, $order);
             $pdo->prepare("UPDATE orders SET payment_status = 'paid', status = 'confirmed', updated_at = NOW() WHERE id = ?")
                 ->execute([$order['id']]);
             notify_order_paid($order);
@@ -78,5 +80,6 @@ function process_dsk_result(PDO $pdo, array $order, string $dskOrderId, array $s
         // Declined
         $pdo->prepare("UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = ? AND payment_status = 'pending'")
             ->execute([$order['id']]);
+        send_payment_failed_email($pdo, $order);
     }
 }

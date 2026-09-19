@@ -1,6 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/unpaid_orders.php';
 $page_title_admin = 'Поръчки';
 $active_nav       = 'orders';
 
@@ -44,12 +45,14 @@ if ($filter_type !== 'all') {
     $where[]  = 'type = ?';
     $params[] = $filter_type;
 }
-if ($filter_status !== 'all') {
+if ($filter_status === 'unpaid') {
+    $where[] = unpaid_orders_sql_condition();
+} elseif ($filter_status !== 'all') {
     $where[]  = 'status = ?';
     $params[] = $filter_status;
 }
 
-$sql    = 'SELECT * FROM orders WHERE ' . implode(' AND ', $where) . ' ORDER BY created_at DESC LIMIT 200';
+$sql    = 'SELECT *, TIMESTAMPDIFF(MINUTE, created_at, NOW()) AS age_minutes FROM orders WHERE ' . implode(' AND ', $where) . ' ORDER BY created_at DESC LIMIT 200';
 $stmt   = $pdo->prepare($sql);
 $stmt->execute($params);
 $orders = $stmt->fetchAll();
@@ -87,7 +90,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <?php endforeach; ?>
   <span style="color:var(--border);padding:.35rem 0;">|</span>
   <?php
-  $status_filters = ['all'=>'Всички статуси','new'=>'Нови','confirmed'=>'Потвърдени','shipped'=>'Изпратени','delivered'=>'Доставени','cancelled'=>'Отменени'];
+  $status_filters = ['all'=>'Всички статуси','new'=>'Нови','confirmed'=>'Потвърдени','shipped'=>'Изпратени','delivered'=>'Доставени','cancelled'=>'Отменени','unpaid'=>'Неплатени'];
   foreach ($status_filters as $val => $label): ?>
     <a href="?type=<?= h($filter_type) ?>&status=<?= $val ?>"
        style="padding:.35rem .9rem;border-radius:20px;font-size:.85rem;text-decoration:none;
@@ -169,14 +172,22 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
           <td style="cursor:pointer;" onclick="location='/admin/order-view.php?id=<?= (int)$o['id'] ?>'">
             <?php [$slabel, $sclass] = $status_labels[$o['status']] ?? [$o['status'], 'badge--draft']; ?>
             <span class="badge <?= $sclass ?>"><?= h($slabel) ?></span>
-            <?php if ($o['type'] === 'donation'): ?>
+            <?php if (order_is_unpaid($o, (int)$o['age_minutes'])): ?>
+              <br><span class="badge" style="margin-top:2px;background:#fdecea;color:#b42318;border:1px solid #f5c2c0;font-weight:600;"
+                        title="Клиентът не е платил<?= $o['unpaid_cancelled_at'] ? ' — отменена автоматично след 24 ч., продуктите са върнати в наличност' : '' ?>">
+                Неплатена
+              </span>
+            <?php elseif ($o['type'] === 'donation' || in_array($o['payment_method'], ['card', 'iris'], true)): ?>
               <br><span class="badge <?= $o['payment_status'] === 'paid' ? 'badge--published' : 'badge--draft' ?>" style="margin-top:2px;">
-                <?= $o['payment_status'] === 'paid' ? 'Платено' : 'Чакащо' ?>
+                <?= $o['payment_status'] === 'paid' ? 'Платено' : 'Чака плащане' ?>
               </span>
             <?php endif; ?>
           </td>
           <td style="font-weight:600;cursor:pointer;" onclick="location='/admin/order-view.php?id=<?= (int)$o['id'] ?>'">
             <?= format_eur((float)$o['total_eur']) ?>
+            <?php if ($o['type'] !== 'ticket' && $o['payment_method']): ?>
+              <small style="display:block;font-weight:400;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= h(payment_method_label($o['payment_method'])) ?></small>
+            <?php endif; ?>
           </td>
         </tr>
         <?php endforeach; ?>

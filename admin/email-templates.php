@@ -39,8 +39,16 @@ $templates = [
         'label' => 'Отменена поръчка (с възстановяване)',
         'vars'  => ['{{customer_name}}', '{{order_number}}'],
     ],
+    'order-payment-failed-customer' => [
+        'label' => 'Неуспешно плащане на поръчка',
+        'vars'  => ['{{customer_name}}', '{{order_number}}'],
+    ],
+    'donation-payment-failed-customer' => [
+        'label' => 'Неуспешно плащане на дарение',
+        'vars'  => ['{{customer_name}}', '{{amount_eur}}'],
+    ],
     'credit-note-customer' => [
-        'label' => 'Кредитен документ (отменена поръчка)',
+        'label' =>'Кредитен документ (отменена поръчка)',
         'vars'  => ['{{customer_name}}', '{{order_number}}', '{{doc_number}}'],
     ],
     'error-alert' => [

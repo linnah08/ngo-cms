@@ -8,6 +8,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DocumentGenerator.
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/TicketGenerator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_shipping.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_view.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/unpaid_orders.php';
 
 admin_require_shop();
 
@@ -475,6 +476,10 @@ if ($can_sign) {
     $signer_has_sig = (bool) $sig_check->fetchColumn();
 }
 
+$_age_stmt = $pdo->prepare('SELECT TIMESTAMPDIFF(MINUTE, created_at, NOW()) FROM orders WHERE id = ?');
+$_age_stmt->execute([$id]);
+$is_unpaid = order_is_unpaid($order, (int)$_age_stmt->fetchColumn());
+
 $page_title_admin = 'Поръчка #' . $order['order_number'];
 $active_nav       = 'orders';
 
@@ -492,6 +497,18 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 <?php foreach ($errors as $e): ?>
   <div class="admin-alert admin-alert--error" style="margin-bottom:1rem;"><?= h($e) ?></div>
 <?php endforeach; ?>
+
+<?php if ($is_unpaid): ?>
+  <div style="background:#fdecea;border:1px solid #f5c2c0;color:#b42318;border-radius:8px;padding:1rem 1.25rem;margin-bottom:1.5rem;line-height:1.6;">
+    <strong style="font-size:1.05rem;">Неплатена поръчка</strong><br>
+    Клиентът избра <strong><?= h(payment_method_label($order['payment_method'])) ?></strong>, но плащането не е получено.
+    <?php if ($order['unpaid_cancelled_at']): ?>
+      Поръчката е отменена автоматично на <?= h(substr($order['unpaid_cancelled_at'], 0, 16)) ?><?= $order['type'] === 'physical' ? ' и продуктите са върнати в наличност' : '' ?>. Не я изпращайте.
+    <?php else: ?>
+      Не изпращайте, докато плащането не пристигне. Ако остане неплатена 24 часа след създаването, ще бъде отменена автоматично<?= $order['type'] === 'physical' ? ' и продуктите ще се върнат в наличност' : '' ?>.
+    <?php endif; ?>
+  </div>
+<?php endif; ?>
 
 <div style="display:grid;grid-template-columns:1fr 340px;gap:2rem;align-items:start;">
 
@@ -638,13 +655,51 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <?php elseif ($is_ticket): ?>
           Дигитален билет (по имейл)
         <?php else: ?>
-          <?php
-            $pm_labels = ['card' => 'Онлайн с карта', 'bank_transfer' => 'Банков превод', 'cod' => 'Наложен платеж', 'iris' => 'Банков превод (IRIS)'];
-            echo h($pm_labels[$order['payment_method'] ?? ''] ?? ucfirst($order['payment_method'] ?? '—'));
-          ?>
+          Без доставка
         <?php endif; ?>
       </div>
     </div>
+
+    <!-- Payment -->
+    <?php if (!$is_ticket): ?>
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.5rem;">
+      <strong style="display:block;margin-bottom:.75rem;font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);">Плащане</strong>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:.35rem 1rem;font-size:.9rem;">
+        <span style="color:var(--text-muted);">Начин:</span>
+        <strong><?= h(payment_method_label($order['payment_method'])) ?></strong>
+
+        <span style="color:var(--text-muted);">Статус:</span>
+        <span>
+          <?php if ($order['payment_status'] === 'paid'): ?>
+            <span style="color:#1a7f37;font-weight:600;">Платено</span>
+          <?php elseif ($order['payment_status'] === 'refunded'): ?>
+            Върнато
+          <?php elseif ($is_unpaid): ?>
+            <span style="color:#b42318;font-weight:600;">Неплатена</span>
+          <?php else: ?>
+            Чака плащане
+          <?php endif; ?>
+        </span>
+
+        <?php if (in_array($order['payment_method'], ['card', 'iris'], true)): ?>
+        <span style="color:var(--text-muted);">Стигна до банката:</span>
+        <span>
+          <?php $_bank_ref = $order['payment_method'] === 'iris' ? $order['iris_payment_hash'] : $order['dsk_order_id']; ?>
+          <?php if ($_bank_ref): ?>
+            Да <small style="color:var(--text-muted);">(номер при банката: <?= h($_bank_ref) ?>)</small>
+          <?php else: ?>
+            Не — сайтът не успя да отвори страницата на банката
+          <?php endif; ?>
+        </span>
+        <?php endif; ?>
+
+        <?php if ($order['payment_failed_email_at']): ?>
+        <span style="color:var(--text-muted);">Имейл до клиента:</span>
+        <span>Изпратен на <?= h(substr($order['payment_failed_email_at'], 0, 16)) ?>, че плащането не е минало</span>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php endif; ?>
 
     <?php if ($is_b2b && $invoice_data): ?>
     <div style="background:var(--teal-light);border:1px solid var(--teal);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.5rem;">
@@ -1085,7 +1140,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <div style="margin-top:1.5rem;font-size:.8rem;color:var(--text-muted);line-height:1.8;">
       Създадена: <?= h(substr($order['created_at'], 0, 16)) ?><br>
       Обновена: <?= h(substr($order['updated_at'], 0, 16)) ?><br>
-      Плащане: <?= h($order['payment_method']) ?> — <?= h($order['payment_status']) ?>
+      Плащане: <?= h(payment_method_label($order['payment_method'])) ?> — <?= h($order['payment_status']) ?>
     </div>
 
     <!-- Delete -->

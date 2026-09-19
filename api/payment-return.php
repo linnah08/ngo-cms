@@ -40,6 +40,12 @@ if (isset($_GET['retry'])) {
         header('Location: ' . $confirm_url);
         exit;
     }
+    // Auto-cancelled after 24h unpaid: items are back in stock, so the order
+    // can't be paid any more — the shopper needs to order again.
+    if (!empty($order['unpaid_cancelled_at'])) {
+        header('Location: ' . $failed_url . '&expired=1');
+        exit;
+    }
     try {
         $dsk        = new DSKBankPayment();
         $ref        = $order_number . '_' . time();
