@@ -192,7 +192,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
                         title="Клиентът не е платил<?= $o['unpaid_cancelled_at'] ? ' — отменена автоматично след 24 ч., продуктите са върнати в наличност' : '' ?>">
                 Неплатена
               </span>
-            <?php elseif ($o['type'] === 'donation' || in_array($o['payment_method'], ['card', 'iris'], true)): ?>
+            <?php elseif ($o['type'] === 'donation' || isset(UNPAID_AFTER_MINUTES[$o['payment_method'] ?? ''])): ?>
               <br><span class="badge <?= $o['payment_status'] === 'paid' ? 'badge--published' : 'badge--draft' ?>" style="margin-top:2px;">
                 <?= $o['payment_status'] === 'paid' ? 'Платено' : 'Чака плащане' ?>
               </span>
