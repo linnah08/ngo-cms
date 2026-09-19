@@ -1,5 +1,5 @@
 <?php
-// Variables: $order (array from orders table), $tpl (rendered subject/intro/outro), $retry_url (string)
+// Variables: $order (array from orders table), $tpl (rendered subject/intro/outro)
 $_lang = ($order['lang'] ?? 'bg') === 'en' ? 'en' : 'bg';
 $_esc  = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 
@@ -19,12 +19,7 @@ echo $tpl['intro'];
       : ($_lang === 'en' ? 'Card' : 'Карта') ?>
 </div>
 
-<p style="text-align:center;margin:28px 0;">
-  <a href="<?= $_esc($retry_url) ?>"
-     style="display:inline-block;background:#0387A5;color:#ffffff;text-decoration:none;font-weight:bold;padding:14px 32px;border-radius:6px;font-size:16px;">
-    <?= $_lang === 'en' ? 'Try again' : 'Опитай отново' ?>
-  </a>
-</p>
+<?= payment_retry_button_html($order) ?>
 
 <?php echo $tpl['outro']; ?>
 

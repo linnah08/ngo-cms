@@ -153,6 +153,31 @@ final class UnpaidOrdersTest extends TestCase
             payment_retry_url(['payment_method' => 'iris', 'order_number' => 'OM-20260919-B60E']));
     }
 
+    public function testRetryIsOfferedOnlyWhileTheOrderCanStillBePaid(): void
+    {
+        $o = ['type' => 'physical', 'status' => 'new', 'payment_method' => 'card', 'payment_status' => 'pending'];
+        $this->assertTrue(order_can_retry_payment($o));
+        $this->assertTrue(order_can_retry_payment(['type' => 'donation', 'payment_method' => 'iris'] + $o));
+        $this->assertFalse(order_can_retry_payment(['payment_status' => 'paid'] + $o));
+        $this->assertFalse(order_can_retry_payment(['payment_method' => 'cod'] + $o));
+        $this->assertFalse(order_can_retry_payment(['stock_returned_at' => '2026-09-19 10:00:00'] + $o));
+        $this->assertFalse(order_can_retry_payment(['unpaid_cancelled_at' => '2026-09-19 10:00:00'] + $o));
+        $this->assertFalse(order_can_retry_payment(['type' => 'ticket'] + $o));
+    }
+
+    public function testRetryButtonIsInTheOrdersLanguage(): void
+    {
+        $o = ['order_number' => 'OM-20260919-B60E', 'payment_method' => 'card'];
+        $bg = payment_retry_button_html($o + ['lang' => 'bg']);
+        $en = payment_retry_button_html($o + ['lang' => 'en']);
+
+        $this->assertStringContainsString('Опитай отново', $bg);
+        $this->assertStringContainsString('Try again', $en);
+        $this->assertStringContainsString('href="' . SITE_URL . '/api/payment-return.php?retry=1&amp;order=OM-20260919-B60E"', $bg);
+        $this->assertSame('donation-payment-failed-customer', payment_failed_template_key(['type' => 'donation']));
+        $this->assertSame('order-payment-failed-customer', payment_failed_template_key(['type' => 'physical']));
+    }
+
     public function testPaymentMethodLabelsAreReadable(): void
     {
         $this->assertSame('Карта (DSK Банк)', payment_method_label('card'));

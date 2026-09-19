@@ -86,6 +86,32 @@ function payment_retry_url(array $order): string
     return SITE_URL . $endpoint . '?retry=1&order=' . urlencode((string)$order['order_number']);
 }
 
+/** True while the shopper can still pay this order via payment_retry_url(). */
+function order_can_retry_payment(array $order): bool
+{
+    return ($order['payment_status'] ?? '') === 'pending'
+        && in_array($order['type'] ?? '', UNPAID_ORDER_TYPES, true)
+        && isset(UNPAID_AFTER_MINUTES[$order['payment_method'] ?? ''])
+        && empty($order['unpaid_cancelled_at'])
+        && empty($order['stock_returned_at']);
+}
+
+/** The "Опитай отново" / "Try again" email button (inline styles — email clients). */
+function payment_retry_button_html(array $order): string
+{
+    $label = ($order['lang'] ?? 'bg') === 'en' ? 'Try again' : 'Опитай отново';
+    return '<p style="text-align:center;margin:28px 0;">'
+         . '<a href="' . htmlspecialchars(payment_retry_url($order), ENT_QUOTES, 'UTF-8') . '"'
+         . ' style="display:inline-block;background:#0387A5;color:#ffffff;text-decoration:none;font-weight:bold;padding:14px 32px;border-radius:6px;font-size:16px;">'
+         . $label . '</a></p>';
+}
+
+/** Email template key for the payment-failed email of this order (shop order or donation). */
+function payment_failed_template_key(array $order): string
+{
+    return ($order['type'] ?? '') === 'donation' ? 'donation-payment-failed-customer' : 'order-payment-failed-customer';
+}
+
 /**
  * Email the shopper that the payment didn't go through — at most once per order.
  *
@@ -110,17 +136,13 @@ function send_payment_failed_email(PDO $pdo, array $order, ?callable $mailer = n
     if ($claim->rowCount() === 0) return false;
 
     $lang = ($order['lang'] ?? 'bg') === 'en' ? 'en' : 'bg';
-    $key  = $order['type'] === 'donation' ? 'donation-payment-failed-customer' : 'order-payment-failed-customer';
+    $key  = payment_failed_template_key($order);
     $tpl  = email_tpl_get($key, $lang, [
         'customer_name' => $order['customer_name'],
         'order_number'  => $order['order_number'],
         'amount_eur'    => number_format((float)$order['total_eur'], 2, '.', ''),
     ]);
-    $html = render_email('payment-failed-customer', [
-        'order'     => $order,
-        'tpl'       => $tpl,
-        'retry_url' => payment_retry_url($order),
-    ]);
+    $html = render_email('payment-failed-customer', ['order' => $order, 'tpl' => $tpl]);
 
     $mailer ??= 'send_mail';
     $sent = false;

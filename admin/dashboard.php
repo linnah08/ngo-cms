@@ -86,6 +86,8 @@ if ($can_shop) {
 // ── Physical orders awaiting shipping (new + confirmed, must have delivery_type) ──
 // delivery_type is always set at checkout for real physical orders; filtering it
 // out also drops any orders that were accidentally stored with type='physical'.
+// Online payments (card / IRIS) only count once paid — an unpaid order must not
+// be shipped; it shows as "Неплатена" in Поръчки instead.
 $shipping_items = [];
 if ($can_shop) {
     $stmt = $pdo->query(
@@ -95,6 +97,7 @@ if ($can_shop) {
          WHERE type = 'physical'
            AND status IN ('new', 'confirmed')
            AND delivery_type IN ('office','apt','address','locker')
+           AND (payment_status = 'paid' OR COALESCE(payment_method, '') NOT IN ('card', 'iris'))
          ORDER BY created_at ASC"
     );
     foreach ($stmt->fetchAll() as $o) {
