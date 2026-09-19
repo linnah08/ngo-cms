@@ -59,7 +59,8 @@ function product_reviews_fetch_approved(PDO $pdo, int $product_id): array
 }
 
 /**
- * True if a non-cancelled order exists for this email containing this product.
+ * True if a paid, non-cancelled order exists for this email containing this
+ * product — an order that was never paid is not a purchase.
  * orders.items is a JSON array with no cross-engine-portable way to search its
  * contents in SQL (MariaDB 10.5 has no JSON_TABLE; JSON_CONTAINS wildcard paths
  * aren't supported the way this needs) — decode in PHP instead. Order counts
@@ -78,7 +79,7 @@ function product_review_is_verified_purchase(PDO $pdo, string $email, int $produ
     if ($email === '' || $product_id <= 0) return false;
 
     $stmt = $pdo->prepare(
-        "SELECT items FROM orders WHERE customer_email = ? AND status != 'cancelled'"
+        "SELECT items FROM orders WHERE customer_email = ? AND payment_status = 'paid' AND status != 'cancelled'"
     );
     $stmt->execute([$email]);
 

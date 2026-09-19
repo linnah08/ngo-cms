@@ -107,14 +107,14 @@ final class ProductReviewsTest extends TestCase
         return $pid;
     }
 
-    private function insertOrder(string $email, int $product_id, string $status = 'new'): int
+    private function insertOrder(string $email, int $product_id, string $status = 'new', string $payment_status = 'paid'): int
     {
         $items = json_encode([['product_id' => $product_id, 'name_bg' => 'Тест', 'quantity' => 1, 'price_eur' => 10]]);
         self::$pdo->prepare(
             "INSERT INTO orders
-               (order_number,type,status,customer_name,customer_email,customer_phone,items,subtotal_eur,total_eur)
-             VALUES (?,?,?,?,?,?,?,?,?)"
-        )->execute(['T' . uniqid(), 'physical', $status, 'Buyer', $email, '+359888000000', $items, 10.00, 10.00]);
+               (order_number,type,status,customer_name,customer_email,customer_phone,items,subtotal_eur,total_eur,payment_status)
+             VALUES (?,?,?,?,?,?,?,?,?,?)"
+        )->execute(['T' . uniqid(), 'physical', $status, 'Buyer', $email, '+359888000000', $items, 10.00, 10.00, $payment_status]);
         $id = (int)self::$pdo->lastInsertId();
         self::$order_ids[] = $id;
         return $id;
@@ -175,6 +175,22 @@ final class ProductReviewsTest extends TestCase
         $this->insertOrder($email, $pid, 'new');
 
         $this->assertTrue(product_review_is_verified_purchase(self::$pdo, $email, $pid));
+    }
+
+    public function testVerifiedPurchaseFalseForUnpaidOrder(): void
+    {
+        if (!test_db_available()) {
+            $this->markTestSkipped('No DB configured.');
+        }
+        $this->ensurePdo();
+
+        // Card/IRIS order that was never paid (and one shipped but never paid) — not a purchase.
+        $pid   = $this->insertTestProduct();
+        $email = 'unpaid-buyer-' . uniqid() . '@example.com';
+        $this->insertOrder($email, $pid, 'new', 'pending');
+        $this->insertOrder($email, $pid, 'delivered', 'pending');
+
+        $this->assertFalse(product_review_is_verified_purchase(self::$pdo, $email, $pid));
     }
 
     public function testVerifiedPurchaseFalseForCancelledOrder(): void
