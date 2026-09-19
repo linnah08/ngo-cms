@@ -405,6 +405,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'delete') {
+        // Give back items the order still holds before its row (and stock record) is gone.
+        if (order_stock_on_delete($pdo, $order)) {
+            flash_set('success', 'Поръчка ' . $order['order_number'] . ' е изтрита. Продуктите са върнати в наличност.');
+        }
         $pdo->prepare('DELETE FROM orders WHERE id = ?')->execute([$id]);
         header('Location: /admin/orders.php?deleted=1');
         exit;

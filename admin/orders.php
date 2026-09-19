@@ -20,7 +20,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
 
         if ($action === 'delete') {
+            // Give back items the orders still hold before their rows are gone.
+            $sel = $pdo->prepare('SELECT * FROM orders WHERE id = ?');
+            $restocked = [];
+            foreach ($ids as $oid) {
+                $sel->execute([$oid]);
+                if (($o = $sel->fetch()) && order_stock_on_delete($pdo, $o)) $restocked[] = $o['order_number'];
+            }
             $pdo->prepare("DELETE FROM orders WHERE id IN ($placeholders)")->execute($ids);
+            if ($restocked) {
+                flash_set('success', 'Продуктите от изтритите поръчки ' . implode(', ', $restocked) . ' са върнати в наличност.');
+            }
         } elseif (in_array($action, ['new','confirmed','shipped','delivered','cancelled'], true)) {
             // One by one so each order's stock moves with its status (cancel → back in stock,
             // reopen → taken out again). Orders that can't be reopened for lack of stock are skipped.

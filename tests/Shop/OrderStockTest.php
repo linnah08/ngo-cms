@@ -61,7 +61,7 @@ final class OrderStockTest extends TestCase
         self::$pdo->prepare(
             "INSERT INTO orders (order_number,type,status,customer_name,customer_email,items,subtotal_eur,shipping_eur,total_eur,payment_method,payment_status)
              VALUES (?,?,?,?,?,?,?,?,?,?,?)"
-        )->execute([generate_order_number(), $type, $status, 'Тест', 't@example.com', json_encode($items), 10, 0, 10, 'card', 'paid']);
+        )->execute(['T' . substr(uniqid(), -13), $type, $status, 'Тест', 't@example.com', json_encode($items), 10, 0, 10, 'card', 'paid']);
         $id = (int)self::$pdo->lastInsertId();
         self::$order_ids[] = $id;
         return $this->reload($id);
@@ -216,6 +216,65 @@ final class OrderStockTest extends TestCase
         $order = $this->insertOrder('cancelled', [['product_id' => $pid, 'quantity' => 1]]);
 
         $this->assertTrue($this->changeStatus($order, 'new')['ok']);
+        $this->assertSame(2, $this->stock('products', $pid));
+    }
+
+    // ── delete ────────────────────────────────────────────────────────────────
+
+    public function testDeletingAnOpenOrderPutsItemsBack(): void
+    {
+        $this->requireDb();
+        $pid   = $this->insertProduct(1);
+        $order = $this->insertOrder('confirmed', [['product_id' => $pid, 'quantity' => 2]]);
+
+        $this->assertTrue(order_stock_on_delete(self::$pdo, $order));
+        $this->assertSame(3, $this->stock('products', $pid));
+    }
+
+    public function testDeletingAlreadyRestockedOrderDoesNotAddTwice(): void
+    {
+        $this->requireDb();
+        $pid   = $this->insertProduct(1);
+        $order = $this->insertOrder('new', [['product_id' => $pid, 'quantity' => 2]]);
+        $this->changeStatus($order, 'cancelled');   // → 3
+
+        $this->assertFalse(order_stock_on_delete(self::$pdo, $this->reload((int)$order['id'])));
+        $this->assertSame(3, $this->stock('products', $pid));
+    }
+
+    public function testDeletingShippedOrderLeavesStockAlone(): void
+    {
+        $this->requireDb();
+        $pid   = $this->insertProduct(1);
+        $order = $this->insertOrder('shipped', [['product_id' => $pid, 'quantity' => 2]]);
+
+        $this->assertFalse(order_stock_on_delete(self::$pdo, $order));
+        $this->assertSame(1, $this->stock('products', $pid));
+    }
+
+    public function testDeletingDeclinedOnlineOrderPutsItemsBack(): void
+    {
+        $this->requireDb();
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/unpaid_orders.php';
+        // Declined at the bank: cancelled, still unpaid, waiting for the auto-cancel.
+        $pid   = $this->insertProduct(0);
+        $order = $this->insertOrder('cancelled', [['product_id' => $pid, 'quantity' => 1]]);
+        self::$pdo->prepare("UPDATE orders SET payment_status = 'pending' WHERE id = ?")->execute([$order['id']]);
+
+        $this->assertTrue(order_stock_on_delete(self::$pdo, $this->reload((int)$order['id'])));
+        $this->assertSame(1, $this->stock('products', $pid));
+    }
+
+    public function testDeletingOldCancelledOrderLeavesStockAlone(): void
+    {
+        $this->requireDb();
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/unpaid_orders.php';
+        // Cancelled long before stock was tracked — its stock was never held back.
+        $pid   = $this->insertProduct(2);
+        $order = $this->insertOrder('cancelled', [['product_id' => $pid, 'quantity' => 1]]);
+        self::$pdo->prepare("UPDATE orders SET payment_status = 'pending', created_at = NOW() - INTERVAL 30 DAY WHERE id = ?")->execute([$order['id']]);
+
+        $this->assertFalse(order_stock_on_delete(self::$pdo, $this->reload((int)$order['id'])));
         $this->assertSame(2, $this->stock('products', $pid));
     }
 

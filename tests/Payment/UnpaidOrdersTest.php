@@ -88,7 +88,7 @@ final class UnpaidOrdersTest extends TestCase
                                  subtotal_eur,shipping_eur,total_eur,payment_method,payment_status,created_at)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?, NOW() - INTERVAL ? MINUTE)"
         )->execute([
-            generate_order_number(), $d['type'], $d['status'], $d['lang'], 'Тест Клиент', $d['customer_email'],
+            'T' . substr(uniqid(), -13), $d['type'], $d['status'], $d['lang'], 'Тест Клиент', $d['customer_email'],
             $d['items'], 20.00, 0, 20.00, $d['payment_method'], $d['payment_status'], $age_minutes,
         ]);
         $id = (int)self::$pdo->lastInsertId();
@@ -296,6 +296,25 @@ final class UnpaidOrdersTest extends TestCase
         run_unpaid_orders_job(self::$pdo, $this->mailer());
 
         $this->assertCount(1, array_filter($this->sent, fn($m) => $m['to'] === $order['customer_email']));
+    }
+
+    public function testRunJobCountsEmailSentWhileCheckingTheBank(): void
+    {
+        $this->requireDb();
+        $order = $this->insertOrder(61, ['customer_email' => 'declined-' . uniqid() . '@example.com']);
+
+        // The bank reports a decline for this order, which sends the email right away
+        // (as process_dsk_result / process_iris_result do) before the job gets to it.
+        $refresh = function (PDO $pdo, array $o) use ($order): void {
+            if ((int)$o['id'] === (int)$order['id']) {
+                send_payment_failed_email($pdo, $o, $this->mailer());
+            }
+        };
+        $result = run_unpaid_orders_job(self::$pdo, $this->mailer(), $refresh);
+
+        $mine = array_filter($this->sent, fn($m) => $m['to'] === $order['customer_email']);
+        $this->assertCount(1, $mine, 'emailed exactly once');
+        $this->assertSame(count($this->sent), $result['emailed'], 'every email sent in the run is counted');
     }
 
     public function testRunJobSkipsOrdersTheBankSaysArePaid(): void

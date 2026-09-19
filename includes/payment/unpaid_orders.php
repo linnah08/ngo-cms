@@ -276,7 +276,9 @@ function run_unpaid_orders_job(PDO $pdo, ?callable $mailer = null, ?callable $re
     $result = ['emailed' => 0, 'cancelled' => 0];
 
     foreach ($due['to_email'] as $order) {
-        if (($order = $still_pending($order)) && send_payment_failed_email($pdo, $order, $mailer)) {
+        if (!$order = $still_pending($order)) continue;
+        // Asking the bank may already have sent it (a decline triggers the email) — count that too.
+        if (!empty($order['payment_failed_email_at']) || send_payment_failed_email($pdo, $order, $mailer)) {
             $result['emailed']++;
         }
     }
