@@ -346,9 +346,50 @@ final class MailerSmtpTest extends TestCase
 
     public function test_builder_from_falls_back_to_site_constants(): void
     {
-        $m = mail_build_smtp_mailer(self::cfg(['from_email' => '', 'from_name' => '']), 'a@example.com', 's', 'b');
+        // The username must be blanked too, not just from_email. The builder
+        // deliberately prefers the authenticated login address over SITE_EMAIL,
+        // and cfg()'s username is a valid address — so blanking from_email alone
+        // exercised the login-address branch, never this one. It only looked
+        // like a passing fallback test because SITE_EMAIL happens to equal that
+        // fixture username on some installs.
+        $m = mail_build_smtp_mailer(
+            self::cfg(['from_email' => '', 'from_name' => '', 'username' => '']),
+            'a@example.com',
+            's',
+            'b'
+        );
         $this->assertSame(SITE_EMAIL, $m->From);
         $this->assertSame(SITE_NAME_BG, $m->FromName);
+    }
+
+    public function test_builder_from_prefers_the_authenticated_login_address(): void
+    {
+        // Shared hosts reject mail whose From differs from the authenticated
+        // mailbox, so this preference is intentional — pin it. The address is
+        // deliberately unlike SITE_EMAIL so the assertion cannot pass by accident.
+        $login = 'postmaster@login.example';
+        $this->assertNotSame(SITE_EMAIL, $login);
+
+        $m = mail_build_smtp_mailer(
+            self::cfg(['from_email' => '', 'username' => $login]),
+            'a@example.com',
+            's',
+            'b'
+        );
+        $this->assertSame($login, $m->From);
+    }
+
+    public function test_builder_from_ignores_a_login_name_that_is_not_an_address(): void
+    {
+        // Plenty of hosts use a bare mailbox name as the SMTP login. That cannot
+        // be a From address, so SITE_EMAIL has to win.
+        $m = mail_build_smtp_mailer(
+            self::cfg(['from_email' => '', 'username' => 'mailbox17']),
+            'a@example.com',
+            's',
+            'b'
+        );
+        $this->assertSame(SITE_EMAIL, $m->From);
     }
 
     public function test_builder_reply_to_and_attachments(): void
