@@ -158,9 +158,25 @@ final class AdminUpdatesPageTest extends TestCase
         }
     }
 
-    /** Logs in via /admin/login.php and returns a cookie-jar path (caller must unlink). */
+    /**
+     * Logs in via /admin/login.php and returns a cookie-jar path (caller must
+     * unlink).
+     *
+     * The rate-limit row is cleared on every call, not just once in
+     * setUpBeforeClass(): this class logs in more times than /admin/login.php
+     * allows a single IP, and the symptom is a silent 302 on the next request
+     * rather than an obvious login failure.
+     */
     private function loginAs(string $email, string $password): string
     {
+        if (test_db_available()) {
+            try {
+                get_pdo()->exec("DELETE FROM rate_limits WHERE action = 'admin_login' AND ip = '127.0.0.1'");
+            } catch (\PDOException $e) {
+                // Table doesn't exist yet — nothing to clear.
+            }
+        }
+
         $jar = tempnam(sys_get_temp_dir(), 'om_updates_test_');
         $ch  = curl_init(self::$base . '/admin/login.php');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -302,5 +318,182 @@ final class AdminUpdatesPageTest extends TestCase
         @unlink($jar);
 
         $this->assertSame(400, $code, 'POST with a wrong CSRF token must be rejected');
+    }
+
+    // ── admin/update-apply-ajax.php + admin/update-progress-ajax.php ─────────
+    //
+    // Only the rejection paths are exercised here, on purpose. A happy-path
+    // test would have to send a VALID CSRF token to the apply endpoint, and
+    // this harness runs the built-in server against the real checked-out repo
+    // — so a passing token would start a genuine self-update and rewrite the
+    // working tree. The successful path is covered instead by
+    // tests/UpdaterTest.php, which drives updater_apply() against a throwaway
+    // root with the network, migrations and audit log all injected.
+
+    /**
+     * POSTs a raw body to $path and returns [httpCode, body]. Deliberately not
+     * shared with loginAs(): these requests need an exact body, not a form.
+     */
+    private function postRaw(string $path, string $body, ?string $jar = null, string $contentType = 'application/json'): array
+    {
+        $ch = curl_init(self::$base . $path);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: ' . $contentType]);
+        if ($jar !== null) {
+            curl_setopt($ch, CURLOPT_COOKIEFILE, $jar);
+        }
+        $out  = (string) curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        return [$code, $out];
+    }
+
+    private function getRaw(string $path, ?string $jar = null): array
+    {
+        $ch = curl_init(self::$base . $path);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+        if ($jar !== null) {
+            curl_setopt($ch, CURLOPT_COOKIEFILE, $jar);
+        }
+        $out  = (string) curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        return [$code, $out];
+    }
+
+    private function versionFileContents(): string
+    {
+        return (string) file_get_contents(self::$root . '/VERSION');
+    }
+
+    // ── Apply endpoint: access control ───────────────────────────────────────
+
+    public function testApplyEndpointRejectsUnauthenticated(): void
+    {
+        $this->requireServer();
+
+        [$code, $body] = $this->postRaw('/admin/update-apply-ajax.php', '{}');
+
+        $this->assertSame(302, $code, 'An anonymous POST must be bounced to login, never run an update');
+        $this->assertStringNotContainsString('"ok":true', $body);
+    }
+
+    public function testApplyEndpointRejectsAuthorRole(): void
+    {
+        $this->requireServer();
+
+        $jar = $this->loginAs(self::$authorEmail, self::$authorPassword);
+        [$code] = $this->postRaw('/admin/update-apply-ajax.php', '{}', $jar);
+        @unlink($jar);
+
+        $this->assertSame(403, $code, 'An author must not be able to rewrite the application code');
+    }
+
+    public function testApplyEndpointRejectsGet(): void
+    {
+        $this->requireServer();
+
+        $jar = $this->loginAs(self::$adminEmail, self::$adminPassword);
+        [$code] = $this->getRaw('/admin/update-apply-ajax.php', $jar);
+        @unlink($jar);
+
+        $this->assertSame(405, $code, 'An update must never be triggerable by a plain GET');
+    }
+
+    // ── Apply endpoint: CSRF ─────────────────────────────────────────────────
+
+    public function testApplyEndpointRejectsMissingCsrfAndAppliesNothing(): void
+    {
+        $this->requireServer();
+
+        $before = $this->versionFileContents();
+        $jar    = $this->loginAs(self::$adminEmail, self::$adminPassword);
+        $this->warmUpSession($jar);
+
+        [$code, $body] = $this->postRaw('/admin/update-apply-ajax.php', json_encode([]), $jar);
+        @unlink($jar);
+
+        $this->assertSame(400, $code, 'A body with no CSRF token must be rejected before any update logic runs');
+        $this->assertStringNotContainsString('"ok":true', $body);
+        $this->assertSame($before, $this->versionFileContents(), 'A rejected request must not have applied anything');
+    }
+
+    public function testApplyEndpointRejectsInvalidCsrfAndAppliesNothing(): void
+    {
+        $this->requireServer();
+
+        $before = $this->versionFileContents();
+        $jar    = $this->loginAs(self::$adminEmail, self::$adminPassword);
+        $this->warmUpSession($jar);
+
+        [$code, $body] = $this->postRaw(
+            '/admin/update-apply-ajax.php',
+            json_encode(['csrf_token' => 'not-the-real-token']),
+            $jar
+        );
+        @unlink($jar);
+
+        $this->assertSame(400, $code);
+        $this->assertStringNotContainsString('"ok":true', $body);
+        $this->assertSame($before, $this->versionFileContents());
+    }
+
+    public function testApplyEndpointRejectsNonJsonBody(): void
+    {
+        $this->requireServer();
+
+        $jar = $this->loginAs(self::$adminEmail, self::$adminPassword);
+        [$code] = $this->postRaw('/admin/update-apply-ajax.php', 'csrf_token=whatever', $jar, 'application/x-www-form-urlencoded');
+        @unlink($jar);
+
+        $this->assertSame(400, $code, 'A form-encoded body is not the contract — it must not fall through to CSRF-less apply');
+    }
+
+    // ── Progress endpoint ────────────────────────────────────────────────────
+
+    public function testProgressEndpointRejectsUnauthenticated(): void
+    {
+        $this->requireServer();
+
+        [$code] = $this->getRaw('/admin/update-progress-ajax.php');
+
+        $this->assertSame(302, $code, 'Update state must not be readable anonymously');
+    }
+
+    public function testProgressEndpointRejectsAuthorRole(): void
+    {
+        $this->requireServer();
+
+        $jar = $this->loginAs(self::$authorEmail, self::$authorPassword);
+        [$code] = $this->getRaw('/admin/update-progress-ajax.php', $jar);
+        @unlink($jar);
+
+        $this->assertSame(403, $code);
+    }
+
+    public function testProgressEndpointReportsIdleWhenNothingIsRunning(): void
+    {
+        $this->requireServer();
+        if (!self::$updaterExists) {
+            $this->markTestSkipped('includes/updater.php does not exist.');
+        }
+
+        $jar = $this->loginAs(self::$adminEmail, self::$adminPassword);
+        [$code, $body] = $this->getRaw('/admin/update-progress-ajax.php', $jar);
+        @unlink($jar);
+
+        $this->assertSame(200, $code);
+
+        $data = json_decode($body, true);
+        $this->assertIsArray($data, 'The progress endpoint must always answer with JSON: ' . $body);
+        $this->assertTrue($data['ok']);
+        $this->assertSame('idle', $data['phase'], 'No update is running during the test suite');
+        $this->assertFalse($data['maintenance'], 'The repo must not be left in maintenance mode');
     }
 }
