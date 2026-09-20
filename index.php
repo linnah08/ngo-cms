@@ -69,11 +69,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
   <div class="container">
     <?php if (!empty($home['section_impact']) || !empty($home['section_impact_en']) || admin_logged_in()): ?>
     <div class="section-header section-header--center" style="margin-bottom:1.5rem;">
-      <span class="section-label"
-            data-cms-field="section_impact" data-cms-section="home" data-cms-type="text"
-            data-cms-bg="<?= h($home['section_impact'] ?? '') ?>"
-            data-cms-en="<?= h($home['section_impact_en'] ?? '') ?>"
-      ><?= h($lang === 'bg' ? ($home['section_impact'] ?: t('home.impact.title')) : ($home['section_impact_en'] ?: t('home.impact.title'))) ?></span>
       <h2 data-cms-field="section_impact" data-cms-section="home" data-cms-type="text"
           data-cms-bg="<?= h($home['section_impact'] ?? '') ?>"
           data-cms-en="<?= h($home['section_impact_en'] ?? '') ?>"
@@ -171,11 +166,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 <section class="section">
   <div class="container">
     <div class="section-header">
-      <span class="section-label"
-            data-cms-field="section_centres" data-cms-section="home" data-cms-type="text"
-            data-cms-bg="<?= h($home['section_centres'] ?? '') ?>"
-            data-cms-en="<?= h($home['section_centres_en'] ?? '') ?>"
-      ><?= h($lang === 'bg' ? ($home['section_centres'] ?: t('home.centres.title')) : ($home['section_centres_en'] ?: t('home.centres.title'))) ?></span>
       <h2 data-cms-field="section_centres" data-cms-section="home" data-cms-type="text"
           data-cms-bg="<?= h($home['section_centres'] ?? '') ?>"
           data-cms-en="<?= h($home['section_centres_en'] ?? '') ?>"
@@ -240,11 +230,10 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
         </span>
       </div>
       <div class="mission-split__text">
-        <span class="section-label"
-              data-cms-field="section_mission" data-cms-section="home" data-cms-type="text"
-              data-cms-bg="<?= h($home['section_mission'] ?? '') ?>"
-              data-cms-en="<?= h($home['section_mission_en'] ?? '') ?>"
-        ><?= h($lang === 'bg' ? ($home['section_mission'] ?: t('home.mission.title')) : ($home['section_mission_en'] ?: t('home.mission.title'))) ?></span>
+        <h2 data-cms-field="section_mission" data-cms-section="home" data-cms-type="text"
+            data-cms-bg="<?= h($home['section_mission'] ?? '') ?>"
+            data-cms-en="<?= h($home['section_mission_en'] ?? '') ?>"
+        ><?= h($lang === 'bg' ? ($home['section_mission'] ?: t('home.mission.title')) : ($home['section_mission_en'] ?: t('home.mission.title'))) ?></h2>
         <p class="lead" style="margin-top:1.5rem;"
            data-cms-field="mission_text"
            data-cms-section="home"
@@ -270,11 +259,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
   </div>
   <?php else: ?>
   <div class="container container--narrow" style="text-align:center;">
-    <span class="section-label"
-          data-cms-field="section_mission" data-cms-section="home" data-cms-type="text"
-          data-cms-bg="<?= h($home['section_mission'] ?? '') ?>"
-          data-cms-en="<?= h($home['section_mission_en'] ?? '') ?>"
-    ><?= h($lang === 'bg' ? ($home['section_mission'] ?: t('home.mission.title')) : ($home['section_mission_en'] ?: t('home.mission.title'))) ?></span>
     <h2 data-cms-field="section_mission" data-cms-section="home" data-cms-type="text"
         data-cms-bg="<?= h($home['section_mission'] ?? '') ?>"
         data-cms-en="<?= h($home['section_mission_en'] ?? '') ?>"
@@ -309,11 +293,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
   <div class="container">
     <div class="section-header" style="display:flex;justify-content:space-between;align-items:flex-end;">
       <div>
-        <span class="section-label"
-              data-cms-field="section_news" data-cms-section="home" data-cms-type="text"
-              data-cms-bg="<?= h($home['section_news'] ?? '') ?>"
-              data-cms-en="<?= h($home['section_news_en'] ?? '') ?>"
-        ><?= h($lang === 'bg' ? ($home['section_news'] ?: t('home.news.title')) : ($home['section_news_en'] ?: t('home.news.title'))) ?></span>
         <h2 data-cms-field="section_news" data-cms-section="home" data-cms-type="text"
             data-cms-bg="<?= h($home['section_news'] ?? '') ?>"
             data-cms-en="<?= h($home['section_news_en'] ?? '') ?>"
@@ -367,11 +346,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 <section class="section section--grey">
   <div class="container">
     <div class="section-header section-header--center">
-      <span class="section-label"
-            data-cms-field="section_partners" data-cms-section="home" data-cms-type="text"
-            data-cms-bg="<?= h($home['section_partners'] ?? '') ?>"
-            data-cms-en="<?= h($home['section_partners_en'] ?? '') ?>"
-      ><?= h($lang === 'bg' ? ($home['section_partners'] ?: t('home.partners.title')) : ($home['section_partners_en'] ?: t('home.partners.title'))) ?></span>
       <h2 data-cms-field="section_partners" data-cms-section="home" data-cms-type="text"
           data-cms-bg="<?= h($home['section_partners'] ?? '') ?>"
           data-cms-en="<?= h($home['section_partners_en'] ?? '') ?>"

@@ -84,7 +84,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 <section class="section">
   <div class="container">
     <div class="section-header">
-      <span class="section-label"><?= h($home['section_centres_en'] ?: t('home.centres.title')) ?></span>
       <h2><?= h($home['section_centres_en'] ?: t('home.centres.title')) ?></h2>
     </div>
     <div class="grid grid--2">
@@ -110,7 +109,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 <!-- MISSION -->
 <section class="section section--grey">
   <div class="container container--narrow" style="text-align:center;">
-    <span class="section-label"><?= h($home['mission_title_en'] ?? t('home.mission.title')) ?></span>
     <h2><?= h($home['mission_title_en'] ?? t('home.mission.title')) ?></h2>
     <p class="lead" style="margin-top:1.5rem;">
       <?= h($home['mission_text_en'] ?? '') ?>
@@ -128,7 +126,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
   <div class="container">
     <div class="section-header" style="display:flex;justify-content:space-between;align-items:flex-end;">
       <div>
-        <span class="section-label"><?= h($home['section_news_en'] ?: t('home.news.title')) ?></span>
         <h2><?= h($home['section_news_en'] ?: t('home.news.title')) ?></h2>
       </div>
       <a href="/en/news/" class="btn btn--outline"><?= h($home['news_btn_all_en'] ?: t('home.news.all')) ?></a>
@@ -177,7 +174,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 <section class="section section--grey">
   <div class="container">
     <div class="section-header section-header--center">
-      <span class="section-label"><?= h($home['section_partners_en'] ?: t('home.partners.title')) ?></span>
       <h2><?= h($home['section_partners_en'] ?: t('home.partners.title')) ?></h2>
     </div>
     <div class="partners-grid">

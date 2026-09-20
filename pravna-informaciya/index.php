@@ -9,7 +9,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
 <section class="section section--grey" style="padding-bottom:2rem;">
   <div class="container">
-    <span class="section-label">Правна информация</span>
     <h1>Правна информация</h1>
   </div>
 </section>
