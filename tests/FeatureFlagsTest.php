@@ -51,7 +51,6 @@ final class FeatureFlagsTest extends TestCase
             ['admin/campaign-backers.php'],
             ['admin/pledge-view.php'],
             ['admin/ticket-checklist.php'],
-            ['admin/download-ticket.php'],
         ];
     }
 
@@ -85,7 +84,6 @@ final class FeatureFlagsTest extends TestCase
             ['admin/includes/admin-header.php'],
             ['admin/dashboard.php'],
             ['admin/pages.php'],
-            ['admin/order-view.php'],
         ];
     }
 
@@ -102,9 +100,11 @@ final class FeatureFlagsTest extends TestCase
     }
 
     /**
-     * The order/payment/document plumbing takes real card payments. It is
-     * deliberately NOT gated — switching the module off makes the surface
-     * unreachable, it does not unpick the code that settled past pledges.
+     * The order/payment/document plumbing takes real card payments, and the
+     * order and ticket views are how past pledges stay legible afterwards.
+     * Both are deliberately NOT gated — switching the module off makes the
+     * surface unreachable, it does not unpick the code that settled past
+     * pledges or hide the records they produced.
      */
     public static function ungatedPlumbing(): array
     {
@@ -114,6 +114,10 @@ final class FeatureFlagsTest extends TestCase
             ['includes/pledge_documents.php'],
             ['includes/order_view.php'],
             ['admin/orders.php'],
+            // Past tickets stay downloadable with the module off, so neither the
+            // endpoint nor the button that points at it may consult the flag.
+            ['admin/order-view.php'],
+            ['admin/download-ticket.php'],
         ];
     }
 

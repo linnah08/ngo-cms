@@ -8,14 +8,6 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 
 admin_require_shop();
 
-// Campaign module switched off for this install — the page does not exist.
-// Deliberately after the auth call: an anonymous request still gets the normal
-// login redirect, so this never becomes an oracle for which modules a site runs.
-if (!feature_enabled('campaign')) {
-    require $_SERVER['DOCUMENT_ROOT'] . '/errors/404.php';
-    exit;
-}
-
 $pledge_number = trim($_GET['pledge'] ?? '');
 $n             = max(1, (int)($_GET['n'] ?? 1));
 

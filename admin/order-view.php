@@ -958,15 +958,11 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
             $dl_url  = '/admin/download-ticket.php?pledge=' . urlencode($order['order_number']) . '&n=' . $n;
           ?>
           <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;">
-            <?php /* The order itself stays viewable with the module off, but
-                     download-ticket.php is gated, so the button would 404. */ ?>
-            <?php if ($fexists && feature_enabled('campaign')): ?>
+            <?php if ($fexists): ?>
               <a href="<?= h($dl_url) ?>" target="_blank"
                  class="btn btn--outline" style="font-size:.8rem;padding:.3rem .75rem;">
                 📄 <?= h($label) ?>
               </a>
-            <?php elseif ($fexists): ?>
-              <span style="font-size:.8rem;color:var(--text-muted);"><?= h($label) ?> — кампанията е изключена</span>
             <?php else: ?>
               <span style="font-size:.8rem;color:var(--text-muted);"><?= h($label) ?> — файлът липсва</span>
             <?php endif; ?>
