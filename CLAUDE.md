@@ -93,10 +93,19 @@ For large features touching DB, logic, UI, and tests: plan as parallel subagent 
 
 ## Database querying — local vs prod MCP
 
-Two read-only MySQL MCP servers are configured in `.mcp.json`: `mysql` (local snapshot) and `mysql-prod` (live production, reached over an SSH tunnel — `scripts/prod-db-tunnel.sh`, auto-opened by the SessionStart hook). Choose deliberately:
+**Operator-only — a fresh clone has none of this.** `.mcp.json` and `scripts/` are both
+gitignored, so the two MCP servers and the helper scripts named below exist only on the
+maintainer's machine. If they are missing, you are on a clone without that setup: skip this
+section and use whatever local database the checkout is already pointed at. Do not try to
+recreate `.mcp.json`, and do not go looking for `scripts/`.
+
+Two read-only MySQL MCP servers are configured in `.mcp.json`: `mysql` (local snapshot) and
+`mysql-prod` (live production, reached over an SSH tunnel). Bring the tunnel up yourself with
+`scripts/prod-db-tunnel.sh up` before querying `mysql-prod` — nothing opens it automatically.
+Choose deliberately:
 
 - **Live troubleshooting** — diagnosing a specific record/order that is wrong in production *right now* → use `mysql-prod`. Keep queries narrow and targeted (filter by id/email/date). Never run table scans or aggregations against it; it is the live DB real users are on.
-- **Feature data analysis** — row counts, distributions, the general shape of the data → use local `mysql`. If the snapshot looks stale, refresh it with `scripts/sync-from-prod.sh` first, then analyse locally. Do not run analytical queries against `mysql-prod`.
+- **Feature data analysis** — row counts, distributions, the general shape of the data → use local `mysql`. If the snapshot looks stale, refresh it with `scripts/sync-from-prod.sh` first (operator-only, see above), then analyse locally. Do not run analytical queries against `mysql-prod`.
 - Both servers are read-only by config. Never loosen the `ALLOW_INSERT/UPDATE/DELETE/DDL` flags on `mysql-prod`.
 
 ---
