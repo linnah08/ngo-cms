@@ -124,20 +124,25 @@ if ($can_shop) {
     }
 
     // ── Campaign pledges awaiting shipping (reward OR arranged delivery) ───────
-    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_shipping.php';
-    foreach (pledges_awaiting_shipping($pdo) as $p) {
-        // Link to order-view (label + status live there); pledge-view as fallback.
-        $link = !empty($p['order_id'])
-            ? '/admin/order-view.php?id=' . (int)$p['order_id']
-            : '/admin/pledge-view.php?id=' . (int)$p['id'];
-        $shipping_items[] = [
-            'kind'   => 'pledge',
-            'link'   => $link,
-            'number' => $p['number'],
-            'name'   => $p['name'],
-            'meta'   => $p['reward_title'] ?: 'Награда',
-            'date'   => $p['created_at'],
-        ];
+    // Gated at the collection step, not at the card: the "За изпращане" card is
+    // shared with physical orders, so skipping the card itself would hide those
+    // too. With no pledges collected the card simply renders orders only.
+    if (feature_enabled('campaign')) {
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_shipping.php';
+        foreach (pledges_awaiting_shipping($pdo) as $p) {
+            // Link to order-view (label + status live there); pledge-view as fallback.
+            $link = !empty($p['order_id'])
+                ? '/admin/order-view.php?id=' . (int)$p['order_id']
+                : '/admin/pledge-view.php?id=' . (int)$p['id'];
+            $shipping_items[] = [
+                'kind'   => 'pledge',
+                'link'   => $link,
+                'number' => $p['number'],
+                'name'   => $p['name'],
+                'meta'   => $p['reward_title'] ?: 'Награда',
+                'date'   => $p['created_at'],
+            ];
+        }
     }
 
     usort($shipping_items, fn($a, $b) => strcmp($a['date'], $b['date']));

@@ -44,6 +44,12 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
             'style' => 'outline',
         ],
     ];
+    // Campaign module off for this install: drop the CTA so nothing links to a
+    // page that now 404s. The CMS-authored section itself stays — its text is
+    // the admin's to remove.
+    if (!feature_enabled('campaign')) {
+        unset($_way_ctas['Подкрепи кампанията']);
+    }
     ?>
     <div class="how-to-help--list-wrapper" style="display:flex;flex-direction:column;gap:0;">
       <?php foreach (($help['ways'] ?? []) as $i => $way): ?>

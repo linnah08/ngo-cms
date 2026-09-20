@@ -42,6 +42,10 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
             'style' => 'outline',
         ],
     ];
+    // See the note in kak-da-pomogna/index.php.
+    if (!feature_enabled('campaign')) {
+        unset($_way_ctas['Support our campaign']);
+    }
     ?>
     <div class="how-to-help--list-wrapper" style="display:flex;flex-direction:column;gap:0;">
       <?php foreach ($ways as $i => $way): ?>

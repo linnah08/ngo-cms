@@ -14,6 +14,9 @@
         <testsuite name="Payment">
             <directory>tests/Payment</directory>
         </testsuite>
+        <testsuite name="FeatureFlags">
+            <file>tests/FeatureFlagsTest.php</file>
+        </testsuite>
         <testsuite name="Campaign">
             <file>tests/CampaignTest.php</file>
             <file>tests/PledgeShippingTest.php</file>

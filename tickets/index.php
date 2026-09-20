@@ -3,6 +3,12 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 start_session();
 
+// Campaign module switched off for this install — the page does not exist.
+if (!feature_enabled('campaign')) {
+    require $_SERVER['DOCUMENT_ROOT'] . '/errors/404.php';
+    exit;
+}
+
 // Redirect if event is not active
 if (setting_get('event_active', '0') !== '1') {
     header('Location: /campaign/');

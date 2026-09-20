@@ -39,7 +39,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
   $campaign_url = setting_get('campaign_url');
   $campaign     = $pages['campaign'] ?? [];
 ?>
-<?php if ($campaign_url !== '' && !empty($campaign['title_en'])): ?>
+<?php if (feature_enabled('campaign') && $campaign_url !== '' && !empty($campaign['title_en'])): ?>
 <!-- CAMPAIGN -->
 <section class="section section--warm">
   <div class="container">

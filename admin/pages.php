@@ -84,6 +84,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: /admin/pages.php?page=home&saved=1&_asclear=page:home'); exit;
 
     } elseif ($section === 'campaign') {
+        // The editor is hidden when the module is off, so a POST arriving here
+        // is either a stale tab or a hand-crafted request. Either way, refuse it
+        // rather than writing settings nothing reads.
+        if (!feature_enabled('campaign')) {
+            header('Location: /admin/pages.php?page=home'); exit;
+        }
         $url = trim($_POST['campaign_url'] ?? '');
         if ($url !== '' && !filter_var($url, FILTER_VALIDATE_URL)) {
             header('Location: /admin/pages.php?page=home&campaign_error=1'); exit;
@@ -599,6 +605,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 </form>
 
 <!-- ── Campaign Section ── -->
+<?php /* Module off: the homepage block never renders, so this editor would be a
+         control that silently does nothing. Hide it rather than mislead. */ ?>
+<?php if (feature_enabled('campaign')): ?>
 <hr style="margin:2rem 0;border:none;border-top:1px solid var(--border);">
 <?php
   $campaign    = $all_pages['campaign'] ?? [];
@@ -684,6 +693,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <button type="submit" class="btn btn--primary">Запази кампанията</button>
   </div>
 </form>
+<?php endif; ?>
 <script>
 function _pickCampaignImage(btn) {
   openMediaPicker(function (p) {

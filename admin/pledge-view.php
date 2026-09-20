@@ -11,6 +11,14 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_documents.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_shipping.php';
 admin_require_shop();
 
+// Campaign module switched off for this install — the page does not exist.
+// Deliberately after the auth call: an anonymous request still gets the normal
+// login redirect, so this never becomes an oracle for which modules a site runs.
+if (!feature_enabled('campaign')) {
+    require $_SERVER['DOCUMENT_ROOT'] . '/errors/404.php';
+    exit;
+}
+
 $pdo = get_pdo();
 $id  = (int)($_GET['id'] ?? 0);
 if (!$id) { header('Location: /admin/campaign-backers.php'); exit; }

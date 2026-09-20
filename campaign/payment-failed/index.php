@@ -3,6 +3,12 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 start_session();
 
+// Campaign module switched off for this install — the page does not exist.
+if (!feature_enabled('campaign')) {
+    require $_SERVER['DOCUMENT_ROOT'] . '/errors/404.php';
+    exit;
+}
+
 $pledge_number = trim($_GET['pledge'] ?? '');
 $retry_url     = '';
 if (preg_match('/^CP-\d{8}-[A-F0-9]{4}$/i', $pledge_number)) {

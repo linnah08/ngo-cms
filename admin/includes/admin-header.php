@@ -175,10 +175,12 @@ $current_user = admin_user();
          class="admin-nav__link <?= in_array($active_nav ?? '', ['newsletter','newsletter-compose','newsletter-send','newsletter-subscribers']) ? 'active' : '' ?>">
         Бюлетин
       </a>
+      <?php if (feature_enabled('campaign')): ?>
       <a href="/admin/campaign.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'campaign' ? 'active' : '' ?>">
         Кампания
       </a>
+      <?php endif; ?>
       <a href="/admin/email-templates.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'email-templates' ? 'active' : '' ?>">
         Имейл шаблони

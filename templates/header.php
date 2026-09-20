@@ -24,6 +24,12 @@ $_path_map_bg_to_en = [
     '/'                          => '/en',
 ];
 
+// Campaign module off: the /campaign pair does not exist, so it must not take
+// part in longest-match path switching either.
+if (!feature_enabled('campaign')) {
+    unset($_path_map_bg_to_en['/campaign']);
+}
+
 function _switch_lang(string $path, string $current_lang): string {
     global $_path_map_bg_to_en;
 
