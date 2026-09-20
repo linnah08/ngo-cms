@@ -18,7 +18,6 @@ final class PledgeDocumentsTest extends TestCase
         require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
         require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_documents.php';
         $this->pdo = get_pdo();
-        try { $this->pdo->exec("ALTER TABLE orders MODIFY COLUMN type ENUM('physical','donation','ticket','pledge') NOT NULL"); } catch (Throwable) {}
         $this->cleanup();
     }
 
@@ -31,8 +30,12 @@ final class PledgeDocumentsTest extends TestCase
 
     private function cleanup(): void
     {
-        // Cascade: orders FK deletes documents rows too
-        $this->pdo->prepare("DELETE FROM orders WHERE order_number = ? AND type = 'pledge'")
+        // Cascade: orders FK deletes documents rows too.
+        // Deliberately NOT filtered on type='pledge': a row written while the enum
+        // was missing that value lands as type='' and would survive the cleanup,
+        // then block the next run's INSERT IGNORE on the UNIQUE order_number —
+        // which fails silently and is very hard to trace back to here.
+        $this->pdo->prepare("DELETE FROM orders WHERE order_number = ?")
             ->execute([$this->pledge_number]);
         $this->pdo->prepare("DELETE FROM campaign_pledges WHERE pledge_number = ?")
             ->execute([$this->pledge_number]);

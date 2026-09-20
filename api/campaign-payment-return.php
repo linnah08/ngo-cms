@@ -18,11 +18,6 @@ start_session();
 $pdo           = get_pdo();
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_documents.php';
 
-// Extend orders.type to include 'pledge' (idempotent)
-try {
-    $pdo->exec("ALTER TABLE orders MODIFY COLUMN type ENUM('physical','donation','ticket','pledge') NOT NULL");
-} catch (Throwable) {}
-
 $pledge_number = trim($_GET['pledge'] ?? '');
 
 if (!preg_match('/^CP-\d{8}-[A-F0-9]{4}$/i', $pledge_number)) {

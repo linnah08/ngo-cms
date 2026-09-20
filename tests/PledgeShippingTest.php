@@ -26,7 +26,8 @@ final class PledgeShippingTest extends TestCase
         if (!self::$pdo) return;
         if (!empty(self::$order_numbers)) {
             $in = implode(',', array_fill(0, count(self::$order_numbers), '?'));
-            self::$pdo->prepare("DELETE FROM orders WHERE order_number IN ($in) AND type='pledge'")
+            // Not filtered on type='pledge' — see the note in PledgeDocumentsTest::cleanup().
+            self::$pdo->prepare("DELETE FROM orders WHERE order_number IN ($in)")
                       ->execute(self::$order_numbers);
         }
         if (!empty(self::$pledge_ids)) {

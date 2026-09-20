@@ -17,6 +17,7 @@
         <testsuite name="Campaign">
             <file>tests/CampaignTest.php</file>
             <file>tests/PledgeShippingTest.php</file>
+            <file>tests/PledgeDocumentsTest.php</file>
         </testsuite>
         <testsuite name="Http">
             <file>tests/HttpTest.php</file>
