@@ -11,15 +11,24 @@ final class HowToHelpCtaTest extends TestCase
 
     public static function setUpBeforeClass(): void
     {
+        // Requiring 200 on /, not just a successful curl — see the note in
+        // HttpTest::setUpBeforeClass() about catch-all dev servers.
         $ch = curl_init(self::$base . '/');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 3);
         curl_setopt($ch, CURLOPT_NOBODY, true);
         curl_exec($ch);
         $errno = curl_errno($ch);
+        $code  = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         if ($errno !== 0) {
             self::markTestSkipped('example.test is not reachable — skipping HTTP tests.');
+        }
+        if ($code !== 200) {
+            self::markTestSkipped(
+                "example.test answered HTTP $code for / — something other than this site is "
+                . 'serving that host; skipping HTTP tests.'
+            );
         }
     }
 

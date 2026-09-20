@@ -17,16 +17,29 @@ final class HttpTest extends TestCase
 
     public static function setUpBeforeClass(): void
     {
-        // Skip the entire class if the local dev server isn't up.
+        // Skip the entire class unless example.test is actually serving THIS site.
+        //
+        // Checking only curl_errno() is not enough: a catch-all dev server, such
+        // as Laravel Herd, answers every hostname it does not know with its own
+        // 404. curl then succeeds, the guard passes, and all of the assertions
+        // below fail as though the site were broken. Requiring 200 on / tells
+        // "nothing is listening" and "something else is listening" apart.
         $ch = curl_init(self::$base . '/');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 3);
         curl_setopt($ch, CURLOPT_NOBODY, true);
         curl_exec($ch);
         $errno = curl_errno($ch);
+        $code  = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         if ($errno !== 0) {
             self::markTestSkipped('example.test is not reachable — skipping HTTP smoke tests.');
+        }
+        if ($code !== 200) {
+            self::markTestSkipped(
+                "example.test answered HTTP $code for / — something other than this site is "
+                . 'serving that host; skipping HTTP smoke tests.'
+            );
         }
     }
 

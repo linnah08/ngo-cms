@@ -24,6 +24,7 @@
         </testsuite>
         <testsuite name="Http">
             <file>tests/HttpTest.php</file>
+            <file>tests/HowToHelpCtaTest.php</file>
         </testsuite>
         <testsuite name="Updater">
             <file>tests/UpdaterTest.php</file>
