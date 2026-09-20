@@ -42,6 +42,34 @@ The site is used by social workers, parents, and other non-technical people. Whe
 - Currency display: show both EUR and BGN where applicable — confirm format with user before implementing currency features.
 - For error states (cart, forms), use persistent, visible error UI — never silent clamping or auto-dismissing flash messages.
 
+### Accessibility — always prioritise it
+
+Accessibility is part of every UI change, not a pass that happens later. This site is used by
+parents, social workers and donors on old phones, with screen readers, with keyboards only, and
+with impaired vision. **When a visual or layout preference conflicts with accessibility,
+accessibility wins.** This applies to admin screens as much as public pages — the admin is used
+by the same non-technical people.
+
+- **Keyboard first.** Every control is reachable and operable with Tab / Enter / Space, in a
+  sensible order, with a visible focus outline. Never remove `outline` without replacing it with
+  something at least as visible. Modals and overlays keep focus inside while open and hand it back
+  where it came from on close.
+- **Semantic HTML before ARIA.** Use a real `<button>`, `<label>`, `<nav>`, real heading levels.
+  Reach for ARIA only when no element expresses the thing — e.g. `role="progressbar"` with
+  `aria-valuenow`, `role="status"` for a region that updates on its own.
+- **Announce what changes.** Anything that updates without a page load (progress, validation
+  errors, AJAX results, cart totals) must sit in a live region, or a screen reader user simply
+  never learns it happened.
+- **Never colour alone.** Error, success, progress and required state always carry text or an
+  icon as well as colour. Target WCAG AA contrast: 4.5:1 for body text, 3:1 for large text and for
+  UI borders like input outlines.
+- **Label every input** with a real `<label for>`, not a placeholder — a placeholder disappears
+  exactly when the user needs it. Icon-only buttons need an `aria-label`.
+- **Images** get meaningful `alt` text, or `alt=""` when they are purely decorative. Never leave
+  the attribute off.
+- **Respect the user's own settings.** Don't block pinch-zoom, honour `prefers-reduced-motion`,
+  and keep tap targets around 44x44px.
+
 ---
 
 ## Feature scope — ask before building
