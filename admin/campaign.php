@@ -17,14 +17,6 @@ $pdo    = get_pdo();
 $saved  = false;
 $errors = [];
 
-// Ensure EN columns exist (idempotent)
-try { $pdo->exec("ALTER TABLE campaign_rewards ADD COLUMN title_en VARCHAR(200) NOT NULL DEFAULT '' AFTER title"); } catch (Throwable) {}
-try { $pdo->exec("ALTER TABLE campaign_rewards ADD COLUMN description_en TEXT NOT NULL AFTER description"); } catch (Throwable) {}
-// Ensure ticket columns exist (idempotent)
-try { $pdo->exec("ALTER TABLE campaign_pledges ADD COLUMN pledge_type ENUM('donation','ticket') NOT NULL DEFAULT 'donation' AFTER pledge_number"); } catch (Throwable) {}
-try { $pdo->exec("ALTER TABLE campaign_pledges ADD COLUMN ticket_code VARCHAR(64) NULL"); } catch (Throwable) {}
-try { $pdo->exec("ALTER TABLE campaign_pledges ADD COLUMN ticket_path VARCHAR(255) NULL"); } catch (Throwable) {}
-
 // ── POST handlers ─────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) { http_response_code(400); exit('Invalid token'); }
