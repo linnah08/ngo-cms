@@ -21,7 +21,8 @@ if (!csrf_verify()) {
 $product_id = (int)($_POST['product_id'] ?? 0);
 $qty        = max(1, (int)($_POST['quantity'] ?? 1));
 $redirect_param = $_POST['redirect'] ?? '';
-$redirect   = $redirect_param === 'cart' ? '/cart/' : $shop_url;
+$home_url   = $lang === 'en' ? '/en/' : '/';
+$redirect   = $redirect_param === 'cart' ? '/cart/' : ($redirect_param === 'home' ? $home_url : $shop_url);
 
 if (!$product_id) {
     flash_set('error', 'Невалиден продукт.');

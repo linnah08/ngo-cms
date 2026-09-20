@@ -19,6 +19,74 @@ function product_compute_slug(string $slug_input, string $name_en, string $name_
 }
 
 /**
+ * Products ticked "Показвай на началната страница" in admin/product-edit.php,
+ * in the same order the shop lists them.
+ *
+ * Inactive products are left out: a hidden product cannot be bought, so putting
+ * it on the homepage would be a dead card. admin/products.php surfaces that
+ * combination as "★ Начало (скрит, неактивен)" rather than letting it be a
+ * silent no-show.
+ */
+function product_featured_list(PDO $pdo): array {
+    return $pdo->query(
+        'SELECT * FROM products WHERE active = 1 AND featured = 1 ORDER BY sort_order, id'
+    )->fetchAll();
+}
+
+/**
+ * Card-rendering support data for variant-type products in $products: each
+ * product's representative image (the lowest-sorted active variant that has
+ * one) and its total stock across active variants. A variant product keeps its
+ * own `image` column empty, so without this the card has nothing to show.
+ *
+ * Scoped to whatever product list is passed in — the full shop catalog, or a
+ * handful of featured products — so callers only pay for the products they render.
+ *
+ * @param array $products Rows with at least 'id' and 'type' keys.
+ * @return array{images: array<int,string>, stock: array<int,int>}
+ */
+function product_variant_support_data(PDO $pdo, array $products): array {
+    $images = [];
+    $stock  = [];
+
+    $variant_ids = array_column(array_filter($products, fn($p) => $p['type'] === 'variant'), 'id');
+    if (!$variant_ids) {
+        return ['images' => $images, 'stock' => $stock];
+    }
+
+    $in = implode(',', array_fill(0, count($variant_ids), '?'));
+
+    $vi_stmt = $pdo->prepare(
+        "SELECT pv.product_id, pv.image
+         FROM product_variants pv
+         INNER JOIN (
+             SELECT product_id, MIN(sort_order) AS min_sort
+             FROM product_variants
+             WHERE product_id IN ($in) AND active = 1 AND image != ''
+             GROUP BY product_id
+         ) m ON pv.product_id = m.product_id AND pv.sort_order = m.min_sort
+         WHERE pv.active = 1 AND pv.image != ''"
+    );
+    $vi_stmt->execute($variant_ids);
+    foreach ($vi_stmt->fetchAll() as $vi) {
+        $images[$vi['product_id']] = $vi['image'];
+    }
+
+    $vs_stmt = $pdo->prepare(
+        "SELECT product_id, SUM(stock) AS in_stock
+         FROM product_variants
+         WHERE product_id IN ($in) AND active = 1
+         GROUP BY product_id"
+    );
+    $vs_stmt->execute($variant_ids);
+    foreach ($vs_stmt->fetchAll() as $vs) {
+        $stock[$vs['product_id']] = (int)$vs['in_stock'];
+    }
+
+    return ['images' => $images, 'stock' => $stock];
+}
+
+/**
  * Build the 'print' product variant structure from POST fields.
  * Returns the array ready to json_encode (keys: colours, sizes, print_area,
  * custom, size_guide, size_dims). Caller uses ['sizes'] and ['size_guide'] for

@@ -15,6 +15,15 @@ $articles = get_articles('bg', 3);
 $pages   = load_json(CONTENT_PATH . '/pages.json');
 $home    = $pages['home'] ?? [];
 
+// Products ticked "Показвай на началната страница" in admin/product-edit.php.
+require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
+$pdo               = get_pdo();
+$featured_products = product_featured_list($pdo);
+$featured_support  = product_variant_support_data($pdo, $featured_products);
+$variant_images    = $featured_support['images'];
+$variant_stock     = $featured_support['stock'];
+
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
 
@@ -62,6 +71,33 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     </div>
   </div>
 </section>
+
+<!-- FEATURED PRODUCTS -->
+<?php if (!empty($featured_products)): ?>
+<section class="section">
+  <div class="container">
+    <div class="section-header" style="display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;flex-wrap:wrap;">
+      <div>
+        <h2 data-cms-field="section_shop" data-cms-section="home" data-cms-type="text"
+            data-cms-bg="<?= h($home['section_shop'] ?? '') ?>"
+            data-cms-en="<?= h($home['section_shop_en'] ?? '') ?>"
+        ><?= h($lang === 'bg' ? ($home['section_shop'] ?: t('home.shop.title')) : ($home['section_shop_en'] ?: t('home.shop.title'))) ?></h2>
+      </div>
+      <a href="/magazin/" class="btn btn--outline"
+         data-cms-field="shop_btn_all" data-cms-section="home" data-cms-type="text"
+         data-cms-bg="<?= h($home['shop_btn_all'] ?? '') ?>"
+         data-cms-en="<?= h($home['shop_btn_all_en'] ?? '') ?>"
+      ><?= h($lang === 'bg' ? ($home['shop_btn_all'] ?: t('home.shop.all')) : ($home['shop_btn_all_en'] ?: t('home.shop.all'))) ?></a>
+    </div>
+    <div class="grid grid--3" style="gap:2rem;align-items:stretch;">
+      <?php $card_removable = false; $card_redirect = 'home'; ?>
+      <?php foreach ($featured_products as $p): ?>
+        <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/product-card.php'; ?>
+      <?php endforeach; ?>
+    </div>
+  </div>
+</section>
+<?php endif; ?>
 
 <!-- IMPACT NUMBERS -->
 <?php if (!empty($impact) || admin_logged_in()): ?>
