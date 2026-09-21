@@ -287,7 +287,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 </div>
 
 <!-- Stats bar -->
-<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:2rem;">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:2rem;">
   <?php
     $raised_bgn = $stats['raised'] * EUR_BGN_RATE;
     $target_bgn = $target_eur    * EUR_BGN_RATE;

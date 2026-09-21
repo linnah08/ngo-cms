@@ -652,3 +652,23 @@ a.admin-stat:hover {
   gap: .75rem;
   justify-content: flex-end;
 }
+
+/* ── NO SIDEWAYS SCROLL ON PHONES ───────────
+   .admin-main is a flex item; without min-width:0 it can't shrink below its
+   widest content and drags the whole page (top bar included) wider than the
+   screen. The phone rules below catch layouts written as inline styles on
+   individual pages (BG/EN column pairs, button rows) — the attribute
+   selectors are the only way to reach those without editing every page. */
+.admin-main { min-width: 0; }
+
+@media (max-width: 600px) {
+  .admin-content [style*="grid-template-columns"]:not([style*="repeat("]) {
+    grid-template-columns: 1fr !important;
+  }
+  .admin-content [style*="display:flex"],
+  .admin-content [style*="display: flex"],
+  .content-tabs { flex-wrap: wrap; }
+  .admin-content .btn { white-space: normal; }
+  .admin-content code { overflow-wrap: anywhere; }
+  .admin-content table { display: block; max-width: 100%; overflow-x: auto; }
+}
