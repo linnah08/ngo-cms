@@ -608,7 +608,16 @@ function home_inline_save(string $id, array $fields): array {
     foreach ($fields as $key => $values) {
         $def = $defs[$key] ?? null;
         if ($def === null || !in_array($def['kind'], ['text', 'textarea', 'html', 'alt', 'image'], true) || !is_array($values)) continue;
-        $raw = $def['kind'] === 'image' ? (string) ($values['bg'] ?? '') : home_pair($values);
+        if ($def['kind'] === 'image') {
+            $raw = (string) ($values['bg'] ?? '');
+        } else {
+            // A language the editor did not send keeps its stored value. One that is
+            // sent — even as '' — replaces it, so clearing a field on purpose still works.
+            $raw = home_pair($doc['sections'][$i]['fields'][$key] ?? null);
+            foreach (['bg', 'en'] as $l) {
+                if (array_key_exists($l, $values)) $raw[$l] = is_string($values[$l]) ? $values[$l] : '';
+            }
+        }
         [$value, $err] = home_clean_field($def, $raw, (string) $key);
         if ($err) return ['ok' => false, 'error' => (string) reset($err)];
         $doc['sections'][$i]['fields'][$key] = $value;

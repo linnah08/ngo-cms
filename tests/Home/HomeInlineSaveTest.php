@@ -39,6 +39,35 @@ final class HomeInlineSaveTest extends TestCase
         $this->assertSame(3, home_load()['doc']['rev']);
     }
 
+    public function test_a_language_left_out_of_the_payload_keeps_its_stored_value(): void
+    {
+        $r = home_inline_save('s_hero', ['title' => ['en' => 'Only English']]);
+        $this->assertTrue($r['ok']);
+        $this->assertSame(['bg' => 'Стар', 'en' => 'Only English'], $this->section('s_hero')['fields']['title']);
+    }
+
+    /**
+     * Contract: a language that IS sent replaces the stored one, even when empty —
+     * that is how an editor deliberately clears a field. The on-page editor
+     * (inline-cms.js) therefore seeds both languages from data-cms-bg/data-cms-en
+     * before the first edit, so it never sends an accidental ''.
+     */
+    public function test_an_empty_language_that_is_sent_clears_it_on_purpose(): void
+    {
+        $r = home_inline_save('s_hero', ['title' => ['bg' => '', 'en' => 'New']]);
+        $this->assertTrue($r['ok']);
+        $this->assertSame(['bg' => '', 'en' => 'New'], $this->section('s_hero')['fields']['title']);
+    }
+
+    public function test_on_page_editor_seeds_both_languages_before_the_first_edit(): void
+    {
+        $js = (string) file_get_contents(dirname(__DIR__, 2) . '/assets/js/inline-cms.js');
+        $this->assertStringContainsString('function _dirtyEntry(', $js);
+        $this->assertStringContainsString("bg: (el && el.dataset.cmsBg) || ''", $js);
+        $this->assertStringContainsString("en: (el && el.dataset.cmsEn) || ''", $js);
+        $this->assertDoesNotMatchRegularExpression("/bg:\\s*'',\\s*en:\\s*''/", $js, 'no dirty entry may start with both languages blank');
+    }
+
     public function test_rich_text_is_cleaned(): void
     {
         home_inline_save('s_ab12', ['body' => ['bg' => '<p onclick="x">Hi</p>', 'en' => '']]);

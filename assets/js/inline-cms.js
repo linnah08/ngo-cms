@@ -95,17 +95,33 @@ window.OmCMS = (function () {
     const el = e.currentTarget;
     const field = el.dataset.cmsField;
     const section = el.dataset.cmsSection;
-    const key = section + '.' + field;
-    if (!dirtyFields[key]) dirtyFields[key] = { section: section, field: field, bg: el.dataset.cmsBg || '', en: el.dataset.cmsEn || '' };
-    dirtyFields[key][activeLang] = el.innerHTML;
+    _dirtyEntry(section, field, el)[activeLang] = el.innerHTML;
     el.dataset['cms' + _cap(activeLang)] = el.innerHTML;
     _showSaveBtn();
   }
 
-  function markDirty(section, field, lang, value) {
+  // The first edit of a field creates its entry. Both languages start from the
+  // stored values the page carries (data-cms-bg / data-cms-en), so saving an edit
+  // made in one language never blanks the other one.
+  function _dirtyEntry(section, field, el) {
     const key = section + '.' + field;
-    if (!dirtyFields[key]) dirtyFields[key] = { section: section, field: field, bg: '', en: '' };
-    dirtyFields[key][lang] = value;
+    if (!dirtyFields[key]) {
+      if (!el) {
+        el = Array.prototype.find.call(document.querySelectorAll('[data-cms-field]'), function (c) {
+          return c.dataset.cmsSection === section && c.dataset.cmsField === field;
+        }) || null;
+      }
+      dirtyFields[key] = {
+        section: section, field: field,
+        bg: (el && el.dataset.cmsBg) || '',
+        en: (el && el.dataset.cmsEn) || ''
+      };
+    }
+    return dirtyFields[key];
+  }
+
+  function markDirty(section, field, lang, value, el) {
+    _dirtyEntry(section, field, el)[lang] = value;
     _showSaveBtn();
   }
 
@@ -131,7 +147,7 @@ window.OmCMS = (function () {
           window._tinyBase.setup(ed);
         }
         ed.on('Change', function () {
-          markDirty(el.dataset.cmsSection, el.dataset.cmsField, activeLang, ed.getContent());
+          markDirty(el.dataset.cmsSection, el.dataset.cmsField, activeLang, ed.getContent(), el);
           el.dataset['cms' + _cap(activeLang)] = ed.getContent();
         });
       }
@@ -144,7 +160,7 @@ window.OmCMS = (function () {
     if (!editMode) return;
     const el = e.target.closest('[data-cms-type="richtext"]');
     if (!el) return;
-    if (tinymce && tinymce.get(el.id)) return; // already inited
+    if (window.tinymce && tinymce.get(el.id)) return; // already inited
     _initRichText(el);
   });
 
@@ -295,8 +311,8 @@ window.OmCMS = (function () {
     const img = wrap.querySelector('img');
     if (img) img.src = path;
     // Image paths are language-neutral — mark both languages dirty
-    markDirty(wrap.dataset.cmsSection, wrap.dataset.cmsField, 'bg', path);
-    markDirty(wrap.dataset.cmsSection, wrap.dataset.cmsField, 'en', path);
+    markDirty(wrap.dataset.cmsSection, wrap.dataset.cmsField, 'bg', path, wrap);
+    markDirty(wrap.dataset.cmsSection, wrap.dataset.cmsField, 'en', path, wrap);
   }
 
   function _uploadImage(file, wrap) {
