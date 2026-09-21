@@ -91,6 +91,15 @@ final class HomeInlineSaveTest extends TestCase
         $this->assertNotSame('javascript:x', $f['btn1_url']['bg'] ?? '');
     }
 
+    public function test_nothing_accepted_means_nothing_is_written(): void
+    {
+        $before = file_get_contents($this->file);
+        $r = home_inline_save('s_hero', ['btn1_url' => ['bg' => '/x/', 'en' => ''], 'nope' => ['bg' => 'x', 'en' => '']]);
+        $this->assertFalse($r['ok']);
+        $this->assertSame($before, file_get_contents($this->file));
+        $this->assertSame(2, home_load()['doc']['rev']);
+    }
+
     public function test_unknown_section_is_refused(): void
     {
         $this->assertFalse(home_inline_save('s_nope', ['title' => ['bg' => 'x', 'en' => '']])['ok']);

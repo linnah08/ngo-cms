@@ -451,6 +451,8 @@ function home_save(array $doc, int $expected_rev): array {
     }
 }
 
+const HOME_CONFLICT_FORM_MESSAGE = 'Междувременно някой друг е променил началната страница. Вашият текст е запазен тук — проверете го и натиснете „Запази“ отново.';
+
 function home_save_error_message(?string $error): string {
     return $error === 'conflict'
         ? 'Междувременно някой друг е променил началната страница. Презаредете страницата и направете промяната отново.'
@@ -605,6 +607,7 @@ function home_inline_save(string $id, array $fields): array {
     $i   = home_find($doc, $id);
     if ($i === null) return ['ok' => false, 'error' => 'unknown section'];
     $defs = home_types()[$doc['sections'][$i]['type']]['fields'] ?? [];
+    $accepted = 0;
     foreach ($fields as $key => $values) {
         $def = $defs[$key] ?? null;
         if ($def === null || !in_array($def['kind'], ['text', 'textarea', 'html', 'alt', 'image'], true) || !is_array($values)) continue;
@@ -621,6 +624,10 @@ function home_inline_save(string $id, array $fields): array {
         [$value, $err] = home_clean_field($def, $raw, (string) $key);
         if ($err) return ['ok' => false, 'error' => (string) reset($err)];
         $doc['sections'][$i]['fields'][$key] = $value;
+        $accepted++;
+    }
+    if ($accepted === 0) {
+        return ['ok' => false, 'error' => 'Тези полета не могат да се променят оттук. Отворете Админ → Съдържание → Начална страница.'];
     }
     $saved = home_save($doc, (int) $doc['rev']);
     return $saved['ok'] ? ['ok' => true] : ['ok' => false, 'error' => home_save_error_message($saved['error'])];
@@ -685,11 +692,12 @@ function home_apply_uploads(array &$in, string $type, array $files, string $sid)
  * takes $doc/$post/$files in, returns a status the controller maps to a response.
  *
  * @param ?callable $fetch_thumb defaults to home_fetch_video_thumb(); injectable for tests.
- * @return array{status: string, doc: ?array, sid: string, message: string, errors: array, form: ?array}
+ * @return array{status: string, doc: ?array, sid: string, message: string, errors: array, form: ?array, rev?: int}
  *   status: 'bad_type' (unknown/builtin type — caller should 400),
  *           'not_found' (posted id no longer exists — caller should flash+redirect),
  *           'saved' (persisted — caller should flash+redirect to ?focus=edit:<sid>),
- *           'invalid' (validation/upload/save-conflict errors — caller should re-render the form).
+ *           'invalid' (validation/upload/save-conflict errors — caller should re-render the form
+ *                      with 'rev': the posted revision, or the current one after a conflict).
  */
 function home_admin_save(array $doc, array $post, array $files, ?callable $fetch_thumb = null): array {
     $fetch_thumb ??= 'home_fetch_video_thumb';
@@ -726,8 +734,16 @@ function home_admin_save(array $doc, array $post, array $files, ?callable $fetch
             $message = $idx !== null ? "„{$name}“ е запазена." : "„{$name}“ е добавена най-долу на страницата и вече се вижда.";
             return ['status' => 'saved', 'doc' => $saved['doc'], 'sid' => $sid, 'message' => $message, 'errors' => [], 'form' => null];
         }
-        $errors['_form'] = home_save_error_message($saved['error']);
+        if ($saved['error'] === 'conflict') {
+            // Only this section is written (upserted into the file as it is now), so the
+            // typed values can simply be saved again — against the current revision.
+            $errors['_form'] = HOME_CONFLICT_FORM_MESSAGE;
+            $rev_out = (int) home_load()['doc']['rev'];
+        } else {
+            $errors['_form'] = home_save_error_message($saved['error']);
+        }
     }
     return ['status' => 'invalid', 'doc' => null, 'sid' => $sid, 'message' => '', 'errors' => $errors,
-            'form' => ['id' => $idx !== null ? $post_id : '', 'type' => $type, 'fields' => $fields]];
+            'form' => ['id' => $idx !== null ? $post_id : '', 'type' => $type, 'fields' => $fields],
+            'rev' => $rev_out ?? $post_rev];
 }

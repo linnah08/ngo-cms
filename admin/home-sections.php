@@ -47,7 +47,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         default:   // 'invalid'
             $errors = $r['errors'];
             $form   = $r['form'];
-            $rev    = $post_rev;   // keep the revision the admin started from
+            // The revision the admin started from — or, after a conflict, the current one,
+            // so the typed values (kept in the form) can be saved with one more click.
+            $rev    = (int) ($r['rev'] ?? $post_rev);
     }
 } elseif (isset($_GET['edit'])) {
     $idx = home_find($doc, (string) $_GET['edit']);

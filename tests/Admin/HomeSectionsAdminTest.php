@@ -137,11 +137,47 @@ final class HomeSectionsAdminTest extends TestCase
         $r = home_admin_save($doc, ['id' => 's_ab12', 'type' => 'cta', 'rev' => 4, 'f' => $this->validCtaFields()], []);
 
         $this->assertSame('invalid', $r['status']);
-        $this->assertSame(home_save_error_message('conflict'), $r['errors']['_form']);
+        $this->assertSame(HOME_CONFLICT_FORM_MESSAGE, $r['errors']['_form']);
 
         $onDisk = json_decode((string) file_get_contents($GLOBALS['_om_home_file']), true);
         $this->assertSame(5, $onDisk['rev']);
         $this->assertSame(['s_hero', 's_ab12'], array_column($onDisk['sections'], 'id'));
+    }
+
+    public function test_after_a_conflict_the_form_keeps_the_typed_values_and_the_current_revision(): void
+    {
+        $this->seedFile($this->doc(5));
+        $doc    = home_load()['doc'];
+        $fields = $this->validCtaFields();
+        $fields['heading']['bg'] = 'Моят нов текст';
+
+        $r = home_admin_save($doc, ['id' => 's_ab12', 'rev' => 4, 'f' => $fields], []);
+
+        $this->assertSame('invalid', $r['status']);
+        $this->assertSame(['_form'], array_keys($r['errors']));
+        $this->assertSame(HOME_CONFLICT_FORM_MESSAGE, $r['errors']['_form']);
+        $this->assertStringContainsString('Вашият текст е запазен тук', $r['errors']['_form']);
+        $this->assertSame('Моят нов текст', $r['form']['fields']['heading']['bg']);
+        $this->assertSame(5, $r['rev'], 'the form must carry the current revision, not the stale one');
+
+        // Pressing "Запази" again (same typed values, the revision the form now carries) saves.
+        $again = home_admin_save(home_load()['doc'], ['id' => 's_ab12', 'rev' => $r['rev'], 'f' => $r['form']['fields']], []);
+        $this->assertSame('saved', $again['status']);
+        $this->assertSame('Моят нов текст', home_load()['doc']['sections'][1]['fields']['heading']['bg']);
+    }
+
+    public function test_validation_errors_keep_the_posted_revision(): void
+    {
+        $this->seedFile($this->doc(5));
+        $fields = $this->validCtaFields();
+        $fields['btn1_url']['bg'] = 'javascript:x';
+        $r = home_admin_save(home_load()['doc'], ['id' => 's_ab12', 'rev' => 4, 'f' => $fields], []);
+        $this->assertSame(4, $r['rev']);
+    }
+
+    public function test_controller_re_renders_with_the_revision_home_admin_save_returns(): void
+    {
+        $this->assertStringContainsString("\$rev    = (int) (\$r['rev'] ?? \$post_rev);", $this->src());
     }
 
     public function test_save_keeps_typed_values_on_an_invalid_link_and_writes_nothing(): void
