@@ -288,7 +288,7 @@ async function txEl(bgEl, enEl, btn, isHtml) {
     var res  = await fetch('/admin/translate-ajax.php', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({text: bgVal, is_html: !!isHtml})
+      body: JSON.stringify({text: bgVal, is_html: !!isHtml, csrf_token: window._csrfToken})
     });
     var data = await res.json();
     if (data.ok) { _tmSet(enEl, data.translated); btn.textContent = '✓'; }
@@ -304,6 +304,84 @@ document.querySelectorAll('.translate-legal-btn').forEach(function(btn) {
     txEl(document.getElementById(this.dataset.src), document.getElementById(this.dataset.tgt), this, true);
   });
 });
+
+/* Every EN field that names its BG source — data-translate-from="<name or id>"
+   — gets a "✦ Translate" button under it. Fields added to the page later
+   (repeating rows) get one too. Rich-text fields are sent as HTML. */
+(function () {
+  function sourceOf(enEl) {
+    var key   = enEl.getAttribute('data-translate-from');
+    var scope = enEl.form || document;
+    return scope.querySelector('[name="' + key + '"]') || document.getElementById(key);
+  }
+
+  function attach(enEl) {
+    if (enEl._txAttached) return;
+    enEl._txAttached = true;
+
+    var wrap = document.createElement('span');
+    wrap.style.cssText = 'display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.35rem;';
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn--outline';
+    btn.style.cssText = 'font-size:.75rem;padding:.2rem .5rem;';
+    btn.textContent = '✦ Translate';
+    var msg = document.createElement('span');
+    msg.setAttribute('role', 'alert');
+    msg.style.cssText = 'font-size:.8rem;color:#b91c1c;';
+    wrap.appendChild(btn);
+    wrap.appendChild(msg);
+    enEl.insertAdjacentElement('afterend', wrap);
+
+    btn.addEventListener('click', async function () {
+      msg.textContent = '';
+      var bgEl = sourceOf(enEl);
+      var text = bgEl ? _tmGet(bgEl) : '';
+      if (!text.trim()) {
+        msg.textContent = 'Българското поле е празно — първо попълнете него.';
+        return;
+      }
+      if (_tmGet(enEl).trim() && window._adminConfirm &&
+          !(await window._adminConfirm('Английският текст ще бъде заменен с превода. Продължаване?', 'Замени'))) {
+        return;
+      }
+      var isHtml = !!(window.tinymce && enEl.id && tinymce.get(enEl.id));
+      btn.disabled = true;
+      btn.textContent = '…';
+      try {
+        var res  = await fetch('/admin/translate-ajax.php', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({text: text, is_html: isHtml, csrf_token: window._csrfToken})
+        });
+        var data = await res.json();
+        if (data.ok) {
+          _tmSet(enEl, data.translated);
+          enEl.dispatchEvent(new Event('input', {bubbles: true}));
+          btn.textContent = '✓';
+          btn.disabled = false;
+          return;
+        }
+        msg.textContent = 'Преводът не успя: ' + (data.error || 'неизвестна грешка');
+      } catch (e) {
+        msg.textContent = 'Преводът не успя. Проверете връзката и опитайте отново (ако сте стояли дълго на страницата — презаредете я).';
+      }
+      btn.textContent = '✦ Translate';
+      btn.disabled = false;
+    });
+  }
+
+  document.querySelectorAll('[data-translate-from]').forEach(attach);
+  new MutationObserver(function (muts) {
+    muts.forEach(function (m) {
+      m.addedNodes.forEach(function (n) {
+        if (n.nodeType !== 1) return;
+        if (n.matches('[data-translate-from]')) attach(n);
+        n.querySelectorAll('[data-translate-from]').forEach(attach);
+      });
+    });
+  }).observe(document.body, {childList: true, subtree: true});
+})();
 </script>
 <script src="/admin/js/session-guard.js"></script>
 </body>

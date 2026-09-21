@@ -816,7 +816,7 @@ tinymce.init(Object.assign({}, window._tinyBase, { selector: '.faq-answer, .faq-
     var r = await fetch('/admin/translate-ajax.php', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ text: text, is_html: isHtml })
+      body: JSON.stringify({ text: text, is_html: isHtml, csrf_token: window._csrfToken })
     });
     var d;
     try { d = await r.json(); } catch (_) { throw new Error('Невалиден отговор от сървъра (HTTP ' + r.status + ')'); }

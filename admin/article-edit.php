@@ -707,7 +707,7 @@ if (translateBtn) {
       var r = await fetch('/admin/translate-ajax.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({text: text, is_html: isHtml})
+        body: JSON.stringify({text: text, is_html: isHtml, csrf_token: window._csrfToken})
       });
       var d = await r.json();
       return d.ok ? d.translated : '';

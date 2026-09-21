@@ -546,7 +546,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       </div>
       <div class="form-group" style="margin:0;">
         <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.4rem;">Topics <span style="font-size:.68rem;font-weight:700;background:#dbeafe;color:#1d4ed8;border-radius:3px;padding:.05rem .35rem;margin-left:.4rem;vertical-align:middle;">EN</span> — one per line</label>
-        <textarea name="topics_en" rows="6"
+        <textarea name="topics_en" rows="6" data-translate-from="topics_bg"
                   style="width:100%;font-size:.88rem;line-height:1.6;font-family:inherit;resize:vertical;box-sizing:border-box;"><?= h(implode("\n", $en_topics)) ?></textarea>
       </div>
     </div>

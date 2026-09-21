@@ -164,6 +164,9 @@ Every `<textarea>` that holds rich/HTML content **must** have TinyMCE initialise
 
 **Single shared config — always.** `window._tinyBase` is defined in `admin/includes/admin-header.php` (inside `<head>` so it's available when `tinymce.init()` calls run). Every change to toolbar, plugins, or options (e.g. adding `fontsize`, changing toolbar buttons, adding a plugin) must be made there and only there. Never duplicate or override `tinymce.init()` in individual admin pages — all instances must stay in sync.
 
+### EN fields — always translatable
+Every English text field in the admin must be auto-translatable from its Bulgarian counterpart. For a new EN field, add `data-translate-from="<bg field name or id>"` to it — the shared script in `admin/includes/admin-footer.php` then adds a "✦ Translate" button (works for inputs, textareas, TinyMCE and dynamically added rows; asks before overwriting existing EN text). `tests/Admin/TranslateButtonCoverageTest.php` fails for any `*_en` field without a translate hook; only fields with no BG counterpart go in its `EXEMPT` list, with the reason.
+
 ### Admin page-level variables
 Set `$page_head_extra`, `$page_title_admin`, and `$active_nav` **before** `require admin-header.php`. Setting them after is a silent no-op — the `<head>` has already been rendered.
 

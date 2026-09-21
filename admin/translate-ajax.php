@@ -30,6 +30,14 @@ if (!is_array($body)) {
     $body = $_POST;
 }
 
+// CSRF: the token arrives in the JSON/form body; csrf_verify() reads $_POST.
+$_POST['csrf_token'] = $body['csrf_token'] ?? ($_POST['csrf_token'] ?? '');
+if (!csrf_verify()) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Invalid CSRF token']);
+    exit;
+}
+
 $text    = trim($body['text'] ?? '');
 $is_html = !empty($body['is_html']);
 

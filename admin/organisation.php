@@ -118,7 +118,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <?= $ferr('site_name_bg') ?>
       </label>
       <label id="f-site_name_en">На английски
-        <input type="text" name="site_name_en" value="<?= h($val('site_name_en')) ?>" maxlength="150" required<?= $fattr('site_name_en') ?>>
+        <input type="text" name="site_name_en" data-translate-from="site_name_bg" value="<?= h($val('site_name_en')) ?>" maxlength="150" required<?= $fattr('site_name_en') ?>>
         <?= $ferr('site_name_en') ?>
       </label>
     </div>
@@ -259,7 +259,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <small style="<?= $hint ?>">Оставете празно, за да се показва текстът по подразбиране.</small>
       </label>
       <label id="f-launch_banner_en">Текст на английски
-        <input type="text" name="launch_banner_en" value="<?= h($val('launch_banner_en')) ?>" maxlength="200"
+        <input type="text" name="launch_banner_en" data-translate-from="launch_banner_bg" value="<?= h($val('launch_banner_en')) ?>" maxlength="200"
                placeholder="<?= h(launch_banner_text('en')) ?>"<?= $fattr('launch_banner_en') ?>>
         <?= $ferr('launch_banner_en') ?>
         <small style="<?= $hint ?>">Оставете празно, за да се показва текстът по подразбиране.</small>
