@@ -549,3 +549,44 @@ function home_upsert(array $doc, array $section): array {
     }
     return $doc;
 }
+
+// ── Video thumbnails ─────────────────────────────────────────────────────────
+// Fetched once, when the admin saves, so visitors' browsers never contact
+// YouTube/Vimeo until they press play.
+
+function home_http_get(string $url): ?string {
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_CONNECTTIMEOUT => 4,
+        CURLOPT_TIMEOUT        => 6,
+        CURLOPT_USERAGENT      => 'ngo-cms',
+    ]);
+    $body = curl_exec($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return is_string($body) && $code === 200 ? $body : null;
+}
+
+/** @return string site path of the saved thumbnail, or '' (the block then shows a plain play panel). */
+function home_fetch_video_thumb(array $v, string $sid, ?callable $get = null, ?string $root = null): string {
+    if (!home_video_valid($v) || !preg_match('/^s_[a-z0-9_]{1,24}$/', $sid)) return '';
+    $get  ??= 'home_http_get';
+    $root ??= ROOT_PATH;
+    if ($v['provider'] === 'youtube') {
+        $src = 'https://i.ytimg.com/vi/' . $v['id'] . '/hqdefault.jpg';
+    } else {
+        $json = json_decode((string) $get('https://vimeo.com/api/oembed.json?url=' . rawurlencode('https://vimeo.com/' . $v['id'])), true);
+        $src  = is_array($json) ? (string) ($json['thumbnail_url'] ?? '') : '';
+        if (!preg_match('#^https://i\.vimeocdn\.com/[^\s"<>]+$#', $src)) return '';
+    }
+    $bytes = $get($src);
+    if (!is_string($bytes) || $bytes === '' || strlen($bytes) > 5_000_000) return '';
+    $ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][(new finfo(FILEINFO_MIME_TYPE))->buffer($bytes)] ?? null;
+    if ($ext === null) return '';
+    $rel = '/assets/images/pages/home/' . $sid . '-video-' . $v['id'] . '.' . $ext;
+    $abs = $root . $rel;
+    if (!is_dir(dirname($abs)) && !mkdir(dirname($abs), 0755, true)) return '';
+    return file_put_contents($abs, $bytes) !== false ? $rel : '';
+}
