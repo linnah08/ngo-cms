@@ -58,5 +58,60 @@
             <directory>tests/Home</directory>
             <file>tests/Admin/HomeSectionsAdminTest.php</file>
         </testsuite>
+        <!--
+            The suites below make the default `php vendor/bin/phpunit` run every
+            *Test.php under tests/. Suites must stay disjoint: a file claimed by two
+            suites still runs once, but PHPUnit prints a warning for it. So when you
+            give a file its own named suite above, add it to the <exclude> list of
+            the directory suite that would otherwise pick it up.
+        -->
+        <testsuite name="Admin">
+            <directory>tests/Admin</directory>
+            <exclude>tests/Admin/ProductEditNullFieldsHttpTest.php</exclude>
+            <exclude>tests/Admin/ArticleSaveLogicTest.php</exclude>
+            <exclude>tests/Admin/ProductSaveLogicTest.php</exclude>
+            <exclude>tests/Admin/OrderViewLogicTest.php</exclude>
+            <exclude>tests/Admin/PagesAdminLogicTest.php</exclude>
+            <exclude>tests/Admin/HomeSectionsAdminTest.php</exclude>
+        </testsuite>
+        <testsuite name="Security">
+            <directory>tests/Security</directory>
+        </testsuite>
+        <testsuite name="Api">
+            <directory>tests/Api</directory>
+        </testsuite>
+        <testsuite name="Cart">
+            <directory>tests/Cart</directory>
+        </testsuite>
+        <testsuite name="Reports">
+            <directory>tests/Reports</directory>
+        </testsuite>
+        <!-- Catch-all: top-level tests/*Test.php plus any new tests/ subdirectory. -->
+        <testsuite name="Core">
+            <directory>tests</directory>
+            <exclude>tests/Admin</exclude>
+            <exclude>tests/Api</exclude>
+            <exclude>tests/Browser</exclude>
+            <exclude>tests/Cart</exclude>
+            <exclude>tests/Couriers</exclude>
+            <exclude>tests/Home</exclude>
+            <exclude>tests/Payment</exclude>
+            <exclude>tests/Relay</exclude>
+            <exclude>tests/Reports</exclude>
+            <exclude>tests/Security</exclude>
+            <exclude>tests/Shop</exclude>
+            <exclude>tests/FeatureFlagsTest.php</exclude>
+            <exclude>tests/CampaignTest.php</exclude>
+            <exclude>tests/PledgeShippingTest.php</exclude>
+            <exclude>tests/PledgeDocumentsTest.php</exclude>
+            <exclude>tests/HttpTest.php</exclude>
+            <exclude>tests/HowToHelpCtaTest.php</exclude>
+            <exclude>tests/UpdaterTest.php</exclude>
+            <exclude>tests/AdminUpdatesPageTest.php</exclude>
+            <exclude>tests/MailerSmtpTest.php</exclude>
+            <exclude>tests/SupportTest.php</exclude>
+            <exclude>tests/OrganisationTest.php</exclude>
+            <exclude>tests/LaunchBannerTest.php</exclude>
+        </testsuite>
     </testsuites>
 </phpunit>
