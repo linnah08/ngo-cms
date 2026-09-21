@@ -456,3 +456,96 @@ function home_save_error_message(?string $error): string {
         ? 'Междувременно някой друг е променил началната страница. Презаредете страницата и направете промяната отново.'
         : 'Промените не можаха да се запазят. Опитайте отново след малко.';
 }
+
+// ── List actions ─────────────────────────────────────────────────────────────
+
+const HOME_ACTIONS = ['move_up', 'move_down', 'toggle', 'duplicate', 'delete'];
+
+function home_find(array $doc, string $id): ?int {
+    foreach ($doc['sections'] as $i => $s) {
+        if (($s['id'] ?? null) === $id) return $i;
+    }
+    return null;
+}
+
+function home_new_id(): string {
+    return 's_' . bin2hex(random_bytes(4));
+}
+
+/** Short human name for messages: the section's own heading, else its type. */
+function home_section_name(array $s): string {
+    $f = $s['fields'] ?? [];
+    foreach (['heading', 'title'] as $k) {
+        $v = trim(strip_tags((string) ($f[$k]['bg'] ?? '')));
+        if ($v !== '') return mb_strimwidth($v, 0, 60, '…');
+    }
+    return home_types()[$s['type'] ?? '']['label'] ?? 'Секция';
+}
+
+/** One line shown under the section name in the admin list. */
+function home_section_preview(array $s): string {
+    $f = $s['fields'] ?? [];
+    if (($s['type'] ?? '') === 'video' && is_array($f['video'] ?? null) && home_video_valid($f['video'])) {
+        return ($f['video']['provider'] === 'youtube' ? 'YouTube' : 'Vimeo') . ' видео';
+    }
+    if (($s['type'] ?? '') === 'cards') return count($f['cards'] ?? []) . ' карти';
+    foreach (['heading', 'title', 'text', 'body', 'intro'] as $k) {
+        $v = trim((string) preg_replace('/\s+/u', ' ', strip_tags((string) ($f[$k]['bg'] ?? ''))));
+        if ($v !== '') return mb_strimwidth($v, 0, 90, '…');
+    }
+    return home_types()[$s['type'] ?? '']['desc'] ?? '';
+}
+
+/** @return array{ok: bool, doc: array, message: string, focus: ?string} */
+function home_apply_action(array $doc, string $action, string $id): array {
+    $fail = fn(string $msg) => ['ok' => false, 'doc' => $doc, 'message' => $msg, 'focus' => $id];
+    $i = home_find($doc, $id);
+    if ($i === null) return $fail('Секцията не е намерена — може би е изтрита междувременно. Презаредете страницата.');
+    $s    = $doc['sections'][$i];
+    $name = home_section_name($s);
+    $list = $doc['sections'];
+    $last = count($list) - 1;
+
+    switch ($action) {
+        case 'move_up':
+            if ($i === 0) return $fail('„' . $name . '" вече е най-горе.');
+            [$list[$i - 1], $list[$i]] = [$list[$i], $list[$i - 1]];
+            $msg = '„' . $name . '" е преместена нагоре.';
+            break;
+        case 'move_down':
+            if ($i === $last) return $fail('„' . $name . '" вече е най-долу.');
+            [$list[$i + 1], $list[$i]] = [$list[$i], $list[$i + 1]];
+            $msg = '„' . $name . '" е преместена надолу.';
+            break;
+        case 'toggle':
+            $list[$i]['visible'] = empty($s['visible']);
+            $msg = $list[$i]['visible'] ? '„' . $name . '" вече се показва на сайта.' : '„' . $name . '" е скрита от сайта.';
+            break;
+        case 'duplicate':
+            if (home_is_builtin((string) $s['type'])) return $fail('Тази секция съществува само веднъж и не може да се дублира.');
+            $copy = $s;
+            $copy['id'] = home_new_id();
+            array_splice($list, $i + 1, 0, [$copy]);
+            $doc['sections'] = $list;
+            return ['ok' => true, 'doc' => $doc, 'message' => '„' . $name . '" е дублирана. Копието е точно под нея.', 'focus' => $copy['id']];
+        case 'delete':
+            if (home_is_builtin((string) $s['type'])) return $fail('Тази секция не може да се изтрие, но можете да я скриете.');
+            array_splice($list, $i, 1);
+            $doc['sections'] = $list;
+            return ['ok' => true, 'doc' => $doc, 'message' => '„' . $name . '" е изтрита.', 'focus' => null];
+        default:
+            return $fail('Непознато действие.');
+    }
+    $doc['sections'] = $list;
+    return ['ok' => true, 'doc' => $doc, 'message' => $msg, 'focus' => $id];
+}
+
+function home_upsert(array $doc, array $section): array {
+    $i = home_find($doc, (string) $section['id']);
+    if ($i === null) {
+        $doc['sections'][] = $section;
+    } else {
+        $doc['sections'][$i] = $section;
+    }
+    return $doc;
+}
