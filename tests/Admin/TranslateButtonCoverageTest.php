@@ -52,8 +52,10 @@ final class TranslateButtonCoverageTest extends TestCase
             if (in_array($name, self::EXEMPT[$file] ?? [], true)) continue;
 
             if (preg_match('/\bdata-translate-from="([^"]+)"/', $body, $from)) {
+                // A keyed source like article_excerpt_bg[slug] — match on its base name.
+                $target = preg_replace('/\[.*$/s', '', $from[1]);
                 $this->assertMatchesRegularExpression(
-                    '/\b(?:name|id)="' . preg_quote($from[1], '/') . '"/',
+                    '/\b(?:name|id)="' . preg_quote($target, '/') . '(?:\[[^"]*)?"/',
                     $src,
                     "$file: $name translates from \"{$from[1]}\", but no field with that name or id exists."
                 );
