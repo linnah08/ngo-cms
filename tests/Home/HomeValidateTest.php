@@ -66,6 +66,20 @@ final class HomeValidateTest extends TestCase
         $this->assertArrayNotHasKey('btn1_url.en', $e);
     }
 
+    public function test_button_link_without_label_is_an_error(): void
+    {
+        [, $e] = home_validate_section('cta', ['btn1_url' => ['bg' => '/za-nas/', 'en' => ''], 'btn1_label' => ['bg' => '', 'en' => '']]);
+        $this->assertArrayHasKey('btn1_label.bg', $e);
+    }
+
+    public function test_english_link_may_reuse_the_bulgarian_label(): void
+    {
+        [, $e] = home_validate_section('cta', [
+            'btn1_label' => ['bg' => 'Дари', 'en' => ''], 'btn1_url' => ['bg' => '/magazin/', 'en' => '/en/shop/'],
+        ]);
+        $this->assertArrayNotHasKey('btn1_label.en', $e);
+    }
+
     public function test_rich_text_is_cleaned(): void
     {
         [$f] = home_validate_section('richtext', ['body' => ['bg' => '<p onclick="x">Hi</p>', 'en' => '']]);

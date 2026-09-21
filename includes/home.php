@@ -144,7 +144,7 @@ function home_types(): array {
                 + $img('Снимка') + $btn(1) + $btn(2)],
         'products' => ['builtin' => true, 'icon' => '🛍', 'label' => 'Продукти от магазина',
             'desc' => 'Продуктите, отбелязани за началната страница.',
-            'note' => 'Кои продукти се показват, избирате в Продукти → „Показвай на началната страница". Ако няма отбелязани, секцията не се показва.',
+            'note' => 'Кои продукти се показват, избирате в Продукти → "Показвай на началната страница". Ако няма отбелязани, секцията не се показва.',
             'fields' => ['heading' => $head] + $btn(1) + ['background' => $bg('white')]],
         'impact' => ['builtin' => true, 'icon' => '🔢', 'label' => 'Показатели (числа)',
             'desc' => 'Числата, които показват вашето въздействие.', 'note' => sprintf($items_note, 'числа'),
@@ -182,7 +182,7 @@ function home_types(): array {
             'desc' => 'От 2 до 4 карти, всяка със снимка, заглавие, кратък текст и линк.', 'note' => null,
             'fields' => ['heading' => $head, 'cards' => ['kind' => 'cards', 'label' => 'Карти'], 'background' => $bg('white')]],
         'video' => ['builtin' => false, 'icon' => '▶️', 'label' => 'Видео',
-            'desc' => 'Видео от YouTube или Vimeo. Зарежда се едва когато посетителят натисне „Пусни".', 'note' => null,
+            'desc' => 'Видео от YouTube или Vimeo. Зарежда се едва когато посетителят натисне "Пусни".', 'note' => null,
             'fields' => ['heading' => $head,
                          'video'   => ['kind' => 'video', 'label' => 'Линк към видеото', 'required' => true],
                          'caption' => ['kind' => 'text', 'label' => 'Надпис под видеото', 'max' => 200],
@@ -287,6 +287,12 @@ function home_validate_section(string $type, array $in): array {
         }
         if ($label['en'] !== '' && $url['en'] === '' && $url['bg'] === '') {
             $errors["btn{$n}_url.en"] ??= 'Добавете линк за бутона или изтрийте надписа му.';
+        }
+        if ($url['bg'] !== '' && $label['bg'] === '') {
+            $errors["btn{$n}_label.bg"] ??= 'Добавете надпис на бутона или изтрийте линка му.';
+        }
+        if ($url['en'] !== '' && $label['en'] === '' && $label['bg'] === '') {
+            $errors["btn{$n}_label.en"] ??= 'Добавете надпис на бутона или изтрийте линка му.';
         }
     }
     return [$fields, $errors];
