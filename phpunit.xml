@@ -50,5 +50,9 @@
             <file>tests/Admin/OrderViewLogicTest.php</file>
             <file>tests/Admin/PagesAdminLogicTest.php</file>
         </testsuite>
+        <testsuite name="Organisation">
+            <file>tests/OrganisationTest.php</file>
+            <file>tests/LaunchBannerTest.php</file>
+        </testsuite>
     </testsuites>
 </phpunit>

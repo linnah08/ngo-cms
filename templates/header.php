@@ -207,6 +207,41 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
 <?php endif; ?>
 
 <header class="site-header">
+  <?php if (launch_banner_enabled()): ?>
+  <!-- Pre-launch notice. Rendered inside .site-header on purpose: that element
+       is already position:sticky, so the strip sticks with it without any
+       z-index or top-offset juggling, and dismissing it just shrinks the
+       header. Styles are inline — main.css can be stale-cached on the server. -->
+  <div id="om-launch-banner"
+       role="status"
+       style="background:#1f2937;color:#f9fafb;font-size:.85rem;line-height:1.45;">
+    <div style="max-width:1200px;margin:0 auto;padding:.6rem 1rem;display:flex;
+                align-items:center;justify-content:center;gap:.75rem;">
+      <span style="flex:1 1 auto;text-align:center;">
+        <?= h(launch_banner_text(get_lang())) ?>
+      </span>
+      <button type="button"
+              onclick="omDismissLaunchBanner()"
+              aria-label="<?= get_lang() === 'en' ? 'Close this notice' : 'Затвори съобщението' ?>"
+              style="flex:0 0 auto;background:none;border:0;color:inherit;font-size:1.25rem;
+                     line-height:1;padding:.25rem .5rem;cursor:pointer;opacity:.75;border-radius:4px;">&times;</button>
+    </div>
+  </div>
+  <script>
+    // Hide before paint on repeat views so the strip does not flash. Storage can
+    // throw (private window, site data blocked) — the banner simply stays then.
+    function omDismissLaunchBanner() {
+      var el = document.getElementById('om-launch-banner');
+      if (el) el.style.display = 'none';
+      try { localStorage.setItem('omLaunchBannerHidden', '1'); } catch (e) {}
+    }
+    try {
+      if (localStorage.getItem('omLaunchBannerHidden') === '1') {
+        document.getElementById('om-launch-banner').style.display = 'none';
+      }
+    } catch (e) {}
+  </script>
+  <?php endif; ?>
   <!-- Top bar -->
   <div class="header-top">
     <div class="container">

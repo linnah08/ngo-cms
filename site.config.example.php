@@ -64,3 +64,19 @@ define('DUAL_CURRENCY_UNTIL', '2026-07-01');
 // ── Optional feature modules ──────────────────────────────────────────────────
 // Crowdfunding campaigns (the campaign/ pages + reward pledges in checkout).
 define('FEATURE_CAMPAIGN', true);
+
+// ── While the site is still being filled in ───────────────────────────────────
+// A dark strip at the top of every public page saying the site is new. It is a
+// notice and nothing more: no page is blocked, no price hidden, no order
+// stopped — a card acquirer reviewing the site for a virtual POS has to be able
+// to walk every page and the whole checkout.
+//
+// Easier to switch in Admin → Организация, which writes the same constants to
+// content/organisation.json and wins over this file. Leave the text constants
+// empty for the built-in BG/EN wording.
+//
+// Its sibling is SITE_NOINDEX (see includes/seo.php), which keeps the same
+// unfinished site out of search results. Both come off on launch day.
+define('SITE_LAUNCH_BANNER',    false);
+define('SITE_LAUNCH_BANNER_BG', '');
+define('SITE_LAUNCH_BANNER_EN', '');

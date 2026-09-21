@@ -108,6 +108,34 @@ function feature_enabled(string $name): bool {
     return !defined($const) || (bool) constant($const);
 }
 
+/**
+ * Pre-launch notice shown as a strip at the top of every public page, switched
+ * on in Admin → Организация while the site is still being filled in.
+ *
+ * It is deliberately only a notice: it never blocks a page, hides a price or
+ * stops an order. A card acquirer reviewing the site before granting a virtual
+ * POS has to be able to walk every page and the whole checkout, and showing a
+ * reviewer something different from the public is not an option.
+ */
+function launch_banner_enabled(): bool {
+    return defined('SITE_LAUNCH_BANNER') && (bool) SITE_LAUNCH_BANNER;
+}
+
+/**
+ * The notice text in the given language: the owner's own wording from
+ * Admin → Организация, else the default below. Never returns '' while the
+ * banner is on, so the strip is never rendered empty.
+ */
+function launch_banner_text(string $lang): string {
+    $const  = $lang === 'en' ? 'SITE_LAUNCH_BANNER_EN' : 'SITE_LAUNCH_BANNER_BG';
+    $custom = defined($const) ? trim((string) constant($const)) : '';
+    if ($custom !== '') return $custom;
+
+    return $lang === 'en'
+        ? 'Our new site has just gone live — we are still adding products and content.'
+        : 'Новият ни сайт току-що заработи — все още добавяме продукти и съдържание.';
+}
+
 // First-run: until the site has been configured (no site.config.php yet), send
 // every web visitor to the install wizard so a fresh upload is "next-next-finish".
 if (PHP_SAPI !== 'cli'

@@ -238,6 +238,35 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </div>
   </section>
 
+  <!-- ── Pre-launch notice ─────────────────────────────────────────────────── -->
+  <section class="admin-card" style="<?= $card ?>">
+    <h2 class="admin-card__title">Съобщение в началото на сайта</h2>
+    <p class="admin-meta" style="margin:0 0 1rem;line-height:1.6;">
+      Показва тъмна лента най-горе на всяка страница от сайта — полезно, докато
+      още добавяте продукти и съдържание. Посетителите могат да я затворят.
+      Лентата не спира нищо: всички страници, цените и поръчките продължават да
+      работят нормално. Махнете отметката, когато сайтът е готов.
+    </p>
+    <label class="admin-checkbox" style="margin-bottom:1rem;">
+      <input type="checkbox" name="launch_banner" value="1" <?= $val('launch_banner') === '1' ? 'checked' : '' ?>>
+      Показвай съобщението
+    </label>
+    <div class="admin-form-grid">
+      <label id="f-launch_banner_bg">Текст на български
+        <input type="text" name="launch_banner_bg" value="<?= h($val('launch_banner_bg')) ?>" maxlength="200"
+               placeholder="<?= h(launch_banner_text('bg')) ?>"<?= $fattr('launch_banner_bg') ?>>
+        <?= $ferr('launch_banner_bg') ?>
+        <small style="<?= $hint ?>">Оставете празно, за да се показва текстът по подразбиране.</small>
+      </label>
+      <label id="f-launch_banner_en">Текст на английски
+        <input type="text" name="launch_banner_en" value="<?= h($val('launch_banner_en')) ?>" maxlength="200"
+               placeholder="<?= h(launch_banner_text('en')) ?>"<?= $fattr('launch_banner_en') ?>>
+        <?= $ferr('launch_banner_en') ?>
+        <small style="<?= $hint ?>">Оставете празно, за да се показва текстът по подразбиране.</small>
+      </label>
+    </div>
+  </section>
+
   <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;margin-bottom:2rem;">
     <button type="submit" class="btn btn--primary">Запази</button>
   </div>

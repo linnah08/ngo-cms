@@ -32,6 +32,9 @@ function org_fields(): array
         'social_facebook'  => 'SOCIAL_FACEBOOK',
         'social_instagram' => 'SOCIAL_INSTAGRAM',
         'social_linkedin'  => 'SOCIAL_LINKEDIN',
+        'launch_banner'    => 'SITE_LAUNCH_BANNER',
+        'launch_banner_bg' => 'SITE_LAUNCH_BANNER_BG',
+        'launch_banner_en' => 'SITE_LAUNCH_BANNER_EN',
     ];
 }
 
@@ -204,6 +207,17 @@ function org_validate(array $in, array $themeKeys): array
     foreach (['social_facebook' => 'Facebook', 'social_instagram' => 'Instagram', 'social_linkedin' => 'LinkedIn'] as $k => $label) {
         if ($v[$k] !== '' && !org_url_valid($v[$k])) {
             $e[$k] = "Моля, поставете пълния адрес на страницата ви във {$label}, започващ с https://";
+        }
+    }
+
+    // An unticked checkbox is simply absent from the POST, which the loop above
+    // turns into ''. Store an explicit '0' instead — otherwise the saved value
+    // reads as "not set", and the banner could never be switched back off.
+    $v['launch_banner'] = ($in['launch_banner'] ?? '') === '1' ? '1' : '0';
+
+    foreach (['launch_banner_bg' => 'на български', 'launch_banner_en' => 'на английски'] as $k => $lang) {
+        if (mb_strlen($v[$k]) > 200) {
+            $e[$k] = "Съобщението {$lang} е твърде дълго (най-много 200 знака).";
         }
     }
 
