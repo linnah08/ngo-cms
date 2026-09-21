@@ -52,4 +52,11 @@ final class HomeVideoThumbTest extends TestCase
         $this->assertSame('', home_fetch_video_thumb($v, 's_ab12', fn() => '<html>not an image</html>', $this->root));
         $this->assertSame('', home_fetch_video_thumb(['provider' => 'youtube', 'id' => '../../x'], 's_ab12', fn() => base64_decode(self::PNG), $this->root));
     }
+
+    public function test_oversized_responses_are_rejected(): void
+    {
+        $v = ['provider' => 'youtube', 'id' => 'dQw4w9WgXcQ'];
+        $oversized = str_repeat('x', HOME_THUMB_MAX_BYTES + 1);
+        $this->assertSame('', home_fetch_video_thumb($v, 's_ab12', fn() => $oversized, $this->root));
+    }
 }

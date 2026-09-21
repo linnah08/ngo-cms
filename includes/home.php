@@ -554,6 +554,8 @@ function home_upsert(array $doc, array $section): array {
 // Fetched once, when the admin saves, so visitors' browsers never contact
 // YouTube/Vimeo until they press play.
 
+const HOME_THUMB_MAX_BYTES = 5_000_000;
+
 function home_http_get(string $url): ?string {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
@@ -562,6 +564,9 @@ function home_http_get(string $url): ?string {
         CURLOPT_CONNECTTIMEOUT => 4,
         CURLOPT_TIMEOUT        => 6,
         CURLOPT_USERAGENT      => 'ngo-cms',
+        CURLOPT_MAXFILESIZE    => HOME_THUMB_MAX_BYTES,
+        CURLOPT_NOPROGRESS     => false,
+        CURLOPT_XFERINFOFUNCTION => fn($ch, $dlTotal, $dlNow, $ulTotal, $ulNow) => $dlNow > HOME_THUMB_MAX_BYTES ? 1 : 0,
     ]);
     $body = curl_exec($ch);
     $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -582,11 +587,12 @@ function home_fetch_video_thumb(array $v, string $sid, ?callable $get = null, ?s
         if (!preg_match('#^https://i\.vimeocdn\.com/[^\s"<>]+$#', $src)) return '';
     }
     $bytes = $get($src);
-    if (!is_string($bytes) || $bytes === '' || strlen($bytes) > 5_000_000) return '';
+    if (!is_string($bytes) || $bytes === '' || strlen($bytes) > HOME_THUMB_MAX_BYTES) return '';
     $ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][(new finfo(FILEINFO_MIME_TYPE))->buffer($bytes)] ?? null;
     if ($ext === null) return '';
     $rel = '/assets/images/pages/home/' . $sid . '-video-' . $v['id'] . '.' . $ext;
     $abs = $root . $rel;
-    if (!is_dir(dirname($abs)) && !mkdir(dirname($abs), 0755, true)) return '';
+    $d   = dirname($abs);
+    if (!is_dir($d) && !@mkdir($d, 0755, true) && !is_dir($d)) return '';
     return file_put_contents($abs, $bytes) !== false ? $rel : '';
 }
