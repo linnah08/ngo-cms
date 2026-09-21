@@ -616,3 +616,55 @@ function home_inline_save(string $id, array $fields): array {
     $saved = home_save($doc, (int) $doc['rev']);
     return $saved['ok'] ? ['ok' => true] : ['ok' => false, 'error' => home_save_error_message($saved['error'])];
 }
+
+// ── Uploads (admin form) ─────────────────────────────────────────────────────
+
+/** One file out of PHP's $_FILES[$name][...][$key] layout, or null. */
+function home_files_entry(array $files, string $name, string|int $key): ?array {
+    if (!isset($files[$name]['tmp_name'][$key])) return null;
+    return [
+        'tmp_name' => $files[$name]['tmp_name'][$key],
+        'error'    => $files[$name]['error'][$key] ?? UPLOAD_ERR_NO_FILE,
+        'name'     => $files[$name]['name'][$key] ?? '',
+    ];
+}
+
+/** @return array{path: ?string, error: ?string} both null when no file was chosen. */
+function home_store_upload(array $file, string $sid, string $key): array {
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE || empty($file['tmp_name'])) return ['path' => null, 'error' => null];
+    if ($file['error'] !== UPLOAD_ERR_OK) return ['path' => null, 'error' => 'Снимката не можа да се качи. Опитайте с по-малък файл.'];
+    $ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][(string) mime_content_type($file['tmp_name'])] ?? null;
+    if ($ext === null) return ['path' => null, 'error' => 'Снимката трябва да е JPEG, PNG или WebP.'];
+    if (!preg_match('/^s_[a-z0-9_]{1,24}$/', $sid)) return ['path' => null, 'error' => 'Снимката не можа да се запази.'];
+    $rel = '/assets/images/pages/home/' . $sid . '-' . preg_replace('/[^a-z0-9_]/', '', $key) . '-' . time() . '.' . $ext;
+    $abs = ROOT_PATH . $rel;
+    if (!is_dir(dirname($abs))) mkdir(dirname($abs), 0755, true);
+    if (!move_uploaded_file($file['tmp_name'], $abs)) return ['path' => null, 'error' => 'Снимката не можа да се запази. Опитайте отново.'];
+    require_once ROOT_PATH . '/includes/images.php';
+    image_resize_to_fit($abs);
+    return ['path' => $rel, 'error' => null];
+}
+
+/** Store chosen files and put their paths into $in. Upload fields: up[<key>], up_card[<index>]. */
+function home_apply_uploads(array &$in, string $type, array $files, string $sid): array {
+    $errors = [];
+    foreach (home_types()[$type]['fields'] ?? [] as $key => $def) {
+        if ($def['kind'] === 'image' && ($file = home_files_entry($files, 'up', $key))) {
+            $r = home_store_upload($file, $sid, $key);
+            if ($r['error']) $errors[$key] = $r['error'];
+            elseif ($r['path']) $in[$key] = $r['path'];
+        }
+        if ($def['kind'] === 'cards' && is_array($in['cards'] ?? null)) {
+            $pos = 0;
+            foreach (array_keys($in['cards']) as $ci) {
+                if (is_array($in['cards'][$ci]) && ($file = home_files_entry($files, 'up_card', $ci))) {
+                    $r = home_store_upload($file, $sid, 'card' . (int) $ci);
+                    if ($r['error']) $errors["cards.$pos.image"] = $r['error'];
+                    elseif ($r['path']) $in['cards'][$ci]['image'] = $r['path'];
+                }
+                $pos++;
+            }
+        }
+    }
+    return $errors;
+}

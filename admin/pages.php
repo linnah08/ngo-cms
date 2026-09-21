@@ -11,8 +11,12 @@ admin_require_admin();
 
 $page = $_GET['page'] ?? '';
 
+// The front page is built in admin/home-sections.php now.
+if ($page === 'home' && $_SERVER['REQUEST_METHOD'] !== 'POST') { header('Location: /admin/home-sections.php'); exit; }
+
 $page_labels = [
     'home'          => 'Начална страница',
+    'home_campaign' => 'Начална страница — кампания',
     'impact'        => 'Показатели (числа)',
     'centres'       => 'Центрове',
     'about'         => 'За нас',
@@ -26,6 +30,7 @@ $page_labels = [
 
 $page_urls = [
     'home'          => '/',
+    'home_campaign' => '/',
     'impact'        => '/',
     'centres'       => '/',
     'about'         => '/za-nas/',
@@ -46,53 +51,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) { http_response_code(400); exit('Invalid token'); }
     $section = $_POST['section'] ?? '';
 
-    if ($section === 'home') {
-        $pages = load_json(CONTENT_PATH . '/pages.json');
-        $pages['home']['hero_title']       = trim($_POST['hero_title']       ?? '');
-        $pages['home']['hero_text']        = trim($_POST['hero_text']        ?? '');
-        $pages['home']['mission_title']    = trim($_POST['mission_title']    ?? '');
-        $pages['home']['mission_text']     = trim($_POST['mission_text']     ?? '');
-        $pages['home']['hero_title_en']    = trim($_POST['hero_title_en']    ?? '');
-        $pages['home']['hero_text_en']     = trim($_POST['hero_text_en']     ?? '');
-        $pages['home']['mission_title_en'] = trim($_POST['mission_title_en'] ?? '');
-        $pages['home']['mission_text_en']  = trim($_POST['mission_text_en']  ?? '');
-
-        // Mission image upload
-        $mission_img_key = 'mission_image';
-        if (!empty($_FILES[$mission_img_key]['tmp_name']) && $_FILES[$mission_img_key]['error'] === UPLOAD_ERR_OK) {
-            $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
-            $ftype   = mime_content_type($_FILES[$mission_img_key]['tmp_name']);
-            if (isset($allowed[$ftype])) {
-                $img_dir = $_SERVER['DOCUMENT_ROOT'] . '/assets/images/pages/';
-                if (!is_dir($img_dir)) mkdir($img_dir, 0755, true);
-                $filename = 'mission.' . $allowed[$ftype];
-                if (move_uploaded_file($_FILES[$mission_img_key]['tmp_name'], $img_dir . $filename)) {
-                    image_resize_to_fit($img_dir . $filename);
-                    $pages['home']['mission_image'] = '/assets/images/pages/' . $filename;
-                }
-            }
-        } elseif (!empty($_POST['mission_image_lib'])) {
-            $lib = $_POST['mission_image_lib'];
-            if (preg_match('#^/assets/images/[a-zA-Z0-9/_.\-]+$#', $lib)) {
-                $pages['home']['mission_image'] = $lib;
-            }
-        } elseif (($_POST['mission_image_clear'] ?? '') === '1') {
-            $pages['home']['mission_image'] = '';
-        }
-
-        save_json(CONTENT_PATH . '/pages.json', $pages);
-        header('Location: /admin/pages.php?page=home&saved=1&_asclear=page:home'); exit;
-
-    } elseif ($section === 'campaign') {
+    if ($section === 'campaign') {
         // The editor is hidden when the module is off, so a POST arriving here
         // is either a stale tab or a hand-crafted request. Either way, refuse it
         // rather than writing settings nothing reads.
         if (!feature_enabled('campaign')) {
-            header('Location: /admin/pages.php?page=home'); exit;
+            header('Location: /admin/pages.php?page=home_campaign'); exit;
         }
         $url = trim($_POST['campaign_url'] ?? '');
         if ($url !== '' && !filter_var($url, FILTER_VALIDATE_URL)) {
-            header('Location: /admin/pages.php?page=home&campaign_error=1'); exit;
+            header('Location: /admin/pages.php?page=home_campaign&campaign_error=1'); exit;
         }
         setting_set('campaign_url', $url);
 
@@ -126,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         save_json(CONTENT_PATH . '/pages.json', $pages);
-        header('Location: /admin/pages.php?page=home&saved=1&_asclear=page:campaign-text'); exit;
+        header('Location: /admin/pages.php?page=home_campaign&saved=1&_asclear=page:campaign-text'); exit;
 
     } elseif ($section === 'impact_delete') {
         $items = pages_list_delete(load_json(IMPACT_FILE), (int)($_POST['item_index'] ?? -1));
@@ -442,7 +410,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
           <?php endif; ?>
         </td>
         <td style="text-align:right;">
-          <a href="/admin/pages.php?page=<?= h($key) ?>" class="btn btn--outline" style="font-size:0.85rem;padding:0.4rem 0.9rem;">
+          <a href="<?= $key === 'home' ? '/admin/home-sections.php' : '/admin/pages.php?page=' . h($key) ?>" class="btn btn--outline" style="font-size:0.85rem;padding:0.4rem 0.9rem;">
             Редактиране
           </a>
         </td>
@@ -534,81 +502,13 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   </form>
 </div>
 
-<?php elseif ($page === 'home'): ?>
-<!-- ══ HOME ══ -->
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
-  <div>
-    <a href="/admin/pages.php" style="color:var(--text-muted);font-size:0.9rem;display:block;margin-bottom:.25rem;">← Назад</a>
-    <h1 style="margin:0;">Начална страница</h1>
-  </div>
-  <button type="submit" form="homeForm" class="btn btn--primary">Запази</button>
-</div>
-<form id="homeForm" method="POST" action="/admin/pages.php?page=home" class="admin-form" enctype="multipart/form-data">
-  <?= csrf_field() ?>
-  <input type="hidden" name="section" value="home">
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
-    <div class="form-group">
-      <label>Hero заглавие <?= $lbl_bg_badge ?></label>
-      <input type="text" id="heroTitleBg" name="hero_title" value="<?= h($home['hero_title'] ?? '') ?>">
-    </div>
-    <div class="form-group">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;"><label style="margin:0;">Hero title <?= $lbl_en_badge ?></label><button type="button" class="btn btn--outline" onclick="txField('heroTitleBg','heroTitleEn',this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button></div>
-      <input type="text" id="heroTitleEn" name="hero_title_en" value="<?= h($home['hero_title_en'] ?? '') ?>">
-    </div>
-    <div class="form-group">
-      <label>Hero текст <?= $lbl_bg_badge ?></label>
-      <textarea id="heroTextBg" name="hero_text" rows="3"><?= h($home['hero_text'] ?? '') ?></textarea>
-    </div>
-    <div class="form-group">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;"><label style="margin:0;">Hero text <?= $lbl_en_badge ?></label><button type="button" class="btn btn--outline" onclick="txField('heroTextBg','heroTextEn',this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button></div>
-      <textarea id="heroTextEn" name="hero_text_en" rows="3"><?= h($home['hero_text_en'] ?? '') ?></textarea>
-    </div>
-    <div class="form-group">
-      <label>Заглавие на мисията <?= $lbl_bg_badge ?></label>
-      <input type="text" id="missionTitleBg" name="mission_title" value="<?= h($home['mission_title'] ?? '') ?>">
-    </div>
-    <div class="form-group">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;"><label style="margin:0;">Mission title <?= $lbl_en_badge ?></label><button type="button" class="btn btn--outline" onclick="txField('missionTitleBg','missionTitleEn',this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button></div>
-      <input type="text" id="missionTitleEn" name="mission_title_en" value="<?= h($home['mission_title_en'] ?? '') ?>">
-    </div>
-    <div class="form-group">
-      <label>Текст на мисията <?= $lbl_bg_badge ?></label>
-      <textarea id="missionTextBg" name="mission_text" rows="4"><?= h($home['mission_text'] ?? '') ?></textarea>
-    </div>
-    <div class="form-group">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;"><label style="margin:0;">Mission text <?= $lbl_en_badge ?></label><button type="button" class="btn btn--outline" onclick="txField('missionTextBg','missionTextEn',this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button></div>
-      <textarea id="missionTextEn" name="mission_text_en" rows="4"><?= h($home['mission_text_en'] ?? '') ?></textarea>
-    </div>
-    <div class="form-group" style="grid-column:1/-1;">
-      <label>Снимка за секция Мисия</label>
-      <?php if (!empty($home['mission_image'])): ?>
-        <img src="<?= h($home['mission_image']) ?>?t=<?= time() ?>" alt="Mission image"
-             style="width:100%;max-width:320px;border-radius:4px;margin-bottom:.75rem;display:block;">
-      <?php endif; ?>
-      <input type="hidden" name="mission_image_lib" id="missionImageLib">
-      <input type="hidden" name="mission_image_clear" id="missionImageClear" value="">
-      <input type="file" name="mission_image" accept="image/jpeg,image/png,image/webp" data-om-crop>
-      <button type="button" class="btn btn--outline"
-              style="margin-top:.5rem;font-size:.82rem;"
-              onclick="_pickMissionImage(this)">Избери от библиотека</button>
-      <?php if (!empty($home['mission_image'])): ?>
-        <button type="button" class="btn btn--outline"
-                style="margin-top:.5rem;font-size:.82rem;color:#a00;border-color:#a00;"
-                onclick="_adminConfirm('Изтрий снимката за секция Мисия?').then(function(ok){ if(ok){ document.getElementById('missionImageClear').value='1'; document.getElementById('homeForm').submit(); } })">Изтрий снимката</button>
-      <?php endif; ?>
-      <p style="font-size:.8rem;color:var(--text-muted);margin-top:.25rem;">JPEG, PNG или WebP. Ако не е зададена, мисията се показва като централизиран текст.</p>
-    </div>
-  </div>
-  <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--border);">
-    <button type="submit" class="btn btn--primary">Запази</button>
-  </div>
-</form>
-
-<!-- ── Campaign Section ── -->
-<?php /* Module off: the homepage block never renders, so this editor would be a
-         control that silently does nothing. Hide it rather than mislead. */ ?>
+<?php elseif ($page === 'home_campaign'): ?>
+<!-- ══ HOME — CAMPAIGN BLOCK ══ -->
+<a href="/admin/home-sections.php" style="color:var(--text-muted);font-size:0.9rem;display:block;margin-bottom:.25rem;">← Назад към началната страница</a>
+<?php if (!feature_enabled('campaign')): ?>
+  <p>Модулът „Кампания“ е изключен, затова блокът на кампанията не се показва на сайта.</p>
+<?php endif; ?>
 <?php if (feature_enabled('campaign')): ?>
-<hr style="margin:2rem 0;border:none;border-top:1px solid var(--border);">
 <?php
   $campaign    = $all_pages['campaign'] ?? [];
   $campaign_url = setting_get('campaign_url');
@@ -623,7 +523,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 <?php if (isset($_GET['campaign_error'])): ?>
   <p style="color:#a00;margin-bottom:1rem;">Невалиден URL — моля въведете пълен адрес (https://...).</p>
 <?php endif; ?>
-<form id="campaignForm" method="POST" action="/admin/pages.php?page=home" class="admin-form" enctype="multipart/form-data">
+<form id="campaignForm" method="POST" action="/admin/pages.php?page=home_campaign" class="admin-form" enctype="multipart/form-data">
   <?= csrf_field() ?>
   <input type="hidden" name="section" value="campaign">
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
@@ -707,21 +607,6 @@ function _pickCampaignImage(btn) {
       img.src = p; img.alt = 'Campaign image';
       img.style.cssText = 'width:100%;max-width:320px;border-radius:4px;margin-bottom:.75rem;display:block;';
       fg.insertBefore(img, fg.querySelector('input[name="campaign_image_lib"]'));
-    }
-  });
-}
-function _pickMissionImage(btn) {
-  openMediaPicker(function (p) {
-    document.getElementById('missionImageLib').value = p;
-    var fg  = btn.closest('.form-group');
-    var img = fg.querySelector('img');
-    if (img) {
-      img.src = p;
-    } else {
-      img = document.createElement('img');
-      img.src = p; img.alt = 'Mission image';
-      img.style.cssText = 'width:100%;max-width:320px;border-radius:4px;margin-bottom:.75rem;display:block;';
-      fg.insertBefore(img, fg.querySelector('input[name="mission_image_lib"]'));
     }
   });
 }
@@ -2184,8 +2069,7 @@ function togglePwd(btn) {
 </script>
 
 <script>
-<?php if ($page === '' || $page === 'home'): ?>
-initAutosave({ key: 'page:home',          formId: 'homeForm',     tinyIds: [] });
+<?php if ($page === 'home_campaign'): ?>
 initAutosave({ key: 'page:campaign-text', formId: 'campaignForm', tinyIds: ['campTextBg', 'campTextEn'] });
 <?php endif; ?>
 <?php if ($page === 'about' && $edit_team_idx === null): ?>
