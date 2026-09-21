@@ -132,8 +132,8 @@ function launch_banner_text(string $lang): string {
     if ($custom !== '') return $custom;
 
     return $lang === 'en'
-        ? 'Our new site has just gone live — we are still adding products and content.'
-        : 'Новият ни сайт току-що заработи — все още добавяме продукти и съдържание.';
+        ? 'Our site is new — we are still adding products and content.'
+        : 'Сайтът ни е нов — още добавяме продукти и съдържание.';
 }
 
 // First-run: until the site has been configured (no site.config.php yet), send

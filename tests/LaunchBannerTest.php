@@ -72,8 +72,8 @@ final class LaunchBannerTest extends TestCase
 
     public function test_default_copy_is_used_when_no_text_is_set(): void
     {
-        $this->assertStringContainsString('Новият ни сайт', launch_banner_text('bg'));
-        $this->assertStringContainsString('has just gone live', launch_banner_text('en'));
+        $this->assertStringContainsString('Сайтът ни е нов', launch_banner_text('bg'));
+        $this->assertStringContainsString('Our site is new', launch_banner_text('en'));
     }
 
     public function test_text_is_never_empty_so_the_strip_is_never_blank(): void
@@ -126,7 +126,7 @@ final class LaunchBannerTest extends TestCase
             'SITE_LAUNCH_BANNER_BG' => "   \n ",
         ], "echo launch_banner_text('bg');");
 
-        $this->assertStringContainsString('Новият ни сайт', $out);
+        $this->assertStringContainsString('Сайтът ни е нов', $out);
     }
 
     public function test_one_language_may_be_customised_without_the_other(): void
@@ -137,7 +137,7 @@ final class LaunchBannerTest extends TestCase
         ], "echo launch_banner_text('bg'), '|', launch_banner_text('en');");
 
         [$bg, $en] = explode('|', $out);
-        $this->assertStringContainsString('Новият ни сайт', $bg);
+        $this->assertStringContainsString('Сайтът ни е нов', $bg);
         $this->assertSame('Soft launch', $en);
     }
 
@@ -240,6 +240,21 @@ final class LaunchBannerTest extends TestCase
         // The text is owner-supplied and lands in HTML, so it must go through h().
         $header = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/templates/header.php');
         $this->assertStringContainsString('h(launch_banner_text(get_lang()))', $header);
+    }
+
+    public function test_banner_cannot_be_dismissed_away(): void
+    {
+        // It first shipped with a × that wrote localStorage, and a single stray
+        // tap then hid it for good — on every page, for the rest of that
+        // browser's life. A notice worth showing must not be that easy to lose.
+        $header = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/templates/header.php');
+        $start  = strpos($header, 'launch_banner_enabled()');
+        $this->assertNotFalse($start);
+        $block  = substr($header, $start, 2000);
+
+        foreach (['localStorage', 'sessionStorage', '<button'] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden, $block, $forbidden);
+        }
     }
 
     public function test_banner_never_gates_a_page(): void
