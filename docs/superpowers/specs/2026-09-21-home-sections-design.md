@@ -131,8 +131,11 @@ section's edit view).
 
 ### Edit view (`?edit=<id>` or `?add=<type>`)
 
-- Form generated from the type registry: BG/EN side by side, `✦ Translate` buttons (existing
-  `txField`), image fields with upload + cropper (`data-om-crop`) + "Избери от библиотека",
+- Form generated from the type registry: BG/EN side by side. Every EN field carries
+  `data-translate-from="<bg field id>"` so the shared script in `admin-footer.php` adds the
+  `✦ Translate` button (CLAUDE.md "EN fields — always translatable"; enforced by
+  `tests/Admin/TranslateButtonCoverageTest.php`, including dynamically added card rows).
+  Image fields with upload + cropper (`data-om-crop`) + "Избери от библиотека",
   rich text via TinyMCE using `window._tinyBase` only.
 - Cards: add/remove card (2–4) and ↑/↓ within the form; new card rows get unique ids and
   `tinymce.init` if they contain rich text.
