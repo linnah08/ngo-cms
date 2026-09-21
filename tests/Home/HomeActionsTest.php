@@ -23,7 +23,7 @@ final class HomeActionsTest extends TestCase
         $r = home_apply_action($this->doc(), 'move_up', 's_ab12');
         $this->assertTrue($r['ok']);
         $this->assertSame(['s_ab12', 's_hero', 's_cd34'], $this->ids($r['doc']));
-        $this->assertSame('„Помогнете" е преместена нагоре.', $r['message']);
+        $this->assertSame("\u{201E}Помогнете\u{201C} е преместена нагоре.", $r['message']);
         $r = home_apply_action($this->doc(), 'move_down', 's_ab12');
         $this->assertSame(['s_hero', 's_cd34', 's_ab12'], $this->ids($r['doc']));
     }

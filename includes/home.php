@@ -144,7 +144,7 @@ function home_types(): array {
                 + $img('Снимка') + $btn(1) + $btn(2)],
         'products' => ['builtin' => true, 'icon' => '🛍', 'label' => 'Продукти от магазина',
             'desc' => 'Продуктите, отбелязани за началната страница.',
-            'note' => 'Кои продукти се показват, избирате в Продукти → "Показвай на началната страница". Ако няма отбелязани, секцията не се показва.',
+            'note' => "Кои продукти се показват, избирате в Продукти → \u{201E}Показвай на началната страница\u{201C}. Ако няма отбелязани, секцията не се показва.",
             'fields' => ['heading' => $head] + $btn(1) + ['background' => $bg('white')]],
         'impact' => ['builtin' => true, 'icon' => '🔢', 'label' => 'Показатели (числа)',
             'desc' => 'Числата, които показват вашето въздействие.', 'note' => sprintf($items_note, 'числа'),
@@ -182,7 +182,7 @@ function home_types(): array {
             'desc' => 'От 2 до 4 карти, всяка със снимка, заглавие, кратък текст и линк.', 'note' => null,
             'fields' => ['heading' => $head, 'cards' => ['kind' => 'cards', 'label' => 'Карти'], 'background' => $bg('white')]],
         'video' => ['builtin' => false, 'icon' => '▶️', 'label' => 'Видео',
-            'desc' => 'Видео от YouTube или Vimeo. Зарежда се едва когато посетителят натисне "Пусни".', 'note' => null,
+            'desc' => "Видео от YouTube или Vimeo. Зарежда се едва когато посетителят натисне \u{201E}Пусни\u{201C}.", 'note' => null,
             'fields' => ['heading' => $head,
                          'video'   => ['kind' => 'video', 'label' => 'Линк към видеото', 'required' => true],
                          'caption' => ['kind' => 'text', 'label' => 'Надпис под видеото', 'max' => 200],
@@ -508,18 +508,18 @@ function home_apply_action(array $doc, string $action, string $id): array {
 
     switch ($action) {
         case 'move_up':
-            if ($i === 0) return $fail('„' . $name . '" вече е най-горе.');
+            if ($i === 0) return $fail("\u{201E}{$name}\u{201C} вече е най-горе.");
             [$list[$i - 1], $list[$i]] = [$list[$i], $list[$i - 1]];
-            $msg = '„' . $name . '" е преместена нагоре.';
+            $msg = "\u{201E}{$name}\u{201C} е преместена нагоре.";
             break;
         case 'move_down':
-            if ($i === $last) return $fail('„' . $name . '" вече е най-долу.');
+            if ($i === $last) return $fail("\u{201E}{$name}\u{201C} вече е най-долу.");
             [$list[$i + 1], $list[$i]] = [$list[$i], $list[$i + 1]];
-            $msg = '„' . $name . '" е преместена надолу.';
+            $msg = "\u{201E}{$name}\u{201C} е преместена надолу.";
             break;
         case 'toggle':
             $list[$i]['visible'] = empty($s['visible']);
-            $msg = $list[$i]['visible'] ? '„' . $name . '" вече се показва на сайта.' : '„' . $name . '" е скрита от сайта.';
+            $msg = $list[$i]['visible'] ? "\u{201E}{$name}\u{201C} вече се показва на сайта." : "\u{201E}{$name}\u{201C} е скрита от сайта.";
             break;
         case 'duplicate':
             if (home_is_builtin((string) $s['type'])) return $fail('Тази секция съществува само веднъж и не може да се дублира.');
@@ -527,12 +527,12 @@ function home_apply_action(array $doc, string $action, string $id): array {
             $copy['id'] = home_new_id();
             array_splice($list, $i + 1, 0, [$copy]);
             $doc['sections'] = $list;
-            return ['ok' => true, 'doc' => $doc, 'message' => '„' . $name . '" е дублирана. Копието е точно под нея.', 'focus' => $copy['id']];
+            return ['ok' => true, 'doc' => $doc, 'message' => "\u{201E}{$name}\u{201C} е дублирана. Копието е точно под нея.", 'focus' => $copy['id']];
         case 'delete':
             if (home_is_builtin((string) $s['type'])) return $fail('Тази секция не може да се изтрие, но можете да я скриете.');
             array_splice($list, $i, 1);
             $doc['sections'] = $list;
-            return ['ok' => true, 'doc' => $doc, 'message' => '„' . $name . '" е изтрита.', 'focus' => null];
+            return ['ok' => true, 'doc' => $doc, 'message' => "\u{201E}{$name}\u{201C} е изтрита.", 'focus' => null];
         default:
             return $fail('Непознато действие.');
     }
