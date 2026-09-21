@@ -160,6 +160,12 @@ if ($section === 'campaign_settings') {
     save_json_response(['ok' => true]);
 }
 
+// Front-page sections (content/home.json): section is "home:<section id>".
+if (str_starts_with($section, 'home:')) {
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/home.php';
+    save_json_response(home_inline_save(substr($section, 5), $fields));
+}
+
 // Allowed field map: section → [field_name => [bg_key, en_key]]
 $allowed = [
     'home' => [

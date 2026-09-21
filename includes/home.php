@@ -596,3 +596,23 @@ function home_fetch_video_thumb(array $v, string $sid, ?callable $get = null, ?s
     if (!is_dir($d) && !@mkdir($d, 0755, true) && !is_dir($d)) return '';
     return file_put_contents($abs, $bytes) !== false ? $rel : '';
 }
+
+// ── On-page editing ──────────────────────────────────────────────────────────
+
+/** Save fields edited on the live page. Links, choices and cards are admin-form only. */
+function home_inline_save(string $id, array $fields): array {
+    $doc = home_load()['doc'];
+    $i   = home_find($doc, $id);
+    if ($i === null) return ['ok' => false, 'error' => 'unknown section'];
+    $defs = home_types()[$doc['sections'][$i]['type']]['fields'] ?? [];
+    foreach ($fields as $key => $values) {
+        $def = $defs[$key] ?? null;
+        if ($def === null || !in_array($def['kind'], ['text', 'textarea', 'html', 'alt', 'image'], true) || !is_array($values)) continue;
+        $raw = $def['kind'] === 'image' ? (string) ($values['bg'] ?? '') : home_pair($values);
+        [$value, $err] = home_clean_field($def, $raw, (string) $key);
+        if ($err) return ['ok' => false, 'error' => (string) reset($err)];
+        $doc['sections'][$i]['fields'][$key] = $value;
+    }
+    $saved = home_save($doc, (int) $doc['rev']);
+    return $saved['ok'] ? ['ok' => true] : ['ok' => false, 'error' => home_save_error_message($saved['error'])];
+}
