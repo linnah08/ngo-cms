@@ -668,3 +668,57 @@ function home_apply_uploads(array &$in, string $type, array $files, string $sid)
     }
     return $errors;
 }
+
+/**
+ * Handle admin/home-sections.php's action=save POST: resolve the target section
+ * (existing id, or a brand-new non-builtin type), apply uploads, validate, fetch
+ * a video thumbnail when needed, and persist. Pure w.r.t. the caller's globals —
+ * takes $doc/$post/$files in, returns a status the controller maps to a response.
+ *
+ * @param ?callable $fetch_thumb defaults to home_fetch_video_thumb(); injectable for tests.
+ * @return array{status: string, doc: ?array, sid: string, message: string, errors: array, form: ?array}
+ *   status: 'bad_type' (unknown/builtin type — caller should 400),
+ *           'not_found' (posted id no longer exists — caller should flash+redirect),
+ *           'saved' (persisted — caller should flash+redirect to ?focus=edit:<sid>),
+ *           'invalid' (validation/upload/save-conflict errors — caller should re-render the form).
+ */
+function home_admin_save(array $doc, array $post, array $files, ?callable $fetch_thumb = null): array {
+    $fetch_thumb ??= 'home_fetch_video_thumb';
+    $types    = home_types();
+    $post_id  = (string) ($post['id'] ?? '');
+    $post_rev = (int) ($post['rev'] ?? -1);
+
+    $idx = $post_id !== '' ? home_find($doc, $post_id) : null;
+    if ($post_id !== '' && $idx === null) {
+        return ['status' => 'not_found', 'doc' => null, 'sid' => $post_id,
+                'message' => 'Секцията не е намерена — може би е изтрита междувременно.', 'errors' => [], 'form' => null];
+    }
+    $type = $idx !== null ? (string) $doc['sections'][$idx]['type'] : (string) ($post['type'] ?? '');
+    if (!isset($types[$type]) || ($idx === null && home_is_builtin($type))) {
+        return ['status' => 'bad_type', 'doc' => null, 'sid' => '', 'message' => '', 'errors' => [], 'form' => null];
+    }
+
+    $sid = $idx !== null ? $post_id : home_new_id();
+    $old = $idx !== null ? ($doc['sections'][$idx]['fields'] ?? []) : [];
+    $in  = is_array($post['f'] ?? null) ? $post['f'] : [];
+    $upload_errors     = home_apply_uploads($in, $type, $files, $sid);
+    [$fields, $errors] = home_validate_section($type, $in);
+    $errors += $upload_errors;
+
+    if (!$errors && $type === 'video') {
+        $fields['thumb'] = (($old['video'] ?? null) === $fields['video'] && !empty($old['thumb']))
+            ? $old['thumb'] : $fetch_thumb($fields['video'], $sid);
+    }
+    if (!$errors) {
+        $section = ['id' => $sid, 'type' => $type, 'visible' => $idx !== null ? !empty($doc['sections'][$idx]['visible']) : true, 'fields' => $fields];
+        $saved   = home_save(home_upsert($doc, $section), $post_rev);
+        if ($saved['ok']) {
+            $name = home_section_name($section);
+            $message = $idx !== null ? "„{$name}“ е запазена." : "„{$name}“ е добавена най-долу на страницата и вече се вижда.";
+            return ['status' => 'saved', 'doc' => $saved['doc'], 'sid' => $sid, 'message' => $message, 'errors' => [], 'form' => null];
+        }
+        $errors['_form'] = home_save_error_message($saved['error']);
+    }
+    return ['status' => 'invalid', 'doc' => null, 'sid' => $sid, 'message' => '', 'errors' => $errors,
+            'form' => ['id' => $idx !== null ? $post_id : '', 'type' => $type, 'fields' => $fields]];
+}

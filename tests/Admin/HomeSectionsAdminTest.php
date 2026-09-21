@@ -10,9 +10,52 @@ require_once dirname(__DIR__, 2) . '/includes/home_admin.php';
 #[Group('admin')]
 final class HomeSectionsAdminTest extends TestCase
 {
+    private string $dir;
+
+    protected function setUp(): void
+    {
+        $this->dir = sys_get_temp_dir() . '/home-sections-admin-' . bin2hex(random_bytes(4));
+        mkdir($this->dir);
+        $GLOBALS['_om_home_file'] = $this->dir . '/home.json';
+    }
+
+    protected function tearDown(): void
+    {
+        unset($GLOBALS['_om_home_file']);
+        foreach (glob($this->dir . '/{,.}*', GLOB_BRACE) as $f) if (is_file($f)) unlink($f);
+        rmdir($this->dir);
+    }
+
     private function src(): string
     {
         return (string) file_get_contents(dirname(__DIR__, 2) . '/admin/home-sections.php');
+    }
+
+    /** @param array $extra extra sections appended after hero + cta */
+    private function doc(int $rev, array $extra = []): array
+    {
+        return ['version' => 1, 'rev' => $rev, 'sections' => array_merge([
+            ['id' => 's_hero', 'type' => 'hero', 'visible' => true, 'fields' => ['title' => ['bg' => 'Здравейте', 'en' => '']]],
+            ['id' => 's_ab12', 'type' => 'cta', 'visible' => false, 'fields' => $this->validCtaFields()],
+        ], $extra)];
+    }
+
+    private function seedFile(array $doc): void
+    {
+        file_put_contents($GLOBALS['_om_home_file'], json_encode($doc, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function validCtaFields(): array
+    {
+        return [
+            'heading'    => ['bg' => 'Помогнете', 'en' => ''],
+            'text'       => ['bg' => '', 'en' => ''],
+            'btn1_label' => ['bg' => '', 'en' => ''],
+            'btn1_url'   => ['bg' => '', 'en' => ''],
+            'btn2_label' => ['bg' => '', 'en' => ''],
+            'btn2_url'   => ['bg' => '', 'en' => ''],
+            'background' => 'teal',
+        ];
     }
 
     public function test_requires_an_admin_before_anything_else(): void
@@ -37,11 +80,180 @@ final class HomeSectionsAdminTest extends TestCase
         $this->assertLessThan(strpos($src, '$_POST[', (int) $post), $csrf);
     }
 
-    public function test_new_sections_cannot_be_builtins_or_unknown_types(): void
+    // ── home_admin_save(): the real save flow ──────────────────────────────────
+
+    public function test_save_refuses_a_new_builtin_section(): void
     {
-        $this->assertStringContainsString('home_is_builtin($type)', $this->src());
-        $this->assertStringContainsString('http_response_code(400)', $this->src());
+        $doc = $this->doc(0);
+        $this->seedFile($doc);
+        $before = file_get_contents($GLOBALS['_om_home_file']);
+
+        $r = home_admin_save($doc, ['id' => '', 'type' => 'hero', 'rev' => 0, 'f' => []], []);
+
+        $this->assertSame('bad_type', $r['status']);
+        $this->assertSame($before, file_get_contents($GLOBALS['_om_home_file']));
     }
+
+    public function test_save_refuses_a_new_unknown_type(): void
+    {
+        $doc = $this->doc(0);
+        $this->seedFile($doc);
+        $before = file_get_contents($GLOBALS['_om_home_file']);
+
+        $r = home_admin_save($doc, ['id' => '', 'type' => 'not_a_real_type', 'rev' => 0, 'f' => []], []);
+
+        $this->assertSame('bad_type', $r['status']);
+        $this->assertSame($before, file_get_contents($GLOBALS['_om_home_file']));
+    }
+
+    public function test_save_creates_a_new_visible_section_appended_last(): void
+    {
+        $doc = $this->doc(3);
+        $this->seedFile($doc);
+
+        $r = home_admin_save($doc, ['id' => '', 'type' => 'cta', 'rev' => 3, 'f' => $this->validCtaFields()], []);
+
+        $this->assertSame('saved', $r['status']);
+        $this->assertMatchesRegularExpression('/^s_[a-z0-9_]{1,24}$/', $r['sid']);
+        $this->assertNotSame('s_hero', $r['sid']);
+        $this->assertNotSame('s_ab12', $r['sid']);
+
+        $sections = $r['doc']['sections'];
+        $last = $sections[count($sections) - 1];
+        $this->assertSame($r['sid'], $last['id']);
+        $this->assertSame('cta', $last['type']);
+        $this->assertTrue($last['visible']);
+
+        $onDisk = json_decode((string) file_get_contents($GLOBALS['_om_home_file']), true);
+        $this->assertSame(4, $onDisk['rev']);
+        $this->assertSame($r['sid'], $onDisk['sections'][count($onDisk['sections']) - 1]['id']);
+    }
+
+    public function test_save_reports_a_conflict_when_the_revision_is_stale_and_writes_nothing(): void
+    {
+        $doc = $this->doc(5);
+        $this->seedFile($doc);
+
+        $r = home_admin_save($doc, ['id' => 's_ab12', 'type' => 'cta', 'rev' => 4, 'f' => $this->validCtaFields()], []);
+
+        $this->assertSame('invalid', $r['status']);
+        $this->assertSame(home_save_error_message('conflict'), $r['errors']['_form']);
+
+        $onDisk = json_decode((string) file_get_contents($GLOBALS['_om_home_file']), true);
+        $this->assertSame(5, $onDisk['rev']);
+        $this->assertSame(['s_hero', 's_ab12'], array_column($onDisk['sections'], 'id'));
+    }
+
+    public function test_save_keeps_typed_values_on_an_invalid_link_and_writes_nothing(): void
+    {
+        $doc = $this->doc(0);
+        $fields = $this->validCtaFields();
+        $fields['heading']['bg']  = 'Нова CTA';
+        $fields['text']['bg']     = 'Описание';
+        $fields['btn1_url']['bg'] = 'javascript:evil()';
+
+        $r = home_admin_save($doc, ['id' => '', 'type' => 'cta', 'rev' => 0, 'f' => $fields], []);
+
+        $this->assertSame('invalid', $r['status']);
+        $this->assertNotSame([], $r['errors']);
+        $this->assertSame('Нова CTA', $r['form']['fields']['heading']['bg']);
+        $this->assertSame('Описание', $r['form']['fields']['text']['bg']);
+        $this->assertSame('javascript:evil()', $r['form']['fields']['btn1_url']['bg']);
+        $this->assertFileDoesNotExist($GLOBALS['_om_home_file']);
+    }
+
+    public function test_save_reports_not_found_for_an_unknown_id(): void
+    {
+        $doc = $this->doc(0);
+
+        $r = home_admin_save($doc, ['id' => 's_zzzz', 'type' => 'cta', 'rev' => 0, 'f' => []], []);
+
+        $this->assertSame('not_found', $r['status']);
+        $this->assertStringContainsString('не е намерена', $r['message']);
+    }
+
+    public function test_save_keeps_the_stored_type_and_visibility_even_if_the_post_disagrees(): void
+    {
+        $doc = $this->doc(2);   // s_ab12 is type 'cta', visible = false
+        $this->seedFile($doc);
+
+        $r = home_admin_save($doc, ['id' => 's_ab12', 'type' => 'hero', 'rev' => 2, 'f' => $this->validCtaFields()], []);
+
+        $this->assertSame('saved', $r['status']);
+        $saved = $r['doc']['sections'][array_search('s_ab12', array_column($r['doc']['sections'], 'id'), true)];
+        $this->assertSame('cta', $saved['type']);
+        $this->assertFalse($saved['visible']);
+    }
+
+    public function test_save_fetches_a_thumbnail_once_for_a_new_video(): void
+    {
+        $doc = $this->doc(0);
+        $this->seedFile($doc);
+        $calls = 0;
+        $fetch = function (array $v, string $sid) use (&$calls): string { $calls++; return '/assets/images/pages/home/new-thumb.jpg'; };
+
+        $post = ['id' => '', 'type' => 'video', 'rev' => 0, 'f' => [
+            'heading' => ['bg' => '', 'en' => ''],
+            'video'   => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            'caption' => ['bg' => '', 'en' => ''],
+            'background' => 'white',
+        ]];
+        $r = home_admin_save($doc, $post, [], $fetch);
+
+        $this->assertSame('saved', $r['status']);
+        $this->assertSame(1, $calls);
+        $last = $r['doc']['sections'][count($r['doc']['sections']) - 1];
+        $this->assertSame('/assets/images/pages/home/new-thumb.jpg', $last['fields']['thumb']);
+    }
+
+    public function test_save_keeps_the_old_thumbnail_when_the_video_is_unchanged(): void
+    {
+        $doc = $this->doc(0, [[
+            'id' => 's_vid1', 'type' => 'video', 'visible' => true, 'fields' => [
+                'heading' => ['bg' => '', 'en' => ''],
+                'video'   => ['provider' => 'youtube', 'id' => 'dQw4w9WgXcQ'],
+                'caption' => ['bg' => '', 'en' => ''],
+                'thumb'   => '/assets/images/pages/home/existing-thumb.jpg',
+                'background' => 'white',
+            ],
+        ]]);
+        $this->seedFile($doc);
+        $calls = 0;
+        $fetch = function (array $v, string $sid) use (&$calls): string { $calls++; return '/assets/images/pages/home/should-not-be-used.jpg'; };
+
+        $post = ['id' => 's_vid1', 'type' => 'video', 'rev' => 0, 'f' => [
+            'heading' => ['bg' => '', 'en' => ''],
+            'video'   => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            'caption' => ['bg' => '', 'en' => ''],
+            'background' => 'white',
+        ]];
+        $r = home_admin_save($doc, $post, [], $fetch);
+
+        $this->assertSame('saved', $r['status']);
+        $this->assertSame(0, $calls);
+        $saved = $r['doc']['sections'][array_search('s_vid1', array_column($r['doc']['sections'], 'id'), true)];
+        $this->assertSame('/assets/images/pages/home/existing-thumb.jpg', $saved['fields']['thumb']);
+    }
+
+    // ── home_apply_uploads(): a non-image at a non-zero card position ──────────
+
+    public function test_apply_uploads_reports_a_non_image_card_upload_at_its_position(): void
+    {
+        $tmp = tempnam(sys_get_temp_dir(), 'up');
+        file_put_contents($tmp, 'not an image, just text');
+        $in = ['cards' => [
+            3 => ['title' => ['bg' => 'Първа', 'en' => '']],
+            7 => ['title' => ['bg' => 'Втора', 'en' => '']],
+        ]];
+        $files = ['up_card' => ['tmp_name' => [7 => $tmp], 'error' => [7 => UPLOAD_ERR_OK], 'name' => [7 => 'x.txt']]];
+
+        $errors = home_apply_uploads($in, 'cards', $files, 's_ab12');
+        unlink($tmp);
+
+        $this->assertSame('Снимката трябва да е JPEG, PNG или WebP.', $errors['cards.1.image'] ?? null);
+    }
+
+    // ── Form-rendering helpers (unchanged behaviour) ────────────────────────────
 
     public function test_english_text_fields_have_a_translate_hook_but_links_do_not(): void
     {

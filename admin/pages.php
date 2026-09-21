@@ -51,7 +51,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) { http_response_code(400); exit('Invalid token'); }
     $section = $_POST['section'] ?? '';
 
-    if ($section === 'campaign') {
+    if ($section === 'home') {
+        // An old open tab from before the front page moved to its own screen.
+        flash_set('error', 'Началната страница вече се редактира на ново място. Моля, въведете промените отново там.');
+        header('Location: /admin/home-sections.php'); exit;
+
+    } elseif ($section === 'campaign') {
         // The editor is hidden when the module is off, so a POST arriving here
         // is either a stale tab or a hand-crafted request. Either way, refuse it
         // rather than writing settings nothing reads.

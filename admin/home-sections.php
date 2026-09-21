@@ -34,37 +34,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if ($action !== 'save') { http_response_code(400); exit('Непознато действие.'); }
 
-    $idx = $post_id !== '' ? home_find($doc, $post_id) : null;
-    if ($post_id !== '' && $idx === null) {
-        flash_set('error', 'Секцията не е намерена — може би е изтрита междувременно.');
-        header('Location: /admin/home-sections.php'); exit;
+    $r = home_admin_save($doc, $_POST, $_FILES);
+    switch ($r['status']) {
+        case 'bad_type':
+            http_response_code(400); exit('Непознат вид секция.');
+        case 'not_found':
+            flash_set('error', $r['message']);
+            header('Location: /admin/home-sections.php'); exit;
+        case 'saved':
+            flash_set('success', $r['message']);
+            header('Location: /admin/home-sections.php?focus=' . rawurlencode('edit:' . $r['sid'])); exit;
+        default:   // 'invalid'
+            $errors = $r['errors'];
+            $form   = $r['form'];
+            $rev    = $post_rev;   // keep the revision the admin started from
     }
-    $type = $idx !== null ? (string) $doc['sections'][$idx]['type'] : (string) ($_POST['type'] ?? '');
-    if (!isset($types[$type]) || ($idx === null && home_is_builtin($type))) { http_response_code(400); exit('Непознат вид секция.'); }
-
-    $sid = $idx !== null ? $post_id : home_new_id();
-    $old = $idx !== null ? ($doc['sections'][$idx]['fields'] ?? []) : [];
-    $in  = is_array($_POST['f'] ?? null) ? $_POST['f'] : [];
-    $upload_errors     = home_apply_uploads($in, $type, $_FILES, $sid);
-    [$fields, $errors] = home_validate_section($type, $in);
-    $errors += $upload_errors;
-
-    if (!$errors && $type === 'video') {
-        $fields['thumb'] = (($old['video'] ?? null) === $fields['video'] && !empty($old['thumb']))
-            ? $old['thumb'] : home_fetch_video_thumb($fields['video'], $sid);
-    }
-    if (!$errors) {
-        $section = ['id' => $sid, 'type' => $type, 'visible' => $idx !== null ? !empty($doc['sections'][$idx]['visible']) : true, 'fields' => $fields];
-        $saved   = home_save(home_upsert($doc, $section), $post_rev);
-        if ($saved['ok']) {
-            $name = home_section_name($section);
-            flash_set('success', $idx !== null ? "„{$name}“ е запазена." : "„{$name}“ е добавена най-долу на страницата и вече се вижда.");
-            header('Location: /admin/home-sections.php?focus=' . rawurlencode('edit:' . $sid)); exit;
-        }
-        $errors['_form'] = home_save_error_message($saved['error']);
-    }
-    $form = ['id' => $idx !== null ? $post_id : '', 'type' => $type, 'fields' => $fields];
-    $rev  = $post_rev;   // keep the revision the admin started from
 } elseif (isset($_GET['edit'])) {
     $idx = home_find($doc, (string) $_GET['edit']);
     if ($idx === null || !isset($types[$doc['sections'][$idx]['type']])) {
@@ -265,7 +249,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       if (rows().length >= 4) return;
       list.insertAdjacentHTML('beforeend', tpl.innerHTML.split('__I__').join(String(next++)));
       renumber();
-      list.lastElementChild.querySelector('input[type=text]').focus();
+      list.lastElementChild.querySelector('input[name$="[title][bg]"]').focus();
       announce('Добавена е нова карта.');
     });
     renumber();
