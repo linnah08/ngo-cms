@@ -297,3 +297,162 @@ function home_validate_section(string $type, array $in): array {
     }
     return [$fields, $errors];
 }
+
+// ── Storage ──────────────────────────────────────────────────────────────────
+
+function home_file(): string {
+    return $GLOBALS['_om_home_file'] ?? CONTENT_PATH . '/home.json';
+}
+
+/**
+ * The default front page, built from what the site shows today: saved values in
+ * pages.json['home'] first, then the strings.json defaults, then the old hard-coded text.
+ */
+function home_seed(array $home, array $sbg, array $sen): array {
+    $p = fn(string $key, string $skey = '', string $dbg = '', string $den = ''): array => [
+        'bg' => (string) (($home[$key] ?? '') ?: ($skey !== '' ? ($sbg[$skey] ?? '') : '') ?: $dbg),
+        'en' => (string) (($home[$key . '_en'] ?? '') ?: ($skey !== '' ? ($sen[$skey] ?? '') : '') ?: $den),
+    ];
+    $pair = fn(string $bg, string $en): array => ['bg' => $bg, 'en' => $en];
+    $sec  = fn(string $type, array $fields): array => ['id' => 's_' . $type, 'type' => $type, 'visible' => true, 'fields' => $fields];
+    $name = $pair(SITE_NAME_BG, SITE_NAME_EN);
+    $img  = fn(string $path, string $fallback = ''): string => home_valid_image_path($path) ? $path : $fallback;
+
+    return ['version' => 1, 'rev' => 0, 'sections' => [
+        $sec('hero', [
+            'title' => $p('hero_title', 'home.hero.title'),
+            'text'  => $p('hero_text', 'home.hero.text'),
+            'image' => $img((string) ($home['hero_image'] ?? ''), '/assets/images/hero.webp'),
+            'image_alt'  => $name,
+            'btn1_label' => $p('hero_cta_primary', 'home.hero.cta_primary', 'Как да помогна', 'How to help'),
+            'btn1_url'   => $pair('/kak-da-pomogna/', '/en/how-to-help/'),
+            'btn2_label' => $p('hero_cta_secondary', 'home.hero.cta_secondary', 'Научи повече', 'Learn more'),
+            'btn2_url'   => $pair('/za-nas/', '/en/about/'),
+        ]),
+        $sec('products', [
+            'heading'    => $p('section_shop', 'home.shop.title'),
+            'btn1_label' => $p('shop_btn_all', 'home.shop.all', 'Отидете на магазина', 'Visit shop'),
+            'btn1_url'   => $pair('/magazin/', '/en/shop/'),
+            'background' => 'white',
+        ]),
+        $sec('impact', ['heading' => $p('section_impact')]),
+        $sec('campaign', []),
+        $sec('centres', [
+            'heading'    => $p('section_centres', 'home.centres.title'),
+            'intro'      => $pair('', ''),
+            'background' => 'white',
+        ]),
+        $sec('mission', [
+            'title' => $pair(
+                (string) (($home['section_mission'] ?? '') ?: ($home['mission_title'] ?? '') ?: ($sbg['home.mission.title'] ?? '')),
+                (string) (($home['section_mission_en'] ?? '') ?: ($home['mission_title_en'] ?? '') ?: ($sen['home.mission.title'] ?? ''))
+            ),
+            'text' => $pair(home_clean_html((string) ($home['mission_text'] ?? '')), home_clean_html((string) ($home['mission_text_en'] ?? ''))),
+            'image'      => $img((string) ($home['mission_image'] ?? '')),
+            'image_alt'  => $name,
+            'btn1_label' => $p('mission_cta_primary', '', 'Разберете повече за нас', 'Learn more about us'),
+            'btn1_url'   => $pair('/za-nas/', '/en/about/'),
+            'btn2_label' => $p('mission_cta_secondary', '', 'Подкрепете ни', 'Support us'),
+            'btn2_url'   => $pair('/magazin/', '/en/shop/'),
+            'background' => 'grey',
+        ]),
+        $sec('news', [
+            'heading'    => $p('section_news', 'home.news.title'),
+            'count'      => '3',
+            'btn1_label' => $p('news_btn_all', 'home.news.all', 'Всички новини', 'All news'),
+            'btn1_url'   => $pair('/novini/', '/en/news/'),
+            'background' => 'white',
+        ]),
+        $sec('partners', ['heading' => $p('section_partners', 'home.partners.title'), 'background' => 'grey']),
+        $sec('cta', [
+            'heading'    => $p('cta_heading', '', 'Всяко дете заслужава шанс', 'Every child deserves a chance'),
+            'text'       => $p('cta_body', '',
+                'С вашата подкрепа можем да достигнем до повече деца, да финансираме повече терапии и да изградим по-добро бъдеще за всяко от тях.',
+                'With your support we can reach more children, fund more therapies, and build a better future for each of them.'),
+            'btn1_label' => $p('cta_btn_donate', '', 'Дарете сега', 'Donate now'),
+            'btn1_url'   => $pair('/magazin/', '/en/shop/'),
+            'btn2_label' => $p('cta_btn_help', '', 'Как да помогна', 'How to help'),
+            'btn2_url'   => $pair('/kak-da-pomogna/', '/en/how-to-help/'),
+            'background' => 'teal',
+        ]),
+    ]];
+}
+
+function home_seed_from_site(): array {
+    $pages = load_json(CONTENT_PATH . '/pages.json');
+    return home_seed($pages['home'] ?? [], load_json(CONTENT_PATH . '/bg/strings.json'), load_json(CONTENT_PATH . '/en/strings.json'));
+}
+
+/** A built-in that went missing (hand edit, older file) comes back hidden, so it can always be restored. */
+function home_ensure_builtins(array $doc): array {
+    $have = array_column($doc['sections'], 'type');
+    foreach (home_seed_from_site()['sections'] as $s) {
+        if (home_is_builtin($s['type']) && !in_array($s['type'], $have, true)) {
+            $s['visible'] = false;
+            $doc['sections'][] = $s;
+        }
+    }
+    return $doc;
+}
+
+/** @return array{doc: array, corrupt: bool, exists: bool} */
+function home_load(): array {
+    $path = home_file();
+    if (!file_exists($path)) return ['doc' => home_seed_from_site(), 'corrupt' => false, 'exists' => false];
+    $raw = @file_get_contents($path);
+    $doc = is_string($raw) ? json_decode($raw, true) : null;
+    if (!is_array($doc) || !is_array($doc['sections'] ?? null)) {
+        error_log('home.json is unreadable or invalid — showing the default front page');
+        return ['doc' => home_seed_from_site(), 'corrupt' => true, 'exists' => true];
+    }
+    $doc['version']  = 1;
+    $doc['rev']      = (int) ($doc['rev'] ?? 0);
+    $doc['sections'] = array_values(array_filter($doc['sections'], fn($s) =>
+        is_array($s) && is_string($s['id'] ?? null) && is_string($s['type'] ?? null)));
+    foreach ($doc['sections'] as &$s) {
+        $s['visible'] = !empty($s['visible']);
+        $s['fields']  = is_array($s['fields'] ?? null) ? $s['fields'] : [];
+    }
+    unset($s);
+    return ['doc' => home_ensure_builtins($doc), 'corrupt' => false, 'exists' => true];
+}
+
+/**
+ * Write the whole document if nobody saved since $expected_rev was read.
+ * @return array{ok: bool, error: ?string, doc?: array}
+ */
+function home_save(array $doc, int $expected_rev): array {
+    $path = home_file();
+    $dir  = dirname($path);
+    if (!is_dir($dir) && !mkdir($dir, 0755, true)) return ['ok' => false, 'error' => 'write'];
+    $lock = @fopen($path . '.lock', 'c');
+    if ($lock === false || !flock($lock, LOCK_EX)) return ['ok' => false, 'error' => 'write'];
+    try {
+        $current = 0;
+        if (file_exists($path)) {
+            $cur     = json_decode((string) file_get_contents($path), true);
+            $current = is_array($cur) ? (int) ($cur['rev'] ?? 0) : 0;
+        }
+        if ($current !== $expected_rev) return ['ok' => false, 'error' => 'conflict'];
+
+        $doc['version']  = 1;
+        $doc['rev']      = $current + 1;
+        $doc['sections'] = array_values($doc['sections']);
+        $json = json_encode($doc, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $tmp  = $path . '.tmp-' . bin2hex(random_bytes(4));
+        if ($json === false || file_put_contents($tmp, $json) === false || !rename($tmp, $path)) {
+            @unlink($tmp);
+            return ['ok' => false, 'error' => 'write'];
+        }
+        return ['ok' => true, 'error' => null, 'doc' => $doc];
+    } finally {
+        flock($lock, LOCK_UN);
+        fclose($lock);
+    }
+}
+
+function home_save_error_message(?string $error): string {
+    return $error === 'conflict'
+        ? 'Междувременно някой друг е променил началната страница. Презаредете страницата и направете промяната отново.'
+        : 'Промените не можаха да се запазят. Опитайте отново след малко.';
+}
