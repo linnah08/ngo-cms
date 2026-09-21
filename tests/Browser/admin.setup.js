@@ -13,6 +13,7 @@
 const { chromium } = require('@playwright/test');
 const { execFileSync } = require('child_process');
 const path = require('path');
+const assertOwnServer = require('./assert-own-server');
 
 const AUTH_FILE = path.join(__dirname, '../../.playwright-auth.json');
 const SEED_SCRIPT = path.join(__dirname, '../seed-admin.php');
@@ -20,7 +21,18 @@ const SEED_SCRIPT = path.join(__dirname, '../seed-admin.php');
 const SEED_EMAIL = 'playwright@test.local';
 const SEED_PASSWORD = 'playwright-local-test';
 
-module.exports = async function globalSetup() {
+module.exports = async function globalSetup(config) {
+  // Take the URL from the config rather than hardcoding a port here — the two
+  // must never drift apart, or setup logs in to one server and the tests drive
+  // another.
+  const baseURL = config?.projects?.[0]?.use?.baseURL
+    || config?.webServer?.url;
+  if (!baseURL) throw new Error('No baseURL in playwright.config.js — cannot tell which server to use.');
+
+  // Before anything else: make sure the port is not already serving a different
+  // checkout, which would make every result below meaningless.
+  await assertOwnServer(baseURL);
+
   // Use an explicit override if provided, otherwise seed + use the test account.
   let email = process.env.ADMIN_EMAIL || SEED_EMAIL;
   let password = process.env.ADMIN_PASSWORD;
@@ -36,7 +48,7 @@ module.exports = async function globalSetup() {
   const browser = await chromium.launch();
   const page = await browser.newPage();
 
-  await page.goto('http://localhost:8080/admin/login.php');
+  await page.goto(new URL('/admin/login.php', baseURL).toString());
   await page.fill('input[name="email"]',    email);
   await page.fill('input[name="password"]', password);
   await page.click('button[type="submit"]');
