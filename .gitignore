@@ -38,6 +38,10 @@ package-lock.json
 
 # Admin-editable content files — server is source of truth, git reset must not overwrite these
 /content/pages.json
+/content/home.json
+/content/home.json.lock
+/content/home.json.tmp-*
+/assets/images/pages/home/
 /content/menus.json
 /content/organisation.json
 

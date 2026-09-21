@@ -218,3 +218,14 @@ links to new screen; home + campaign forms removed from there), `.gitignore`
 (`/content/home.json`).
 
 No DB migration.
+
+## Changes made while planning
+
+1. No HTML sanitiser exists in the codebase (articles store TinyMCE output unfiltered;
+   inline-save uses `strip_tags` allowlists, which keep `onclick`/`javascript:`). So this
+   feature adds `home_clean_html()` (tag allowlist + attribute strip via `Dom\HTMLDocument`).
+2. The mission section also gets its two buttons (label + link), which today are hard-coded —
+   needed for "fully edit".
+3. The campaign form stays in `admin/pages.php`, moved to its own view `?page=home_campaign`;
+   the campaign section's Edit view links there. Moving its POST handler buys nothing.
+4. Card fields are edited only in the admin form (no inline editing inside cards).

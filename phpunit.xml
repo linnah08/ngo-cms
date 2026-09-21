@@ -54,5 +54,9 @@
             <file>tests/OrganisationTest.php</file>
             <file>tests/LaunchBannerTest.php</file>
         </testsuite>
+        <testsuite name="Home">
+            <directory>tests/Home</directory>
+            <file>tests/Admin/HomeSectionsAdminTest.php</file>
+        </testsuite>
     </testsuites>
 </phpunit>
