@@ -76,8 +76,8 @@ final class FeatureFlagsTest extends TestCase
     public static function gatedSurfaces(): array
     {
         return [
-            ['index.php'],
-            ['en/index.php'],
+            ['templates/home/campaign.php'],
+            ['admin/home-sections.php'],
             ['kak-da-pomogna/index.php'],
             ['en/how-to-help/index.php'],
             ['templates/header.php'],
