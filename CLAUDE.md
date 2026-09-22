@@ -26,6 +26,20 @@ The running model does not switch itself per task — it is fixed for the sessio
 
 ---
 
+## Shared code — ngo-cms first
+
+One CMS lives in three repos:
+- **ngo-cms** (`~/Code/oddminds-oss`, github `linnah08/ngo-cms`) — the upstream. Generic, de-branded, released as tags.
+- **oddminds** (`~/Code/oddminds`) — the original site. Different history (Odd Minds copy, Lafetki subdomain, other migration numbers), so it can't `git merge` ngo-cms; changes are ported by hand.
+- **lafetki** (`~/Code/lafetki`, github `linnah08/lafetki`) — a git fork of ngo-cms (`upstream` remote).
+
+Rules:
+- **Generic changes are built in ngo-cms first**, then ported to oddminds and merged into lafetki. "Generic" = anything that isn't one site's own copy, branding, theme, content or infra. If a live hotfix has to land on oddminds or lafetki first, port it to ngo-cms in the same session — never leave it for "the next sync".
+- **lafetki takes ngo-cms only by `git merge`** (`git fetch upstream --tags && git merge upstream/main` or a release tag) — never by cherry-picking or copying files. Cherry-picks make git lose track of what's shared and turn every later sync into a manual diff.
+- **Keep lafetki's own changes out of shared files** where possible: a feature flag in `site.config.php`, `includes/themes.php` + `assets/css/theme-lafetki.css`, or content. A lafetki change that another NGO could use goes upstream to ngo-cms instead.
+- **Mark every oddminds commit with its sync status** as a last trailer line: `Ported: ngo-cms <sha>` when the same change exists in ngo-cms (either direction), or `Sync: skip` when it's oddminds-only. A commit with neither is still owed to ngo-cms.
+- **Migrations:** a fork-only migration (lafetki) must not reuse a number/name ngo-cms has or is likely to use next; check `ls migrations` in ngo-cms before naming it.
+
 ## Target users — non-technical audience
 
 The site is used by social workers, parents, and other non-technical people. When suggesting solutions or designing features:
