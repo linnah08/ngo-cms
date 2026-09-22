@@ -27,6 +27,10 @@ final class UpdaterTest extends TestCase
     protected function setUp(): void
     {
         require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/updater.php';
+        // This checkout has a .git folder, and a fork's site.config.php may set
+        // FEATURE_SELF_UPDATE to false — either would refuse every apply below.
+        // The tests further down that are ABOUT that refusal clear the override.
+        updater_set_self_update_override(true);
     }
 
     /**
@@ -37,6 +41,7 @@ final class UpdaterTest extends TestCase
     protected function tearDown(): void
     {
         updater_set_root_override(null);
+        updater_set_self_update_override(null);
         foreach ($this->tempDirs as $dir) {
             if (is_dir($dir)) {
                 updater_rrmdir($dir);
@@ -634,12 +639,17 @@ final class UpdaterTest extends TestCase
 
     public function test_self_update_is_allowed_on_a_plain_install(): void
     {
+        updater_set_self_update_override(null);
+        if (defined('FEATURE_SELF_UPDATE') && !FEATURE_SELF_UPDATE) {
+            $this->markTestSkipped('This site switches self-update off in its own config — see the subprocess test below.');
+        }
         updater_set_root_override($this->makeTempRoot());
         $this->assertTrue(updater_self_update_allowed());
     }
 
     public function test_a_git_folder_switches_self_update_off(): void
     {
+        updater_set_self_update_override(null);
         $root = $this->makeTempRoot();
         mkdir($root . '/.git');
         updater_set_root_override($root);
@@ -650,6 +660,7 @@ final class UpdaterTest extends TestCase
     {
         $this->requireZip();
 
+        updater_set_self_update_override(null);
         $root = $this->makeTempRoot();
         mkdir($root . '/.git');
         file_put_contents($root . '/VERSION', "1.0.0\n");

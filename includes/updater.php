@@ -73,10 +73,24 @@ function updater_root(): string
  */
 function updater_self_update_allowed(): bool
 {
+    $override = $GLOBALS['__updater_self_update_override'] ?? null;
+    if (is_bool($override)) {
+        return $override;
+    }
     if (defined('FEATURE_SELF_UPDATE') && !FEATURE_SELF_UPDATE) {
         return false;
     }
     return !file_exists(updater_root() . '/.git');
+}
+
+/**
+ * Test seam, like updater_set_root_override(): lets a test drive updater_apply()
+ * whatever the host site's own config says, so the apply tests still run on a
+ * fork that has switched self-update off. Production never calls this.
+ */
+function updater_set_self_update_override(?bool $allowed): void
+{
+    $GLOBALS['__updater_self_update_override'] = $allowed;
 }
 
 function updater_cache_file(): string
