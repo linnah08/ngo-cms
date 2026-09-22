@@ -470,10 +470,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $order->execute([$order_id]);
         $order = $order->fetch();
 
-        send_mail(
+        send_order_mail(
+            (int)$order_id,
             $d['customer_email'],
             render_email_subject('order-confirmation-customer', $order['lang'] ?? 'bg', ['order_number' => $order_number]),
-            render_email('order-confirmation-customer', ['order' => $order, 'lang' => $order['lang'] ?? 'bg'])
+            render_email('order-confirmation-customer', ['order' => $order, 'lang' => $order['lang'] ?? 'bg']),
+            ['template_key' => 'order-confirmation-customer']
         );
         send_mail(
             SITE_EMAIL,

@@ -6,6 +6,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/auth.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_documents.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DocumentGenerator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/TicketGenerator.php';
 admin_require_admin();
@@ -106,12 +107,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (file_exists($ticket_file)) {
                 $attachments[] = ['path' => $ticket_file, 'name' => 'ticket-' . $pledge['pledge_number'] . '.pdf'];
             }
-            $ok = send_mail(
+            $ok = send_order_mail(
+                pledge_ensure_order_row($pdo, $pledge),
                 $pledge['email'],
                 'Твоят билет за ' . setting_get('event_name', 'събитието') . ' — ' . $pledge['pledge_number'],
                 render_email('campaign-ticket', ['pledge' => $pledge]),
-                '',
-                $attachments
+                ['template_key' => 'campaign-ticket', 'attachments' => $attachments]
             );
             flash_set($ok ? 'success' : 'error', $ok ? 'Билетът е изпратен отново.' : 'Грешка при изпращане.');
         } else {

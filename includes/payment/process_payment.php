@@ -19,7 +19,8 @@ function notify_order_paid(array $order): void
         $items   = json_decode($order['items'] ?? '[]', true) ?? [];
         $don     = $items[0] ?? [];
         $reference = $order['customer_name'] . ' — дарение';
-        send_mail(
+        send_order_mail(
+            (int)$order['id'],
             $order['customer_email'],
             'Благодарим за вашето дарение!',
             render_email('donation-confirmation-customer', [
@@ -27,7 +28,8 @@ function notify_order_paid(array $order): void
                 'amount_eur'       => (float)$order['total_eur'],
                 'donation_message' => $order['donation_message'] ?? '',
                 'reference'        => $reference,
-            ])
+            ]),
+            ['template_key' => 'donation-confirmation-customer']
         );
         send_mail(
             SITE_EMAIL,
@@ -41,10 +43,12 @@ function notify_order_paid(array $order): void
             ])
         );
     } else {
-        send_mail(
+        send_order_mail(
+            (int)$order['id'],
             $order['customer_email'],
             render_email_subject('order-confirmation-customer', $order['lang'] ?? 'bg', ['order_number' => $order['order_number'], 'customer_name' => $order['customer_name']]),
-            render_email('order-confirmation-customer', ['order' => $order])
+            render_email('order-confirmation-customer', ['order' => $order]),
+            ['template_key' => 'order-confirmation-customer']
         );
         send_mail(
             SITE_EMAIL,

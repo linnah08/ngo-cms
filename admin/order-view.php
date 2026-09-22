@@ -163,10 +163,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'customer_name' => $order['customer_name'],
                         'order_number'  => $order['order_number'],
                     ]);
-                    send_mail(
+                    send_order_mail(
+                        (int)$id,
                         $order['customer_email'],
                         $tpl['subject'],
-                        render_email('order-cancelled-customer', ['order' => $order, 'tpl' => $tpl])
+                        render_email('order-cancelled-customer', ['order' => $order, 'tpl' => $tpl]),
+                        ['template_key' => 'order-cancelled-customer']
                     );
                 } catch (Throwable $e) {
                     payment_error_report('Автоматичното връщане на парите при отмяна не успя — върнете сумата ръчно в DSK', $order['order_number'], $e);
@@ -177,14 +179,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Send shipped email
             if ($new_status === 'shipped' && $order['status'] !== 'shipped') {
                 $courier_label = $courier_labels[$order['courier']] ?? ucfirst($order['courier']);
-                send_mail(
+                send_order_mail(
+                    (int)$id,
                     $order['customer_email'],
                     render_email_subject('order-shipped-customer', $order['lang'] ?? 'bg', ['customer_name' => $order['customer_name'], 'order_number' => $order['order_number'], 'courier' => $courier_label]),
                     render_email('order-shipped-customer', [
                         'order'          => $order,
                         'tracking_number'=> $tracking,
                         'courier_label'  => $courier_label,
-                    ])
+                    ]),
+                    ['template_key' => 'order-shipped-customer']
                 );
             }
 
@@ -387,12 +391,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'lang'          => $ticket_pledge['lang'] ?? 'bg',
             ];
             $_pledge_lang = $pledge_for_email['lang'];
-            $ok = send_mail(
+            $ok = send_order_mail(
+                (int)$id,
                 $order['customer_email'],
                 render_email_subject('campaign-ticket', $_pledge_lang, ['event_name' => setting_get('event_name', 'събитието'), 'pledge_number' => $order['order_number']]),
                 render_email('campaign-ticket', ['pledge' => $pledge_for_email, 'lang' => $_pledge_lang]),
-                '',
-                $attachments
+                ['template_key' => 'campaign-ticket', 'attachments' => $attachments]
             );
             $success = $ok ? 'Билетът е изпратен отново.' : 'Грешка при изпращане.';
             // Re-fetch
@@ -445,12 +449,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'path' => $cert_file,
                         'name' => 'certificate-' . $order['order_number'] . '.pdf',
                     ]];
-                    $ok = send_mail(
+                    $ok = send_order_mail(
+                        (int)$id,
                         $order['customer_email'],
                         render_email_subject('campaign-confirmation', $_cert_lang, ['name' => $pledge_for_email['name'], 'pledge_number' => $order['order_number']]),
                         render_email('campaign-confirmation', ['pledge' => $pledge_for_email, 'lang' => $_cert_lang]),
-                        '',
-                        $attachments
+                        ['template_key' => 'campaign-confirmation', 'attachments' => $attachments]
                     );
                     if ($ok) {
                         $pdo->prepare('UPDATE documents SET emailed_at = NOW() WHERE id = ?')
@@ -804,6 +808,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <button type="submit" class="btn btn--primary" style="width:100%;justify-content:center;">Запази</button>
       </form>
     </div>
+
+    <?php $oeh_order_id = (int)$id; require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/order-email-history.php'; ?>
 
     <?php if ($order['type'] === 'pledge' && $pledge_row && !empty($pledge_row['delivery_courier'])): ?>
     <!-- Reward shipping label -->

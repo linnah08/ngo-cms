@@ -155,9 +155,11 @@ function boxnow_mark_shipped(PDO $pdo, array $order, string $parcel_id): void
 
     if (empty($order['customer_email'])) return;
     $lang = $order['lang'] ?? 'bg';
-    send_mail(
+    send_order_mail(
+        (int)$order['id'],
         $order['customer_email'],
         render_email_subject('order-shipped-customer', $lang, ['customer_name' => $order['customer_name'], 'order_number' => $order['order_number'], 'courier' => 'BoxNow']),
-        render_email('order-shipped-customer', ['order' => $order, 'tracking_number' => $parcel_id, 'courier_label' => 'BoxNow'])
+        render_email('order-shipped-customer', ['order' => $order, 'tracking_number' => $parcel_id, 'courier_label' => 'BoxNow']),
+        ['template_key' => 'order-shipped-customer']
     );
 }

@@ -112,7 +112,8 @@ function pledge_send_shipped_email(array $pledge, string $courier, string $track
         'lang'           => $lang,
     ];
 
-    send_mail(
+    send_order_mail(
+        pledge_ensure_order_row(get_pdo(), $pledge),
         $pledge['email'],
         render_email_subject('order-shipped-customer', $lang, [
             'customer_name' => $pledge['name'],
@@ -123,7 +124,8 @@ function pledge_send_shipped_email(array $pledge, string $courier, string $track
             'order'           => $synthetic,
             'tracking_number' => $tracking,
             'courier_label'   => $courier_label,
-        ])
+        ]),
+        ['template_key' => 'order-shipped-customer']
     );
 }
 

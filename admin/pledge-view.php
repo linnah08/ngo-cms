@@ -81,10 +81,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'pledge_number' => $pledge['pledge_number'],
                     'amount_eur'    => number_format((float)$pledge['amount_eur'], 2, '.', ' '),
                 ]);
-                send_mail(
+                send_order_mail(
+                    pledge_ensure_order_row($pdo, $pledge),
                     $pledge['email'],
                     $tpl['subject'],
-                    render_email('pledge-reversed-customer', ['pledge' => $pledge, 'tpl' => $tpl])
+                    render_email('pledge-reversed-customer', ['pledge' => $pledge, 'tpl' => $tpl]),
+                    ['template_key' => 'pledge-reversed-customer']
                 );
 
                 header('Location: /admin/pledge-view.php?id=' . $id . '&refund_ok=1');
@@ -323,6 +325,14 @@ $pledge_phone = $pledge['phone'] ?? null;
 <?php
 $psc_pledge = $pledge;
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/pledge-shipping-card.php';
+?>
+
+<!-- Email history -->
+<?php
+$_oeh = $pdo->prepare("SELECT id FROM orders WHERE order_number = ? AND type = 'pledge'");
+$_oeh->execute([$pledge['pledge_number']]);
+$oeh_order_id = (int)$_oeh->fetchColumn();
+require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/order-email-history.php';
 ?>
 
 <!-- Refund section -->

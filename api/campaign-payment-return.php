@@ -154,19 +154,21 @@ function process_campaign_dsk_result(PDO $pdo, array $pledge, string $dskOrderId
                         ];
                     }
                 }
-                send_mail(
+                send_order_mail(
+                    pledge_ensure_order_row($pdo, $pledge),
                     $pledge['email'],
                     render_email_subject('campaign-ticket', $_pledge_lang, ['event_name' => setting_get('event_name', 'събитието'), 'pledge_number' => $pledge['pledge_number']]),
                     render_email('campaign-ticket', ['pledge' => $pledge, 'lang' => $_pledge_lang]),
-                    '',
-                    $ticket_attachments
+                    ['template_key' => 'campaign-ticket', 'attachments' => $ticket_attachments]
                 );
             } else {
                 // Send donation confirmation email
-                send_mail(
+                send_order_mail(
+                    pledge_ensure_order_row($pdo, $pledge),
                     $pledge['email'],
                     render_email_subject('campaign-confirmation', $_pledge_lang, ['name' => $pledge['name'], 'pledge_number' => $pledge['pledge_number']]),
-                    render_email('campaign-confirmation', ['pledge' => $pledge, 'lang' => $_pledge_lang])
+                    render_email('campaign-confirmation', ['pledge' => $pledge, 'lang' => $_pledge_lang]),
+                    ['template_key' => 'campaign-confirmation']
                 );
             }
 

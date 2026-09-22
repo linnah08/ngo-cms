@@ -196,12 +196,12 @@ if ($doc_type === 'credit_note') {
         'order' => $order,
         'tpl'   => $tpl,
     ]);
-    send_mail(
+    send_order_mail(
+        (int)$order_id,
         $order['customer_email'],
         $tpl['subject'],
         $body,
-        '',
-        [['path' => $filepath, 'name' => $filename]]
+        ['template_key' => 'credit-note-customer', 'attachments' => [['path' => $filepath, 'name' => $filename]]]
     );
 }
 

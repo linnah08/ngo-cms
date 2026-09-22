@@ -141,7 +141,7 @@ function payment_failed_template_key(array $order): string
  * duplicate bank callbacks or overlapping cron runs can't send it twice. If the
  * send fails the claim is released so the next cron run retries.
  *
- * @param callable|null $mailer fn(string $to, string $subject, string $html): bool — defaults to send_mail()
+ * @param callable|null $mailer fn(string $to, string $subject, string $html): bool — defaults to send_order_mail() (sends + records in the order's email history)
  * @return bool true when an email was sent
  */
 function send_payment_failed_email(PDO $pdo, array $order, ?callable $mailer = null): bool
@@ -168,7 +168,9 @@ function send_payment_failed_email(PDO $pdo, array $order, ?callable $mailer = n
     ]);
     $html = render_email('payment-failed-customer', ['order' => $order, 'tpl' => $tpl]);
 
-    $mailer ??= 'send_mail';
+    $oid    = (int)$order['id'];
+    $mailer ??= fn(string $to, string $subject, string $html): bool =>
+        send_order_mail($oid, $to, $subject, $html, ['template_key' => $key]);
     $sent = false;
     try {
         $sent = (bool)$mailer($order['customer_email'], $tpl['subject'], $html);

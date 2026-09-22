@@ -111,15 +111,15 @@ $pledge_for_email = $pledge_row ?: [
 ];
 $_cert_lang = $pledge_for_email['lang'] ?? 'bg';
 
-$email_ok = send_mail(
+$email_ok = send_order_mail(
+    (int)$order_id,
     $order['customer_email'],
     render_email_subject('campaign-confirmation', $_cert_lang, [
         'name'          => $pledge_for_email['name'],
         'pledge_number' => $order['order_number'],
     ]),
     render_email('campaign-confirmation', ['pledge' => $pledge_for_email, 'lang' => $_cert_lang]),
-    '',
-    [['path' => $filepath, 'name' => 'certificate-' . $order['order_number'] . '.pdf']]
+    ['template_key' => 'campaign-confirmation', 'attachments' => [['path' => $filepath, 'name' => 'certificate-' . $order['order_number'] . '.pdf']]]
 );
 
 if ($email_ok) {

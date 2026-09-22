@@ -537,3 +537,82 @@ function mail_send_graph(string $to, string $subject, string $body_html, string 
 
     return true;
 }
+
+/**
+ * Human-readable label for an order_emails.template_key (shown in the order's email history).
+ * Unknown keys fall back to a generic label so history never shows a raw code.
+ */
+function order_email_kind_label(?string $key): string
+{
+    static $labels = [
+        'order-confirmation-customer'       => 'Потвърждение на поръчка',
+        'donation-confirmation-customer'    => 'Благодарност за дарение',
+        'order-shipped-customer'            => 'Поръчката е изпратена',
+        'order-cancelled-customer'          => 'Поръчката е отменена',
+        'order-payment-failed-customer'     => 'Плащането не е минало',
+        'donation-payment-failed-customer'  => 'Плащането не е минало',
+        'payment-failed'                    => 'Плащането не е минало',
+        'admin-payment-recovery'            => 'Плащането не е минало',
+        'credit-note-customer'              => 'Кредитно известие',
+        'campaign-ticket'                   => 'Билет',
+        'campaign-confirmation'             => 'Потвърждение на подкрепа',
+        'pledge-reversed-customer'          => 'Подкрепата е върната',
+        'donation-cert'                     => 'Сертификат за дарение',
+        'pledge-cert'                       => 'Сертификат за дарение',
+        'admin-message'                     => 'Ръчно съобщение',
+    ];
+    if ($key === null || $key === '') return 'Ръчно съобщение';
+    return $labels[$key] ?? 'Имейл';
+}
+
+/**
+ * Record an email in the order's communication history (order_emails).
+ * Never throws — a logging problem must not break the email flow itself.
+ */
+function order_email_log(int $order_id, string $recipient, string $subject, string $body, ?string $template_key, bool $ok, ?string $sent_by_name = null, ?int $sent_by = null): void
+{
+    if ($order_id <= 0) return;
+    try {
+        if (!function_exists('get_pdo')) require_once dirname(__DIR__) . '/admin/includes/db.php';
+        get_pdo()->prepare(
+            'INSERT INTO order_emails (order_id, recipient, subject, body, template_key, sent_by, sent_by_name, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute([
+            $order_id, mb_substr($recipient, 0, 150), mb_substr($subject, 0, 255), $body,
+            $template_key !== null && $template_key !== '' ? mb_substr($template_key, 0, 50) : null,
+            $sent_by, $sent_by_name !== null ? mb_substr($sent_by_name, 0, 150) : null,
+            $ok ? 'sent' : 'failed',
+        ]);
+    } catch (Throwable $e) {
+        error_log('order_email_log order=' . $order_id . ': ' . $e->getMessage());
+    }
+}
+
+/**
+ * send_mail() for an email to the buyer of an order — sends it AND records it in the
+ * order's email history. Options: template_key, attachments, reply_to, log_body
+ * (store this instead of the full HTML), sent_by_name / sent_by (default: the logged-in
+ * admin if any, otherwise NULL = automatic).
+ */
+function send_order_mail(int $order_id, string $to, string $subject, string $body_html, array $opts = []): bool
+{
+    $attachments = $opts['attachments'] ?? [];
+    $ok = send_mail($to, $subject, $body_html, $opts['reply_to'] ?? '', $attachments);
+
+    $by_name = $opts['sent_by_name'] ?? null;
+    $by_id   = $opts['sent_by'] ?? null;
+    if ($by_name === null && $by_id === null && PHP_SAPI !== 'cli' && defined('ADMIN_SESSION_NAME')
+        && (session_status() === PHP_SESSION_ACTIVE || !headers_sent())) {
+        $admin   = admin_user();
+        $by_name = $admin['name'] ?? null;
+        $by_id   = isset($admin['id']) ? (int)$admin['id'] : null;
+    }
+
+    $body = $opts['log_body'] ?? $body_html;
+    if ($attachments) {
+        $names = implode(', ', array_map(fn($a) => htmlspecialchars((string)($a['name'] ?? ''), ENT_QUOTES, 'UTF-8'), $attachments));
+        $body .= '<p style="font-size:12px;color:#6b7280;">Прикачени файлове: ' . $names . '</p>';
+    }
+    order_email_log($order_id, $to, $subject, $body, $opts['template_key'] ?? null, $ok, $by_name, $by_id);
+    return $ok;
+}
