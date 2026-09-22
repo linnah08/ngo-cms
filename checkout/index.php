@@ -1008,7 +1008,7 @@ $subtotal  = $cart_info['subtotal'];
           <input type="checkbox" name="accept_terms" value="1" required
                  <?= !empty($_POST['accept_terms']) ? 'checked' : '' ?>
                  style="width:1.1rem;height:1.1rem;margin-top:.15rem;flex-shrink:0;accent-color:var(--teal);">
-          <span style="font-size:.9rem;line-height:1.6;">
+          <span style="font-size:.9rem;line-height:1.6;text-transform:none;letter-spacing:normal;">
             <?php if ($lang === 'en'): ?>
               I accept the <a href="<?= $_c_terms ?>" target="_blank" rel="noopener">Terms of Use</a>
               and the <a href="<?= $_c_privacy ?>" target="_blank" rel="noopener">Privacy Policy</a>,
@@ -1026,7 +1026,7 @@ $subtotal  = $cart_info['subtotal'];
           <input type="checkbox" name="accept_newsletter" value="1"
                  <?= !empty($_POST['accept_newsletter']) ? 'checked' : '' ?>
                  style="width:1.1rem;height:1.1rem;margin-top:.15rem;flex-shrink:0;accent-color:var(--teal);">
-          <span style="font-size:.9rem;line-height:1.6;">
+          <span style="font-size:.9rem;line-height:1.6;text-transform:none;letter-spacing:normal;">
             <?= $lang === 'en'
                 ? 'Send me news from ' . h(SITE_NAME_EN) . '.'
                 : 'Искам да получавам новини от ' . h(SITE_NAME_BG) . '.' ?>
