@@ -679,6 +679,21 @@ final class UpdaterTest extends TestCase
         $this->assertSame([], $logged, 'Nothing was attempted, so nothing is logged');
     }
 
+    public function test_feature_self_update_true_wins_over_a_git_folder(): void
+    {
+        // The install that tests this feature is itself a git clone, so an
+        // explicit true has to beat the .git heuristic.
+        $root = $this->makeTempRoot();
+        mkdir($root . '/.git');
+        $code = sprintf(
+            'define("ROOT_PATH", %s); define("FEATURE_SELF_UPDATE", true); require %s; echo var_export(updater_self_update_allowed(), true);',
+            var_export($root, true),
+            var_export(dirname(__DIR__) . '/includes/updater.php', true)
+        );
+        $out = shell_exec(escapeshellarg(PHP_BINARY) . ' -r ' . escapeshellarg($code) . ' 2>&1');
+        $this->assertSame('true', trim((string) $out));
+    }
+
     public function test_feature_self_update_false_switches_it_off(): void
     {
         // Constants can't be undefined, so this runs in its own PHP process.

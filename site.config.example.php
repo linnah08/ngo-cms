@@ -67,7 +67,8 @@ define('FEATURE_CAMPAIGN', true);
 
 // Updating from Admin → Обновления. Set to false on a site a developer updates
 // through git (a fork with its own changes): a release would overwrite them.
-// A .git folder in the site root switches it off too.
+// With this line removed, a .git folder in the site root switches it off; the
+// setting itself always wins, so a deliberate git clone can still say true.
 define('FEATURE_SELF_UPDATE', true);
 
 // ── While the site is still being filled in ───────────────────────────────────

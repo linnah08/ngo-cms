@@ -68,8 +68,9 @@ function updater_root(): string
  * or a dev checkout. A release ZIP knows nothing of the fork's changes, and a
  * git-deployed site has no checksums.json baseline, so conflict detection is
  * off and those changes would simply be overwritten. Such a site sets
- * FEATURE_SELF_UPDATE to false in site.config.php; a .git folder in the site
- * root counts as the same answer.
+ * FEATURE_SELF_UPDATE to false in site.config.php. With nothing set, a .git
+ * folder in the site root is taken as the same answer — but an install that is
+ * a git clone on purpose (the test site for this feature) says true and wins.
  */
 function updater_self_update_allowed(): bool
 {
@@ -77,9 +78,13 @@ function updater_self_update_allowed(): bool
     if (is_bool($override)) {
         return $override;
     }
-    if (defined('FEATURE_SELF_UPDATE') && !FEATURE_SELF_UPDATE) {
-        return false;
+    // An explicit answer in site.config.php always wins, in both directions:
+    // false on a fork that must never be overwritten, true on an install that
+    // is a git clone on purpose — the test site for this very feature is one.
+    if (defined('FEATURE_SELF_UPDATE')) {
+        return (bool) FEATURE_SELF_UPDATE;
     }
+    // Nothing said: a .git folder means a developer looks after this copy.
     return !file_exists(updater_root() . '/.git');
 }
 
