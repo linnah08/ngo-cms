@@ -343,6 +343,39 @@ final class HomeSectionsAdminTest extends TestCase
         $this->assertStringContainsString('data-confirm="Да изтрия ли „Помогнете“? Това не може да се върне."', $del);
     }
 
+    public function test_disabled_move_buttons_look_disabled(): void
+    {
+        $s = ['id' => 's_ab12', 'type' => 'cta', 'visible' => true, 'fields' => []];
+        $this->assertStringContainsString('opacity:.5;cursor:not-allowed;', hs_action_form('move_up', $s, 1, '↑', 'Нагоре', true, 'вече е най-горе'));
+        $this->assertStringNotContainsString('opacity:.5', hs_action_form('move_down', $s, 1, '↓', 'Надолу'));
+    }
+
+    public function test_request_values_of_the_wrong_type_are_treated_as_missing(): void
+    {
+        $src = $this->src();
+        $this->assertDoesNotMatchRegularExpression('/\(string\)\s*\(?\$_(POST|GET)\[/', $src, 'no (string) cast of raw request values');
+        $this->assertStringContainsString("is_string(\$_POST[\$k] ?? null)", $src);
+        $this->assertStringContainsString("is_string(\$_GET['edit'])", $src);
+        $this->assertStringContainsString("is_string(\$_GET['add'])", $src);
+        $this->assertStringNotContainsString('home_admin_save($doc, $_POST', $src, 'the save gets the type-checked values, not raw $_POST');
+    }
+
+    public function test_campaign_page_has_a_main_heading(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 2) . '/admin/pages.php');
+        $start = strpos($src, "elseif (\$page === 'home_campaign')");
+        $this->assertNotFalse($start);
+        $end = strpos($src, '<?php elseif', $start + 10);
+        $this->assertStringContainsString('<h1 style="margin:0 0 1rem;">Начална страница — кампания</h1>', substr($src, $start, $end - $start));
+    }
+
+    public function test_a_chosen_file_is_previewed(): void
+    {
+        $src = $this->src();
+        $this->assertStringContainsString("addEventListener('change'", $src);
+        $this->assertStringContainsString('URL.createObjectURL(input.files[0])', $src);
+    }
+
     public function test_upload_rejects_non_images(): void
     {
         $tmp = tempnam(sys_get_temp_dir(), 'up');

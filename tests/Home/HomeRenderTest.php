@@ -145,6 +145,31 @@ final class HomeRenderTest extends TestCase
         $this->assertStringNotContainsString('btn--primary', $html);
     }
 
+    public function test_admin_view_carries_both_languages_for_the_on_page_editor(): void
+    {
+        $GLOBALS['_show_admin_bar'] = true;
+        $html = $this->render([$this->s('richtext', ['heading' => ['bg' => 'Заглавие', 'en' => 'Heading'],
+                                                    'body' => ['bg' => '<p>Текст & още</p>', 'en' => '<p>Text</p>']], true, 's_ab12')], 'en');
+        $this->assertStringContainsString('data-cms-field="body" data-cms-type="richtext" data-cms-bg="&lt;p&gt;Текст &amp; още&lt;/p&gt;" data-cms-en="&lt;p&gt;Text&lt;/p&gt;"', $html);
+        $this->assertStringContainsString('data-cms-field="heading" data-cms-type="text" data-cms-bg="Заглавие" data-cms-en="Heading"', $html);
+    }
+
+    public function test_visitors_do_not_get_the_other_language_in_data_attributes(): void
+    {
+        $html = $this->render([$this->s('richtext', ['heading' => ['bg' => 'Заглавие', 'en' => 'Heading']])], 'en');
+        $this->assertStringNotContainsString('data-cms-bg=', $html);
+    }
+
+    public function test_hidden_hero_still_leaves_one_visually_hidden_h1(): void
+    {
+        $html = $this->render([$this->s('hero', ['title' => ['bg' => 'Здравейте', 'en' => '']], false), $this->s('richtext', [])], 'en');
+        $this->assertSame(1, substr_count($html, '<h1'));
+        $this->assertMatchesRegularExpression('#<h1 style="position:absolute;[^"]*clip:rect\(0 0 0 0\)[^"]*">' . preg_quote(h(SITE_NAME_EN), '#') . '</h1>#u', $html);
+        $shown = $this->render([$this->s('hero', ['title' => ['bg' => 'Здравейте', 'en' => '']])]);
+        $this->assertSame(1, substr_count($shown, '<h1'));
+        $this->assertStringNotContainsString('position:absolute;width:1px', $shown);
+    }
+
     public function test_shared_style_is_emitted_once(): void
     {
         $html = $this->render([$this->s('cta', []), $this->s('richtext', [])]);

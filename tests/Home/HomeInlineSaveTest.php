@@ -110,6 +110,37 @@ final class HomeInlineSaveTest extends TestCase
         $this->assertSame([], glob($this->file . '.corrupt-*'));
     }
 
+    public function test_text_from_the_page_is_stored_as_plain_characters(): void
+    {
+        home_inline_save('s_hero', ['title' => ['bg' => 'Деца &amp; семейства<br>', 'en' => 'Kids &amp; families&nbsp;']]);
+        $title = $this->section('s_hero')['fields']['title'];
+        $this->assertSame('Деца & семейства', $title['bg']);
+        $this->assertStringStartsWith('Kids & families', $title['en']);
+        $this->assertStringNotContainsString('&amp;', $title['en']);
+    }
+
+    public function test_rich_text_entities_are_left_to_the_html_cleaner(): void
+    {
+        home_inline_save('s_ab12', ['body' => ['bg' => '<p>A &amp; B</p>', 'en' => '']]);
+        $this->assertSame('<p>A &amp; B</p>', $this->section('s_ab12')['fields']['body']['bg']);
+    }
+
+    public function test_a_button_label_cannot_be_cleared_while_its_link_is_set(): void
+    {
+        $doc = json_decode(file_get_contents($this->file), true);
+        $doc['sections'][0]['fields']['btn1_label'] = ['bg' => 'Помогни', 'en' => 'Help'];
+        $doc['sections'][0]['fields']['btn1_url']   = ['bg' => '/kak-da-pomogna/', 'en' => '/en/how-to-help/'];
+        file_put_contents($this->file, json_encode($doc));
+
+        $r = home_inline_save('s_hero', ['btn1_label' => ['bg' => '', 'en' => 'Help']]);
+        $this->assertFalse($r['ok']);
+        $this->assertSame('Добавете надпис на бутона или изтрийте линка му.', $r['error']);
+        $this->assertSame('Помогни', $this->section('s_hero')['fields']['btn1_label']['bg']);
+
+        // Clearing only the English label is fine — English falls back to the Bulgarian one.
+        $this->assertTrue(home_inline_save('s_hero', ['btn1_label' => ['bg' => 'Помогни', 'en' => '']])['ok']);
+    }
+
     public function test_unknown_section_is_refused(): void
     {
         $this->assertFalse(home_inline_save('s_nope', ['title' => ['bg' => 'x', 'en' => '']])['ok']);

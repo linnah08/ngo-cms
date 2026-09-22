@@ -17,7 +17,19 @@ function home_clean_link(string $url): ?string {
     if ($url[0] === '/') return str_starts_with($url, '//') ? null : $url;
     $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
     if (!in_array($scheme, ['http', 'https'], true)) return null;
-    return filter_var($url, FILTER_VALIDATE_URL) !== false ? $url : null;
+    // Cyrillic addresses (https://пример.бг/път, https://bg.wikipedia.org/wiki/България): check
+    // the punycode host with the path percent-encoded, but keep what the admin typed.
+    // Without the intl extension a Cyrillic host is refused, as before.
+    $host = parse_url($url, PHP_URL_HOST);
+    if (!is_string($host) || $host === '') return null;
+    $at   = strpos($url, $host);
+    $rest = (string) preg_replace_callback('/[^\x00-\x7F]+/', fn($m) => rawurlencode($m[0]), substr($url, $at + strlen($host)));
+    if (preg_match('/[^\x00-\x7F]/', $host) && function_exists('idn_to_ascii')) {
+        $host = idn_to_ascii($host, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46);
+        if ($host === false) return null;
+    }
+    $check = substr($url, 0, $at) . $host . $rest;
+    return filter_var($check, FILTER_VALIDATE_URL) !== false ? $url : null;
 }
 
 function home_valid_image_path(string $path): bool {
@@ -294,11 +306,16 @@ function home_validate_section(string $type, array $in): array {
         [$fields[$key], $e] = home_clean_field($def, $in[$key] ?? null, $key);
         $errors += $e;
     }
-    // A button needs both a label and a link. EN falls back to BG for either.
+    return [$fields, $errors + home_button_errors($fields)];
+}
+
+/** A button needs both a label and a link. EN falls back to BG for either. */
+function home_button_errors(array $fields): array {
+    $errors = [];
     foreach ([1, 2] as $n) {
         if (!isset($fields["btn{$n}_label"])) continue;
-        $label = $fields["btn{$n}_label"];
-        $url   = $fields["btn{$n}_url"];
+        $label = home_pair($fields["btn{$n}_label"]);
+        $url   = home_pair($fields["btn{$n}_url"] ?? null);
         if ($label['bg'] !== '' && $url['bg'] === '') {
             $errors["btn{$n}_url.bg"] ??= 'Добавете линк за бутона или изтрийте надписа му.';
         }
@@ -312,7 +329,7 @@ function home_validate_section(string $type, array $in): array {
             $errors["btn{$n}_label.en"] ??= 'Добавете надпис на бутона или изтрийте линка му.';
         }
     }
-    return [$fields, $errors];
+    return $errors;
 }
 
 // ── Storage ──────────────────────────────────────────────────────────────────
@@ -655,7 +672,11 @@ function home_inline_save(string $id, array $fields): array {
             // sent — even as '' — replaces it, so clearing a field on purpose still works.
             $raw = home_pair($doc['sections'][$i]['fields'][$key] ?? null);
             foreach (['bg', 'en'] as $l) {
-                if (array_key_exists($l, $values)) $raw[$l] = is_string($values[$l]) ? $values[$l] : '';
+                if (!array_key_exists($l, $values)) continue;
+                $v = is_string($values[$l]) ? $values[$l] : '';
+                // The page sends innerHTML: "&amp;" must be stored as "&" (output is escaped again).
+                if ($def['kind'] !== 'html') $v = html_entity_decode(strip_tags($v), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $raw[$l] = $v;
             }
         }
         [$value, $err] = home_clean_field($def, $raw, (string) $key);
@@ -665,6 +686,10 @@ function home_inline_save(string $id, array $fields): array {
     }
     if ($accepted === 0) {
         return ['ok' => false, 'error' => 'Тези полета не могат да се променят оттук. Отворете Админ → Съдържание → Начална страница.'];
+    }
+    // Same rule as the admin form: a button whose link is set keeps a label.
+    foreach (home_button_errors($doc['sections'][$i]['fields']) as $k => $msg) {
+        if (preg_match('/^btn\d_label\./', $k) && array_key_exists(strtok($k, '.'), $fields)) return ['ok' => false, 'error' => $msg];
     }
     $saved = home_save($doc, (int) $doc['rev']);
     return $saved['ok'] ? ['ok' => true] : ['ok' => false, 'error' => home_save_error_message($saved['error'])];

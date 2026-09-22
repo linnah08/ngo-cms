@@ -128,6 +128,15 @@ function home_render(array $doc, string $lang): void {
     $ctx        = home_context($doc, $lang);
     $show_admin = (bool) ($GLOBALS['_show_admin_bar'] ?? false);
     echo home_shared_head();
+    // The hero carries the page's only <h1>. Hidden, the page still needs one for screen readers.
+    $hero_shown = false;
+    foreach ($doc['sections'] as $s) {
+        if (!empty($s['visible']) && ($s['type'] ?? '') === 'hero') $hero_shown = true;
+    }
+    if (!$hero_shown) {
+        echo '<h1 style="position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;">'
+           . h($lang === 'bg' ? SITE_NAME_BG : SITE_NAME_EN) . '</h1>';
+    }
     foreach ($doc['sections'] as $s) {
         if (empty($s['visible']) || !isset($types[$s['type'] ?? ''])) continue;
         home_render_section($s, $lang, $ctx, $show_admin);

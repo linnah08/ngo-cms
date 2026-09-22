@@ -19,9 +19,11 @@ $form   = null;   // section shown in the edit form: ['id' => '' for new, 'type'
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) { http_response_code(400); exit('Невалидна заявка — презаредете страницата и опитайте отново.'); }
-    $action   = (string) ($_POST['action'] ?? '');
-    $post_rev = (int) ($_POST['rev'] ?? -1);
-    $post_id  = (string) ($_POST['id'] ?? '');
+    // Wrong types (e.g. action[]=x) count as missing — never "Array to string conversion".
+    $post_str = fn(string $k): string => is_string($_POST[$k] ?? null) ? $_POST[$k] : '';
+    $action   = $post_str('action');
+    $post_rev = is_string($_POST['rev'] ?? null) && preg_match('/^\d{1,9}$/', $_POST['rev']) ? (int) $_POST['rev'] : -1;
+    $post_id  = $post_str('id');
 
     if (in_array($action, HOME_ACTIONS, true)) {
         $r = home_apply_action($doc, $action, $post_id);
@@ -34,7 +36,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if ($action !== 'save') { http_response_code(400); exit('Непознато действие.'); }
 
-    $r = home_admin_save($doc, $_POST, $_FILES);
+    $post = ['id' => $post_id, 'type' => $post_str('type'), 'rev' => $post_rev, 'f' => is_array($_POST['f'] ?? null) ? $_POST['f'] : []];
+    $r = home_admin_save($doc, $post, $_FILES);
     switch ($r['status']) {
         case 'bad_type':
             http_response_code(400); exit('Непознат вид секция.');
@@ -52,14 +55,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $rev    = (int) ($r['rev'] ?? $post_rev);
     }
 } elseif (isset($_GET['edit'])) {
-    $idx = home_find($doc, (string) $_GET['edit']);
+    $idx = is_string($_GET['edit']) ? home_find($doc, $_GET['edit']) : null;
     if ($idx === null || !isset($types[$doc['sections'][$idx]['type']])) {
         flash_set('error', 'Секцията не е намерена.');
         header('Location: /admin/home-sections.php'); exit;
     }
     $form = $doc['sections'][$idx];
 } elseif (isset($_GET['add']) && $_GET['add'] !== '') {
-    $type = (string) $_GET['add'];
+    $type = is_string($_GET['add']) ? $_GET['add'] : '';
     if (!isset($types[$type]) || home_is_builtin($type)) { header('Location: /admin/home-sections.php?add='); exit; }
     $form = ['id' => '', 'type' => $type, 'fields' => home_validate_section($type, [])[0]];
 }
@@ -208,6 +211,19 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     if (e.target.closest('[data-hs-clear]')) {
       path.value = ''; img.removeAttribute('src'); img.style.display = 'none'; file.value = ''; announce('Снимката е премахната.');
     }
+  });
+
+  // A newly chosen file shows in the preview straight away. The image cropper may swap
+  // the file and fire "change" again — each change simply shows the latest file.
+  document.addEventListener('change', function (e) {
+    var input = e.target;
+    if (!input.matches || !input.matches('[data-hs-image] input[type=file]')) return;
+    var img = input.closest('[data-hs-image]').querySelector('[data-hs-preview]');
+    if (!img || !input.files || !input.files[0] || !window.URL || !URL.createObjectURL) return;
+    if (img.dataset.hsObjectUrl) URL.revokeObjectURL(img.dataset.hsObjectUrl);
+    img.dataset.hsObjectUrl = URL.createObjectURL(input.files[0]);
+    img.src = img.dataset.hsObjectUrl;
+    img.style.display = 'block';
   });
 
   // Cards: add, remove, reorder (2 to 4).

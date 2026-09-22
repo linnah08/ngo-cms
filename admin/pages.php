@@ -510,6 +510,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 <?php elseif ($page === 'home_campaign'): ?>
 <!-- ══ HOME — CAMPAIGN BLOCK ══ -->
 <a href="/admin/home-sections.php" style="color:var(--text-muted);font-size:0.9rem;display:block;margin-bottom:.25rem;">← Назад към началната страница</a>
+<h1 style="margin:0 0 1rem;">Начална страница — кампания</h1>
 <?php if (!feature_enabled('campaign')): ?>
   <p>Модулът „Кампания“ е изключен, затова блокът на кампанията не се показва на сайта.</p>
 <?php endif; ?>

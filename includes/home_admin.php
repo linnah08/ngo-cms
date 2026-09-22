@@ -160,6 +160,6 @@ function hs_action_form(string $action, array $s, int $rev, string $label, strin
          . '<input type="hidden" name="rev" value="' . $rev . '">'
          . '<button type="submit" id="' . h("btn-$action-$id") . '" class="btn btn--outline"'
          . ' aria-label="' . h($disabled && $why !== '' ? "$aria ($why)" : $aria) . '"' . ($disabled ? ' disabled' : '')
-         . ' style="min-height:44px;min-width:44px;' . ($danger ? 'color:#b91c1c;border-color:#b91c1c;' : '') . '">' . h($label) . '</button>'
+         . ' style="min-height:44px;min-width:44px;' . ($danger ? 'color:#b91c1c;border-color:#b91c1c;' : '') . ($disabled ? 'opacity:.5;cursor:not-allowed;' : '') . '">' . h($label) . '</button>'
          . '</form>';
 }

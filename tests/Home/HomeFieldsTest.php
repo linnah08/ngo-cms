@@ -142,4 +142,13 @@ final class HomeFieldsTest extends TestCase
         $this->assertSame(['bg' => '', 'en' => ''], home_pair(null));
         $this->assertSame(['bg' => '', 'en' => 'b'], home_pair(['bg' => ['x'], 'en' => 'b']));
     }
+
+    public function test_cyrillic_web_addresses_are_accepted_as_typed(): void
+    {
+        if (!function_exists('idn_to_ascii')) $this->markTestSkipped('intl extension not installed');
+        $this->assertSame('https://пример.бг/път?x=1', home_clean_link('https://пример.бг/път?x=1'));
+        $this->assertSame('https://bg.wikipedia.org/wiki/България', home_clean_link('https://bg.wikipedia.org/wiki/България') ?? 'null');
+        $this->assertNull(home_clean_link('https://-.бг'));
+        $this->assertNull(home_clean_link('javascript://пример.бг'));
+    }
 }
