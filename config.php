@@ -162,6 +162,12 @@ if (PHP_SAPI !== 'cli'
 // Derived display logic (not configuration).
 define('SHOW_DUAL_CURRENCY', date('Y-m-d') < DUAL_CURRENCY_UNTIL);
 
+// Version of the Условия / Политика за поверителност a customer accepts at
+// checkout. Stored on every order, so that months later it is possible to show
+// which wording someone actually agreed to. Bump it — same date format —
+// whenever the legal text changes in a way that affects the customer.
+define('LEGAL_VERSION', '2026-09-20');
+
 // Start session early — must happen before any output so the cookie can be set.
 // CSRF and cart both depend on $_SESSION being available before HTML is rendered.
 // A host-only session cookie is used (no parent-domain override), so the site

@@ -89,6 +89,11 @@ test('full checkout flow: shop → cart → checkout → payment hand-off', asyn
   // Checkout is online-payment only (cash on delivery was removed), so the
   // order leaves for the bank's payment page. The confirmation page needs a
   // real gateway callback and can't be reached here.
+
+  // No order can be placed without accepting the terms, so a customer getting
+  // this far has to tick the box.
+  await page.check('input[name="accept_terms"]');
+
   const siteHost = new URL(page.url()).host;
   await Promise.all([
     page.waitForURL(u => u.host !== siteHost || u.pathname.startsWith('/cart'),

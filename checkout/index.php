@@ -284,6 +284,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $order_lang_raw = $_POST['lang'] ?? 'bg';
         $order_lang     = in_array($order_lang_raw, ['bg', 'en'], true) ? $order_lang_raw : 'bg';
 
+        // Consent is verified here, on the server. The `required` attribute on
+        // the checkbox is a convenience for the customer, not a control — and
+        // no order may be created without it, so this bails out before the
+        // stock is reserved or the row is written.
+        if (empty($_POST['accept_terms'])) {
+            $errors[] = $order_lang === 'en'
+                ? 'Please accept the Terms of Use and the Privacy Policy to place your order.'
+                : 'За да завършите поръчката, приемете Условията за ползване и Политиката за поверителност.';
+            $step = 3;
+            goto render;
+        }
+        $consents = [
+            'terms_version' => LEGAL_VERSION,
+            'accepted_at'   => date('c'),
+            'documents'     => ['terms', 'privacy', 'withdrawal'],
+            'newsletter'    => !empty($_POST['accept_newsletter']),
+        ];
+
         // Online payment only — COD is not offered. Resolve to an enabled provider.
         require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
         require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/IRISPayment.php';
@@ -379,8 +397,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   (order_number,type,status,lang,customer_name,customer_email,customer_phone,
                    delivery_type,courier,courier_office_code,courier_office_name,
                    delivery_address,delivery_city,items,subtotal_eur,shipping_eur,total_eur,
-                   payment_method,payment_status,invoice_data)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                   payment_method,payment_status,invoice_data,consents)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ")->execute([
                 $order_number, 'physical', 'new', $order_lang,
                 $d['customer_name'], $d['customer_email'], $d['customer_phone'],
@@ -391,9 +409,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $subtotal, $shipping, $total,
                 $payment_method, 'pending',
                 $inv_data_json,
+                json_encode($consents, JSON_UNESCAPED_UNICODE),
             ]);
             $order_id = $pdo->lastInsertId();
             $pdo->commit();
+
+            // Newsletter opt-in, after the order is safely committed: a failure
+            // to subscribe must never cost the customer their order.
+            if (!empty($consents['newsletter'])) {
+                try {
+                    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
+                    newsletter_subscribe(
+                        $d['customer_email'], $d['customer_name'], $order_lang, 'checkout'
+                    );
+                } catch (Throwable $e) {
+                    error_log('Checkout newsletter opt-in failed: ' . $e->getMessage());
+                }
+            }
 
         } catch (RuntimeException $e) {
             $pdo->rollBack();
@@ -961,6 +993,45 @@ $subtotal  = $cart_info['subtotal'];
           </span>
         </label>
         <?php endforeach; ?>
+      </fieldset>
+
+      <?php
+        // Consent, immediately before the pay button. The links open in a new
+        // tab so a half-filled order is never lost to reading the terms.
+        $_c_terms   = $lang === 'en' ? '/en/terms/'           : '/usloviya/';
+        $_c_privacy = $lang === 'en' ? '/en/privacy-policy/'  : '/politika-za-poveritelnost/';
+      ?>
+      <fieldset style="border:none;padding:0;margin:0 0 1.5rem;">
+        <legend class="sr-only"><?= $lang === 'en' ? 'Consents' : 'Съгласия' ?></legend>
+
+        <label style="display:flex;align-items:flex-start;gap:.75rem;padding:1rem 1.25rem;border:2px solid var(--border);border-radius:var(--radius-lg);cursor:pointer;margin-bottom:.6rem;">
+          <input type="checkbox" name="accept_terms" value="1" required
+                 <?= !empty($_POST['accept_terms']) ? 'checked' : '' ?>
+                 style="width:1.1rem;height:1.1rem;margin-top:.15rem;flex-shrink:0;accent-color:var(--teal);">
+          <span style="font-size:.9rem;line-height:1.6;">
+            <?php if ($lang === 'en'): ?>
+              I accept the <a href="<?= $_c_terms ?>" target="_blank" rel="noopener">Terms of Use</a>
+              and the <a href="<?= $_c_privacy ?>" target="_blank" rel="noopener">Privacy Policy</a>,
+              and I have read the information about my right of withdrawal within 14 days.
+            <?php else: ?>
+              Приемам <a href="<?= $_c_terms ?>" target="_blank" rel="noopener">Условията за ползване</a>
+              и <a href="<?= $_c_privacy ?>" target="_blank" rel="noopener">Политиката за поверителност</a>
+              и съм запознат/а с правото си на отказ в 14-дневен срок.
+            <?php endif; ?>
+            <span aria-hidden="true" style="color:#a4243d;">*</span>
+          </span>
+        </label>
+
+        <label style="display:flex;align-items:flex-start;gap:.75rem;padding:1rem 1.25rem;border:2px solid var(--border);border-radius:var(--radius-lg);cursor:pointer;">
+          <input type="checkbox" name="accept_newsletter" value="1"
+                 <?= !empty($_POST['accept_newsletter']) ? 'checked' : '' ?>
+                 style="width:1.1rem;height:1.1rem;margin-top:.15rem;flex-shrink:0;accent-color:var(--teal);">
+          <span style="font-size:.9rem;line-height:1.6;">
+            <?= $lang === 'en'
+                ? 'Send me news from ' . h(SITE_NAME_EN) . '.'
+                : 'Искам да получавам новини от ' . h(SITE_NAME_BG) . '.' ?>
+          </span>
+        </label>
       </fieldset>
 
       <div style="display:flex;gap:1rem;align-items:center;">
