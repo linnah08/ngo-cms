@@ -35,6 +35,7 @@ package-lock.json
 /documents/receipts/*/
 /documents/donation_certs/*/
 /documents/tickets/*/
+/documents/boxnow_batches/
 
 # Admin-editable content files — server is source of truth, git reset must not overwrite these
 /content/pages.json

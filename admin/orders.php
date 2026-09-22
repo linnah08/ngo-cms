@@ -87,12 +87,15 @@ $status_labels = [
 ];
 $type_labels = ['physical' => 'Продукт', 'donation' => 'Дарение', 'ticket' => 'Билет'];
 
+$boxnow_ready = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE courier='boxnow' AND type='physical' AND payment_status='paid' AND status IN ('new','confirmed')")->fetchColumn();
+
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 ?>
 
 <div class="admin-page-header">
   <h1>Поръчки</h1>
   <div style="display:flex;flex-wrap:wrap;gap:.5rem;">
+    <a href="/admin/boxnow-bulk-labels.php" class="btn btn--primary">Печат на BoxNow етикети<?= $boxnow_ready ? ' (' . $boxnow_ready . ')' : '' ?></a>
     <a href="/admin/manual-invoice.php" class="btn btn--outline">+ Фактура</a>
     <a href="/admin/manual-cert.php" class="btn btn--outline">+ Сертификат за дарение</a>
   </div>
