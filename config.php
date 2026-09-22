@@ -6,8 +6,18 @@ define('ERROR_LOG_FILE', __DIR__ . '/logs/errors.log');
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
 
+// Deploys often skip logs/ (it is server-side state), so a fresh site may not
+// have it — create it on first use, locked against web access.
+function _om_log_dir_ready(string $dir): bool
+{
+    if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) return false;
+    if (!is_file($dir . '/.htaccess')) @file_put_contents($dir . '/.htaccess', "Require all denied\n");
+    return true;
+}
+
 function _om_log(string $level, string $message, string $file = '', int $line = 0): void
 {
+    if (!_om_log_dir_ready(dirname(ERROR_LOG_FILE))) return;
     $entry = '[' . date('Y-m-d H:i:s') . '] [' . $level . '] ' . $message
            . ($file ? ' in ' . $file . ':' . $line : '')
            . PHP_EOL;
