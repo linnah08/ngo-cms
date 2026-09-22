@@ -50,6 +50,12 @@ if (!csrf_verify()) {
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/updater.php';
 
+if (!updater_self_update_allowed()) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'self_update_disabled']);
+    exit;
+}
+
 // Guard against a double submit, a stale tab, or a second admin clicking at
 // the same moment: never start an update on top of one already running.
 if (updater_is_maintenance_mode()) {

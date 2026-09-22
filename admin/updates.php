@@ -33,7 +33,7 @@ if ($is_post) {
     if ($action === 'apply_update') {
         // Guard against double-submit / stale form: never apply while an
         // update is already in progress.
-        if (!updater_is_maintenance_mode()) {
+        if (!updater_is_maintenance_mode() && updater_self_update_allowed()) {
             $apply_result = updater_apply();
             $did_apply    = true;
         }
@@ -62,6 +62,7 @@ if ($apply_result === null) {
 // new state; otherwise use the ~1hr cache like any normal page load.
 $check         = updater_check_latest($did_apply);
 $maintenance   = updater_is_maintenance_mode();
+$self_update   = updater_self_update_allowed();
 $local_version = updater_get_local_version();
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
@@ -116,6 +117,13 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <h2 class="admin-card__title">Текуща версия</h2>
   <p style="font-size:1.1rem;margin:.25rem 0 1rem;"><strong><?= h($local_version) ?></strong></p>
 
+  <?php if (!$self_update): ?>
+    <p class="admin-meta" style="margin-bottom:1rem;padding:.75rem 1rem;border:1px solid var(--border);border-radius:8px;background:#f6f7f8;">
+      Този сайт се обновява от разработчика, затова обновяването от тази страница е изключено.
+      Така промените, направени специално за вашия сайт, не се губят.
+    </p>
+  <?php endif; ?>
+
   <?php if (empty($check['error']) && !empty($check['update_available'])): ?>
     <p class="admin-meta" style="margin-bottom:.5rem;">
       Налична е нова версия: <strong><?= h((string)($check['latest_version'] ?? '')) ?></strong>
@@ -124,7 +132,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       <div style="background:#f6f7f8;border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem;white-space:pre-wrap;font-size:.85rem;color:var(--text-muted);max-height:260px;overflow-y:auto;"><?= h((string)$check['notes']) ?></div>
     <?php endif; ?>
 
-    <?php if (!$maintenance): ?>
+    <?php if ($self_update && !$maintenance): ?>
       <form method="post" id="applyUpdateForm">
         <?= csrf_field() ?>
         <input type="hidden" name="action" value="apply_update">

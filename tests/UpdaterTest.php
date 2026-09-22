@@ -630,6 +630,57 @@ final class UpdaterTest extends TestCase
         $this->assertSame("2.0.0\n", file_get_contents($root . '/VERSION'));
     }
 
+    // ── Sites updated through git never self-update ─────────────────────────────
+
+    public function test_self_update_is_allowed_on_a_plain_install(): void
+    {
+        updater_set_root_override($this->makeTempRoot());
+        $this->assertTrue(updater_self_update_allowed());
+    }
+
+    public function test_a_git_folder_switches_self_update_off(): void
+    {
+        $root = $this->makeTempRoot();
+        mkdir($root . '/.git');
+        updater_set_root_override($root);
+        $this->assertFalse(updater_self_update_allowed());
+    }
+
+    public function test_apply_on_a_git_site_touches_nothing(): void
+    {
+        $this->requireZip();
+
+        $root = $this->makeTempRoot();
+        mkdir($root . '/.git');
+        file_put_contents($root . '/VERSION', "1.0.0\n");
+        file_put_contents($root . '/theme.css', '/* the fork’s own */');
+        $zip = $this->makeReleaseZip(['VERSION' => "2.0.0\n", 'theme.css' => '/* upstream */']);
+        updater_set_root_override($root);
+
+        $logged = [];
+        $result = updater_apply(null, $this->deps($zip, $logged));
+
+        $this->assertSame('failed', $result['status']);
+        $this->assertNotEmpty($result['error']);
+        $this->assertSame("1.0.0\n", file_get_contents($root . '/VERSION'));
+        $this->assertSame('/* the fork’s own */', file_get_contents($root . '/theme.css'));
+        $this->assertFalse(updater_is_maintenance_mode(), 'A refused update must not leave maintenance mode on');
+        $this->assertSame([], $logged, 'Nothing was attempted, so nothing is logged');
+    }
+
+    public function test_feature_self_update_false_switches_it_off(): void
+    {
+        // Constants can't be undefined, so this runs in its own PHP process.
+        $root = $this->makeTempRoot();
+        $code = sprintf(
+            'define("ROOT_PATH", %s); define("FEATURE_SELF_UPDATE", false); require %s; echo var_export(updater_self_update_allowed(), true);',
+            var_export($root, true),
+            var_export(dirname(__DIR__) . '/includes/updater.php', true)
+        );
+        $out = shell_exec(escapeshellarg(PHP_BINARY) . ' -r ' . escapeshellarg($code) . ' 2>&1');
+        $this->assertSame('false', trim((string) $out));
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
     private function requireZip(): void

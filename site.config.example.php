@@ -65,6 +65,11 @@ define('DUAL_CURRENCY_UNTIL', '2026-07-01');
 // Crowdfunding campaigns (the campaign/ pages + reward pledges in checkout).
 define('FEATURE_CAMPAIGN', true);
 
+// Updating from Admin → Обновления. Set to false on a site a developer updates
+// through git (a fork with its own changes): a release would overwrite them.
+// A .git folder in the site root switches it off too.
+define('FEATURE_SELF_UPDATE', true);
+
 // ── While the site is still being filled in ───────────────────────────────────
 // A dark strip at the top of every public page saying the site is new. It is a
 // notice and nothing more: no page is blocked, no price hidden, no order

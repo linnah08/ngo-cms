@@ -13,6 +13,7 @@
  *   - updater_check_latest(bool $force = false): array
  *   - updater_apply(?callable $onProgress = null, array $deps = []): array
  *   - updater_is_maintenance_mode(): bool
+ *   - updater_self_update_allowed(): bool
  *
  * Progress reporting (used by admin/update-apply-ajax.php and polled by
  * admin/update-progress-ajax.php). updater_apply() only *emits* progress, it
@@ -58,6 +59,24 @@ function updater_root(): string
         return ROOT_PATH;
     }
     return dirname(__DIR__);
+}
+
+/**
+ * May this install update itself from the admin?
+ *
+ * Not when a developer looks after it through git — a fork with its own theme,
+ * or a dev checkout. A release ZIP knows nothing of the fork's changes, and a
+ * git-deployed site has no checksums.json baseline, so conflict detection is
+ * off and those changes would simply be overwritten. Such a site sets
+ * FEATURE_SELF_UPDATE to false in site.config.php; a .git folder in the site
+ * root counts as the same answer.
+ */
+function updater_self_update_allowed(): bool
+{
+    if (defined('FEATURE_SELF_UPDATE') && !FEATURE_SELF_UPDATE) {
+        return false;
+    }
+    return !file_exists(updater_root() . '/.git');
 }
 
 function updater_cache_file(): string
@@ -751,6 +770,13 @@ function updater_apply(?callable $onProgress = null, array $deps = []): array
         'skipped'      => [],
         'error'        => null,
     ];
+
+    // Checked here, not only in the UI, so no caller can overwrite a site that
+    // is updated through git. Nothing was attempted, so nothing is logged.
+    if (!updater_self_update_allowed()) {
+        $result['error'] = 'Този сайт се обновява от разработчика, не от админ панела.';
+        return $result;
+    }
 
     // Repeated identical states are dropped rather than reported: the apply
     // loop runs once per file and can fire thousands of times, but the bar
