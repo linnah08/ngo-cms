@@ -96,6 +96,21 @@ final class HomeValidateTest extends TestCase
         $this->assertArrayHasKey('background', $e);
     }
 
+    public function test_teal_is_offered_only_for_the_cta_block(): void
+    {
+        foreach (home_types() as $type => $t) {
+            if (!isset($t['fields']['background'])) continue;
+            $has_teal = array_key_exists('teal', $t['fields']['background']['options']);
+            $this->assertSame($type === 'cta', $has_teal, $type);
+        }
+        [$f, $e] = home_validate_section('text_image', ['heading' => ['bg' => 'Х', 'en' => ''], 'background' => 'teal']);
+        $this->assertSame('white', $f['background']);
+        $this->assertArrayHasKey('background', $e);
+        [$f, $e] = home_validate_section('cta', ['background' => 'teal']);
+        $this->assertSame('teal', $f['background']);
+        $this->assertArrayNotHasKey('background', $e);
+    }
+
     public function test_image_outside_assets_is_an_error(): void
     {
         [, $e] = home_validate_section('text_image', ['image' => '/etc/passwd']);

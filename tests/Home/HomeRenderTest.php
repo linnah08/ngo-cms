@@ -125,6 +125,26 @@ final class HomeRenderTest extends TestCase
         $this->assertStringContainsString('data-cms-section="home:s_ab12" data-cms-field="heading"', $html);
     }
 
+    public function test_a_stored_teal_background_outside_the_cta_block_renders_as_the_default(): void
+    {
+        $html = $this->render([$this->s('text_image', ['heading' => ['bg' => 'Х', 'en' => ''], 'background' => 'teal'])]);
+        $this->assertStringNotContainsString('section--teal', $html);
+        $html = $this->render([$this->s('mission', ['title' => ['bg' => 'Х', 'en' => ''], 'background' => 'teal'])]);
+        $this->assertStringNotContainsString('section--teal', $html);
+        $this->assertStringContainsString('section--grey', $html);
+    }
+
+    public function test_cta_on_teal_uses_solid_white_text_and_white_buttons(): void
+    {
+        $html = $this->render([$this->s('cta', ['heading' => ['bg' => 'Х', 'en' => ''], 'text' => ['bg' => 'Кратък текст', 'en' => ''],
+            'btn1_label' => ['bg' => 'Дарете', 'en' => ''], 'btn1_url' => ['bg' => '/magazin/', 'en' => ''], 'background' => 'teal'])]);
+        $this->assertStringContainsString('section--teal', $html);
+        $this->assertStringContainsString('color:#fff;', $html);
+        $this->assertStringNotContainsString('rgba(255,255,255,0.85)', $html);
+        $this->assertStringContainsString('btn btn--white', $html);
+        $this->assertStringNotContainsString('btn--primary', $html);
+    }
+
     public function test_shared_style_is_emitted_once(): void
     {
         $html = $this->render([$this->s('cta', []), $this->s('richtext', [])]);

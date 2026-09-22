@@ -107,7 +107,11 @@ function home_pair(mixed $raw): array {
 
 // ── Section types ─────────────────────────────────────────────────────────────
 
-const HOME_BACKGROUNDS = ['white' => 'Бял', 'grey' => 'Светлосив', 'teal' => 'Основният цвят на сайта', 'warm' => 'Топъл (бежов)'];
+// Teal is offered only for the call-to-action block: its template switches text and
+// buttons to white there. On teal, the other blocks' links and primary buttons (also
+// teal) would disappear.
+const HOME_BACKGROUNDS     = ['white' => 'Бял', 'grey' => 'Светлосив', 'warm' => 'Топъл (бежов)'];
+const HOME_BACKGROUNDS_CTA = ['white' => 'Бял', 'grey' => 'Светлосив', 'teal' => 'Основният цвят на сайта', 'warm' => 'Топъл (бежов)'];
 
 const HOME_CARD_FIELDS = [
     'image'     => ['kind' => 'image', 'label' => 'Снимка'],
@@ -121,7 +125,7 @@ function home_types(): array {
     static $types = null;
     if ($types !== null) return $types;
 
-    $bg   = fn(string $default): array => ['kind' => 'choice', 'label' => 'Фон на секцията', 'options' => HOME_BACKGROUNDS, 'default' => $default];
+    $bg   = fn(string $default, array $options = HOME_BACKGROUNDS): array => ['kind' => 'choice', 'label' => 'Фон на секцията', 'options' => $options, 'default' => $default];
     $head = ['kind' => 'text', 'label' => 'Заглавие', 'max' => 150];
     $btn  = fn(int $n): array => [
         "btn{$n}_label" => ['kind' => 'text', 'label' => "Бутон $n — надпис", 'max' => 60],
@@ -174,7 +178,7 @@ function home_types(): array {
         'cta' => ['builtin' => false, 'icon' => '📢', 'label' => 'Призив за действие',
             'desc' => 'Цветна лента със заглавие, кратък текст и до два бутона.', 'note' => null,
             'fields' => ['heading' => $head, 'text' => ['kind' => 'textarea', 'label' => 'Кратък текст', 'max' => 400]]
-                + $btn(1) + $btn(2) + ['background' => $bg('teal')]],
+                + $btn(1) + $btn(2) + ['background' => $bg('teal', HOME_BACKGROUNDS_CTA)]],
         'richtext' => ['builtin' => false, 'icon' => '📝', 'label' => 'Свободен текст',
             'desc' => 'Заглавие и текст със списъци, връзки и таблици.', 'note' => null,
             'fields' => ['heading' => $head, 'body' => $rich, 'background' => $bg('white')]],

@@ -16,7 +16,7 @@ $heading = hf($f, 'heading', $lang);
         <div class="impact-item om-removable" data-cms-remove-type="impact" data-cms-remove-id="<?= $i ?>">
           <div class="impact-item__number" data-cms-field="number" data-cms-section="impact" data-cms-type="text"
                data-cms-bg="<?= h($item['number'] ?? '') ?>" data-cms-en="<?= h($item['number'] ?? '') ?>"><?= h($item['number'] ?? '') ?></div>
-          <div class="impact-item__label" style="color:rgba(255,255,255,0.8);" data-cms-field="label" data-cms-section="impact" data-cms-type="text"
+          <div class="impact-item__label" style="color:#fff;" data-cms-field="label" data-cms-section="impact" data-cms-type="text"
                data-cms-bg="<?= h($item['label_bg'] ?? '') ?>" data-cms-en="<?= h($item['label_en'] ?? '') ?>"><?= h($lang === 'bg' ? ($item['label_bg'] ?? '') : (($item['label_en'] ?? '') ?: ($item['label_bg'] ?? ''))) ?></div>
         </div>
       <?php $i++; endforeach; ?>

@@ -34,13 +34,14 @@ function home_img_attrs(string $sid, string $key): string {
     return ' data-cms-section="home:' . h($sid) . '" data-cms-field="' . h($key) . '"';
 }
 
-function home_bg_key(array $f, string $default = 'white'): string {
-    $bg = (string) ($f['background'] ?? $default);
-    return array_key_exists($bg, HOME_BACKGROUNDS) ? $bg : $default;
+/** The stored background if this block offers it, else $default (a stored teal outside the CTA block → $default). */
+function home_bg_key(array $f, string $default = 'white', array $allowed = HOME_BACKGROUNDS): string {
+    $bg = is_string($f['background'] ?? null) ? $f['background'] : $default;
+    return array_key_exists($bg, $allowed) ? $bg : $default;
 }
 
-function home_bg_class(array $f, string $default = 'white'): string {
-    return ['white' => '', 'grey' => ' section--grey', 'teal' => ' section--teal', 'warm' => ' section--warm'][home_bg_key($f, $default)];
+function home_bg_class(array $f, string $default = 'white', array $allowed = HOME_BACKGROUNDS): string {
+    return ['white' => '', 'grey' => ' section--grey', 'teal' => ' section--teal', 'warm' => ' section--warm'][home_bg_key($f, $default, $allowed)];
 }
 
 /**

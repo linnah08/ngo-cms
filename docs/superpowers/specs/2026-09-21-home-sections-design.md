@@ -43,8 +43,10 @@ Stored in `content/home.json` (gitignored, like `content/pages.json`):
   back to BG.
 - Link fields are also per-language `{"bg": "/kak-da-pomogna/", "en": "/en/how-to-help/"}`.
 - Image fields are a path string plus a translatable `*_alt` field. Empty alt → `alt=""`.
-- Every section has an optional `background`: `white | grey | teal | warm`, mapped to the
-  existing `section--*` classes.
+- Every section has an optional `background`: `white | grey | warm`, mapped to the
+  existing `section--*` classes. `teal` is offered only for the `cta` block, whose template
+  turns its text and buttons white; elsewhere teal links/primary buttons would vanish, so a
+  stored `teal` on any other block renders as that block's default.
 
 ### Built-in sections (exactly one each; hide/show and reorder; never deleted or duplicated)
 
