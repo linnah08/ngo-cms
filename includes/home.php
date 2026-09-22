@@ -28,6 +28,7 @@ function home_valid_image_path(string $path): bool {
 function home_clean_html(string $html): string {
     $html = trim($html);
     if ($html === '') return '';
+    if (!class_exists('Dom\\HTMLDocument')) return home_clean_html_plain($html);
     $doc  = Dom\HTMLDocument::createFromString(
         '<!DOCTYPE html><html><body><div>' . $html . '</div></body></html>', LIBXML_NOERROR, 'UTF-8'
     );
@@ -61,6 +62,18 @@ function home_clean_html(string $html): string {
         }
     }
     return trim($root->innerHTML);
+}
+
+/** Without PHP 8.4's HTML parser: keep the words, drop all formatting, escape everything. */
+function home_clean_html_plain(string $html): string {
+    static $logged = false;
+    if (!$logged) {
+        $logged = true;
+        error_log('home_clean_html: PHP 8.4 or newer (Dom\\HTMLDocument) is required to keep text formatting — saving plain text');
+    }
+    $html = (string) preg_replace('#<br\s*/?>|</(?:p|li|h[2-4]|blockquote|tr)>#i', "\n", $html);
+    $text = trim(html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    return $text === '' ? '' : '<p>' . nl2br(htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8'), false) . '</p>';
 }
 
 function home_parse_video_url(string $url): ?array {
@@ -387,11 +400,18 @@ function home_seed_from_site(): array {
     return home_seed($pages['home'] ?? [], load_json(CONTENT_PATH . '/bg/strings.json'), load_json(CONTENT_PATH . '/en/strings.json'));
 }
 
-/** A built-in that went missing (hand edit, older file) comes back hidden, so it can always be restored. */
-function home_ensure_builtins(array $doc): array {
-    $have = array_column($doc['sections'], 'type');
-    foreach (home_seed_from_site()['sections'] as $s) {
-        if (home_is_builtin($s['type']) && !in_array($s['type'], $have, true)) {
+/**
+ * A built-in that went missing (hand edit, older file) comes back hidden, so it can always be restored.
+ * The seed (pages.json + both strings files + HTML cleaning) is built only when one is missing —
+ * this runs on every front-page view.
+ * @param ?callable $seed defaults to home_seed_from_site(); injectable for tests.
+ */
+function home_ensure_builtins(array $doc, ?callable $seed = null): array {
+    $have    = array_column($doc['sections'], 'type');
+    $missing = array_diff(array_keys(array_filter(home_types(), fn($t) => $t['builtin'])), $have);
+    if (!$missing) return $doc;
+    foreach (($seed ?? 'home_seed_from_site')()['sections'] as $s) {
+        if (in_array($s['type'], $missing, true)) {
             $s['visible'] = false;
             $doc['sections'][] = $s;
         }

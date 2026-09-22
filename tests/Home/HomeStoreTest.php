@@ -94,6 +94,35 @@ final class HomeStoreTest extends TestCase
         $this->assertSame(3, $doc['rev']);
     }
 
+    /**
+     * The seed reads pages.json and both strings files on every call, so it is injected
+     * here as a counter: with every built-in present it must not be built at all.
+     */
+    public function test_ensure_builtins_does_not_build_the_seed_when_nothing_is_missing(): void
+    {
+        $calls = 0;
+        $seed  = function () use (&$calls) { $calls++; return $this->seed(); };
+        $full  = $this->seed();
+        $this->assertSame($full, home_ensure_builtins($full, $seed));
+        $this->assertSame(0, $calls);
+
+        $partial = $full;
+        $partial['sections'] = array_values(array_filter($full['sections'], fn($s) => $s['type'] !== 'news'));
+        $out = home_ensure_builtins($partial, $seed);
+        $this->assertSame(1, $calls);
+        $this->assertSame('news', end($out['sections'])['type']);
+        $this->assertFalse(end($out['sections'])['visible']);
+        $this->assertCount(count($full['sections']), $out['sections']);
+    }
+
+    public function test_plain_fallback_keeps_the_words_and_escapes_everything(): void
+    {
+        $out = home_clean_html_plain('<p>Здравей &amp; <b>добре</b> дошли</p><p><script>alert(1)</script>Втори</p>');
+        $this->assertSame('<p>Здравей &amp; добре дошли<br>' . "\n" . 'alert(1)Втори</p>', $out);
+        $this->assertSame('', home_clean_html_plain('<p> </p>'));
+        $this->assertStringNotContainsString('<script', home_clean_html_plain('&lt;script&gt;x'));
+    }
+
     public function test_unknown_type_is_preserved_on_save(): void
     {
         file_put_contents($GLOBALS['_om_home_file'], json_encode(['version' => 1, 'rev' => 1, 'sections' => [
