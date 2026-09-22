@@ -52,7 +52,10 @@ set_exception_handler(function(Throwable $e): void {
     if (file_exists($err_page)) {
         require $err_page;
     } else {
-        echo '<!DOCTYPE html><html><head><title>500</title></head><body><h1>500 — Something went wrong</h1><p>The error has been logged.</p></body></html>';
+        echo '<!DOCTYPE html><html lang="bg"><head><meta charset="UTF-8"><title>500</title></head><body>'
+           . '<h1>500 — Нещо се обърка</h1><p>Грешката е регистрирана. Опитай отново след малко.</p>'
+           . '<h2 lang="en">Something went wrong</h2><p lang="en">The error has been logged. Please try again shortly.</p>'
+           . '</body></html>';
     }
     exit(1);
 });
@@ -277,12 +280,21 @@ if (PHP_SAPI !== 'cli' && file_exists(ROOT_PATH . '/.maintenance')) {
     if (!$_om_is_admin) {
         http_response_code(503);
         header('Retry-After: 120');
-        echo '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+        // The branded page picks BG/EN from the URL. The inline fallback covers
+        // an update that is replacing errors/ at this very moment.
+        if (is_file(ROOT_PATH . '/errors/503.php')) {
+            require ROOT_PATH . '/errors/503.php';
+            exit;
+        }
+        $_om_maint_en = $_om_maint_uri === '/en' || str_starts_with($_om_maint_uri, '/en/')
+            || str_starts_with($_om_maint_uri, '/en?');
+        echo '<!DOCTYPE html><html lang="' . ($_om_maint_en ? 'en' : 'bg') . '"><head><meta charset="UTF-8">'
            . '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
-           . '<title>Site update in progress</title></head>'
+           . '<title>' . ($_om_maint_en ? 'Site update in progress' : 'Сайтът се обновява') . '</title></head>'
            . '<body style="font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:4rem 1rem;">'
-           . '<h1>We\'ll be right back</h1>'
-           . '<p>We\'re applying an update, back in a few minutes.</p>'
+           . ($_om_maint_en
+               ? '<h1>We\'ll be right back</h1><p>We\'re applying an update, back in a few minutes.</p>'
+               : '<h1>Връщаме се след малко</h1><p>Сайтът се обновява. Ще е готов до няколко минути.</p>')
            . '</body></html>';
         exit;
     }

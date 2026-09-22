@@ -10,18 +10,12 @@
  *   $show_home   bool   — show "Към началото" button (default true)
  */
 $show_home = $show_home ?? true;
-$lang = 'bg';
-if (!empty($_SERVER['HTTP_ACCEPT_LANGUAGE'])) {
-    if (stripos($_SERVER['HTTP_ACCEPT_LANGUAGE'], 'en') !== false &&
-        stripos($_SERVER['HTTP_ACCEPT_LANGUAGE'], 'bg') === false) {
-        $lang = 'en';
-    }
-}
-// Simple path-based detection
-$path = $_SERVER['REQUEST_URI'] ?? '';
-if (str_starts_with($path, '/en/') || $path === '/en') {
-    $lang = 'en';
-}
+// The language comes from the URL alone, like every other page: /en or /en/...
+// is English, everything else Bulgarian. Never from the browser's
+// Accept-Language — a Bulgarian visitor with an English-language browser would
+// otherwise get an English error page on a Bulgarian URL.
+$path = strtok($_SERVER['REQUEST_URI'] ?? '/', '?#') ?: '/';
+$lang = ($path === '/en' || str_starts_with($path, '/en/')) ? 'en' : 'bg';
 $is_en = $lang === 'en';
 $display_title   = $is_en ? $title_en   : $title;
 $display_message = $is_en ? $message_en : $message;
