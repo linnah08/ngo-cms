@@ -66,7 +66,8 @@ final class ImageCropperTest extends TestCase
             'admin/article-edit.php'  => 1,
             'admin/partners.php'      => 1,
             'admin/product-edit.php'  => 3,
-            'admin/pages.php'         => 5,
+            // 4, not 5: the mission-image input left with the old home form (front page is built in admin/home-sections.php now)
+            'admin/pages.php'         => 4,
         ];
         foreach ($expected as $file => $count) {
             $src = $this->read($file);
