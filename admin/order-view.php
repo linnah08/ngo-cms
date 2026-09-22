@@ -434,7 +434,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'name'          => $order['customer_name'],
                         'email'         => $order['customer_email'],
                         'pledge_number' => $order['order_number'],
-                        'amount_eur'    => $order['total_eur'],
+                        'amount_eur'    => order_donation_amount(json_decode($order['items'] ?? '[]', true) ?? [], (float)$order['total_eur']),
                         'created_at'    => $order['created_at'],
                         'delivery_address' => null,
                         'lang'          => 'bg',

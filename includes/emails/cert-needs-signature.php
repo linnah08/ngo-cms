@@ -3,7 +3,8 @@
 $sign_url = SITE_URL . '/admin/order-view.php?id=' . (int)$order_id;
 $cert_num  = htmlspecialchars($document['formatted_number'], ENT_QUOTES, 'UTF-8');
 $donor     = htmlspecialchars($order['customer_name'], ENT_QUOTES, 'UTF-8');
-$amount    = number_format((float)$order['total_eur'], 2, '.', ' ') . ' €';
+require_once __DIR__ . '/../order_view.php';
+$amount    = number_format(order_donation_amount(json_decode($order['items'] ?? '[]', true) ?? [], (float)$order['total_eur']), 2, '.', ' ') . ' €';
 ?>
 <h2>Нов сертификат за дарение — нужен подпис</h2>
 <p>Здравейте,</p>

@@ -54,6 +54,46 @@ final class OrderViewLogicTest extends TestCase
         $this->assertFalse(order_has_donation('physical', [['type' => 'physical']]));
     }
 
+    // ── order_donation_amount ────────────────────────────────────────────────
+
+    public function testDonationAmountFallsBackToOrderTotalWhenNoDonationItems(): void
+    {
+        // Dedicated donation orders store the amount as the order total, not a
+        // line item, so the helper must fall back rather than return 0.
+        $this->assertSame(25.0, order_donation_amount([], 25.0));
+    }
+
+    public function testDonationAmountSumsDonationItemsOnMixedOrder(): void
+    {
+        $items = [
+            ['type' => 'physical', 'subtotal_eur' => 30.0],
+            ['type' => 'donation', 'amount_eur' => 10.0],
+        ];
+        // Order total (40) includes the product price; only the donation
+        // portion (10) should be reported.
+        $this->assertSame(10.0, order_donation_amount($items, 40.0));
+    }
+
+    public function testDonationAmountSumsMultipleDonationItems(): void
+    {
+        $items = [
+            ['type' => 'donation', 'amount_eur' => 5.0],
+            ['type' => 'donation', 'amount_eur' => 7.5],
+        ];
+        $this->assertSame(12.5, order_donation_amount($items, 12.5));
+    }
+
+    public function testCertNeedsSignatureEmailShowsOnlyTheDonation(): void
+    {
+        $order = ['customer_name' => 'Ана', 'total_eur' => 40.0,
+                  'items' => json_encode([['type' => 'physical', 'subtotal_eur' => 30.0], ['type' => 'donation', 'amount_eur' => 10.0]])];
+        $document = ['formatted_number' => 'D-1'];
+        $order_id = 1;
+        ob_start(); include dirname(__DIR__, 2) . '/includes/emails/cert-needs-signature.php'; $html = ob_get_clean();
+        $this->assertStringContainsString('10.00 €', $html);
+        $this->assertStringNotContainsString('40.00 €', $html);
+    }
+
     // ── order_print_spec ─────────────────────────────────────────────────────
 
     public function testPrintSpecComputesCmFromPlacementAndSize(): void

@@ -94,6 +94,7 @@ $pdo->prepare('UPDATE documents SET signed_at = NOW(), signed_by = ? WHERE id = 
 
 // Auto-email the signed cert to the donor
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_view.php';
 
 $ps = $pdo->prepare('SELECT * FROM campaign_pledges WHERE pledge_number = ?');
 $ps->execute([$order['order_number']]);
@@ -103,7 +104,7 @@ $pledge_for_email = $pledge_row ?: [
     'name'             => $order['customer_name'],
     'email'            => $order['customer_email'],
     'pledge_number'    => $order['order_number'],
-    'amount_eur'       => $order['total_eur'],
+    'amount_eur'       => order_donation_amount($items, (float)$order['total_eur']),
     'created_at'       => $order['created_at'],
     'delivery_address' => null,
     'lang'             => 'bg',

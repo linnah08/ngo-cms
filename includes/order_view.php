@@ -30,6 +30,19 @@ function order_has_donation(string $type, array $items): bool {
 }
 
 /**
+ * Sum of donation line items within an order, falling back to the order total
+ * for dedicated donation orders (which have no items marked type=donation).
+ * Same rule DonationCertGenerator uses for the amount on the certificate.
+ */
+function order_donation_amount(array $items, float $order_total): float {
+    $sum = 0.0;
+    foreach ($items as $i) {
+        if (($i['type'] ?? '') === 'donation') $sum += (float)($i['amount_eur'] ?? 0);
+    }
+    return $sum > 0 ? $sum : $order_total;
+}
+
+/**
  * Human-readable placement spec for a printed design.
  *
  * Given the design placement ($pos: scale, x, y in 0..1 of the print area), the
