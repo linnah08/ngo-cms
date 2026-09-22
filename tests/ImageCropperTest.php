@@ -66,7 +66,9 @@ final class ImageCropperTest extends TestCase
             'admin/article-edit.php'  => 1,
             'admin/partners.php'      => 1,
             'admin/product-edit.php'  => 3,
-            'admin/pages.php'         => 5,
+            'admin/pages.php'         => 4,
+            // The front-page section editor renders its image inputs from here.
+            'includes/home_admin.php' => 1,
         ];
         foreach ($expected as $file => $count) {
             $src = $this->read($file);

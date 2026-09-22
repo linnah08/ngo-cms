@@ -7,34 +7,47 @@ use PHPUnit\Framework\TestCase;
 class InlineAddRemoveTest extends TestCase
 {
     private string $pagesPath;
-    private array  $origPages;
     private string $partnersPath;
-    private array  $origPartners;
     private string $impactPath;
-    private array  $origImpact;
     private string $centresPath;
-    private array  $origCentres;
+    /** Raw bytes of each content file before the test, or null if it did not exist. */
+    private array  $backup = [];
 
     protected function setUp(): void
     {
         $this->pagesPath    = CONTENT_PATH . '/pages.json';
-        $this->origPages    = json_decode(file_get_contents($this->pagesPath), true);
         $this->partnersPath = PARTNERS_FILE;
-        $this->origPartners = json_decode(file_get_contents($this->partnersPath), true);
         $this->impactPath   = IMPACT_FILE;
-        $this->origImpact   = json_decode(file_get_contents($this->impactPath), true);
         $this->centresPath  = CENTRES_FILE;
-        $this->origCentres  = json_decode(file_get_contents($this->centresPath), true);
+        // Keep the exact bytes, so restoring never reformats a file that is in git.
+        foreach ([$this->pagesPath, $this->partnersPath, $this->impactPath, $this->centresPath] as $path) {
+            $this->backup[$path] = is_file($path) ? file_get_contents($path) : null;
+        }
         if (session_status() === PHP_SESSION_NONE) session_start();
         $_SESSION[ADMIN_SESSION_NAME] = ['role' => 'admin', 'time' => time()];
     }
 
     protected function tearDown(): void
     {
-        file_put_contents($this->pagesPath,    json_encode($this->origPages,    JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-        file_put_contents($this->partnersPath, json_encode($this->origPartners, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-        file_put_contents($this->impactPath,   json_encode($this->origImpact,   JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-        file_put_contents($this->centresPath,  json_encode($this->origCentres,  JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        // Put every file back exactly as it was, and remove any the test created.
+        foreach ($this->backup as $path => $bytes) {
+            if ($bytes !== null) {
+                file_put_contents($path, $bytes);
+            } elseif (is_file($path)) {
+                unlink($path);
+            }
+        }
+    }
+
+    /**
+     * pages.json holds the site's own content and is not in git, so a fresh
+     * checkout has none. Tests that edit it skip without it.
+     */
+    private function requireContentFile(string $path): void
+    {
+        if ($this->backup[$path] === null) {
+            $this->markTestSkipped(basename($path) . ' not present (it is not in git).');
+        }
     }
 
     // ── Type whitelist ────────────────────────────────────────────────────────
@@ -121,6 +134,7 @@ class InlineAddRemoveTest extends TestCase
 
     public function test_remove_team_member(): void
     {
+        $this->requireContentFile($this->pagesPath);
         $pages = load_json(CONTENT_PATH . '/pages.json');
         // Add a dummy member first
         if (!isset($pages['about']['team'])) $pages['about']['team'] = [];
@@ -153,6 +167,7 @@ class InlineAddRemoveTest extends TestCase
 
     public function test_remove_product_deactivates(): void
     {
+        if (!test_db_available()) $this->markTestSkipped('DB not available.');
         require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
         $pdo  = get_pdo();
         $prod = $pdo->query('SELECT id, active FROM products WHERE active = 1 LIMIT 1')->fetch();

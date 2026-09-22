@@ -20,6 +20,9 @@ class SpeedyCourierTest extends TestCase
 
     protected function setUp(): void
     {
+        if (!test_courier_live('speedy_user')) {
+            $this->markTestSkipped('No Speedy credentials (courier.config.php or admin settings).');
+        }
         $this->speedy = new SpeedyCourier();
     }
 

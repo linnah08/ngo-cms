@@ -18,21 +18,35 @@ final class LoginHttpTest extends TestCase
     private static string $password = 'LoginHttpTest_Pass_42!';
     private static ?int   $uid      = null;
 
+    /** Null when example.test is serving this site; otherwise why the tests skip. */
+    private static ?string $unavailable = null;
+
     public static function setUpBeforeClass(): void
     {
-        // Skip when example.test is unreachable.
-        $ch = curl_init(self::$base . '/admin/login.php');
+        // Require HTTP 200 on /, not just a successful curl: a catch-all dev server
+        // (e.g. Laravel Herd) answers unknown hosts with its own 404, and the tests
+        // would then fail as though login were broken. See HttpTest::setUpBeforeClass().
+        $ch = curl_init(self::$base . '/');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 3);
         curl_setopt($ch, CURLOPT_NOBODY, true);
         curl_exec($ch);
         $errno = curl_errno($ch);
+        $code  = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         if ($errno !== 0) {
-            return; // skip flag set per-test via test_db_available + reachability
+            self::$unavailable = 'example.test is not reachable.';
+            return;
+        }
+        if ($code !== 200) {
+            self::$unavailable = "example.test answered HTTP $code for / — something other than this site is serving that host.";
+            return;
         }
 
-        if (!test_db_available()) return;
+        if (!test_db_available()) {
+            self::$unavailable = 'DB not available.';
+            return;
+        }
 
         require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/auth.php';
 
@@ -46,35 +60,27 @@ final class LoginHttpTest extends TestCase
 
     public static function tearDownAfterClass(): void
     {
-        if (self::$uid === null || !test_db_available()) return;
+        if (self::$uid === null) return;
         get_pdo()->prepare('DELETE FROM admin_users WHERE id = ?')->execute([self::$uid]);
     }
 
     private function skip(): void
     {
-        $ch = curl_init(self::$base . '/admin/login.php');
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 3);
-        curl_setopt($ch, CURLOPT_NOBODY, true);
-        curl_exec($ch);
-        $errno = curl_errno($ch);
-        curl_close($ch);
-        if ($errno !== 0 || !test_db_available() || self::$uid === null) {
-            $this->markTestSkipped('example.test or DB not available.');
+        if (self::$unavailable !== null) {
+            $this->markTestSkipped(self::$unavailable);
         }
     }
 
     public function testLoginPageLoads(): void
     {
+        $this->skip();
+
         $ch = curl_init(self::$base . '/admin/login.php');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-        $errno = curl_errno($ch);
-        $code  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_exec($ch);
-        $code  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-        if ($errno !== 0) $this->markTestSkipped('example.test not reachable.');
         $this->assertSame(200, $code);
     }
 

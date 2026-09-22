@@ -64,6 +64,8 @@ final class TranslatorTest extends TestCase
     public function test_load_glossary_pairs_have_two_elements(): void
     {
         $glossary = deepl_load_glossary();
+        // An empty glossary is valid; it must still be a list, so the test checks something.
+        $this->assertIsList($glossary);
         foreach ($glossary as $pair) {
             $this->assertCount(2, $pair, 'Each glossary pair must be [source, target]');
         }

@@ -23,6 +23,14 @@ class BoxNowCourierTest extends TestCase
         $this->boxnow = new BoxNowCourier();
     }
 
+    /** The auth-token tests need real credentials; the rest pass on the placeholders. */
+    private function requireLiveCredentials(): void
+    {
+        if (!test_courier_live('boxnow_client_id')) {
+            $this->markTestSkipped('No BoxNow credentials (courier.config.php or admin settings).');
+        }
+    }
+
     // ── getOffices ─────────────────────────────────────────────────────────────
 
     public function testGetOfficesReturnsNonEmptyArray(): void
@@ -157,6 +165,7 @@ class BoxNowCourierTest extends TestCase
 
     public function testGetAccessTokenReturnsNonEmptyString(): void
     {
+        $this->requireLiveCredentials();
         $token = $this->boxnow->getAccessToken();
 
         $this->assertIsString($token);
@@ -165,6 +174,7 @@ class BoxNowCourierTest extends TestCase
 
     public function testGetAccessTokenIsCachedAcrossCalls(): void
     {
+        $this->requireLiveCredentials();
         $token1 = $this->boxnow->getAccessToken();
         $token2 = $this->boxnow->getAccessToken();
 

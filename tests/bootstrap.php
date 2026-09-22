@@ -24,6 +24,8 @@ if (file_exists($root . '/courier.config.php')) {
     define('BOXNOW_PARTNER_ID',    'test');
     define('BOXNOW_WAREHOUSE_ID',  'test');
     define('BOXNOW_TEST_MODE',     true);
+    // The values above are placeholders; live courier tests skip on them.
+    define('TEST_COURIER_STUB_CREDENTIALS', true);
     define('SENDER_NAME',          'Test Sender');
     define('SENDER_PHONE',         '0888000000');
     define('SENDER_CITY',          'София');
@@ -107,6 +109,21 @@ function test_dsk_available(): bool {
     try {
         return setting_get('dsk_merchant') !== ''
             && setting_get('dsk_password') !== '';
+    } catch (Throwable) {
+        return false;
+    }
+}
+
+/**
+ * Returns true when a courier has real credentials for live API tests: either
+ * courier.config.php exists, or the admin settings hold a value for $settingKey.
+ * Without either, the bootstrap's placeholder credentials are in use, and a live
+ * call can only fail (401, or an unreachable test host), so those tests skip.
+ */
+function test_courier_live(string $settingKey): bool {
+    if (!defined('TEST_COURIER_STUB_CREDENTIALS')) return true;
+    try {
+        return setting_is_set($settingKey);
     } catch (Throwable) {
         return false;
     }

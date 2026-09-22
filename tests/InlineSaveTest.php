@@ -7,25 +7,43 @@ use PHPUnit\Framework\TestCase;
 class InlineSaveTest extends TestCase
 {
     private string $pagesPath;
-    private array  $origPages;
     private string $menusPath;
-    private array  $origMenus;
+    /** Raw bytes of each content file before the test, or null if it did not exist. */
+    private array  $backup = [];
 
     protected function setUp(): void
     {
         $this->pagesPath = CONTENT_PATH . '/pages.json';
-        $this->origPages = json_decode(file_get_contents($this->pagesPath), true);
         $this->menusPath = CONTENT_PATH . '/menus.json';
-        $this->origMenus = json_decode(file_get_contents($this->menusPath), true);
+        // Keep the exact bytes, so restoring never reformats the file.
+        foreach ([$this->pagesPath, $this->menusPath] as $path) {
+            $this->backup[$path] = is_file($path) ? file_get_contents($path) : null;
+        }
         if (session_status() === PHP_SESSION_NONE) session_start();
         $_SESSION[ADMIN_SESSION_NAME] = ['role' => 'admin', 'time' => time()];
     }
 
     protected function tearDown(): void
     {
-        // Restore original files after each test
-        file_put_contents($this->pagesPath, json_encode($this->origPages, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-        file_put_contents($this->menusPath, json_encode($this->origMenus, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        // Put every file back exactly as it was, and remove any the test created.
+        foreach ($this->backup as $path => $bytes) {
+            if ($bytes !== null) {
+                file_put_contents($path, $bytes);
+            } elseif (is_file($path)) {
+                unlink($path);
+            }
+        }
+    }
+
+    /**
+     * pages.json and menus.json hold the site's own content and are not in git,
+     * so a fresh checkout has neither. Tests that edit one skip without it.
+     */
+    private function requireContentFile(string $path): void
+    {
+        if ($this->backup[$path] === null) {
+            $this->markTestSkipped(basename($path) . ' not present (it is not in git).');
+        }
     }
 
     // ── Whitelist validation ────────────────────────────────────────────────
@@ -77,6 +95,7 @@ class InlineSaveTest extends TestCase
 
     public function test_saves_home_hero_title(): void
     {
+        $this->requireContentFile($this->pagesPath);
         $pages = load_json(CONTENT_PATH . '/pages.json');
         $pages['home']['hero_title']    = trim(strip_tags('Нов заглавие'));
         $pages['home']['hero_title_en'] = trim(strip_tags('New title'));
@@ -89,6 +108,7 @@ class InlineSaveTest extends TestCase
 
     public function test_saves_shop_donation_text(): void
     {
+        $this->requireContentFile($this->pagesPath);
         $pages = load_json(CONTENT_PATH . '/pages.json');
         $pages['shop']['donation_text_bg'] = '<p>Помогни ни</p>';
         $pages['shop']['donation_text_en'] = '<p>Help us</p>';
@@ -100,6 +120,7 @@ class InlineSaveTest extends TestCase
 
     public function test_saves_donation_page_title(): void
     {
+        $this->requireContentFile($this->pagesPath);
         $pages = load_json(CONTENT_PATH . '/pages.json');
         $pages['donation']['title']    = 'Подкрепи ни';
         $pages['donation']['title_en'] = 'Support us';
@@ -112,6 +133,7 @@ class InlineSaveTest extends TestCase
 
     public function test_saves_menus_header_label(): void
     {
+        $this->requireContentFile($this->menusPath);
         $menus = load_json(CONTENT_PATH . '/menus.json');
         if (empty($menus['header']['bg'])) {
             $this->markTestSkipped('No header BG menu items');
@@ -148,7 +170,7 @@ class InlineSaveTest extends TestCase
         $files = glob($articles_dir . '/*.json');
         if (!$files) $this->markTestSkipped('No BG articles found');
         $file = $files[0];
-        $orig = json_decode(file_get_contents($file), true);
+        $orig = file_get_contents($file);
 
         // Directly apply the article-save logic
         $article = load_json($file);
@@ -159,7 +181,7 @@ class InlineSaveTest extends TestCase
         $this->assertSame('Тест заглавие', $saved['title']);
 
         // Restore
-        file_put_contents($file, json_encode($orig, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        file_put_contents($file, $orig);
     }
 
     public function test_article_slug_path_traversal_blocked(): void
@@ -174,6 +196,7 @@ class InlineSaveTest extends TestCase
 
     public function test_saves_product_name(): void
     {
+        if (!test_db_available()) $this->markTestSkipped('DB not available.');
         require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
         $pdo  = get_pdo();
         $prod = $pdo->query('SELECT id, name_bg FROM products WHERE active = 1 LIMIT 1')->fetch();
