@@ -129,4 +129,34 @@ final class HomeStoreTest extends TestCase
         $this->assertTrue(home_save(home_load()['doc'], 0)['ok']);
         $this->assertFalse(home_load()['corrupt']);
     }
+
+    public function test_a_damaged_file_is_backed_up_before_it_is_overwritten(): void
+    {
+        file_put_contents($GLOBALS['_om_home_file'], '{not json');
+        $this->assertTrue(home_save(home_load()['doc'], 0)['ok']);
+        $copies = glob($GLOBALS['_om_home_file'] . '.corrupt-*');
+        $this->assertCount(1, $copies);
+        $this->assertMatchesRegularExpression('/\.corrupt-\d{14}$/', $copies[0]);
+        $this->assertSame('{not json', file_get_contents($copies[0]));
+    }
+
+    public function test_a_file_without_sections_counts_as_damaged_and_is_backed_up(): void
+    {
+        file_put_contents($GLOBALS['_om_home_file'], '{"rev":0,"sections":"oops"}');
+        $this->assertTrue(home_load()['corrupt']);
+        $this->assertTrue(home_save(home_load()['doc'], 0)['ok']);
+        $this->assertCount(1, glob($GLOBALS['_om_home_file'] . '.corrupt-*'));
+    }
+
+    public function test_a_healthy_file_is_not_backed_up(): void
+    {
+        home_save(home_load()['doc'], 0);
+        home_save(home_load()['doc'], 1);
+        $this->assertSame([], glob($GLOBALS['_om_home_file'] . '.corrupt-*'));
+    }
+
+    public function test_backups_are_ignored_by_git(): void
+    {
+        $this->assertStringContainsString('/content/home.json.corrupt-*', (string) file_get_contents(dirname(__DIR__, 2) . '/.gitignore'));
+    }
 }

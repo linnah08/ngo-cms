@@ -100,6 +100,16 @@ final class HomeInlineSaveTest extends TestCase
         $this->assertSame(2, home_load()['doc']['rev']);
     }
 
+    public function test_refuses_to_save_over_a_damaged_file(): void
+    {
+        file_put_contents($this->file, '{not json');
+        $r = home_inline_save('s_hero', ['title' => ['bg' => 'Нов', 'en' => 'New']]);
+        $this->assertFalse($r['ok']);
+        $this->assertStringContainsString('повреден', $r['error']);
+        $this->assertSame('{not json', file_get_contents($this->file));
+        $this->assertSame([], glob($this->file . '.corrupt-*'));
+    }
+
     public function test_unknown_section_is_refused(): void
     {
         $this->assertFalse(home_inline_save('s_nope', ['title' => ['bg' => 'x', 'en' => '']])['ok']);

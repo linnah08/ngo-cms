@@ -429,11 +429,20 @@ function home_save(array $doc, int $expected_rev): array {
     if ($lock === false || !flock($lock, LOCK_EX)) return ['ok' => false, 'error' => 'write'];
     try {
         $current = 0;
+        $damaged = false;
         if (file_exists($path)) {
             $cur     = json_decode((string) file_get_contents($path), true);
             $current = is_array($cur) ? (int) ($cur['rev'] ?? 0) : 0;
+            $damaged = !is_array($cur) || !is_array($cur['sections'] ?? null);
         }
         if ($current !== $expected_rev) return ['ok' => false, 'error' => 'conflict'];
+        // Never overwrite a damaged file without keeping a copy — it may be fixable by hand.
+        if ($damaged) {
+            $backup = $path . '.corrupt-' . date('YmdHis');
+            if (file_exists($backup)) $backup .= '-' . bin2hex(random_bytes(2));
+            if (!copy($path, $backup)) return ['ok' => false, 'error' => 'write'];
+            error_log('home.json was damaged — kept a copy as ' . basename($backup) . ' before saving');
+        }
 
         $doc['version']  = 1;
         $doc['rev']      = $current + 1;
@@ -603,7 +612,11 @@ function home_fetch_video_thumb(array $v, string $sid, ?callable $get = null, ?s
 
 /** Save fields edited on the live page. Links, choices and cards are admin-form only. */
 function home_inline_save(string $id, array $fields): array {
-    $doc = home_load()['doc'];
+    $loaded = home_load();
+    if ($loaded['corrupt']) {
+        return ['ok' => false, 'error' => 'Файлът на началната страница е повреден — отворете Админ → Съдържание → Начална страница.'];
+    }
+    $doc = $loaded['doc'];
     $i   = home_find($doc, $id);
     if ($i === null) return ['ok' => false, 'error' => 'unknown section'];
     $defs = home_types()[$doc['sections'][$i]['type']]['fields'] ?? [];

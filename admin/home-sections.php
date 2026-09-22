@@ -148,7 +148,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <?php if ($loaded['corrupt']): ?>
     <div role="alert" style="border:2px solid #b45309;background:#fffbeb;color:#78350f;border-radius:8px;padding:.85rem 1.1rem;margin-bottom:1.25rem;">
       <strong><span aria-hidden="true">⚠ </span>Файлът с подредбата на началната страница е повреден.</strong>
-      Сайтът показва стандартната подредба. Първата промяна, която запазите тук, ще я замени.
+      Сайтът показва стандартната подредба. Първата промяна, която запазите тук, ще я замени
+      (повреденият файл се пази като резервно копие на сървъра).
     </div>
   <?php endif; ?>
   <ol id="list" style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.75rem;">
