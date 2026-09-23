@@ -218,6 +218,32 @@ final class UpdaterTest extends TestCase
         $this->assertSame([], $skipped);
     }
 
+    /**
+     * A site whose vendor/ was installed with dev dependencies (any git-deployed
+     * site) has autoload maps that differ from the release's. That is composer's
+     * doing, not the adopter's, and skipping it would leave the site running a
+     * stale autoloader after an update it was told had succeeded.
+     */
+    public function test_diff_conflicts_never_skips_vendor(): void
+    {
+        $old = [
+            'vendor/composer/autoload_static.php' => 'hash-shipped',
+            'templates/header.php'                => 'hash-a',
+        ];
+        $newFiles = ['vendor/composer/autoload_static.php', 'templates/header.php'];
+
+        // Both differ from the baseline; only the adopter's own file is a conflict.
+        $liveHasher = fn(string $rel): ?string => match ($rel) {
+            'vendor/composer/autoload_static.php' => 'hash-shipped-WITH-DEV-DEPS',
+            'templates/header.php'                => 'hash-a-CUSTOMIZED',
+            default                               => null,
+        };
+
+        $skipped = updater_diff_conflicts($old, $newFiles, $liveHasher);
+
+        $this->assertSame(['templates/header.php'], $skipped);
+    }
+
     // ── updater_is_maintenance_mode() ───────────────────────────────────────────
 
     // ── cPanel-managed .htaccess blocks ─────────────────────────────────────

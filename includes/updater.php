@@ -407,6 +407,20 @@ function updater_rrmdir(string $dir): void
 }
 
 /**
+ * Machine-generated files that are never an adopter's own work, whatever their
+ * hash says. vendor/ is written by composer, and the autoload maps in
+ * vendor/composer/ differ from the release's the moment a site's vendor was
+ * installed with dev dependencies — which is every site deployed from git
+ * rather than from the zip. Treating that as a customization would leave the
+ * site on a stale autoloader, and the next release that adds a class fatals on
+ * a site that was told its update succeeded.
+ */
+function updater_never_conflicts(string $rel): bool
+{
+    return str_starts_with($rel, 'vendor/');
+}
+
+/**
  * Pure diffing logic, extracted so it's unit-testable without touching disk:
  * for each path the new release touches, if we have an old baseline hash for
  * it AND the live file's current hash no longer matches that baseline (i.e.
@@ -423,6 +437,9 @@ function updater_diff_conflicts(array $oldChecksums, array $newFiles, callable $
     foreach ($newFiles as $path) {
         if (!array_key_exists($path, $oldChecksums)) {
             continue; // no baseline — new file, not a conflict
+        }
+        if (updater_never_conflicts($path)) {
+            continue; // composer's, not the adopter's
         }
         $liveHashes = $liveHasher($path);
         if ($liveHashes === null) {
