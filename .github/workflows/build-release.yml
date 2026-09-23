@@ -94,7 +94,7 @@ jobs:
         run: |
           gh release create "${GITHUB_REF_NAME}" "${ZIP}" \
             --title "${GITHUB_REF_NAME}" \
-            --notes "Ready-to-upload package. Unzip into your domain folder and open the site to run the installer." \
+            --notes "An existing site updates itself from Admin → Обновления. For a first install, unzip this package into your domain folder and open the site to run the installer." \
           || gh release upload "${GITHUB_REF_NAME}" "${ZIP}" --clobber
 
       - name: Upload as build artifact (manual runs)

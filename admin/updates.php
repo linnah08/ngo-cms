@@ -128,7 +128,10 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <p class="admin-meta" style="margin-bottom:.5rem;">
       Налична е нова версия: <strong><?= h((string)($check['latest_version'] ?? '')) ?></strong>
     </p>
-    <?php if (!empty($check['notes'])): ?>
+    <?php /* The notes describe how to install the release. On a site that is
+             looked after by a developer they are not the admin's to act on —
+             and following them by hand is exactly what must not happen. */ ?>
+    <?php if ($self_update && !empty($check['notes'])): ?>
       <div style="background:#f6f7f8;border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem;white-space:pre-wrap;font-size:.85rem;color:var(--text-muted);max-height:260px;overflow-y:auto;"><?= h((string)$check['notes']) ?></div>
     <?php endif; ?>
 
