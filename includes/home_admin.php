@@ -92,6 +92,9 @@ function hs_field(string $key, array $def, mixed $val, array $errors, string $nb
 
         case 'cards':
             return hs_cards(is_array($val) ? $val : [], $errors);
+
+        case 'site':   // a site's own field (see home_site_types()) draws itself
+            return is_callable($def['render'] ?? null) ? ($def['render'])($key, $def, $val, $errors) : '';
     }
     return '';   // 'internal' fields are not shown
 }

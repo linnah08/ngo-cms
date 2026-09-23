@@ -20,7 +20,7 @@ final class HomeValidateTest extends TestCase
 
     public function test_every_field_kind_is_known(): void
     {
-        $kinds = ['text', 'textarea', 'alt', 'html', 'link', 'image', 'choice', 'video', 'internal', 'cards'];
+        $kinds = ['text', 'textarea', 'alt', 'html', 'link', 'image', 'choice', 'video', 'internal', 'cards', 'site'];
         foreach (home_types() as $type => $def) {
             foreach ($def['fields'] as $key => $f) {
                 $this->assertContains($f['kind'], $kinds, "$type.$key");

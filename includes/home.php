@@ -146,9 +146,41 @@ const HOME_CARD_FIELDS = [
     'link'      => ['kind' => 'link', 'label' => 'Линк', 'hint' => 'Страница от сайта (напр. /za-nas/) или пълен адрес (https://…). По желание.'],
 ];
 
+/**
+ * Extra section types a site adds on top of the built-in ones, from the PHP file named by
+ * the active theme's 'home_types' key (a path from the site root) — so a fork keeps its own
+ * blocks in its own files. The file returns [type => definition], shaped like home_types().
+ * Such a type is never built-in, and cannot replace a type defined here.
+ *
+ * Besides the field kinds below, its fields may use kind 'site', with callables:
+ *   'clean'   fn(mixed $raw, string $key): array{0: mixed, 1: array}  — required, like home_clean_field()
+ *   'render'  fn(string $key, array $def, mixed $val, array $errors): string  — the admin form markup
+ *   'uploads' fn(array &$in, array $files, string $sid, string $key): array  — optional, stores files, returns errors
+ * Templates go where every type's does: templates/home/<type>.php.
+ */
+function home_site_types(): array {
+    $file = $GLOBALS['_om_home_types_file']
+        ?? (function_exists('current_theme') ? (string) (current_theme()['home_types'] ?? '') : '');
+    if ($file === '') return [];
+    $path = str_starts_with($file, '/') && is_file($file) ? $file : ROOT_PATH . '/' . ltrim($file, '/');
+    if (!is_file($path)) {
+        error_log('home_site_types: ' . $file . ' not found — the site\'s own home sections are not available');
+        return [];
+    }
+    $extra = require $path;
+    $out   = [];
+    foreach (is_array($extra) ? $extra : [] as $type => $def) {
+        if (!is_string($type) || !preg_match('/^[a-z][a-z0-9_]{1,31}$/', $type) || !is_array($def['fields'] ?? null)) continue;
+        $out[$type] = ['builtin' => false, 'icon' => $def['icon'] ?? '▫️', 'label' => (string) ($def['label'] ?? $type),
+                       'desc' => (string) ($def['desc'] ?? ''), 'note' => $def['note'] ?? null, 'fields' => $def['fields']];
+    }
+    return $out;
+}
+
 function home_types(): array {
-    static $types = null;
-    if ($types !== null) return $types;
+    static $cache = [];
+    $cache_key = (string) ($GLOBALS['_om_home_types_file'] ?? '');
+    if (isset($cache[$cache_key])) return $cache[$cache_key];
 
     $bg   = fn(string $default, array $options = HOME_BACKGROUNDS): array => ['kind' => 'choice', 'label' => 'Фон на секцията', 'options' => $options, 'default' => $default];
     $head = ['kind' => 'text', 'label' => 'Заглавие', 'max' => 150];
@@ -166,7 +198,7 @@ function home_types(): array {
              'hint' => 'Размерът и цветът на шрифта не се запазват — сайтът използва своите стилове.'];
     $items_note = 'Самите %s се добавят и редактират направо на началната страница, когато сте влезли като администратор.';
 
-    return $types = [
+    $types = [
         'hero' => ['builtin' => true, 'icon' => '🏠', 'label' => 'Начален банер',
             'desc' => 'Голямото заглавие и снимка най-горе на страницата.', 'note' => null,
             'fields' => ['title' => $head, 'text' => ['kind' => 'textarea', 'label' => 'Текст', 'max' => 600]]
@@ -218,6 +250,7 @@ function home_types(): array {
                          'thumb'   => ['kind' => 'internal', 'label' => 'Картинка на видеото'],
                          'background' => $bg('white')]],
     ];
+    return $cache[$cache_key] = $types + home_site_types();
 }
 
 function home_is_builtin(string $type): bool {
@@ -278,6 +311,10 @@ function home_clean_field(array $def, mixed $raw, string $key): array {
         case 'internal':
             $v = is_string($raw) ? $raw : '';
             return [home_valid_image_path($v) ? $v : '', []];
+
+        case 'site':
+            if (!is_callable($def['clean'] ?? null)) return [null, [$key => 'Непознато поле.']];
+            return ($def['clean'])($raw, $key);
 
         case 'cards':
             $items = is_array($raw) ? array_values(array_filter($raw, 'is_array')) : [];
@@ -732,6 +769,9 @@ function home_apply_uploads(array &$in, string $type, array $files, string $sid)
             if ($r['error']) $errors[$key] = $r['error'];
             elseif ($r['path']) $in[$key] = $r['path'];
         }
+        if ($def['kind'] === 'site' && is_callable($def['uploads'] ?? null)) {
+            $errors += ($def['uploads'])($in, $files, $sid, $key);
+        }
         if ($def['kind'] === 'cards' && is_array($in['cards'] ?? null)) {
             $pos = 0;
             foreach (array_keys($in['cards']) as $ci) {
@@ -784,7 +824,8 @@ function home_admin_save(array $doc, array $post, array $files, ?callable $fetch
     [$fields, $errors] = home_validate_section($type, $in);
     $errors += $upload_errors;
 
-    if (!$errors && $type === 'video') {
+    // Any block with a video and a thumb field keeps a local thumbnail (site types too).
+    if (!$errors && isset($types[$type]['fields']['video'], $types[$type]['fields']['thumb'])) {
         $fields['thumb'] = (($old['video'] ?? null) === $fields['video'] && !empty($old['thumb']))
             ? $old['thumb'] : $fetch_thumb($fields['video'], $sid);
     }
