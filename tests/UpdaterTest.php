@@ -595,6 +595,56 @@ final class UpdaterTest extends TestCase
         $this->assertSame('partial', $logged[0][2]);
     }
 
+    /**
+     * Host configuration differs on every host by design. It is kept, like the
+     * owner's logo, but naming it to the admin would accuse them of customizing
+     * a file they have never opened — and offer them nothing to do about it.
+     * The audit log still records it, because support does need to know.
+     */
+    public function test_apply_keeps_host_config_without_reporting_it(): void
+    {
+        $this->requireZip();
+
+        $root = $this->makeTempRoot();
+        file_put_contents($root . '/VERSION', "1.0.0\n");
+        @mkdir($root . '/admin', 0755, true);
+
+        file_put_contents($root . '/.htaccess', "# this host's rewrite rules");
+        file_put_contents($root . '/admin/.user.ini', 'upload_max_filesize = 64M');
+        file_put_contents($root . '/includes-note.txt', 'pristine');
+        file_put_contents($root . '/checksums.json', json_encode([
+            '.htaccess'         => hash('sha256', '# as shipped'),
+            'admin/.user.ini'   => hash('sha256', 'upload_max_filesize = 8M'),
+            'includes-note.txt' => hash('sha256', 'pristine'),
+        ]));
+
+        $zip = $this->makeReleaseZip([
+            'VERSION'           => "2.0.0\n",
+            '.htaccess'         => '# as shipped, updated',
+            'admin/.user.ini'   => 'upload_max_filesize = 8M',
+            'includes-note.txt' => 'updated',
+        ]);
+
+        updater_set_root_override($root);
+        $logged = [];
+        $result = updater_apply(null, $this->deps($zip, $logged));
+
+        $this->assertSame('success', $result['status'], 'Host config alone is not a partial update');
+        $this->assertSame([], $result['skipped']);
+
+        // Kept, not overwritten — the reason they are skipped in the first place.
+        $this->assertSame("# this host's rewrite rules", file_get_contents($root . '/.htaccess'));
+        $this->assertSame('upload_max_filesize = 64M', file_get_contents($root . '/admin/.user.ini'));
+
+        // Everything else still updates normally.
+        $this->assertSame('updated', file_get_contents($root . '/includes-note.txt'));
+
+        // The log keeps the full picture for support.
+        $this->assertSame('success', $logged[0][2]);
+        $this->assertContains('.htaccess', $logged[0][3]);
+        $this->assertContains('admin/.user.ini', $logged[0][3]);
+    }
+
     public function test_apply_reports_a_failed_migration_and_still_clears_maintenance_mode(): void
     {
         $this->requireZip();

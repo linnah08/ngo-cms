@@ -525,6 +525,18 @@ function updater_owner_files(): array
 }
 
 /**
+ * Server configuration, which every host sets differently: PHP limits, the
+ * rewrite rules, the handler cPanel writes. Keeping the live copy is the whole
+ * point of these, so like owner files they are kept quietly — telling an admin
+ * "you customized .user.ini, contact support" names a file they have never
+ * opened, about a difference they did not make and cannot act on.
+ */
+function updater_is_host_config(string $rel): bool
+{
+    return in_array(basename($rel), ['.htaccess', '.user.ini', 'php.ini'], true);
+}
+
+/**
  * The subset of $newFiles that are owner files with a live copy — kept as they
  * are, and not reported as "skipped" (keeping them is expected, not a conflict).
  */
@@ -1015,9 +1027,18 @@ function updater_apply(?callable $onProgress = null, array $deps = []): array
             return $result;
         }
 
-        $status = $skipped === [] ? 'success' : 'partial';
+        // Host configuration is kept on purpose, so it is not something to
+        // report as a conflict. The log still records every skipped path —
+        // support needs the whole picture, the admin only the part that is
+        // theirs and that they can do something about.
+        $reportable = array_values(array_filter(
+            $skipped,
+            static fn(string $rel) => !updater_is_host_config($rel)
+        ));
+
+        $status = $reportable === [] ? 'success' : 'partial';
         $result['status']  = $status;
-        $result['skipped'] = array_values($skipped);
+        $result['skipped'] = $reportable;
         $emit('done', 'Готово.');
         $logger($from, $to, $status, $skipped, null);
         return $result;
