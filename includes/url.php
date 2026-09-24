@@ -5,9 +5,13 @@
  * PHP's own tools cannot be trusted with them:
  *
  *   parse_url('https://пример.бг/път', PHP_URL_HOST)
- *       returns a string that is NOT the host that was typed — the non-ASCII
- *       bytes come back altered, so strpos() cannot find it in the original and
- *       every check built on top works on rubbish.
+ *       can return a string that is NOT the host that was typed: it swaps any
+ *       byte iscntrl() calls a control character for '_', and under a UTF-8
+ *       LC_CTYPE on macOS that includes 0x80 (the second byte of "р"). PHP
+ *       takes LC_CTYPE from the environment, so whether it happens depends on
+ *       the server's locale and C library, not the PHP version. When it does,
+ *       strpos() cannot find the host in the original and every check built
+ *       on top works on rubbish. Code here must not depend on which it is.
  *
  *   filter_var('https://пример.бг/път', FILTER_VALIDATE_URL)
  *       returns false. The address is perfectly valid; the filter only knows

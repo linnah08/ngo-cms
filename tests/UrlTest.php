@@ -7,25 +7,45 @@ require_once dirname(__DIR__) . '/includes/url.php';
 
 /**
  * These exist because PHP's own URL tools quietly mishandle the addresses this
- * product's users actually have. Both failures are asserted directly below, so
- * if a future PHP ever fixes them, that shows up here rather than in a form
- * that silently drops someone's link.
+ * product's users actually have.
+ *
+ * FILTER_VALIDATE_URL refuses a Cyrillic address everywhere, so that is
+ * asserted directly: if a future PHP fixes it, it shows up here.
+ *
+ * parse_url() is not a PHP-version bug but a locale one: it swaps every byte
+ * iscntrl() calls a control character for '_', and whether 0x80 (the second
+ * byte of "р") counts depends on LC_CTYPE and the C library. On macOS under
+ * a UTF-8 locale it does; under "C" it does not. PHP takes LC_CTYPE from the
+ * environment, so the same code worked or broke depending on the shell's LANG.
+ * Asserting "parse_url() corrupts" is therefore not a stable canary; what
+ * is asserted instead is the thing that matters — url_split() and url_host()
+ * give back the typed host under either locale.
  */
 final class UrlTest extends TestCase
 {
-    public function test_php_still_mishandles_non_ascii_urls(): void
+    public function test_filter_var_still_refuses_a_cyrillic_address(): void
     {
-        $url = 'https://пример.бг/път?x=1';
-
-        $this->assertNotSame(
-            'пример.бг',
-            parse_url($url, PHP_URL_HOST),
-            'parse_url() is expected to corrupt a non-ASCII host — the reason url_split() exists'
-        );
         $this->assertFalse(
-            filter_var($url, FILTER_VALIDATE_URL),
+            filter_var('https://пример.бг/път?x=1', FILTER_VALIDATE_URL),
             'FILTER_VALIDATE_URL is expected to refuse a valid Cyrillic address'
         );
+    }
+
+    public function test_host_survives_a_utf8_locale(): void
+    {
+        $saved = setlocale(LC_CTYPE, '0');
+        try {
+            foreach (['C', 'C.UTF-8', 'en_US.UTF-8', 'bg_BG.UTF-8'] as $locale) {
+                if (setlocale(LC_CTYPE, $locale) === false) {
+                    continue;
+                }
+                $this->assertSame('пример.бг', url_split('https://пример.бг/път?x=1')['host'], $locale);
+                $this->assertSame('пример.бг', url_host('https://пример.бг/път?x=1'), $locale);
+                $this->assertSame('/път', url_request_path('/път?x=1'), $locale);
+            }
+        } finally {
+            setlocale(LC_CTYPE, $saved);
+        }
     }
 
     // ── url_split ─────────────────────────────────────────────────────────────
