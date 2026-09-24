@@ -465,6 +465,20 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <p style="font-size:.875rem;color:var(--text-muted);margin:0 0 1rem;">
     Думи или фрази, които DeepL трябва да превежда по конкретен начин. Пример: <strong>марка → Brand</strong>.
   </p>
+  <?php $builtin_pairs = deepl_builtin_glossary(); ?>
+  <div style="font-size:.875rem;margin:0 0 1rem;padding:.75rem 1rem;background:#f5f7fa;border-radius:8px;">
+    <?php if ($builtin_pairs): ?>
+      <p style="margin:0 0 .4rem;">Имената на организацията се превеждат винаги така, без да ги добавяте тук:</p>
+      <ul style="margin:0 0 .4rem;padding-left:1.2rem;">
+        <?php foreach ($builtin_pairs as [$bg, $en]): ?>
+          <li><?= h($bg) ?> → <?= h($en) ?></li>
+        <?php endforeach; ?>
+      </ul>
+      <p style="margin:0;"><a href="/admin/organisation.php">Промяна в „Организация“</a></p>
+    <?php else: ?>
+      <p style="margin:0;">Попълнете името на организацията на двата езика в <a href="/admin/organisation.php">„Организация“</a> и то ще се превежда винаги правилно.</p>
+    <?php endif; ?>
+  </div>
   <?php $glossary_pairs = deepl_load_glossary(); ?>
   <?php if ($glossary_pairs): ?>
   <table style="width:100%;border-collapse:collapse;margin-bottom:1rem;font-size:.875rem;">
@@ -485,7 +499,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
             <?= csrf_field() ?>
             <input type="hidden" name="section" value="deepl_glossary_delete">
             <input type="hidden" name="glossary_idx" value="<?= $i ?>">
-            <button type="submit" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:1rem;line-height:1;padding:0;" title="Изтрий">✕</button>
+            <button type="submit" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:1rem;line-height:1;padding:0;min-width:32px;min-height:32px;" title="Изтрий" aria-label="Изтрий „<?= h($pair[0]) ?>“ от речника">✕</button>
           </form>
         </td>
       </tr>
@@ -497,10 +511,12 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <?= csrf_field() ?>
     <input type="hidden" name="section" value="deepl_glossary_add">
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
-      <input type="text" name="glossary_source" placeholder="Дума на БГ" required
+      <label for="glossary_source" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;">Дума или фраза на български</label>
+      <input type="text" id="glossary_source" name="glossary_source" placeholder="Дума на БГ" required
              style="flex:1;min-width:140px;">
-      <span style="color:var(--text-muted);">→</span>
-      <input type="text" name="glossary_target" placeholder="Word in EN" required
+      <span style="color:var(--text-muted);" aria-hidden="true">→</span>
+      <label for="glossary_target" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;">Превод на английски</label>
+      <input type="text" id="glossary_target" name="glossary_target" placeholder="Word in EN" required
              style="flex:1;min-width:140px;">
       <button type="submit" class="btn btn--primary">Добави</button>
     </div>

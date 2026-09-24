@@ -122,6 +122,23 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <?= $ferr('site_name_en') ?>
       </label>
     </div>
+
+    <h3 style="margin:1.5rem 0 .25rem;font-size:.95rem;">Юридическо име</h3>
+    <p style="<?= $hint ?>margin:0 0 .75rem;">
+      Официалното име от регистрацията, например „Фондация Пример“ / „Example Foundation“.
+      Автоматичният превод винаги превежда това име и името на организацията по-горе точно така, както са написани тук.
+      Не е задължително — оставете двете полета празни, ако юридическото име е същото като името на организацията.
+    </p>
+    <div class="admin-form-grid">
+      <label id="f-site_legal_name_bg">Юридическо име на български
+        <input type="text" name="site_legal_name_bg" value="<?= h($val('site_legal_name_bg')) ?>" maxlength="150"<?= $fattr('site_legal_name_bg') ?>>
+        <?= $ferr('site_legal_name_bg') ?>
+      </label>
+      <label id="f-site_legal_name_en">Юридическо име на английски
+        <input type="text" name="site_legal_name_en" data-translate-from="site_legal_name_bg" value="<?= h($val('site_legal_name_en')) ?>" maxlength="150"<?= $fattr('site_legal_name_en') ?>>
+        <?= $ferr('site_legal_name_en') ?>
+      </label>
+    </div>
   </section>
 
   <!-- ── Contacts ──────────────────────────────────────────────────────────── -->

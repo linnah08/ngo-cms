@@ -106,6 +106,62 @@ final class TranslatorTest extends TestCase
         deepl_save_glossary($original);
     }
 
+    // ── Built-in names: the organisation's own names are always protected ────
+
+    public function test_builtin_glossary_takes_the_legal_name_and_the_site_name(): void
+    {
+        $this->assertSame(
+            [['Фондация Различни умове', 'Odd Minds Foundation'], ['Лафетки', 'Lafetki']],
+            deepl_builtin_glossary([
+                [' Фондация Различни умове ', 'Odd Minds Foundation'],
+                ['Лафетки', 'Lafetki'],
+            ])
+        );
+    }
+
+    public function test_builtin_glossary_skips_pairs_that_cannot_help(): void
+    {
+        $this->assertSame([], deepl_builtin_glossary([
+            ['', 'Odd Minds Foundation'],   // no Bulgarian name
+            ['Лафетки', ''],                // no English name
+            ['Lafetki', 'Lafetki'],         // same in both: nothing to protect
+            ['Дом', 'Home'],                // too short: would match inside ordinary words
+        ]));
+    }
+
+    public function test_builtin_glossary_reads_the_site_constants(): void
+    {
+        // Whatever the test site is called, its own name is protected when it has one in both languages.
+        $pairs = deepl_builtin_glossary();
+        $this->assertIsList($pairs);
+        if (defined('SITE_NAME_BG') && defined('SITE_NAME_EN')
+            && mb_strlen(SITE_NAME_BG) >= 4 && trim(SITE_NAME_BG) !== trim(SITE_NAME_EN)) {
+            $this->assertContains([trim(SITE_NAME_BG), trim(SITE_NAME_EN)], $pairs);
+        }
+    }
+
+    public function test_effective_glossary_puts_the_longest_term_first(): void
+    {
+        $pairs = deepl_effective_glossary(
+            [['Лафетки', 'Lafetki'], ['Фондация Различни умове', 'Odd Minds Foundation']],
+            [['Различни умове', 'Odd Minds']]
+        );
+        $this->assertSame([
+            ['Фондация Различни умове', 'Odd Minds Foundation'],
+            ['Различни умове', 'Odd Minds'],
+            ['Лафетки', 'Lafetki'],
+        ], $pairs);
+    }
+
+    public function test_effective_glossary_lets_the_admin_override_a_builtin_name(): void
+    {
+        $pairs = deepl_effective_glossary(
+            [['Лафетки', 'Lafetki']],
+            [['Лафетки', 'Lafetki napkins'], ['', 'ignored'], ['broken']]
+        );
+        $this->assertSame([['Лафетки', 'Lafetki napkins']], $pairs);
+    }
+
     // ── Host routing (free-tier vs paid) — tested via is_configured guard ─────
 
     public function test_free_tier_key_pattern(): void

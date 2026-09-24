@@ -45,7 +45,7 @@ function deepl_translate(string $text, string $target_lang = 'EN-GB', bool $is_h
 
     // Apply glossary: swap known source terms for opaque tokens so DeepL
     // leaves them alone, then restore the target terms after translation.
-    $glossary   = deepl_load_glossary();
+    $glossary   = deepl_effective_glossary();
     $token_map  = [];   // token → target_en
     foreach ($glossary as $i => $pair) {
         [$source, $target] = $pair;
@@ -154,4 +154,60 @@ function deepl_load_glossary(): array
 function deepl_save_glossary(array $pairs): void
 {
     setting_set('deepl_glossary_bg_en', json_encode(array_values($pairs), JSON_UNESCAPED_UNICODE));
+}
+
+/**
+ * The organisation's own names, which DeepL must never translate: the legal
+ * name and the site name from Admin → Организация. A pair is left out when a
+ * side is empty, when both sides are the same, or when the Bulgarian name is
+ * shorter than 4 letters — it would match inside ordinary words.
+ *
+ * @param  array|null $names [[bg, en], ...]; null reads the site's constants
+ * @return array             [[bg, en], ...]
+ */
+function deepl_builtin_glossary(?array $names = null): array
+{
+    $c = static fn(string $k): string => defined($k) ? (string) constant($k) : '';
+    $names ??= [
+        [$c('SITE_LEGAL_NAME_BG'), $c('SITE_LEGAL_NAME_EN')],
+        [$c('SITE_NAME_BG'),       $c('SITE_NAME_EN')],
+    ];
+    $out = [];
+    foreach ($names as [$bg, $en]) {
+        $bg = trim((string) $bg);
+        $en = trim((string) $en);
+        if ($bg === '' || $en === '' || $bg === $en || mb_strlen($bg) < 4) continue;
+        $out[] = [$bg, $en];
+    }
+    return $out;
+}
+
+/**
+ * The glossary a translation actually uses: the organisation's own names plus
+ * the admin's pairs. For the same Bulgarian term the admin's translation wins.
+ * Longest term first, so "Различни умове" never replaces part of
+ * "Фондация Различни умове" before the longer name has its turn.
+ *
+ * @param  array|null $builtin null = deepl_builtin_glossary()
+ * @param  array|null $admin   null = deepl_load_glossary()
+ * @return array               [[bg, en], ...]
+ */
+function deepl_effective_glossary(?array $builtin = null, ?array $admin = null): array
+{
+    $builtin ??= deepl_builtin_glossary();
+    $admin   ??= deepl_load_glossary();
+
+    $bySource = [];
+    foreach ([$builtin, $admin] as $list) {
+        foreach ($list as $pair) {
+            if (!is_array($pair) || count($pair) < 2) continue;
+            [$bg, $en] = array_values($pair);
+            $bg = (string) $bg;
+            if (trim($bg) === '') continue;
+            $bySource[$bg] = [$bg, (string) $en];
+        }
+    }
+    $pairs = array_values($bySource);
+    usort($pairs, static fn(array $a, array $b): int => mb_strlen($b[0]) <=> mb_strlen($a[0]));
+    return $pairs;
 }

@@ -22,6 +22,8 @@ function org_fields(): array
     return [
         'site_name_bg'     => 'SITE_NAME_BG',
         'site_name_en'     => 'SITE_NAME_EN',
+        'site_legal_name_bg' => 'SITE_LEGAL_NAME_BG',
+        'site_legal_name_en' => 'SITE_LEGAL_NAME_EN',
         'site_email'       => 'SITE_EMAIL',
         'site_phone'       => 'SITE_PHONE',
         'site_iban'        => 'SITE_IBAN',
@@ -164,6 +166,18 @@ function org_validate(array $in, array $themeKeys): array
     foreach (['site_name_bg' => 'на български', 'site_name_en' => 'на английски'] as $k => $lang) {
         if ($v[$k] === '') {
             $e[$k] = "Моля, въведете името на организацията {$lang}.";
+        } elseif (mb_strlen($v[$k]) > 150) {
+            $e[$k] = 'Името е твърде дълго (най-много 150 знака).';
+        }
+    }
+
+    // The legal name is optional, but it is used as a pair (the translator keeps
+    // BG → EN exactly as written), so one language without the other is a mistake.
+    $legal = ['site_legal_name_bg' => 'на български', 'site_legal_name_en' => 'на английски'];
+    $anyLegal = $v['site_legal_name_bg'] !== '' || $v['site_legal_name_en'] !== '';
+    foreach ($legal as $k => $lang) {
+        if ($v[$k] === '' && $anyLegal) {
+            $e[$k] = "Моля, въведете юридическото име и {$lang} — или оставете и двете полета празни.";
         } elseif (mb_strlen($v[$k]) > 150) {
             $e[$k] = 'Името е твърде дълго (най-много 150 знака).';
         }

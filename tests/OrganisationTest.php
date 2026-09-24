@@ -127,6 +127,32 @@ final class OrganisationTest extends TestCase
         $this->assertArrayNotHasKey('site_name_en', $r['errors']);
     }
 
+    public function test_legal_name_is_optional_but_needs_both_languages(): void
+    {
+        $themes = array_keys(brand_themes());
+
+        $none = org_validate($this->validInput(['site_legal_name_bg' => '', 'site_legal_name_en' => '']), $themes);
+        $this->assertSame([], $none['errors']);
+
+        $both = org_validate($this->validInput([
+            'site_legal_name_bg' => '  Фондация Различни умове ', 'site_legal_name_en' => 'Odd Minds Foundation',
+        ]), $themes);
+        $this->assertSame([], $both['errors']);
+        $this->assertSame('Фондация Различни умове', $both['values']['site_legal_name_bg']);
+
+        $bgOnly = org_validate($this->validInput(['site_legal_name_bg' => 'Фондация Различни умове']), $themes);
+        $this->assertArrayHasKey('site_legal_name_en', $bgOnly['errors']);
+        $this->assertArrayNotHasKey('site_legal_name_bg', $bgOnly['errors']);
+
+        $enOnly = org_validate($this->validInput(['site_legal_name_en' => 'Odd Minds Foundation']), $themes);
+        $this->assertArrayHasKey('site_legal_name_bg', $enOnly['errors']);
+
+        $long = org_validate($this->validInput([
+            'site_legal_name_bg' => str_repeat('я', 151), 'site_legal_name_en' => 'X Foundation',
+        ]), $themes);
+        $this->assertArrayHasKey('site_legal_name_bg', $long['errors']);
+    }
+
     public function test_validate_ignores_non_string_and_unknown_input(): void
     {
         $r = org_validate($this->validInput(['site_name_en' => ['array'], 'evil' => 'x']), array_keys(brand_themes()));

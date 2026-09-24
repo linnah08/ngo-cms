@@ -16,6 +16,10 @@
 // ── Organisation identity ─────────────────────────────────────────────────────
 define('SITE_NAME_BG', 'Вашата организация');   // name shown on the Bulgarian site
 define('SITE_NAME_EN', 'Your Organisation');     // name shown on the English site
+// Registered legal name, e.g. 'Фондация „Пример“' / 'Example Foundation'. Optional.
+// Automatic translation always renders it exactly as written here.
+define('SITE_LEGAL_NAME_BG', '');
+define('SITE_LEGAL_NAME_EN', '');
 
 // Public base URL — NO trailing slash. Every absolute URL (emails, payment
 // callbacks, lang_url()) derives from this.
