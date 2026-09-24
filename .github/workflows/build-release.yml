@@ -47,8 +47,9 @@ jobs:
           // `zip -x` list in the "Build ZIP" step below — the checksums must
           // describe exactly what's in the zip.
           $root        = getcwd();
-          $dirPrefixes = ['.git', '.github', 'tests', 'node_modules', '.githooks', 'relay'];
-          $exactFiles  = ['phpunit.xml', 'playwright.config.js', 'package.json', 'package-lock.json', 'deploy.php'];
+          $dirPrefixes = ['.git', '.github', 'tests', 'node_modules', '.githooks', 'relay', 'docs'];
+          $exactFiles  = ['phpunit.xml', 'playwright.config.js', 'package.json', 'package-lock.json', 'deploy.php',
+                          'CLAUDE.md', '.gitignore'];
 
           function should_exclude(string $rel, array $dirPrefixes, array $exactFiles): bool {
               if (in_array($rel, $exactFiles, true)) return true;
@@ -84,7 +85,7 @@ jobs:
             -x ".git/*" ".github/*" "tests/*" "node_modules/*" \
                "*.zip" ".phpunit*" "phpunit.xml" "playwright.config.js" \
                "package.json" "package-lock.json" ".githooks/*" "deploy.php" \
-               "relay/*"
+               "relay/*" "docs/*" "CLAUDE.md" ".gitignore"
           echo "ZIP=$ZIP" >> "$GITHUB_ENV"
 
       - name: Attach to the release (tag builds)
@@ -94,7 +95,7 @@ jobs:
         run: |
           gh release create "${GITHUB_REF_NAME}" "${ZIP}" \
             --title "${GITHUB_REF_NAME}" \
-            --notes "An existing site updates itself from Admin → Обновления. For a first install, unzip this package into your domain folder and open the site to run the installer." \
+            --notes "Пакет за първоначална инсталация: разархивирайте го в папката на домейна си и отворете сайта, за да стартирате инсталатора. Сайт, който вече работи, се обновява сам от Администрация → Обновления." \
           || gh release upload "${GITHUB_REF_NAME}" "${ZIP}" --clobber
 
       - name: Upload as build artifact (manual runs)
