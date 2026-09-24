@@ -176,6 +176,23 @@ function _email_tpl_defaults(): array {
             'outro_en'   => '<p>We apologise for the inconvenience and thank you for your understanding.</p>',
         ],
 
+        // A shop order that went out before anyone noticed its online payment never arrived.
+        // The composer adds the "Опитай отново" button between intro and outro.
+        'admin-payment-recovery' => [
+            'subject_bg' => 'Моля, завършете плащането за поръчка {{order_number}}',
+            'intro_bg'   => '<p>Здравейте, {{customer_name}},</p>'
+                          . '<p>Благодарим ви за поръчката! Тя вече е изпратена към вас, но при проверка открихме, че плащането ѝ не е стигнало до нас. Причината е технически проблем при нас, който забелязахме едва сега. Вината не е ваша.</p>'
+                          . '<p>Молим ви да завършите плащането на <strong>{{amount_eur}} €</strong> с бутона по-долу. Отнема по-малко от минута, а поръчката ви няма да бъде отменена.</p>',
+            'outro_bg'   => '<p>Ако междувременно вече сте платили по друг начин или банката ви е удържала сума, не плащайте повторно — пишете ни и ще проверим.</p>'
+                          . '<p>Съжаляваме за неудобството и благодарим за търпението!</p>',
+            'subject_en' => 'Please complete the payment for order {{order_number}}',
+            'intro_en'   => '<p>Hello {{customer_name}},</p>'
+                          . '<p>Thank you for your order! It is already on its way to you, but when checking we found that its payment never reached us. The cause was a technical problem on our side that we only noticed now. It is not your fault.</p>'
+                          . '<p>Please complete the payment of <strong>{{amount_eur}} €</strong> with the button below. It takes less than a minute, and your order will not be cancelled.</p>',
+            'outro_en'   => '<p>If you have already paid in another way, or your bank has charged you, please do not pay again — write to us and we will check.</p>'
+                          . '<p>We are sorry for the inconvenience and thank you for your patience!</p>',
+        ],
+
         'admin-order-delayed' => [
             'subject_bg' => 'Малко забавяне с поръчка {{order_number}}',
             'intro_bg'   => '<p>Здравейте, {{customer_name}},</p>'
@@ -309,7 +326,11 @@ function email_tpl_subject(string $key, string $lang = 'bg', array $vars = []): 
  * this registry only adds the admin-facing label, the placeholders the editor
  * lists, and the order types the message makes sense for.
  *
- * @return array<string,array{label:string,vars:string[],types:string[]}>
+ * retry_button: the message asks the buyer to pay, so it gets the "Опитай отново"
+ * button, is offered only while the order can still be paid online, and counts
+ * as the "payment didn't go through" email (the cron won't send its own).
+ *
+ * @return array<string,array{label:string,vars:string[],types:string[],retry_button?:bool}>
  */
 function admin_message_presets(): array {
     return [
@@ -317,6 +338,12 @@ function admin_message_presets(): array {
             'label' => 'Поръчка: Продукт не е наличен',
             'vars'  => ['{{customer_name}}', '{{order_number}}'],
             'types' => ['physical'],
+        ],
+        'admin-payment-recovery' => [
+            'label'        => 'Поръчка: Изпратена, но неплатена — технически проблем (с бутон „Опитай отново“)',
+            'vars'         => ['{{customer_name}}', '{{order_number}}', '{{amount_eur}}'],
+            'types'        => ['physical'],
+            'retry_button' => true,
         ],
         'admin-order-delayed' => [
             'label' => 'Поръчка: Забавяне',

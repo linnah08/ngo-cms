@@ -179,6 +179,90 @@ final class UnpaidOrdersTest extends TestCase
         $this->assertSame('order-payment-failed-customer', payment_failed_template_key(['type' => 'physical']));
     }
 
+    // ── "Имейл до клиента": shipped-but-unpaid message ───────────────────────
+
+    /** Capturing mailer in order_email_send()'s shape. */
+    private function orderMailer(): callable
+    {
+        return function (int $order_id, string $to, string $subject, string $html, array $opts): bool {
+            $this->sent[] = compact('to', 'subject', 'html') + ['template_key' => $opts['template_key'] ?? null];
+            return true;
+        };
+    }
+
+    public function testPaymentRecoveryTemplateIsSeparateFromAutomaticEmail(): void
+    {
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_email_composer.php';
+
+        $presets = admin_message_presets();
+        $this->assertTrue($presets['admin-payment-recovery']['retry_button']);
+        $this->assertTrue(order_email_asks_to_pay('admin-payment-recovery'));
+        $this->assertFalse(order_email_asks_to_pay('admin-order-delayed'));
+
+        $vars = ['customer_name' => 'Мария', 'order_number' => 'OM-1', 'amount_eur' => '19.76'];
+        foreach (['bg', 'en'] as $lang) {
+            $t = email_tpl_get('admin-payment-recovery', $lang, $vars);
+            $this->assertStringContainsString('19.76', $t['intro']);
+            $this->assertStringContainsString('OM-1', $t['subject']);
+            $this->assertStringNotContainsString('{{', $t['intro'] . $t['outro']);
+        }
+        $this->assertNotSame(
+            email_tpl_get('admin-payment-recovery', 'bg', $vars)['intro'],
+            email_tpl_get('order-payment-failed-customer', 'bg', $vars)['intro']
+        );
+    }
+
+    public function testPaymentRecoveryIsOfferedWithTheButtonOnlyWhileTheOrderCanBePaid(): void
+    {
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_email_composer.php';
+        $o = ['type' => 'physical', 'status' => 'shipped', 'lang' => 'en', 'payment_method' => 'card', 'payment_status' => 'pending',
+              'order_number' => 'OM-20260919-B60E', 'customer_name' => 'Maria', 'total_eur' => '19.76'];
+
+        $c = order_email_choices($o)['admin-payment-recovery'];
+        $this->assertTrue($c['available']);
+        $this->assertStringContainsString('Try again', $c['body']);
+        $this->assertStringContainsString('/api/payment-return.php?retry=1&amp;order=OM-20260919-B60E', $c['body']);
+
+        $paid = order_email_choices(['payment_status' => 'paid'] + $o)['admin-payment-recovery'];
+        $this->assertFalse($paid['available'], 'A paid order shows the choice greyed out');
+        $this->assertSame('', $paid['body']);
+        $this->assertNotSame('', $paid['note']);
+
+        $this->assertArrayNotHasKey('admin-payment-recovery', order_email_choices(['payment_method' => 'cod'] + $o), 'Cash on delivery: never offered');
+        $this->assertArrayNotHasKey('admin-payment-recovery', order_email_choices(['type' => 'donation'] + $o), 'Shop orders only');
+    }
+
+    public function testSendingThePaymentRecoveryMessageStopsTheAutomaticEmail(): void
+    {
+        $this->requireDb();
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_email_composer.php';
+        $order = $this->insertOrder(5, ['status' => 'shipped']);
+
+        $r = order_email_send(self::$pdo, (int)$order['id'], $order, 'Моля, платете', '<p>Текст</p>', 'admin-payment-recovery', $this->orderMailer());
+        $this->assertTrue($r['ok']);
+        $this->assertSame('admin-payment-recovery', $this->sent[0]['template_key']);
+        $this->assertNotNull($this->reload((int)$order['id'])['payment_failed_email_at']);
+
+        $this->assertFalse(send_payment_failed_email(self::$pdo, $this->reload((int)$order['id']), $this->mailer()), 'The cron must not email again');
+        $this->assertCount(1, $this->sent);
+    }
+
+    public function testOtherMessagesAndGreyedOutChoicesDoNotTouchTheAutomaticEmail(): void
+    {
+        $this->requireDb();
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_email_composer.php';
+        $pending = $this->insertOrder(5);
+        $paid    = $this->insertOrder(5, ['payment_status' => 'paid']);
+
+        order_email_send(self::$pdo, (int)$pending['id'], $pending, 'Тема', '<p>Текст</p>', 'admin-order-delayed', $this->orderMailer());
+        // Posted by hand for a paid order, where the picker greys it out: sent as a plain message.
+        order_email_send(self::$pdo, (int)$paid['id'], $paid, 'Тема', '<p>Текст</p>', 'admin-payment-recovery', $this->orderMailer());
+
+        $this->assertNull($this->reload((int)$pending['id'])['payment_failed_email_at']);
+        $this->assertNull($this->reload((int)$paid['id'])['payment_failed_email_at']);
+        $this->assertSame('admin-message', $this->sent[1]['template_key']);
+    }
+
     public function testPaymentMethodLabelsAreReadable(): void
     {
         $this->assertSame('Карта (DSK Банк)', payment_method_label('card'));

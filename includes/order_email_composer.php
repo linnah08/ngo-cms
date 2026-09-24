@@ -13,6 +13,7 @@
  */
 require_once __DIR__ . '/email-templates.php';
 require_once __DIR__ . '/mailer.php';
+require_once __DIR__ . '/payment/unpaid_orders.php';
 
 /** Picker value that only fills in a greeting, for a message written from scratch. */
 const ORDER_EMAIL_BLANK = 'blank';
@@ -42,16 +43,28 @@ function order_email_choices(array $order): array
         'amount_eur'    => number_format((float)($order['total_eur'] ?? 0), 2, '.', ''),
     ];
 
+    // Messages that ask the buyer to pay only make sense for an online payment,
+    // and can only be sent while that payment can still be made.
+    $pays_online = isset(UNPAID_AFTER_MINUTES[$order['payment_method'] ?? '']);
+    $can_retry   = order_can_retry_payment($order);
+    $unpayable   = ['available' => false, 'note' => 'само за неплатени поръчки', 'subject' => '', 'body' => ''];
+
     $choices = [];
     foreach (admin_message_presets() as $key => $meta) {
         if (!in_array($type, $meta['types'], true)) continue;
+        $button = !empty($meta['retry_button']);
+        if ($button && !$pays_online) continue;
+        if ($button && !$can_retry) {
+            $choices[$key] = ['label' => $meta['label']] + $unpayable;
+            continue;
+        }
         $t = email_tpl_get($key, $lang, $vars);
         $choices[$key] = [
             'label'     => $meta['label'],
             'available' => true,
             'note'      => '',
             'subject'   => $t['subject'],
-            'body'      => trim($t['intro'] . "\n" . $t['outro']),
+            'body'      => trim($t['intro'] . "\n" . ($button ? payment_retry_button_html($order) . "\n" : '') . $t['outro']),
         ];
     }
 
@@ -112,8 +125,20 @@ function order_email_send(PDO $pdo, int $order_id, array $order, string $subject
         'reply_to'     => defined('SITE_EMAIL') ? SITE_EMAIL : '',
     ]);
 
+    if ($ok && order_email_asks_to_pay($template_key)) {
+        // Counts as the "payment didn't go through" email — the cron won't send another.
+        $pdo->prepare('UPDATE orders SET payment_failed_email_at = NOW() WHERE id = ? AND payment_failed_email_at IS NULL')
+            ->execute([$order_id]);
+    }
+
     if (!$ok) {
         return $fail('Имейлът не беше изпратен. Опитайте отново след малко. Ако пак не стане, може би изпращането на имейли не е настроено (меню „Имейл“) — обърнете се към администратора на сайта.');
     }
     return ['ok' => true, 'error' => '', 'recipient' => $recipient, 'template_key' => $template_key];
+}
+
+/** True for a picker choice that asks the buyer to pay (it carries the "Опитай отново" button). */
+function order_email_asks_to_pay(string $key): bool
+{
+    return !empty(admin_message_presets()[$key]['retry_button']);
 }
