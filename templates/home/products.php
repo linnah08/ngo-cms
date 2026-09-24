@@ -3,6 +3,7 @@ if (empty($ctx['featured_products'])) return;
 // templates/product-card.php expects these names.
 $variant_images  = $ctx['variant_images'];
 $variant_stock   = $ctx['variant_stock'];
+$variant_single  = $ctx['variant_single'] ?? [];
 $_show_admin_bar = $show_admin;
 $card_removable  = false;
 $card_redirect   = 'home';

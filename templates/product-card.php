@@ -6,6 +6,10 @@
  *   $lang               string 'bg' | 'en'
  *   $variant_images     array  product_id => image filename (variant-type products)
  *   $variant_stock      array  product_id => total stock across active variants
+ *   $variant_single     array  optional, product_id => variant id for products with
+ *                              exactly ONE active variant. Such a product behaves like
+ *                              a plain one: "Add to cart" posts that variant straight
+ *                              away instead of sending the buyer to "Choose variant".
  *   $_show_admin_bar    bool   set by templates/header.php
  *   $card_removable     bool   optional, default false (opt-in). The shop listing sets
  *                              this true to render the CMS "×" remove control — but that
@@ -26,6 +30,10 @@ $card_img       = $p['type'] === 'variant'
     : $p['image'];
 $card_removable = $card_removable ?? false;
 $card_redirect  = $card_redirect ?? 'shop';
+$variant_single = $variant_single ?? [];
+// A product with exactly one active variant has nothing to choose — treat it
+// like a plain product and add that variant directly.
+$single_vid     = $p['type'] === 'variant' ? (int)($variant_single[$p['id']] ?? 0) : 0;
 ?>
 <div class="card<?= $card_removable ? ' om-removable' : '' ?>" id="<?= h($p['slug']) ?>"
      <?php if ($card_removable): ?>
@@ -103,15 +111,18 @@ $card_redirect  = $card_redirect ?? 'shop';
 
     <!-- actions -->
     <div style="display:flex;flex-direction:column;gap:.5rem;">
-      <?php if ($p['type'] === 'variant'): ?>
+      <?php if ($p['type'] === 'variant' && !$single_vid): ?>
         <a href="<?= $prod_url ?>" class="btn btn--primary"
            style="width:100%;justify-content:center;font-size:.9rem;padding:.65rem 1rem;text-align:center;box-sizing:border-box;">
           <?= $lang === 'bg' ? 'Избери вариант' : 'Choose variant' ?>
         </a>
-      <?php elseif ((int)$p['stock'] > 0): ?>
+      <?php elseif ($in_stock_count > 0): ?>
         <form method="POST" action="/cart/add.php">
           <?= csrf_field() ?>
           <input type="hidden" name="product_id" value="<?= (int)$p['id'] ?>">
+          <?php if ($single_vid): ?>
+          <input type="hidden" name="variant_id" value="<?= $single_vid ?>">
+          <?php endif; ?>
           <input type="hidden" name="redirect" value="<?= h($card_redirect) ?>">
           <input type="hidden" name="_lang" value="<?= h($lang) ?>">
           <button type="submit" class="btn btn--primary"

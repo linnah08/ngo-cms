@@ -36,22 +36,28 @@ function product_featured_list(PDO $pdo): array {
 /**
  * Card-rendering support data for variant-type products in $products: each
  * product's representative image (the lowest-sorted active variant that has
- * one) and its total stock across active variants. A variant product keeps its
- * own `image` column empty, so without this the card has nothing to show.
+ * one), its total stock across active variants, and — for products with exactly
+ * ONE active variant — that variant's id. A variant product keeps its own
+ * `image` column empty, so without this the card has nothing to show.
+ *
+ * `single` lets the card treat a one-variant product like a plain product: an
+ * "Add to cart" button that posts that variant, instead of a "Choose variant"
+ * step with nothing to choose.
  *
  * Scoped to whatever product list is passed in — the full shop catalog, or a
  * handful of featured products — so callers only pay for the products they render.
  *
  * @param array $products Rows with at least 'id' and 'type' keys.
- * @return array{images: array<int,string>, stock: array<int,int>}
+ * @return array{images: array<int,string>, stock: array<int,int>, single: array<int,int>}
  */
 function product_variant_support_data(PDO $pdo, array $products): array {
     $images = [];
     $stock  = [];
+    $single = [];
 
     $variant_ids = array_column(array_filter($products, fn($p) => $p['type'] === 'variant'), 'id');
     if (!$variant_ids) {
-        return ['images' => $images, 'stock' => $stock];
+        return ['images' => $images, 'stock' => $stock, 'single' => $single];
     }
 
     $in = implode(',', array_fill(0, count($variant_ids), '?'));
@@ -83,7 +89,30 @@ function product_variant_support_data(PDO $pdo, array $products): array {
         $stock[$vs['product_id']] = (int)$vs['in_stock'];
     }
 
-    return ['images' => $images, 'stock' => $stock];
+    $vo_stmt = $pdo->prepare(
+        "SELECT product_id, MIN(id) AS only_id
+         FROM product_variants
+         WHERE product_id IN ($in) AND active = 1
+         GROUP BY product_id
+         HAVING COUNT(*) = 1"
+    );
+    $vo_stmt->execute($variant_ids);
+    foreach ($vo_stmt->fetchAll() as $vo) {
+        $single[(int)$vo['product_id']] = (int)$vo['only_id'];
+    }
+
+    return ['images' => $images, 'stock' => $stock, 'single' => $single];
+}
+
+/**
+ * The one variant of a product that has exactly one active variant, or null.
+ *
+ * $active_variants is the product's active variant rows (as the product page
+ * loads them). With a single variant there is nothing for the buyer to choose,
+ * so the page shows it as already selected rather than asking for a choice.
+ */
+function product_single_variant(array $active_variants): ?array {
+    return count($active_variants) === 1 ? reset($active_variants) : null;
 }
 
 /**

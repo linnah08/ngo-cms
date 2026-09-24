@@ -70,7 +70,7 @@ function home_context(array $doc, string $lang): array {
         if (!empty($s['visible'])) $on[$s['type']] = $s;
     }
     $ctx = ['impact' => [], 'centres' => [], 'partners' => [], 'articles' => [],
-            'featured_products' => [], 'variant_images' => [], 'variant_stock' => [],
+            'featured_products' => [], 'variant_images' => [], 'variant_stock' => [], 'variant_single' => [],
             'campaign' => [], 'campaign_url' => ''];
     if (isset($on['products'])) {
         require_once ROOT_PATH . '/admin/includes/db.php';
@@ -80,6 +80,7 @@ function home_context(array $doc, string $lang): array {
         $support = product_variant_support_data($pdo, $ctx['featured_products']);
         $ctx['variant_images'] = $support['images'];
         $ctx['variant_stock']  = $support['stock'];
+        $ctx['variant_single'] = $support['single'];
     }
     if (isset($on['impact']))   $ctx['impact']   = get_impact();
     if (isset($on['centres']))  $ctx['centres']  = get_centres();

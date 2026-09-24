@@ -1,6 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
 start_session();
 
 $lang = get_lang();
@@ -206,46 +207,7 @@ if ($slug) {
         <?php endif; ?>
 
         <?php if ($is_variant && !empty($prod_variants)): ?>
-          <div style="margin-bottom:1rem;">
-            <div style="font-size:.85rem;font-weight:600;margin-bottom:.6rem;">
-              <?= $lang === 'bg' ? 'Избери вариант' : 'Choose variant' ?>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:.5rem;">
-              <?php foreach ($prod_variants as $pvi => $pv): ?>
-                <?php
-                  $pv_label = $lang === 'bg' ? $pv['label_bg'] : ($pv['label_en'] ?: $pv['label_bg']);
-                  $pv_attrs_arr = json_decode($pv['attributes'] ?? '{}', true) ?? [];
-                  $pv_attrs_arr = array_filter($pv_attrs_arr, fn($v) => trim((string)$v) !== '');
-                  $pv_attr_str  = implode(' · ', array_map(
-                      fn($k,$v) => h($k) . ': ' . h($v),
-                      array_keys($pv_attrs_arr), $pv_attrs_arr
-                  ));
-                  $pv_in_stock = (int)$pv['stock'] > 0;
-                  $pv_img_src  = $pv['image'] ? '/assets/images/products/' . $pv['image'] : '';
-                ?>
-                <div class="pv-option<?= $pvi === 0 ? ' active' : '' ?><?= !$pv_in_stock ? ' disabled' : '' ?>"
-                     id="pvo-<?= (int)$pv['id'] ?>"
-                     <?= $pv_in_stock ? 'onclick="selectVariant(' . (int)$pv['id'] . ')"' : '' ?>>
-                  <?php if ($pv_img_src): ?>
-                    <img class="pv-thumb" src="<?= h($pv_img_src) ?>" alt="">
-                  <?php else: ?>
-                    <div class="pv-thumb" style="background:var(--off-white);border-radius:4px;"></div>
-                  <?php endif; ?>
-                  <div style="flex:1;min-width:0;">
-                    <div style="font-weight:600;font-size:.95rem;"><?= h($pv_label) ?></div>
-                    <?php if ($pv_attr_str): ?>
-                      <div style="font-size:.78rem;color:var(--text-muted);"><?= $pv_attr_str ?></div>
-                    <?php endif; ?>
-                  </div>
-                  <div style="font-size:.8rem;flex-shrink:0;<?= $pv_in_stock ? 'color:var(--teal);' : 'color:#e53935;' ?>">
-                    <?= $pv_in_stock
-                        ? (int)$pv['stock'] . ($lang === 'bg' ? ' бр.' : ' left')
-                        : ($lang === 'bg' ? 'Изчерпан' : 'Out of stock') ?>
-                  </div>
-                </div>
-              <?php endforeach; ?>
-            </div>
-          </div>
+          <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/product-variant-chooser.php'; ?>
         <?php endif; ?>
 
         <?php
@@ -501,7 +463,8 @@ if ($slug) {
           <?php endif; ?>
 
         <?php else: ?>
-          <?php if (!$is_variant): ?>
+          <?php /* A multi-variant product shows per-variant stock in its chooser; everything else (no variants, or a single one) gets this box. */ ?>
+          <?php if (!$is_variant || count($prod_variants) <= 1): ?>
           <div style="padding:.75rem 1.25rem;background:#fdf0ef;border:1px solid #f0c4c0;color:#c0392b;border-radius:var(--radius);font-weight:600;">
             <?= $lang === 'bg' ? 'Изчерпан' : 'Out of stock' ?>
           </div>
@@ -651,42 +614,13 @@ $_donation_pay_default = array_key_first($_donation_pay_methods);
 
 $products = $pdo->query('SELECT * FROM products WHERE active=1 ORDER BY sort_order, id')->fetchAll();
 
-// For variant products, image column is empty — use first active variant's image
-$variant_images = [];
-$variant_product_ids = array_column(
-    array_filter($products, fn($p) => $p['type'] === 'variant'),
-    'id'
-);
-$variant_stock = []; // product_id => total stock units across all active variants
-if ($variant_product_ids) {
-    $in2 = implode(',', array_fill(0, count($variant_product_ids), '?'));
-    $vi_stmt = $pdo->prepare(
-        "SELECT pv.product_id, pv.image
-         FROM product_variants pv
-         INNER JOIN (
-             SELECT product_id, MIN(sort_order) AS min_sort
-             FROM product_variants
-             WHERE product_id IN ($in2) AND active = 1 AND image != ''
-             GROUP BY product_id
-         ) m ON pv.product_id = m.product_id AND pv.sort_order = m.min_sort
-         WHERE pv.active = 1 AND pv.image != ''"
-    );
-    $vi_stmt->execute($variant_product_ids);
-    foreach ($vi_stmt->fetchAll() as $vi) {
-        $variant_images[$vi['product_id']] = $vi['image'];
-    }
-
-    $vs_stmt = $pdo->prepare(
-        "SELECT product_id, SUM(stock) AS in_stock
-         FROM product_variants
-         WHERE product_id IN ($in2) AND active = 1
-         GROUP BY product_id"
-    );
-    $vs_stmt->execute($variant_product_ids);
-    foreach ($vs_stmt->fetchAll() as $vs) {
-        $variant_stock[$vs['product_id']] = (int)$vs['in_stock'];
-    }
-}
+// Variant products keep their own image/stock empty — borrow them from their
+// active variants, and note which have exactly one variant (those get a plain
+// "Add to cart" instead of "Choose variant"). Same data the homepage cards use.
+$_variant_support = product_variant_support_data($pdo, $products);
+$variant_images   = $_variant_support['images'];
+$variant_stock    = $_variant_support['stock'];
+$variant_single   = $_variant_support['single'];
 
 $flash    = flash_get();
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';

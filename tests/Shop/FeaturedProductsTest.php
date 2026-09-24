@@ -177,6 +177,40 @@ final class FeaturedProductsTest extends TestCase
 
         $this->assertSame([], $support['images']);
         $this->assertSame([], $support['stock']);
+        $this->assertSame([], $support['single']);
+    }
+
+    public function test_single_active_variant_is_reported_by_id(): void
+    {
+        // An inactive variant doesn't count — the buyer can only ever get the active one.
+        $id   = $this->insertProduct(['type' => 'variant']);
+        $only = $this->insertVariant($id, ['active' => 1]);
+        $this->insertVariant($id, ['active' => 0]);
+
+        $support = product_variant_support_data(self::$pdo, [['id' => $id, 'type' => 'variant']]);
+
+        $this->assertSame($only, $support['single'][$id] ?? null);
+    }
+
+    public function test_product_with_several_active_variants_is_not_single(): void
+    {
+        $id = $this->insertProduct(['type' => 'variant']);
+        $this->insertVariant($id);
+        $this->insertVariant($id);
+
+        $support = product_variant_support_data(self::$pdo, [['id' => $id, 'type' => 'variant']]);
+
+        $this->assertArrayNotHasKey($id, $support['single']);
+    }
+
+    public function test_product_with_no_active_variant_is_not_single(): void
+    {
+        $id = $this->insertProduct(['type' => 'variant']);
+        $this->insertVariant($id, ['active' => 0]);
+
+        $support = product_variant_support_data(self::$pdo, [['id' => $id, 'type' => 'variant']]);
+
+        $this->assertArrayNotHasKey($id, $support['single']);
     }
 
     // ── the card the section renders ─────────────────────────────────────────
@@ -188,6 +222,7 @@ final class FeaturedProductsTest extends TestCase
         $lang            = $opts['lang'] ?? 'bg';
         $variant_images  = $opts['variant_images'] ?? [];
         $variant_stock   = $opts['variant_stock'] ?? [];
+        $variant_single  = $opts['variant_single'] ?? [];
         $_show_admin_bar = false;
         $card_removable  = $opts['card_removable'] ?? null;
         $card_redirect   = $opts['card_redirect'] ?? null;
@@ -267,5 +302,56 @@ final class FeaturedProductsTest extends TestCase
 
         $this->assertStringContainsString('Избери вариант', $html);
         $this->assertStringContainsString('v.webp', $html);
+    }
+
+    public function test_variant_card_with_several_variants_has_no_hidden_variant_id(): void
+    {
+        $html = $this->renderCard(
+            $this->sampleProduct(['type' => 'variant', 'image' => '', 'stock' => 0]),
+            ['variant_stock' => [4242 => 7]]
+        );
+
+        $this->assertStringNotContainsString('name="variant_id"', $html);
+        $this->assertStringNotContainsString('Добави в количката', $html);
+    }
+
+    // ── a product with exactly one variant behaves like a plain product ──────
+
+    public function test_single_variant_card_adds_that_variant_straight_to_the_cart(): void
+    {
+        $html = $this->renderCard(
+            $this->sampleProduct(['type' => 'variant', 'image' => '', 'stock' => 0]),
+            ['variant_stock' => [4242 => 3], 'variant_single' => [4242 => 77]]
+        );
+
+        $this->assertStringContainsString('Добави в количката', $html);
+        $this->assertStringContainsString('name="variant_id" value="77"', $html);
+        $this->assertStringNotContainsString('Избери вариант', $html);
+    }
+
+    public function test_single_variant_card_in_english(): void
+    {
+        $html = $this->renderCard(
+            $this->sampleProduct(['type' => 'variant', 'image' => '', 'stock' => 0]),
+            ['lang' => 'en', 'variant_stock' => [4242 => 3], 'variant_single' => [4242 => 77]]
+        );
+
+        $this->assertStringContainsString('Add to cart', $html);
+        $this->assertStringContainsString('name="variant_id" value="77"', $html);
+        $this->assertStringNotContainsString('Choose variant', $html);
+    }
+
+    public function test_sold_out_single_variant_card_says_out_of_stock(): void
+    {
+        // The product row's own stock is irrelevant for a variant product —
+        // only the variant's stock decides.
+        $html = $this->renderCard(
+            $this->sampleProduct(['type' => 'variant', 'image' => '', 'stock' => 9]),
+            ['variant_stock' => [4242 => 0], 'variant_single' => [4242 => 77]]
+        );
+
+        $this->assertStringContainsString('Изчерпан', $html);
+        $this->assertStringNotContainsString('Добави в количката', $html);
+        $this->assertStringNotContainsString('Избери вариант', $html);
     }
 }
