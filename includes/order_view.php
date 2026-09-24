@@ -43,6 +43,16 @@ function order_donation_amount(array $items, float $order_total): float {
 }
 
 /**
+ * Which "thank you" email template to use when (re)sending a signed donation
+ * certificate. The campaign-confirmation template thanks the donor for supporting
+ * a campaign, so it must only go to donors who actually pledged to one (i.e. have
+ * a campaign_pledges row). Every other donation gets the general donation thanks.
+ */
+function donation_cert_email_key(bool $is_campaign_pledge): string {
+    return $is_campaign_pledge ? 'campaign-confirmation' : 'donation-confirmation-customer';
+}
+
+/**
  * Human-readable placement spec for a printed design.
  *
  * Given the design placement ($pos: scale, x, y in 0..1 of the print area), the

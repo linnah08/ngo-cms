@@ -111,15 +111,26 @@ $pledge_for_email = $pledge_row ?: [
 ];
 $_cert_lang = $pledge_for_email['lang'] ?? 'bg';
 
+// Campaign wording only for real campaign pledges; general donations get the plain thanks.
+$_is_pledge = $pledge_row !== null;
+$_tpl_key   = donation_cert_email_key($_is_pledge);
+$_subj_vars = ['name' => $pledge_for_email['name'], 'pledge_number' => $order['order_number']];
+$_body_vars = $_is_pledge
+    ? ['pledge' => $pledge_for_email, 'lang' => $_cert_lang]
+    : [
+        'donor_name'       => $pledge_for_email['name'],
+        'amount_eur'       => $pledge_for_email['amount_eur'],
+        'donation_message' => $order['donation_message'] ?? '',
+        'reference'        => $order['order_number'],
+        'lang'             => $_cert_lang,
+    ];
+
 $email_ok = send_order_mail(
     (int)$order_id,
     $order['customer_email'],
-    render_email_subject('campaign-confirmation', $_cert_lang, [
-        'name'          => $pledge_for_email['name'],
-        'pledge_number' => $order['order_number'],
-    ]),
-    render_email('campaign-confirmation', ['pledge' => $pledge_for_email, 'lang' => $_cert_lang]),
-    ['template_key' => 'campaign-confirmation', 'attachments' => [['path' => $filepath, 'name' => 'certificate-' . $order['order_number'] . '.pdf']]]
+    render_email_subject($_tpl_key, $_cert_lang, $_subj_vars),
+    render_email($_tpl_key, $_body_vars),
+    ['template_key' => $_tpl_key, 'attachments' => [['path' => $filepath, 'name' => 'certificate-' . $order['order_number'] . '.pdf']]]
 );
 
 if ($email_ok) {

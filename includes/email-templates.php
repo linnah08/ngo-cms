@@ -71,13 +71,13 @@ function _email_tpl_defaults(): array {
             'subject_bg' => 'Благодарим за вашето дарение!',
             'intro_bg'   => '<h2>Благодарим за вашето дарение!</h2>'
                           . '<p>Здравейте, {{donor_name}},</p>'
-                          . '<p>Получихме успешно вашето дарение от <strong>{{amount_eur}} €</strong> за ' . SITE_NAME_BG . '. Вашата подкрепа прави истинска разлика в живота на децата, на които помагаме.</p>',
-            'outro_bg'   => '<p>Вашето дарение ще помогне на деца с увреждания и деца, лишени от родителска грижа, да имат по-добро бъдеще.</p>',
+                          . '<p>Получихме успешно вашето дарение от <strong>{{amount_eur}} €</strong> за ' . SITE_NAME_BG . '. Вашата подкрепа прави истинска разлика.</p>',
+            'outro_bg'   => '<p>Благодарим ви, че сте част от нашата кауза.</p>',
             'subject_en' => 'Thank you for your donation!',
             'intro_en'   => '<h2>Thank you for your donation!</h2>'
                           . '<p>Hello {{donor_name}},</p>'
-                          . '<p>We have successfully received your donation of <strong>{{amount_eur}} €</strong> to the Different Minds Foundation. Your support makes a real difference in the lives of the children we help.</p>',
-            'outro_en'   => '<p>Your donation will help children with disabilities and children deprived of parental care to have a better future.</p>',
+                          . '<p>We have successfully received your donation of <strong>{{amount_eur}} €</strong> to ' . (defined('SITE_NAME_EN') ? SITE_NAME_EN : SITE_NAME_BG) . '. Your support makes a real difference.</p>',
+            'outro_en'   => '<p>Thank you for being part of our cause.</p>',
         ],
 
         'order-cancelled-customer' => [

@@ -18,6 +18,18 @@ final class OrderViewLogicTest extends TestCase
         require_once dirname(__DIR__, 2) . '/includes/order_view.php';
     }
 
+    // ── donation_cert_email_key ──────────────────────────────────────────────
+
+    public function testCertEmailKeyUsesCampaignTemplateForActualPledges(): void
+    {
+        $this->assertSame('campaign-confirmation', donation_cert_email_key(true));
+    }
+
+    public function testCertEmailKeyUsesDonationTemplateForGeneralDonations(): void
+    {
+        $this->assertSame('donation-confirmation-customer', donation_cert_email_key(false));
+    }
+
     // ── order_ticket_paths ───────────────────────────────────────────────────
 
     public function testTicketPathsEmptyForNullOrEmpty(): void

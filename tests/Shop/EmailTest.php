@@ -211,6 +211,44 @@ final class EmailTest extends TestCase
         $this->assertStringNotContainsString('Специално посвещение', $html);
     }
 
+    /**
+     * The signed-certificate email for a general (non-campaign) donation renders
+     * donation-confirmation-customer with the vars sign-document.php / order-view.php
+     * pass — in both languages, with no campaign wording and no hard-coded org name.
+     */
+    public function testDonationCertEmailForGeneralDonationRendersInBothLanguages(): void
+    {
+        foreach (['bg', 'en'] as $lang) {
+            $html = render_email('donation-confirmation-customer', [
+                'donor_name'       => 'Donor Test',
+                'amount_eur'       => 42.0,
+                'donation_message' => '',
+                'reference'        => 'ORD-0001',
+                'lang'             => $lang,
+            ]);
+            $this->assertStringContainsString('Donor Test', $html, $lang);
+            $this->assertStringContainsString('42.00', $html, $lang);
+            $this->assertStringNotContainsString('Different Minds', $html, $lang);
+            $this->assertStringNotContainsString('CP-', $html, $lang);
+            $this->assertNotSame('', render_email_subject('donation-confirmation-customer', $lang, [
+                'name' => 'Donor Test', 'pledge_number' => 'ORD-0001',
+            ]), $lang);
+        }
+    }
+
+    public function testDonationConfirmationEnglishUsesSiteName(): void
+    {
+        $html = render_email('donation-confirmation-customer', [
+            'donor_name'       => 'Donor Test',
+            'amount_eur'       => 10.0,
+            'donation_message' => '',
+            'reference'        => 'ORD-0001',
+            'lang'             => 'en',
+        ]);
+        $this->assertStringContainsString('Thank you for your donation', $html);
+        $this->assertStringContainsString(htmlspecialchars(SITE_NAME_EN, ENT_QUOTES, 'UTF-8'), $html);
+    }
+
     // ── donation-notification-admin ──────────────────────────────────────────
 
     public function testDonationAdminNotificationContainsDonorInfo(): void

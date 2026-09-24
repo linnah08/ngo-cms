@@ -445,6 +445,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ];
                     $_cert_lang = $pledge_for_email['lang'] ?? 'bg';
 
+                    // Campaign wording only for real campaign pledges; general donations get the plain thanks.
+                    $_is_pledge = $pledge_row !== null;
+                    $_tpl_key   = donation_cert_email_key($_is_pledge);
+                    $_subj_vars = ['name' => $pledge_for_email['name'], 'pledge_number' => $order['order_number']];
+                    $_body_vars = $_is_pledge
+                        ? ['pledge' => $pledge_for_email, 'lang' => $_cert_lang]
+                        : [
+                            'donor_name'       => $pledge_for_email['name'],
+                            'amount_eur'       => $pledge_for_email['amount_eur'],
+                            'donation_message' => $order['donation_message'] ?? '',
+                            'reference'        => $order['order_number'],
+                            'lang'             => $_cert_lang,
+                        ];
+
                     $attachments = [[
                         'path' => $cert_file,
                         'name' => 'certificate-' . $order['order_number'] . '.pdf',
@@ -452,9 +466,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $ok = send_order_mail(
                         (int)$id,
                         $order['customer_email'],
-                        render_email_subject('campaign-confirmation', $_cert_lang, ['name' => $pledge_for_email['name'], 'pledge_number' => $order['order_number']]),
-                        render_email('campaign-confirmation', ['pledge' => $pledge_for_email, 'lang' => $_cert_lang]),
-                        ['template_key' => 'campaign-confirmation', 'attachments' => $attachments]
+                        render_email_subject($_tpl_key, $_cert_lang, $_subj_vars),
+                        render_email($_tpl_key, $_body_vars),
+                        ['template_key' => $_tpl_key, 'attachments' => $attachments]
                     );
                     if ($ok) {
                         $pdo->prepare('UPDATE documents SET emailed_at = NOW() WHERE id = ?')
