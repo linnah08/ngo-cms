@@ -37,7 +37,10 @@ final class HomeStoreTest extends TestCase
 
     public function test_seed_shows_every_section_unless_the_site_says_otherwise(): void
     {
-        $this->assertSame([true], array_values(array_unique(array_column($this->seed()['sections'], 'visible'))));
+        // An explicit empty list: the site's own theme may start some hidden, and a
+        // fork's test run uses that theme (lafetki hides three).
+        $doc = home_seed([], [], [], []);
+        $this->assertSame([true], array_values(array_unique(array_column($doc['sections'], 'visible'))));
     }
 
     public function test_a_site_can_start_some_built_ins_hidden(): void
