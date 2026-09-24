@@ -369,14 +369,19 @@ function home_file(): string {
 /**
  * The default front page, built from what the site shows today: saved values in
  * pages.json['home'] first, then the strings.json defaults, then the old hard-coded text.
+ * Every section starts visible, except the built-in types the active theme lists under
+ * 'home_start_hidden' — so a fork can start with a shorter front page without editing this file.
+ * @param ?array $start_hidden types to start hidden; defaults to the theme's list (tests pass their own).
  */
-function home_seed(array $home, array $sbg, array $sen): array {
+function home_seed(array $home, array $sbg, array $sen, ?array $start_hidden = null): array {
+    $start_hidden ??= function_exists('current_theme') ? (array) (current_theme()['home_start_hidden'] ?? []) : [];
     $p = fn(string $key, string $skey = '', string $dbg = '', string $den = ''): array => [
         'bg' => (string) (($home[$key] ?? '') ?: ($skey !== '' ? ($sbg[$skey] ?? '') : '') ?: $dbg),
         'en' => (string) (($home[$key . '_en'] ?? '') ?: ($skey !== '' ? ($sen[$skey] ?? '') : '') ?: $den),
     ];
     $pair = fn(string $bg, string $en): array => ['bg' => $bg, 'en' => $en];
-    $sec  = fn(string $type, array $fields): array => ['id' => 's_' . $type, 'type' => $type, 'visible' => true, 'fields' => $fields];
+    $sec  = fn(string $type, array $fields): array => ['id' => 's_' . $type, 'type' => $type,
+        'visible' => !in_array($type, $start_hidden, true), 'fields' => $fields];
     $name = $pair(SITE_NAME_BG, SITE_NAME_EN);
     $img  = fn(string $path, string $fallback = ''): string => home_valid_image_path($path) ? $path : $fallback;
 

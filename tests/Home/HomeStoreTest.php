@@ -35,6 +35,22 @@ final class HomeStoreTest extends TestCase
         $this->assertSame(['hero', 'products', 'impact', 'campaign', 'centres', 'mission', 'news', 'partners', 'cta'], $types);
     }
 
+    public function test_seed_shows_every_section_unless_the_site_says_otherwise(): void
+    {
+        $this->assertSame([true], array_values(array_unique(array_column($this->seed()['sections'], 'visible'))));
+    }
+
+    public function test_a_site_can_start_some_built_ins_hidden(): void
+    {
+        // What a theme's 'home_start_hidden' key does: the sections stay, switched off.
+        $doc = home_seed([], [], [], ['impact', 'partners', 'no_such_type', 42]);
+        $vis = array_column($doc['sections'], 'visible', 'type');
+        $this->assertFalse($vis['impact']);
+        $this->assertFalse($vis['partners']);
+        $this->assertSame(7, count(array_filter($vis)));
+        $this->assertCount(9, $doc['sections']);
+    }
+
     public function test_seed_prefers_saved_page_values_over_defaults(): void
     {
         $doc  = $this->seed(['hero_title' => 'Нашият дом', 'hero_title_en' => '', 'section_mission' => '', 'mission_title' => 'Мисия X',

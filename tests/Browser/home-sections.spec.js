@@ -73,6 +73,28 @@ test('add a text + image block, drag it up and back, hide it', async ({ page }) 
   await expect(rows.filter({ hasText: stamp })).toHaveCount(0);
 });
 
+test('a failed drop puts the list back and shows the error where the admin can see it', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 500 });   // the list runs well below the fold
+  await page.goto('/admin/home-sections.php');
+  const ids = () => page.$$eval('#list > li', l => l.map(x => x.dataset.id));
+  const before = await ids();
+  await page.$eval('#list', l => { l.dataset.rev = '99999'; });   // as if someone else saved meanwhile
+  const rows = page.locator('#list > li');
+  const n = await rows.count();
+  const grip = rows.nth(n - 1).getByRole('button', { name: /^Премести/ });
+  await grip.scrollIntoViewIfNeeded();
+  await expect(page.locator('#hsSortMsg')).not.toBeInViewport();
+  await grip.focus();
+  await page.keyboard.press('Space');
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('Space');
+  const box = page.locator('#hsSortMsg');
+  await expect(box).toHaveAttribute('role', 'alert');
+  await expect(box).toContainText('някой друг');
+  await expect(box).toBeInViewport();
+  expect(await ids()).toEqual(before);
+});
+
 test('a bad video link keeps the form and explains why', async ({ page }) => {
   await page.goto('/admin/home-sections.php?add=video');
   await page.fill('#f_video', 'https://example.org/not-a-video');

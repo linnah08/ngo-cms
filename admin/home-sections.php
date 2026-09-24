@@ -366,6 +366,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       msg.style.background  = ok ? '#f0fdf4' : '#fef2f2';
       msg.style.color       = ok ? '#14532d' : '#7f1d1d';
       if (flash) flash.hidden = true;
+      // The box sits above the list; the admin may have dropped a row far below it.
+      if (!ok) msg.scrollIntoView({ block: 'nearest', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     }
     var list_ = sortable(sections, {
       item: 'li[data-id]',
