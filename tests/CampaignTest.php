@@ -196,26 +196,6 @@ final class CampaignTest extends TestCase
         $this->assertEqualsWithDelta((float)$before['total'] + 20.0, (float)$after['total'], 0.001);
     }
 
-    // ── packs sold = total printed minus current reward variant stock ───
-
-    public function test_packs_sold_is_total_minus_current_stock(): void
-    {
-        $in_stock = (int)self::$pdo->query("
-            SELECT COALESCE(SUM(pv.stock),0)
-            FROM products p
-            JOIN product_variants pv ON pv.product_id = p.id
-            WHERE p.slug = 'campaign-reward'
-        ")->fetchColumn();
-
-        $total      = 100;
-        $packs_sold = max(0, $total - $in_stock);
-
-        // Sold can never be negative and never exceeds the total printed.
-        $this->assertGreaterThanOrEqual(0, $packs_sold);
-        $this->assertLessThanOrEqual($total, $packs_sold);
-        $this->assertSame(max(0, $total - $in_stock), $packs_sold);
-    }
-
     // ── pledge_number format validation (regex used in callback) ─────────────
 
     public function test_pledge_number_regex(): void
