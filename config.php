@@ -586,9 +586,17 @@ function csrf_field(): string {
 }
 
 function csrf_verify(): bool {
+    return csrf_matches($_POST['csrf_token'] ?? '');
+}
+
+/**
+ * Does $given match this session's CSRF token? A session that has no token yet
+ * matches nothing — otherwise an empty token would pass against an empty session.
+ */
+function csrf_matches(mixed $given): bool {
     if (session_status() === PHP_SESSION_NONE) session_start();
-    $token = $_POST['csrf_token'] ?? '';
-    return hash_equals($_SESSION['csrf_token'] ?? '', $token);
+    $expected = $_SESSION['csrf_token'] ?? '';
+    return is_string($expected) && $expected !== '' && is_string($given) && hash_equals($expected, $given);
 }
 
 function sanitize(string $val): string {

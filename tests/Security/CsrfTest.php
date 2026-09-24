@@ -81,4 +81,28 @@ final class CsrfTest extends TestCase
 
         $this->assertFalse(csrf_verify(), 'csrf_verify() must return false for a wrong token');
     }
+
+    public function testCsrfVerifyRejectsEmptyTokenWhenSessionHasNone(): void
+    {
+        // A fresh session with no token yet must not accept an empty one.
+        $_POST['csrf_token'] = '';
+
+        $this->assertFalse(csrf_verify(), 'csrf_verify() must return false when neither side has a token');
+    }
+
+    public function testCsrfMatchesRejectsNonStringToken(): void
+    {
+        $token = csrf_token();
+
+        $this->assertFalse(csrf_matches([$token]), 'csrf_matches() must return false for an array');
+        $this->assertTrue(csrf_matches($token));
+    }
+
+    public function testTranslateArticleEndpointUsesSharedCheck(): void
+    {
+        $src = file_get_contents(dirname(__DIR__, 2) . '/admin/translate-article-ajax.php');
+
+        $this->assertStringContainsString('csrf_matches(', $src);
+        $this->assertStringNotContainsString("\$_SESSION['csrf_token'] ?? ''", $src);
+    }
 }

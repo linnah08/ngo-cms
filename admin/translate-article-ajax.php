@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $body = json_decode(file_get_contents('php://input'), true) ?? [];
 
 // CSRF check
-if (!hash_equals($_SESSION['csrf_token'] ?? '', $body['csrf_token'] ?? '')) {
+if (!csrf_matches($body['csrf_token'] ?? '')) {
     echo json_encode(['ok' => false, 'error' => 'Invalid token']); exit;
 }
 
