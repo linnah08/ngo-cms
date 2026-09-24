@@ -116,6 +116,30 @@ function product_single_variant(array $active_variants): ?array {
 }
 
 /**
+ * The variant the product page starts on: the first (in sort order) that is in
+ * stock, or null when every variant is sold out. Starting on a sold-out variant
+ * would make "Add to cart" fail for a buyer who didn't change the choice.
+ */
+function product_default_variant(array $active_variants): ?array {
+    foreach ($active_variants as $pv) {
+        if ((int)($pv['stock'] ?? 0) > 0) return $pv;
+    }
+    return null;
+}
+
+/**
+ * Whether a product can be bought at all: a variant product when any of its
+ * active variants has stock (its own `stock` column is unused), any other
+ * product by its own stock.
+ */
+function product_is_in_stock(array $product, array $active_variants = []): bool {
+    if (($product['type'] ?? '') === 'variant') {
+        return product_default_variant($active_variants) !== null;
+    }
+    return (int)($product['stock'] ?? 0) > 0;
+}
+
+/**
  * Build the 'print' product variant structure from POST fields.
  * Returns the array ready to json_encode (keys: colours, sizes, print_area,
  * custom, size_guide, size_dims). Caller uses ['sizes'] and ['size_guide'] for

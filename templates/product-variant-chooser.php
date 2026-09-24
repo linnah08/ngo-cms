@@ -5,8 +5,13 @@
  *   $prod_variants  array   the product's ACTIVE variant rows, in sort order (non-empty)
  *   $lang           string  'bg' | 'en'
  *
- * Several variants → the "Choose variant" list; the first one starts selected
- * and the hidden variant_id in the add-to-cart form follows the buyer's pick.
+ * Several variants → a "Choose variant" group of native radio buttons (a
+ * fieldset + legend, so keyboards use Tab / arrow keys and screen readers
+ * announce "radio, 2 of 3, checked"). The first IN-STOCK variant starts
+ * checked; sold-out ones are disabled radios that still say "Out of stock".
+ * The hidden variant_id in the add-to-cart form follows the pick via
+ * selectVariant() in magazin/index.php. The tile look lives in that page's
+ * <style> (.pv-option / .pv-radio).
  *
  * Exactly one variant → nothing to choose, so no "Choose variant" prompt: the
  * variant is shown as plain text (name, attributes, stock) so the buyer — and a
@@ -55,34 +60,43 @@ $_single_pv = product_single_variant($prod_variants);
     </div>
   </div>
 <?php else: ?>
-  <div style="margin-bottom:1rem;">
-    <div style="font-size:.85rem;font-weight:600;margin-bottom:.6rem;">
-      <?= $lang === 'bg' ? 'Избери вариант' : 'Choose variant' ?>
-    </div>
+  <?php $_default_pv = product_default_variant($prod_variants); ?>
+  <fieldset class="pv-choices">
+    <legend><?= $lang === 'bg' ? 'Избери вариант' : 'Choose variant' ?></legend>
     <div style="display:flex;flex-direction:column;gap:.5rem;">
-      <?php foreach ($prod_variants as $pvi => $pv): ?>
-        <?php $d = $_pv_describe($pv); ?>
-        <div class="pv-option<?= $pvi === 0 ? ' active' : '' ?><?= !$d['in_stock'] ? ' disabled' : '' ?>"
-             id="pvo-<?= (int)$pv['id'] ?>"
-             <?= $d['in_stock'] ? 'onclick="selectVariant(' . (int)$pv['id'] . ')"' : '' ?>>
+      <?php foreach ($prod_variants as $pv): ?>
+        <?php
+          $d       = $_pv_describe($pv);
+          $pv_id   = (int)$pv['id'];
+          $checked = $_default_pv && (int)$_default_pv['id'] === $pv_id;
+        ?>
+        <label class="pv-option<?= $checked ? ' active' : '' ?><?= !$d['in_stock'] ? ' disabled' : '' ?>"
+               id="pvo-<?= $pv_id ?>" for="pvr-<?= $pv_id ?>">
+          <input type="radio" class="pv-radio" name="pv_choice" id="pvr-<?= $pv_id ?>" value="<?= $pv_id ?>"
+                 <?= $checked ? 'checked' : '' ?>
+                 <?= $d['in_stock'] ? 'onchange="selectVariant(' . $pv_id . ')"' : 'disabled' ?>>
           <?php if ($d['img']): ?>
             <img class="pv-thumb" src="<?= h($d['img']) ?>" alt="">
           <?php else: ?>
-            <div class="pv-thumb" style="background:var(--off-white);border-radius:4px;"></div>
+            <span class="pv-thumb" style="display:block;background:var(--off-white);border-radius:4px;"></span>
           <?php endif; ?>
-          <div style="flex:1;min-width:0;">
-            <div style="font-weight:600;font-size:.95rem;"><?= h($d['label']) ?></div>
+          <span style="display:block;flex:1;min-width:0;">
+            <span style="display:block;font-weight:600;font-size:.95rem;">
+              <?= h($d['label']) ?>
+              <?php /* Visible, non-colour "selected" marker; the radio's own checked state is what a screen reader announces. */ ?>
+              <span class="pv-selected" aria-hidden="true">✓ <?= $lang === 'bg' ? 'Избран' : 'Selected' ?></span>
+            </span>
             <?php if ($d['attrs']): ?>
-              <div style="font-size:.78rem;color:var(--text-muted);"><?= $d['attrs'] ?></div>
+              <span style="display:block;font-size:.78rem;color:var(--text-muted);"><?= $d['attrs'] ?></span>
             <?php endif; ?>
-          </div>
-          <div style="font-size:.8rem;flex-shrink:0;<?= $d['in_stock'] ? 'color:var(--teal);' : 'color:#e53935;' ?>">
+          </span>
+          <span style="font-size:.8rem;flex-shrink:0;<?= $d['in_stock'] ? 'color:var(--teal);' : 'color:#b03a2e;font-weight:600;' ?>">
             <?= $d['in_stock']
                 ? (int)$pv['stock'] . ($lang === 'bg' ? ' бр.' : ' left')
                 : ($lang === 'bg' ? 'Изчерпан' : 'Out of stock') ?>
-          </div>
-        </div>
+          </span>
+        </label>
       <?php endforeach; ?>
     </div>
-  </div>
+  </fieldset>
 <?php endif; ?>

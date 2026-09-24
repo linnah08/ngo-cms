@@ -48,6 +48,8 @@ if ($slug) {
         $pv_stmt->execute([$p['id']]);
         $prod_variants = $pv_stmt->fetchAll();
     }
+    // The variant the page starts on: the first in-stock one (null if all sold out).
+    $default_pv = product_default_variant($prod_variants);
 
     if (!$p) {
         http_response_code(404);
@@ -83,7 +85,7 @@ if ($slug) {
             '@type'         => 'Offer',
             'price'         => number_format((float)$p['price_eur'], 2, '.', ''),
             'priceCurrency' => 'EUR',
-            'availability'  => ((int)$p['stock'] > 0) ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+            'availability'  => product_is_in_stock($p, $prod_variants) ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
             'url'           => rtrim(SITE_URL, '/') . ($lang === 'bg' ? '/magazin/' : '/en/shop/') . rawurlencode($p['slug']) . '/',
         ];
     }
@@ -105,10 +107,19 @@ if ($slug) {
 .print-size-btn:disabled{opacity:.4;cursor:default;}
 @keyframes size-pulse{0%,100%{outline:2px solid transparent}50%{outline:2px solid var(--teal);outline-offset:4px;}}
 #sizeBtns{animation:size-pulse 1.8s ease-in-out 3;}
-.pv-option{display:flex;align-items:center;gap:.75rem;padding:.6rem .9rem;border:2px solid var(--border);border-radius:8px;cursor:pointer;transition:border-color .15s;}
+.pv-choices{border:0;margin:0 0 1rem;padding:0;min-width:0;}
+.pv-choices legend{font-size:.85rem;font-weight:600;margin-bottom:.6rem;padding:0;}
+.pv-option{display:flex;align-items:center;gap:.75rem;min-height:44px;box-sizing:border-box;margin:0;text-transform:none;letter-spacing:normal;font-size:1rem;font-weight:400;color:var(--text,inherit);padding:.6rem .9rem;border:2px solid var(--border);border-radius:8px;cursor:pointer;transition:border-color .15s;}
 .pv-option:hover{border-color:var(--teal);}
-.pv-option.active{border-color:var(--teal);background:#e8f7f9;}
-.pv-option.disabled{opacity:.45;cursor:default;}
+.pv-option.active,.pv-option:has(.pv-radio:checked){border-color:var(--teal);background:#e8f7f9;}
+.pv-option:has(.pv-radio:focus-visible){outline:3px solid var(--teal);outline-offset:2px;}
+.pv-option.disabled{opacity:.6;cursor:not-allowed;}
+.pv-option.disabled:hover{border-color:var(--border);}
+.pv-radio{width:1.15rem;height:1.15rem;margin:0;flex-shrink:0;accent-color:var(--teal);cursor:inherit;}
+.pv-radio:focus-visible{outline:3px solid var(--teal);outline-offset:2px;}
+.pv-selected{display:none;font-size:.75rem;font-weight:700;color:#1b5e63;}
+.pv-option.active .pv-selected,.pv-option:has(.pv-radio:checked) .pv-selected{display:inline;}
+@media (prefers-reduced-motion:reduce){.pv-option{transition:none;}}
 .pv-thumb{width:40px;height:40px;object-fit:cover;border-radius:4px;flex-shrink:0;background:var(--off-white);}
 .pv-thumbstrip{display:flex;gap:.5rem;margin-top:.6rem;flex-wrap:wrap;}
 .pv-thumbstrip img{width:52px;height:52px;object-fit:cover;border-radius:4px;cursor:pointer;border:2px solid transparent;transition:border-color .15s;}
@@ -140,7 +151,7 @@ if ($slug) {
       <?php $initial_src = $p['image'] ? '/assets/images/products/' . $p['image'] : ''; ?>
       <?php
         if ($is_variant && !empty($prod_variants)) {
-            $first_pv = $prod_variants[0];
+            $first_pv = $default_pv ?? $prod_variants[0];
             $initial_src = $first_pv['image'] ? '/assets/images/products/' . $first_pv['image'] : '';
         }
       ?>
@@ -211,9 +222,7 @@ if ($slug) {
         <?php endif; ?>
 
         <?php
-          $show_cart_form = $is_variant
-              ? !empty(array_filter($prod_variants, fn($pv) => (int)$pv['stock'] > 0))
-              : (int)$p['stock'] > 0;
+          $show_cart_form = product_is_in_stock($p, $prod_variants);
         ?>
         <?php if ($show_cart_form): ?>
           <form method="POST" action="/cart/add.php"
@@ -226,7 +235,7 @@ if ($slug) {
 
             <?php if ($is_variant): ?>
               <input type="hidden" name="variant_id" id="variantIdInput"
-                     value="<?= !empty($prod_variants) ? (int)$prod_variants[0]['id'] : '' ?>">
+                     value="<?= $default_pv ? (int)$default_pv['id'] : '' ?>">
             <?php endif; ?>
 
             <?php if ($is_print && !empty($print_colours)): ?>
@@ -463,12 +472,7 @@ if ($slug) {
           <?php endif; ?>
 
         <?php else: ?>
-          <?php /* A multi-variant product shows per-variant stock in its chooser; everything else (no variants, or a single one) gets this box. */ ?>
-          <?php if (!$is_variant || count($prod_variants) <= 1): ?>
-          <div style="padding:.75rem 1.25rem;background:#fdf0ef;border:1px solid #f0c4c0;color:#c0392b;border-radius:var(--radius);font-weight:600;">
-            <?= $lang === 'bg' ? 'Изчерпан' : 'Out of stock' ?>
-          </div>
-          <?php endif; ?>
+          <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/product-out-of-stock.php'; ?>
         <?php endif; ?>
       </div>
 
@@ -546,11 +550,14 @@ function selectVariant(vid) {
   var img = document.getElementById('mockupImg');
   if (img && pv.image) img.src = pv.image;
 
+  // .active mirrors the checked radio, for browsers without CSS :has()
   document.querySelectorAll('.pv-option').forEach(function(el){
     el.classList.remove('active');
   });
   var opt = document.getElementById('pvo-' + vid);
   if (opt) opt.classList.add('active');
+  var radio = document.getElementById('pvr-' + vid);
+  if (radio && !radio.checked) radio.checked = true;
 
   renderGallery(vid);
 }
@@ -569,9 +576,7 @@ function selectVariant(vid) {
   }, { passive: true });
 })();
 
-<?php if (!empty($prod_variants)): ?>
-renderGallery(<?= (int)$prod_variants[0]['id'] ?>);
-<?php endif; ?>
+renderGallery(<?= (int)($default_pv ?? $prod_variants[0])['id'] ?>);
 
 </script>
 <?php endif; ?>
