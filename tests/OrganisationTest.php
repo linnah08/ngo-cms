@@ -253,6 +253,25 @@ final class OrganisationTest extends TestCase
         }
     }
 
+    /**
+     * Some of these organisations are on a .бг domain. filter_var() refuses
+     * such an address outright, so the website field rejected their own site.
+     */
+    public function test_website_accepts_a_cyrillic_address(): void
+    {
+        if (!function_exists('idn_to_ascii')) {
+            $this->markTestSkipped('intl extension not installed');
+        }
+
+        $this->assertTrue(org_url_valid('https://фондация.бг'));
+        $this->assertTrue(org_url_valid('https://пример.бг/за-нас'));
+        $this->assertTrue(org_url_valid('https://example.org'));
+
+        $this->assertFalse(org_url_valid('javascript:alert(1)'));
+        $this->assertFalse(org_url_valid('ftp://example.org'));
+        $this->assertFalse(org_url_valid('not a url'));
+    }
+
     public function test_logo_rejects_non_images_and_wrong_types(): void
     {
         if (!function_exists('imagecreatetruecolor')) $this->markTestSkipped('GD not available');

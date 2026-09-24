@@ -382,7 +382,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <p class="admin-meta" style="margin-bottom:1.25rem;">
     Използва се за rich-text редактиране на статии.<br>
     Вземете безплатен API ключ от <a href="https://www.tiny.cloud/" target="_blank" rel="noopener">tiny.cloud</a>.
-    Регистрирайте домейна <strong><?= h(parse_url(SITE_URL, PHP_URL_HOST)) ?></strong> и домейна на вашата администрация в Tiny Cloud.
+    Регистрирайте домейна <strong><?= h((string) url_host(SITE_URL)) ?></strong> и домейна на вашата администрация в Tiny Cloud.
   </p>
 
   <form method="post">

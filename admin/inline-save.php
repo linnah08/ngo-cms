@@ -5,7 +5,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 
 // ── CORS: allow credentialed requests from subdomains of this site ────────────
 $_origin    = $_SERVER['HTTP_ORIGIN'] ?? '';
-$_site_host = parse_url(SITE_URL, PHP_URL_HOST) ?: '';
+$_site_host = url_host(SITE_URL) ?: '';
 $_site_origin = rtrim(SITE_URL, '/');
 if ($_origin !== '') {
     $is_subdomain = (bool) preg_match(

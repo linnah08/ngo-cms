@@ -2,6 +2,8 @@
 // includes/home.php — configurable front-page sections: the model.
 // Storage is content/home.json. Spec: docs/superpowers/specs/2026-09-21-home-sections-design.md
 
+require_once __DIR__ . '/url.php';
+
 const HOME_IMAGE_RE  = '#^/assets/images/[a-zA-Z0-9/_.\-]+$#';
 const HOME_HTML_TAGS = ['p', 'br', 'b', 'strong', 'em', 'i', 'u', 's', 'a', 'ul', 'ol', 'li',
                         'h2', 'h3', 'h4', 'blockquote', 'hr', 'img',
@@ -15,21 +17,10 @@ function home_clean_link(string $url): ?string {
     if ($url === '') return '';
     if (preg_match('/[\s<>"\'\\\\]/', $url)) return null;
     if ($url[0] === '/') return str_starts_with($url, '//') ? null : $url;
-    $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
-    if (!in_array($scheme, ['http', 'https'], true)) return null;
-    // Cyrillic addresses (https://пример.бг/път, https://bg.wikipedia.org/wiki/България): check
-    // the punycode host with the path percent-encoded, but keep what the admin typed.
-    // Without the intl extension a Cyrillic host is refused, as before.
-    $host = parse_url($url, PHP_URL_HOST);
-    if (!is_string($host) || $host === '') return null;
-    $at   = strpos($url, $host);
-    $rest = (string) preg_replace_callback('/[^\x00-\x7F]+/', fn($m) => rawurlencode($m[0]), substr($url, $at + strlen($host)));
-    if (preg_match('/[^\x00-\x7F]/', $host) && function_exists('idn_to_ascii')) {
-        $host = idn_to_ascii($host, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46);
-        if ($host === false) return null;
-    }
-    $check = substr($url, 0, $at) . $host . $rest;
-    return filter_var($check, FILTER_VALIDATE_URL) !== false ? $url : null;
+    // A Cyrillic address (https://пример.бг/път, https://bg.wikipedia.org/wiki/България) is
+    // checked as punycode with the path percent-encoded, but what the admin typed is what
+    // gets stored. url_is_web() does that; parse_url() cannot be used for any of it.
+    return url_is_web($url) ? $url : null;
 }
 
 function home_valid_image_path(string $path): bool {

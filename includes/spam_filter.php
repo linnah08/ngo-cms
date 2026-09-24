@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/url.php';
 /**
  * Shared spam defenses for public-facing forms (contact, comments, reviews):
  * an admin-editable content blocklist, a fixed link-count rule, and
@@ -51,7 +52,9 @@ function spam_extract_domains(array $texts): array
         }
         foreach ($matches[0] as $url) {
             $withScheme = str_starts_with(strtolower($url), 'http') ? $url : 'http://' . $url;
-            $host = parse_url($withScheme, PHP_URL_HOST);
+            // Not parse_url(): it mangles a Cyrillic host, so the domain never
+            // matched the blocklist and was never learned from a spam report.
+            $host = url_host($withScheme);
             if ($host) {
                 $host = rtrim($host, ".,;:)]}\'\"");
                 $host = preg_replace('/^www\./i', '', $host);

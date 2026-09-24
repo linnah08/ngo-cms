@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/url.php';
 /**
  * Organisation identity that admins can change after installation
  * (admin/organisation.php): name, contacts, bank details, brand, social links.
@@ -141,9 +142,10 @@ function org_color_valid(string $c): bool
 
 function org_url_valid(string $url): bool
 {
-    if (filter_var($url, FILTER_VALIDATE_URL) === false) return false;
-    $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
-    return $scheme === 'https' || $scheme === 'http';
+    // Not filter_var() on the raw string: it refuses https://фондация.бг, which
+    // is exactly the address some of these organisations have. url_is_web()
+    // checks the punycode form instead. See includes/url.php.
+    return url_is_web($url);
 }
 
 /**

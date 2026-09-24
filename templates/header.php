@@ -6,7 +6,7 @@ $lang = get_lang();
 $site_name = $lang === 'bg' ? SITE_NAME_BG : SITE_NAME_EN;
 $other = other_lang();
 $other_label = $other === 'en' ? 'EN' : 'БГ';
-$current_path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '/';
+$current_path = url_request_path($_SERVER['REQUEST_URI'] ?? '/');
 
 // BG path prefix → EN path prefix (longest match wins)
 $_path_map_bg_to_en = [
@@ -89,7 +89,7 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
 
   <?php
     require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/seo.php';
-    $_seo_path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+    $_seo_path = url_request_path($_SERVER['REQUEST_URI'] ?? '/');
     seo_render_meta([
         'title'       => $_doc_title,
         'description' => $page_description ?? '',

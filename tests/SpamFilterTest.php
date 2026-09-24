@@ -97,6 +97,24 @@ final class SpamFilterTest extends TestCase
         $this->assertSame(['spam-site.com'], $domains);
     }
 
+    /**
+     * A spam link on a Cyrillic domain used to come back as a mangled string,
+     * so it never matched the blocklist and marking the message as spam never
+     * learned the domain either.
+     */
+    public function test_extracts_a_cyrillic_domain(): void
+    {
+        $this->assertSame(
+            ['пример.бг'],
+            spam_extract_domains(['Виж http://пример.бг/оферта сега'])
+        );
+        $this->assertSame(
+            ['пример.бг'],
+            spam_extract_domains(['www.пример.бг', 'http://WWW.Пример.бг/x']),
+            'the www. prefix and case are normalised for a Cyrillic host too'
+        );
+    }
+
     public function test_no_links_returns_empty_array(): void
     {
         $this->assertSame([], spam_extract_domains(['no links here at all']));
