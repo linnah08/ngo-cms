@@ -9,6 +9,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/email-templates.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_documents.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_shipping.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_email_composer.php';
 admin_require_shop();
 
 // Campaign module switched off for this install — the page does not exist.
@@ -54,6 +55,21 @@ $success = '';
 if (!empty($_GET['refund_ok']))     $success = 'Плащането е върнато успешно.';
 if (!empty($_GET['cert_ok']))       $success = 'Сертификатът е регенериран.';
 if (!empty($_GET['doc_success']))   $success = trim($_GET['doc_success']);
+if (!empty($_GET['email_sent']))    $success = 'Имейлът е изпратен до ' . $pledge['email'] . '. Виждате го в „Комуникация с клиента“.';
+
+// "Имейл до клиента": the supporter as an order-shaped row (the pledge is the source of truth).
+$email_order_for = fn(array $p, ?array $o): array => [
+    'id'             => (int)($o['id'] ?? 0),
+    'type'           => 'pledge',
+    'order_number'   => $p['pledge_number'],
+    'customer_name'  => $p['name'],
+    'customer_email' => $p['email'],
+    'total_eur'      => $p['amount_eur'],
+    'lang'           => $p['lang'] ?? 'bg',
+    'payment_method' => $o['payment_method'] ?? 'card',
+    'payment_status' => $p['payment_status'],
+];
+$email_draft = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) { http_response_code(400); exit('Invalid token'); }
@@ -96,6 +112,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'Грешка при връщане на плащането. Моля, обработете го ръчно в DSK Bank.';
             }
         }
+    }
+
+    // ── Email the supporter ("Имейл до клиента") ─────────────────────────────
+    if ($action === 'send_customer_email') {
+        $_post_str = fn(string $k): string => is_string($_POST[$k] ?? null) ? $_POST[$k] : '';
+        // The email is kept in the order's history, so it needs the order row. A paid
+        // pledge always has one (or gets it now); an unpaid one has nothing to attach to.
+        $email_order_id = $order ? (int)$order['id']
+            : ($pledge['payment_status'] === 'paid' ? pledge_ensure_order_row($pdo, $pledge) : 0);
+        if ($email_order_id <= 0) {
+            $errors[] = 'Имейл до поддръжника може да се изпрати оттук, след като плащането му бъде получено.';
+        } else {
+            $sent = order_email_send($pdo, $email_order_id, $email_order_for($pledge, $order),
+                $_post_str('email_subject'), $_post_str('email_body'), $_post_str('email_preset'));
+            if ($sent['ok']) {
+                header('Location: /admin/pledge-view.php?id=' . $id . '&email_sent=1#email-history');
+                exit;
+            }
+            $errors[] = $sent['error'];
+        }
+        $email_draft = ['preset' => $_post_str('email_preset'), 'subject' => $_post_str('email_subject'), 'body' => $_post_str('email_body')];
     }
 
     // ── Regenerate cert ───────────────────────────────────────────────────────
@@ -174,6 +211,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+
+$_tinymce_key    = setting_get('tinymce_api_key', 'no-api-key');
+$page_head_extra = '<script src="https://cdn.tiny.cloud/1/' . h($_tinymce_key) . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>';
 
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
@@ -327,8 +367,12 @@ $psc_pledge = $pledge;
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/pledge-shipping-card.php';
 ?>
 
-<!-- Email history -->
+<!-- Email the supporter + email history -->
 <?php
+$oec_order = $email_order_for($pledge, $order);
+$oec_draft = $email_draft;
+require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/order-email-composer.php';
+
 $_oeh = $pdo->prepare("SELECT id FROM orders WHERE order_number = ? AND type = 'pledge'");
 $_oeh->execute([$pledge['pledge_number']]);
 $oeh_order_id = (int)$_oeh->fetchColumn();

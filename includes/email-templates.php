@@ -156,6 +156,55 @@ function _email_tpl_defaults(): array {
             'outro_en'   => '<p>If you have questions, contact us at <a href="mailto:' . (defined('SITE_EMAIL') ? SITE_EMAIL : '') . '">' . (defined('SITE_EMAIL') ? SITE_EMAIL : '') . '</a>.</p>',
         ],
 
+        // ── Ready-made messages for "Имейл до клиента" on the order page ────────
+        // (see admin_message_presets()). The admin can still edit them before sending.
+
+        'admin-product-unavailable' => [
+            'subject_bg' => 'Относно вашата поръчка {{order_number}}',
+            'intro_bg'   => '<p>Здравейте, {{customer_name}},</p>'
+                          . '<p>За съжаление, един или повече от продуктите във вашата поръчка '
+                          . '<strong>{{order_number}}</strong> в момента не са налични.</p>'
+                          . '<p>Моля, отговорете на този имейл, за да уточним как да продължим — '
+                          . 'замяна с друг продукт, изчакване на наличност или връщане на сумата.</p>',
+            'outro_bg'   => '<p>Извиняваме се за неудобството и благодарим за разбирането.</p>',
+            'subject_en' => 'Regarding your order {{order_number}}',
+            'intro_en'   => '<p>Hello {{customer_name}},</p>'
+                          . '<p>Unfortunately, one or more of the products in your order '
+                          . '<strong>{{order_number}}</strong> are currently out of stock.</p>'
+                          . '<p>Please reply to this email so we can agree how to proceed — '
+                          . 'a replacement, waiting for restock, or a refund.</p>',
+            'outro_en'   => '<p>We apologise for the inconvenience and thank you for your understanding.</p>',
+        ],
+
+        'admin-order-delayed' => [
+            'subject_bg' => 'Малко забавяне с поръчка {{order_number}}',
+            'intro_bg'   => '<p>Здравейте, {{customer_name}},</p>'
+                          . '<p>Искаме да ви уведомим, че обработката на вашата поръчка '
+                          . '<strong>{{order_number}}</strong> ще отнеме малко повече време от обичайното.</p>',
+            'outro_bg'   => '<p>Ще ви пишем веднага щом поръчката бъде изпратена. '
+                          . 'Благодарим ви за търпението!</p>',
+            'subject_en' => 'A short delay with order {{order_number}}',
+            'intro_en'   => '<p>Hello {{customer_name}},</p>'
+                          . '<p>We wanted to let you know that processing your order '
+                          . '<strong>{{order_number}}</strong> is taking a little longer than usual.</p>',
+            'outro_en'   => '<p>We will write to you as soon as it ships. Thank you for your patience!</p>',
+        ],
+
+        'admin-need-info' => [
+            'subject_bg' => 'Нужна ни е информация за {{order_number}}',
+            'intro_bg'   => '<p>Здравейте, {{customer_name}},</p>'
+                          . '<p>За да продължим с <strong>{{order_number}}</strong>, '
+                          . 'се нуждаем от малко допълнителна информация:</p>'
+                          . '<p>[опишете какво ви е необходимо]</p>',
+            'outro_bg'   => '<p>Моля, отговорете на този имейл. Благодарим ви!</p>',
+            'subject_en' => 'We need some details for {{order_number}}',
+            'intro_en'   => '<p>Hello {{customer_name}},</p>'
+                          . '<p>To go ahead with <strong>{{order_number}}</strong>, '
+                          . 'we need a little more information:</p>'
+                          . '<p>[describe what you need]</p>',
+            'outro_en'   => '<p>Please reply to this email. Thank you!</p>',
+        ],
+
         'error-alert' => [
             'subject_bg' => '[' . (defined('SITE_NAME_BG') ? SITE_NAME_BG : 'Site') . '] Грешка на сайта — {{error_class}}',
             'intro_bg'   => '<h2>Грешка на сайта</h2>'
@@ -251,6 +300,35 @@ function email_tpl_render(string $html, array $vars): string {
  */
 function email_tpl_subject(string $key, string $lang = 'bg', array $vars = []): string {
     return email_tpl_get($key, $lang, $vars)['subject'];
+}
+
+/**
+ * Ready-made messages for the "Имейл до клиента" composer on the order and
+ * pledge pages. Their text is stored and edited like every other template
+ * (Съдържание → Имейл шаблони), under the same key in _email_tpl_defaults();
+ * this registry only adds the admin-facing label, the placeholders the editor
+ * lists, and the order types the message makes sense for.
+ *
+ * @return array<string,array{label:string,vars:string[],types:string[]}>
+ */
+function admin_message_presets(): array {
+    return [
+        'admin-product-unavailable' => [
+            'label' => 'Поръчка: Продукт не е наличен',
+            'vars'  => ['{{customer_name}}', '{{order_number}}'],
+            'types' => ['physical'],
+        ],
+        'admin-order-delayed' => [
+            'label' => 'Поръчка: Забавяне',
+            'vars'  => ['{{customer_name}}', '{{order_number}}'],
+            'types' => ['physical'],
+        ],
+        'admin-need-info' => [
+            'label' => 'Нужна е информация от клиента',
+            'vars'  => ['{{customer_name}}', '{{order_number}}'],
+            'types' => ['physical', 'donation', 'pledge', 'ticket'],
+        ],
+    ];
 }
 
 /**

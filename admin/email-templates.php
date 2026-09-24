@@ -69,6 +69,11 @@ $templates = [
     ],
 ];
 
+// Ready-made "Имейл до клиента" messages (the composer on the order/pledge page)
+foreach (admin_message_presets() as $_pk => $_pm) {
+    $templates[$_pk] = ['label' => $_pm['label'], 'vars' => $_pm['vars']];
+}
+
 // ── POST: save one template ───────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) { http_response_code(400); exit('Invalid token'); }

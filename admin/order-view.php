@@ -10,6 +10,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/TicketGenerator.ph
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_shipping.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_view.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/unpaid_orders.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_email_composer.php';
 
 admin_require_shop();
 
@@ -89,6 +90,17 @@ if (!empty($_GET['doc_success'])) {
 if (!empty($_GET['doc_error'])) {
     $errors[] = $_GET['doc_error'];
 }
+if (!empty($_GET['email_sent'])) {
+    $success = 'Имейлът е изпратен до ' . $order['customer_email'] . '. Виждате го в „Комуникация с клиента“.';
+}
+
+// "Имейл до клиента": for campaign orders (pledge, ticket) the buyer's language lives on the pledge.
+$email_order_for = function (array $o) use ($pledge_row, $ticket_pledge): array {
+    $p = $pledge_row ?? $ticket_pledge;
+    if (!empty($p['lang'])) $o['lang'] = $p['lang'];
+    return $o;
+};
+$email_draft = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) { http_response_code(400); exit('Invalid token'); }
@@ -480,6 +492,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    if ($action === 'send_customer_email') {
+        $_post_str = fn(string $k): string => is_string($_POST[$k] ?? null) ? $_POST[$k] : '';
+        $sent = order_email_send($pdo, (int)$id, $email_order_for($order),
+            $_post_str('email_subject'), $_post_str('email_body'), $_post_str('email_preset'));
+        if ($sent['ok']) {
+            header('Location: /admin/order-view.php?id=' . (int)$id . '&email_sent=1#email-history');
+            exit;
+        }
+        $errors[] = $sent['error'];
+        // Keep what the admin wrote so a failed send loses nothing.
+        $email_draft = ['preset' => $_post_str('email_preset'), 'subject' => $_post_str('email_subject'), 'body' => $_post_str('email_body')];
+    }
+
     if ($action === 'update_payment') {
         $payment_status = $_POST['payment_status'] ?? '';
         if (in_array($payment_status, ['pending','paid','refunded'])) {
@@ -508,6 +533,8 @@ $is_unpaid = order_is_unpaid($order, (int)$_age_stmt->fetchColumn());
 
 $page_title_admin = 'Поръчка #' . $order['order_number'];
 $active_nav       = 'orders';
+$_tinymce_key     = setting_get('tinymce_api_key', 'no-api-key');
+$page_head_extra  = '<script src="https://cdn.tiny.cloud/1/' . h($_tinymce_key) . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>';
 
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 ?>
@@ -845,7 +872,13 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       </form>
     </div>
 
-    <?php $oeh_order_id = (int)$id; require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/order-email-history.php'; ?>
+    <?php
+    $oec_order = $email_order_for($order);
+    $oec_draft = $email_draft;
+    require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/order-email-composer.php';
+    $oeh_order_id = (int)$id;
+    require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/order-email-history.php';
+    ?>
 
     <?php if ($order['type'] === 'pledge' && $pledge_row && !empty($pledge_row['delivery_courier'])): ?>
     <!-- Reward shipping label -->

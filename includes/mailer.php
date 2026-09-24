@@ -560,6 +560,9 @@ function order_email_kind_label(?string $key): string
         'donation-cert'                     => 'Сертификат за дарение',
         'pledge-cert'                       => 'Сертификат за дарение',
         'admin-message'                     => 'Ръчно съобщение',
+        'admin-product-unavailable'         => 'Продукт не е наличен',
+        'admin-order-delayed'               => 'Забавяне на поръчката',
+        'admin-need-info'                   => 'Нужна е информация',
     ];
     if ($key === null || $key === '') return 'Ръчно съобщение';
     return $labels[$key] ?? 'Имейл';
