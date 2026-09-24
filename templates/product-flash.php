@@ -1,0 +1,87 @@
+<?php
+/**
+ * Flash messages on the single-product page.
+ *
+ * After a buyer adds a product to the cart (cart/add.php with redirect=product)
+ * they land back on the product page with a success flash. A bare "Added to
+ * cart!" leaves them stranded, so the success message also offers the next
+ * step: view the cart, or go straight to checkout.
+ *
+ * Accessibility:
+ *   - success sits in role="status" (polite), errors in role="alert";
+ *   - the success notice takes focus on load (tabindex="-1"), because content
+ *     already in the HTML is not announced by a live region on its own — this
+ *     way keyboard and screen-reader users land on it and hear it;
+ *   - a real close button (44x44, aria-label) dismisses it and hands focus back
+ *     to the "Add to cart" button, or to the page's <h1> when there is none;
+ *   - no animation, so nothing to switch off for prefers-reduced-motion.
+ *
+ * Inline styles only (see CLAUDE.md — main.css may be stale-cached).
+ *
+ * Expects: $flash (array of ['type' => ..., 'message' => ...]).
+ */
+$flash = $flash ?? [];
+if (!$flash) return;
+$_pf_has_success = false;
+
+// Copy comes from content/{lang}/strings.json. A site that customised its
+// strings.json keeps its own copy through updates (the updater skips files the
+// owner changed), so it may not have these keys yet — fall back to the
+// defaults rather than printing the raw key.
+$_pf_t = static function (string $key, string $bg, string $en): string {
+    $v = t($key);
+    return $v !== $key ? $v : (get_lang() === 'en' ? $en : $bg);
+};
+?>
+<?php foreach ($flash as $f):
+    $_pf_success = ($f['type'] ?? '') === 'success';
+    if ($_pf_success) $_pf_has_success = true;
+?>
+  <div <?= $_pf_success ? 'role="status" aria-live="polite" tabindex="-1" data-cart-notice' : 'role="alert"' ?>
+       style="position:relative;padding:.9rem 1.25rem;border-radius:6px;margin-bottom:1.5rem;outline-offset:3px;
+       <?= $_pf_success ? 'background:#e6f4ea;border:1px solid #a8d5b0;color:#2d6a35;padding-right:3.25rem;' : 'background:#fdf0ef;border:1px solid #f0c4c0;color:#c0392b;' ?>">
+    <?php if ($_pf_success): ?>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+        <span style="font-weight:600;"><span aria-hidden="true">✓ </span><?= h($f['message']) ?></span>
+        <span style="display:flex;gap:.6rem;flex-wrap:wrap;">
+          <a href="/cart/" class="btn btn--outline"
+             style="display:inline-flex;align-items:center;min-height:44px;padding:.45rem 1.1rem;font-size:.9rem;">
+            <?= h($_pf_t('shop.added.view_cart', 'Виж количката', 'View cart')) ?>
+          </a>
+          <a href="/checkout/" class="btn btn--primary"
+             style="display:inline-flex;align-items:center;min-height:44px;padding:.45rem 1.1rem;font-size:.9rem;">
+            <?= h($_pf_t('shop.added.checkout', 'Завърши поръчката', 'Checkout now')) ?> <span aria-hidden="true">&nbsp;→</span>
+          </a>
+        </span>
+      </div>
+      <button type="button" data-cart-notice-close aria-label="<?= h($_pf_t('shop.added.dismiss', 'Затвори съобщението', 'Dismiss message')) ?>"
+              style="position:absolute;top:.25rem;right:.25rem;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:transparent;border:0;border-radius:6px;color:inherit;font-size:1.4rem;line-height:1;cursor:pointer;">
+        <span aria-hidden="true">×</span>
+      </button>
+    <?php else: ?>
+      <?= h($f['message']) ?>
+    <?php endif; ?>
+  </div>
+<?php endforeach; ?>
+<?php if ($_pf_has_success): ?>
+<script>
+(function () {
+  var notice = document.querySelector('[data-cart-notice]');
+  if (!notice) return;
+  try { notice.focus(); } catch (e) {}
+  var close = notice.querySelector('[data-cart-notice-close]');
+  if (!close) return;
+  close.addEventListener('click', function () {
+    var back = document.getElementById('addToCartBtn') || document.querySelector('h1');
+    notice.parentNode.removeChild(notice);
+    if (back) {
+      if (!back.hasAttribute('tabindex') && back.tagName === 'H1') back.setAttribute('tabindex', '-1');
+      back.focus();
+    }
+  });
+  notice.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') close.click();
+  });
+})();
+</script>
+<?php endif; ?>

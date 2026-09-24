@@ -138,12 +138,7 @@ if ($slug) {
       </a>
     </div>
 
-    <?php foreach ($flash as $f): ?>
-      <div style="padding:.9rem 1.25rem;border-radius:6px;margin-bottom:1.5rem;
-        <?= $f['type'] === 'success' ? 'background:#e6f4ea;border:1px solid #a8d5b0;color:#2d6a35;' : 'background:#fdf0ef;border:1px solid #f0c4c0;color:#c0392b;' ?>">
-        <?= h($f['message']) ?>
-      </div>
-    <?php endforeach; ?>
+    <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/product-flash.php'; ?>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:start;" class="product-detail-grid">
 
