@@ -28,7 +28,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     <p>Orders can be placed without registration. The User is obliged to provide accurate data. The Foundation may refuse an order in case of incomplete data, suspicion of abuse or technical impossibility.</p>
 
     <h2>V. Prices and payment methods</h2>
-    <p>All prices are in euros (EUR), excluding VAT. Payment by debit/credit card via V-POS. Visa and Mastercard debit, credit and business cards are accepted. Transactions are carried out through the MasterCard Identity Check and VISA Secure security programmes. We do not store bank card data. In case of return, the amount will be refunded to the card used for payment.</p>
+    <p>All prices are final, in euros (EUR). The Foundation is not registered for VAT and does not charge VAT. Payment by debit/credit card via V-POS. Visa and Mastercard debit, credit and business cards are accepted. Transactions are carried out through the MasterCard Identity Check and VISA Secure security programmes. We do not store bank card data. In case of return, the amount will be refunded to the card used for payment.</p>
 
     <h2>VI. Delivery</h2>
     <p>Via courier service to the User's address. Timeframes are indicative. Delivery costs are at the User's expense.</p>
