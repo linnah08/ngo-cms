@@ -79,25 +79,15 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 <?php endif; ?>
 
 <?php if ($apply_result !== null): ?>
-  <?php if ($apply_result['status'] === 'success'): ?>
+  <?php /* 'partial' is not a distinct outcome for the person reading this. Files
+           kept because they were customized for this site are the update working
+           as designed, and an admin cannot tell whether they needed what was in
+           a file they have never opened — asking them was asking for a guess.
+           So both outcomes say the same thing here. What did not change is
+           recorded in platform_updates.skipped_files for support to read. */ ?>
+  <?php if ($apply_result['status'] === 'success' || $apply_result['status'] === 'partial'): ?>
     <div class="admin-alert admin-alert--success" style="margin-bottom:1.5rem;">
       Обновяването завърши успешно. Сайтът вече е на версия <?= h($apply_result['to_version'] ?? '') ?>.
-    </div>
-  <?php elseif ($apply_result['status'] === 'partial'): ?>
-    <div class="admin-alert admin-alert--success" style="margin-bottom:1rem;">
-      Обновяването завърши успешно. Сайтът вече е на версия <?= h($apply_result['to_version'] ?? '') ?>.
-    </div>
-    <div class="admin-card" style="margin-bottom:1.5rem;border-color:#e0a800;background:#fff9e6;">
-      <h2 class="admin-card__title" style="margin-bottom:.5rem;">Някои файлове не бяха променени</h2>
-      <p class="admin-meta" style="margin-bottom:.75rem;">
-        Следните файлове са били персонализирани преди това, затова обновяването не ги е презаписало.
-        Ако имате нужда от промените, включени в новата версия, за тези конкретни файлове, свържете се с поддръжката.
-      </p>
-      <ul style="margin:0;padding-left:1.25rem;font-size:.85rem;color:var(--text-muted);">
-        <?php foreach (($apply_result['skipped'] ?? []) as $path): ?>
-          <li><code><?= h((string)$path) ?></code></li>
-        <?php endforeach; ?>
-      </ul>
     </div>
   <?php else: /* failed */ ?>
     <div class="admin-alert admin-alert--error" style="margin-bottom:1.5rem;">

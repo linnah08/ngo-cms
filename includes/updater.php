@@ -763,9 +763,19 @@ function updater_log_attempt(string $from, string $to, string $status, array $sk
         ]);
     } catch (\Throwable $e) {
         // Never let audit-logging failure mask the real update result; fall
-        // back to the plain error log.
+        // back to the plain error log. The skipped paths go in there too: the
+        // admin is told nothing about them on purpose, so this row is the only
+        // record of what an update left alone, and losing it because the
+        // database was unreachable would leave support with nothing to read.
         if (function_exists('_om_log')) {
-            _om_log('UPDATER', 'Failed to write platform_updates audit row: ' . $e->getMessage());
+            _om_log('UPDATER', sprintf(
+                'Failed to write platform_updates audit row (%s). Update %s -> %s: %s. Files left unchanged: %s',
+                $e->getMessage(),
+                $from,
+                $to,
+                $status,
+                $skipped ? implode(', ', array_values($skipped)) : 'none'
+            ));
         }
     }
 }
