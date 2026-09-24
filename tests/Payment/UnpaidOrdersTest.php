@@ -263,6 +263,66 @@ final class UnpaidOrdersTest extends TestCase
         $this->assertSame('admin-message', $this->sent[1]['template_key']);
     }
 
+    // ── "Имейл до клиента": the automatic payment-failed email, sent by hand ──
+
+    public function testPaymentFailedChoiceUsesTheAutomaticEmailsTextAndButton(): void
+    {
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_email_composer.php';
+        $o = ['type' => 'physical', 'status' => 'new', 'lang' => 'bg', 'payment_method' => 'iris', 'payment_status' => 'pending',
+              'order_number' => 'OM-20260919-B60E', 'customer_name' => 'Мария', 'total_eur' => '19.76',
+              'created_at' => '2026-09-19 08:09:00'];
+
+        $c = order_email_choices($o)[ORDER_EMAIL_PAYMENT_FAILED];
+        $auto = email_tpl_get('order-payment-failed-customer', 'bg', [
+            'customer_name' => 'Мария', 'order_number' => 'OM-20260919-B60E', 'amount_eur' => '19.76',
+            'cancel_date' => unpaid_cancel_deadline($o), 'cancel_days' => unpaid_cancel_days(),
+        ]);
+        $this->assertTrue($c['available']);
+        $this->assertSame($auto['subject'], $c['subject']);
+        $this->assertStringContainsString($auto['intro'], $c['body']);
+        $this->assertStringContainsString('/api/iris-payment-return.php?retry=1&amp;order=OM-20260919-B60E', $c['body']);
+        $this->assertStringContainsString('Опитай отново', $c['body']);
+        $this->assertStringNotContainsString('{{', $c['subject'] . $c['body']);
+        $this->assertTrue(order_email_asks_to_pay(ORDER_EMAIL_PAYMENT_FAILED));
+
+        $donation = order_email_choices(['type' => 'donation'] + $o)[ORDER_EMAIL_PAYMENT_FAILED];
+        $this->assertSame(email_tpl_get('donation-payment-failed-customer', 'bg', [])['subject'], $donation['subject'], 'Donation wording for a donation');
+
+        $this->assertFalse(order_email_choices(['payment_status' => 'paid'] + $o)[ORDER_EMAIL_PAYMENT_FAILED]['available']);
+        $this->assertFalse(order_email_choices(['stock_returned_at' => '2026-09-22 08:09:00'] + $o)[ORDER_EMAIL_PAYMENT_FAILED]['available']);
+        $this->assertArrayNotHasKey(ORDER_EMAIL_PAYMENT_FAILED, order_email_choices(['payment_method' => 'cod'] + $o));
+        $this->assertArrayNotHasKey(ORDER_EMAIL_PAYMENT_FAILED, order_email_choices(['type' => 'ticket'] + $o));
+        $this->assertArrayNotHasKey(ORDER_EMAIL_PAYMENT_FAILED, order_email_choices(['type' => 'pledge'] + $o));
+    }
+
+    public function testSendingPaymentFailedByHandCountsAsTheAutomaticEmail(): void
+    {
+        $this->requireDb();
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_email_composer.php';
+        $order = $this->insertOrder(5);
+
+        $r = order_email_send(self::$pdo, (int)$order['id'], $order, 'Плащането не беше завършено', '<p>Текст</p>', ORDER_EMAIL_PAYMENT_FAILED, $this->orderMailer());
+        $this->assertTrue($r['ok']);
+        $this->assertSame('payment-failed', $this->sent[0]['template_key']);
+        $this->assertSame('Плащането не е минало', order_email_kind_label('payment-failed'));
+
+        $fresh = $this->reload((int)$order['id']);
+        $this->assertNotNull($fresh['payment_failed_email_at']);
+        $this->assertTrue(order_is_unpaid($fresh, 5), 'Emailed about the payment = shown as unpaid');
+        $this->assertNotContains($order['order_number'], $this->dueNumbers('to_email'));
+        $this->assertFalse(send_payment_failed_email(self::$pdo, $fresh, $this->mailer()));
+    }
+
+    public function testUnpaidOnlineOrdersAreNotListedForShipping(): void
+    {
+        // Dashboard "За изпращане": a card / IRIS order is listed only once paid.
+        $src = (string)file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/admin/dashboard.php');
+        $this->assertStringContainsString(
+            "AND (payment_status = 'paid' OR COALESCE(payment_method, '') NOT IN ('card', 'iris'))",
+            $src
+        );
+    }
+
     public function testPaymentMethodLabelsAreReadable(): void
     {
         $this->assertSame('Карта (DSK Банк)', payment_method_label('card'));

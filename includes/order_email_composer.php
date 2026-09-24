@@ -18,6 +18,12 @@ require_once __DIR__ . '/payment/unpaid_orders.php';
 /** Picker value that only fills in a greeting, for a message written from scratch. */
 const ORDER_EMAIL_BLANK = 'blank';
 
+/**
+ * Picker value for the automatic "payment didn't go through" email, sent by hand:
+ * the same editable text (Имейл шаблони → Неуспешно плащане…) and "Опитай отново" button.
+ */
+const ORDER_EMAIL_PAYMENT_FAILED = 'payment-failed';
+
 /** Language the buyer gets their email in. */
 function order_email_lang(array $order): string
 {
@@ -66,6 +72,27 @@ function order_email_choices(array $order): array
             'subject'   => $t['subject'],
             'body'      => trim($t['intro'] . "\n" . ($button ? payment_retry_button_html($order) . "\n" : '') . $t['outro']),
         ];
+    }
+
+    // The automatic "payment didn't go through" email, for the orders the cron sends it for
+    // (shop orders and donations paid online) — donation wording for a donation.
+    if ($pays_online && in_array($type, UNPAID_ORDER_TYPES, true)) {
+        $label = 'Плащането не е минало (с бутон „Опитай отново“)';
+        if ($can_retry) {
+            $t = email_tpl_get(payment_failed_template_key($order), $lang, $vars + [
+                'cancel_date' => unpaid_cancel_deadline($order),
+                'cancel_days' => unpaid_cancel_days(),
+            ]);
+            $choices[ORDER_EMAIL_PAYMENT_FAILED] = [
+                'label'     => $label,
+                'available' => true,
+                'note'      => '',
+                'subject'   => $t['subject'],
+                'body'      => trim($t['intro'] . "\n" . payment_retry_button_html($order) . "\n" . $t['outro']),
+            ];
+        } else {
+            $choices[ORDER_EMAIL_PAYMENT_FAILED] = ['label' => $label] + $unpayable;
+        }
     }
 
     $choices[ORDER_EMAIL_BLANK] = [
@@ -140,5 +167,5 @@ function order_email_send(PDO $pdo, int $order_id, array $order, string $subject
 /** True for a picker choice that asks the buyer to pay (it carries the "Опитай отново" button). */
 function order_email_asks_to_pay(string $key): bool
 {
-    return !empty(admin_message_presets()[$key]['retry_button']);
+    return $key === ORDER_EMAIL_PAYMENT_FAILED || !empty(admin_message_presets()[$key]['retry_button']);
 }

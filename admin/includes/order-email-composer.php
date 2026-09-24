@@ -42,9 +42,7 @@ $oec_label = 'font-size:.875rem;font-weight:600;display:block;margin-bottom:.35r
       <select id="emailPreset" name="email_preset" aria-describedby="emailPresetHelp" style="<?= $oec_input ?>">
         <option value="">— Избери (по желание) —</option>
         <?php foreach ($oec_choices as $k => $c): ?>
-          <option value="<?= h($k) ?>" <?= $c['available'] ? '' : 'disabled' ?> <?= ($oec_draft['preset'] ?? '') === $k ? 'selected' : '' ?>>
-            <?= h($c['label']) ?><?= $c['available'] ? '' : ' — ' . h($c['note']) ?>
-          </option>
+          <option value="<?= h($k) ?>"<?= $c['available'] ? '' : ' disabled' ?><?= ($oec_draft['preset'] ?? '') === $k ? ' selected' : '' ?>><?= h($c['label']) ?><?= $c['available'] ? '' : ' — ' . h($c['note']) ?></option>
         <?php endforeach; ?>
       </select>
       <p id="emailPresetHelp" style="font-size:.75rem;color:var(--text-muted);margin:.3rem 0 0;">
