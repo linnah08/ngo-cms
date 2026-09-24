@@ -2,6 +2,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/unpaid_orders.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_view.php';
 $page_title_admin = 'Поръчки';
 $active_nav       = 'orders';
 
@@ -62,7 +63,10 @@ $filter_status = $_GET['status'] ?? 'all';
 
 $where  = ['1=1'];
 $params = [];
-if ($filter_type !== 'all') {
+if ($filter_type === 'donation') {
+    // Dedicated donation orders AND product orders with a donation add-on line.
+    $where[] = order_has_donation_sql();
+} elseif ($filter_type !== 'all') {
     $where[]  = 'type = ?';
     $params[] = $filter_type;
 }

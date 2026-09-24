@@ -3,6 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/articles.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_view.php';
 
 $page_title_admin = 'Начало';
 $active_nav       = 'dashboard';
@@ -83,14 +84,8 @@ if ($can_sign) {
 // ── Paid donations without a cert ────────────────────────────────────────────
 $uncerted_donations = [];
 if ($can_shop) {
-    $stmt = $pdo->query(
-        "SELECT o.id, o.order_number, o.customer_name, o.total_eur
-         FROM orders o
-         LEFT JOIN documents d ON d.order_id = o.id AND d.type = 'donation_cert'
-         WHERE o.type = 'donation' AND o.payment_status = 'paid' AND d.id IS NULL
-         ORDER BY o.created_at ASC"
-    );
-    $uncerted_donations = $stmt->fetchAll();
+    // Dedicated donation orders AND product orders with a donation add-on line.
+    $uncerted_donations = orders_paid_donations_without_cert($pdo);
 }
 
 // ── Physical orders awaiting shipping (new + confirmed, must have delivery_type) ──
@@ -387,7 +382,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
          onmouseover="this.style.background='var(--warm-grey)'" onmouseout="this.style.background='#fff'">
         <span style="width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--teal);"></span>
         <span style="font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= h($don['order_number']) ?></span>
-        <span style="color:var(--text-muted);font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:8rem;"><?= h($don['customer_name']) ?> · <?= format_eur((float)$don['total_eur']) ?></span>
+        <span style="color:var(--text-muted);font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:8rem;"><?= h($don['customer_name']) ?> · <?= format_eur((float)$don['donation_eur']) ?></span>
         <span style="font-size:.68rem;color:var(--teal);font-weight:600;flex-shrink:0;">Генерирай →</span>
       </a>
       <?php endforeach; ?>

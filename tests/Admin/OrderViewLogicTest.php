@@ -66,6 +66,21 @@ final class OrderViewLogicTest extends TestCase
         $this->assertFalse(order_has_donation('physical', [['type' => 'physical']]));
     }
 
+    // ── order_has_donation_sql ───────────────────────────────────────────────
+
+    public function testDonationSqlCoversAddOnLinesWithAlias(): void
+    {
+        $sql = order_has_donation_sql('o');
+        $this->assertStringContainsString("o.type = 'donation'", $sql);
+        $this->assertStringContainsString("JSON_SEARCH(o.items, 'one', 'donation', NULL, '$[*].type')", $sql);
+    }
+
+    public function testDonationSqlRejectsUnsafeAlias(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        order_has_donation_sql('o; DROP TABLE orders');
+    }
+
     // ── order_donation_amount ────────────────────────────────────────────────
 
     public function testDonationAmountFallsBackToOrderTotalWhenNoDonationItems(): void

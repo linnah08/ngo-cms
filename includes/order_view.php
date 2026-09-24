@@ -53,6 +53,45 @@ function donation_cert_email_key(bool $is_campaign_pledge): string {
 }
 
 /**
+ * SQL condition: the order carries a donation — either a dedicated donation
+ * order, or a product order with a donation add-on line (stored as
+ * {"type":"donation"} inside the items JSON). The SQL twin of
+ * order_has_donation(). Portable to MySQL and MariaDB.
+ *
+ * @param string $alias Table alias of `orders` in the query ('' for none).
+ */
+function order_has_donation_sql(string $alias = ''): string {
+    if ($alias !== '' && !preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $alias)) {
+        throw new InvalidArgumentException('Invalid table alias.');
+    }
+    $p = $alias === '' ? '' : $alias . '.';
+    return "({$p}type = 'donation' OR JSON_SEARCH({$p}items, 'one', 'donation', NULL, '\$[*].type') IS NOT NULL)";
+}
+
+/**
+ * Paid orders that carry a donation but have no donation certificate yet,
+ * oldest first. Each row gets `donation_eur`: the donation portion only (for a
+ * mixed order, not the whole order total) — the amount the certificate uses.
+ */
+function orders_paid_donations_without_cert(PDO $pdo): array {
+    $stmt = $pdo->query(
+        "SELECT o.id, o.order_number, o.customer_name, o.total_eur, o.items
+         FROM orders o
+         LEFT JOIN documents d ON d.order_id = o.id AND d.type = 'donation_cert'
+         WHERE " . order_has_donation_sql('o') . "
+           AND o.payment_status = 'paid' AND d.id IS NULL
+         ORDER BY o.created_at ASC, o.id ASC"
+    );
+    $rows = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $items = json_decode($row['items'] ?? '[]', true);
+        $row['donation_eur'] = order_donation_amount(is_array($items) ? $items : [], (float)$row['total_eur']);
+        $rows[] = $row;
+    }
+    return $rows;
+}
+
+/**
  * Human-readable placement spec for a printed design.
  *
  * Given the design placement ($pos: scale, x, y in 0..1 of the print area), the
