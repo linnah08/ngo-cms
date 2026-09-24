@@ -99,15 +99,33 @@ function hs_field(string $key, array $def, mixed $val, array $errors, string $nb
     return '';   // 'internal' fields are not shown
 }
 
+/**
+ * The grip that moves a row: drag it with the mouse or a finger, or focus it and press
+ * Space, move with ↑ ↓ and press Space again. The script in admin/home-sections.php drives it.
+ */
+function hs_sort_handle(string $aria, string $help_id): string {
+    return '<button type="button" class="btn btn--outline" data-hs-sort-handle aria-pressed="false"'
+         . ' aria-label="' . h($aria) . '" aria-describedby="' . h($help_id) . '"'
+         . ' style="min-height:44px;min-width:44px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;">'
+         . '<span aria-hidden="true" style="font-size:1.2rem;line-height:1;margin-right:.35rem;">⠿</span>Премести</button>';
+}
+
+/** How to use the grips, for the list of $what ("секциите", "картите"). */
+function hs_sort_help(string $id, string $what): string {
+    return '<p id="' . h($id) . '" style="margin:0 0 1rem;color:var(--text-muted);">'
+         . 'За да смените реда на ' . h($what) . ', хванете бутона „⠿ Премести“ и плъзнете. '
+         . 'С клавиатура: застанете на бутона, натиснете интервал, преместете със стрелките ↑ ↓ и натиснете интервал отново. '
+         . 'Esc отказва преместването.</p>';
+}
+
 function hs_card_row(string $i, array $card, array $errors, int $number): string {
-    $out = '<li data-hs-card style="border:1px solid var(--border);border-radius:8px;padding:1rem;">'
-         . '<fieldset style="border:0;padding:0;margin:0;min-width:0;"><legend data-hs-card-legend style="font-weight:600;margin-bottom:.75rem;">Карта ' . $number . '</legend>';
+    $out = '<li data-hs-card style="border:1px solid var(--border);border-radius:8px;padding:1rem;background:#fff;">'
+         . '<fieldset style="border:0;padding:0;margin:0;min-width:0;"><legend data-hs-card-legend style="font-weight:600;margin-bottom:.75rem;">Карта ' . $number . '</legend>'
+         . '<div style="margin:0 0 .75rem;">' . hs_sort_handle('Премести карта ' . $number, 'hsCardSortHelp') . '</div>';
     foreach (HOME_CARD_FIELDS as $k => $def) {
         $out .= hs_field($k, $def, $card[$k] ?? null, $errors, "f[cards][$i]", "f_cards_$i", "cards.$i.", "up_card[$i]");
     }
     return $out . '<div style="display:flex;gap:.5rem;flex-wrap:wrap;">'
-         . '<button type="button" class="btn btn--outline" style="min-height:44px;" data-hs-card-up>↑ Нагоре</button>'
-         . '<button type="button" class="btn btn--outline" style="min-height:44px;" data-hs-card-down>↓ Надолу</button>'
          . '<button type="button" class="btn btn--outline" style="min-height:44px;color:#b91c1c;border-color:#b91c1c;" data-hs-card-remove>Премахни картата</button>'
          . '</div></fieldset></li>';
 }
@@ -119,6 +137,7 @@ function hs_cards(array $cards, array $errors): string {
     $html = '<fieldset id="f_cards" tabindex="-1" style="border:0;padding:0;margin:0 0 1.5rem;min-width:0;"' . ($err ? ' aria-describedby="f_cards_err"' : '') . '>'
           . '<legend style="font-weight:600;font-size:1.05rem;margin-bottom:.5rem;">Карти (от 2 до 4)</legend>'
           . hs_error_html('f_cards_err', $err)
+          . hs_sort_help('hsCardSortHelp', 'картите')
           . '<ol data-hs-cards style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:1rem;">';
     foreach ($cards as $i => $card) $html .= hs_card_row((string) $i, $card, $errors, $i + 1);
     return $html . '</ol>'
@@ -151,7 +170,7 @@ function hs_error_summary(string $type, array $errors): string {
          . '<ul style="margin:0;padding-left:1.25rem;">' . $items . '</ul></div>';
 }
 
-function hs_action_form(string $action, array $s, int $rev, string $label, string $aria, bool $disabled = false, string $why = '', bool $danger = false): string {
+function hs_action_form(string $action, array $s, int $rev, string $label, string $aria, bool $danger = false): string {
     $id      = (string) $s['id'];
     $confirm = $action === 'delete'
         ? ' data-confirm="' . h('Да изтрия ли „' . home_section_name($s) . '“? Това не може да се върне.') . '" data-confirm-ok="Да, изтрий"'
@@ -162,7 +181,7 @@ function hs_action_form(string $action, array $s, int $rev, string $label, strin
          . '<input type="hidden" name="id" value="' . h($id) . '">'
          . '<input type="hidden" name="rev" value="' . $rev . '">'
          . '<button type="submit" id="' . h("btn-$action-$id") . '" class="btn btn--outline"'
-         . ' aria-label="' . h($disabled && $why !== '' ? "$aria ($why)" : $aria) . '"' . ($disabled ? ' disabled' : '')
-         . ' style="min-height:44px;min-width:44px;' . ($danger ? 'color:#b91c1c;border-color:#b91c1c;' : '') . ($disabled ? 'opacity:.5;cursor:not-allowed;' : '') . '">' . h($label) . '</button>'
+         . ' aria-label="' . h($aria) . '"'
+         . ' style="min-height:44px;min-width:44px;' . ($danger ? 'color:#b91c1c;border-color:#b91c1c;' : '') . '">' . h($label) . '</button>'
          . '</form>';
 }

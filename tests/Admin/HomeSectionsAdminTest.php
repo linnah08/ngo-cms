@@ -334,20 +334,47 @@ final class HomeSectionsAdminTest extends TestCase
     public function test_action_buttons_have_names_and_delete_asks_first(): void
     {
         $s = ['id' => 's_ab12', 'type' => 'cta', 'visible' => true, 'fields' => ['heading' => ['bg' => 'Помогнете', 'en' => '']]];
-        $up = hs_action_form('move_up', $s, 4, '↑ Нагоре', 'Премести „Помогнете“ нагоре', true, 'вече е най-горе');
-        $this->assertStringContainsString('aria-label="Премести „Помогнете“ нагоре (вече е най-горе)"', $up);
-        $this->assertStringContainsString(' disabled', $up);
-        $this->assertStringContainsString('name="rev" value="4"', $up);
-        $this->assertStringContainsString('name="csrf_token"', $up);
-        $del = hs_action_form('delete', $s, 4, 'Изтрий', 'Изтрий „Помогнете“');
+        $hide = hs_action_form('toggle', $s, 4, 'Скрий', 'Скрий „Помогнете“');
+        $this->assertStringContainsString('aria-label="Скрий „Помогнете“"', $hide);
+        $this->assertStringContainsString('name="rev" value="4"', $hide);
+        $this->assertStringContainsString('name="csrf_token"', $hide);
+        $del = hs_action_form('delete', $s, 4, 'Изтрий', 'Изтрий „Помогнете“', true);
         $this->assertStringContainsString('data-confirm="Да изтрия ли „Помогнете“? Това не може да се върне."', $del);
+        $this->assertStringContainsString('color:#b91c1c;', $del);
     }
 
-    public function test_disabled_move_buttons_look_disabled(): void
+    public function test_sort_handle_is_a_named_keyboard_button_with_instructions(): void
     {
-        $s = ['id' => 's_ab12', 'type' => 'cta', 'visible' => true, 'fields' => []];
-        $this->assertStringContainsString('opacity:.5;cursor:not-allowed;', hs_action_form('move_up', $s, 1, '↑', 'Нагоре', true, 'вече е най-горе'));
-        $this->assertStringNotContainsString('opacity:.5', hs_action_form('move_down', $s, 1, '↓', 'Надолу'));
+        $g = hs_sort_handle('Премести „Помогнете“ (място 2 от 5)', 'hsSortHelp');
+        $this->assertStringStartsWith('<button type="button"', $g);
+        $this->assertStringContainsString('aria-label="Премести „Помогнете“ (място 2 от 5)"', $g);
+        $this->assertStringContainsString('aria-describedby="hsSortHelp"', $g);
+        $this->assertStringContainsString('aria-pressed="false"', $g);
+        $this->assertStringContainsString('touch-action:none', $g, 'a finger drag must move the row, not scroll the page');
+        $this->assertStringContainsString('min-height:44px', $g);
+        $this->assertStringContainsString('>Премести</button>', $g, 'visible text is part of the accessible name');
+        $help = hs_sort_help('hsSortHelp', 'секциите');
+        $this->assertStringContainsString('id="hsSortHelp"', $help);
+        $this->assertStringContainsString('интервал', $help);
+    }
+
+    public function test_cards_move_by_handle_not_arrows(): void
+    {
+        $html = hs_cards([], []);
+        $this->assertStringContainsString('data-hs-sort-handle', $html);
+        $this->assertStringContainsString('id="hsCardSortHelp"', $html);
+        $this->assertStringNotContainsString('data-hs-card-up', $html);
+        $this->assertStringNotContainsString('data-hs-card-down', $html);
+    }
+
+    public function test_reorder_endpoint_checks_csrf_and_the_revision(): void
+    {
+        $src = $this->src();
+        $csrf    = strpos($src, 'csrf_verify()');
+        $reorder = strpos($src, "\$action === 'reorder'");
+        $this->assertNotFalse($reorder);
+        $this->assertLessThan($reorder, $csrf, 'CSRF is checked before the reorder branch');
+        $this->assertMatchesRegularExpression('/home_apply_reorder\(.*?home_save\(\$r\[\'doc\'\], \$post_rev\)/s', $src);
     }
 
     public function test_request_values_of_the_wrong_type_are_treated_as_missing(): void

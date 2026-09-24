@@ -25,6 +25,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $post_rev = is_string($_POST['rev'] ?? null) && preg_match('/^\d{1,9}$/', $_POST['rev']) ? (int) $_POST['rev'] : -1;
     $post_id  = $post_str('id');
 
+    if ($action === 'reorder') {   // sent by the drag handles, answers in JSON
+        header('Content-Type: application/json; charset=UTF-8');
+        $order = is_array($_POST['order'] ?? null) ? $_POST['order'] : [];
+        $r = home_apply_reorder($doc, $order, $post_id);
+        $new_rev = $post_rev;
+        if ($r['ok']) {
+            $saved = home_save($r['doc'], $post_rev);
+            if ($saved['ok']) $new_rev = (int) $saved['doc']['rev'];
+            else $r = ['ok' => false, 'message' => home_save_error_message($saved['error'])];
+        }
+        echo json_encode(['ok' => $r['ok'], 'message' => $r['message'], 'rev' => $new_rev], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     if (in_array($action, HOME_ACTIONS, true)) {
         $r = home_apply_action($doc, $action, $post_id);
         if ($r['ok']) {
@@ -147,7 +160,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       <a href="/admin/home-sections.php?add=" class="btn btn--primary" style="min-height:44px;">+ Добави секция</a>
     </div>
   </div>
-  <p style="margin:0 0 1.5rem;">Секциите се показват на сайта в този ред, отгоре надолу, на български и на английски.</p>
+  <p style="margin:0 0 .5rem;">Секциите се показват на сайта в този ред, отгоре надолу, на български и на английски.</p>
+  <?= hs_sort_help('hsSortHelp', 'секциите') ?>
+  <div id="hsSortMsg" hidden style="border:2px solid #15803d;background:#f0fdf4;color:#14532d;border-radius:8px;padding:.85rem 1.1rem;margin-bottom:1.25rem;font-weight:600;"></div>
   <?php if ($loaded['corrupt']): ?>
     <div role="alert" style="border:2px solid #b45309;background:#fffbeb;color:#78350f;border-radius:8px;padding:.85rem 1.1rem;margin-bottom:1.25rem;">
       <strong><span aria-hidden="true">⚠ </span>Файлът с подредбата на началната страница е повреден.</strong>
@@ -155,11 +170,12 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       (повреденият файл се пази като резервно копие на сървъра).
     </div>
   <?php endif; ?>
-  <ol id="list" style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.75rem;">
+  <ol id="list" data-rev="<?= (int) $rev ?>" data-csrf="<?= h(csrf_token()) ?>" style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.75rem;">
     <?php $n = count($doc['sections']); foreach ($doc['sections'] as $i => $s):
       $t = $types[$s['type']] ?? null; if ($t === null) continue;
       $name = home_section_name($s); $vis = !empty($s['visible']); ?>
-    <li id="row-<?= h($s['id']) ?>" style="border:1px solid var(--border);border-radius:8px;padding:1rem;display:flex;flex-wrap:wrap;gap:1rem;align-items:center;justify-content:space-between;background:<?= $vis ? '#fff' : '#f3f4f6' ?>;">
+    <li id="row-<?= h($s['id']) ?>" data-id="<?= h($s['id']) ?>" data-name="<?= h($name) ?>" style="border:1px solid var(--border);border-radius:8px;padding:1rem;display:flex;flex-wrap:wrap;gap:1rem;align-items:center;justify-content:space-between;background:<?= $vis ? '#fff' : '#f3f4f6' ?>;">
+      <?= hs_sort_handle("Премести „{$name}“ (място " . ($i + 1) . " от {$n})", 'hsSortHelp') ?>
       <div style="flex:1;min-width:220px;">
         <h2 id="h-<?= h($s['id']) ?>" tabindex="-1" style="font-size:1.05rem;margin:0;"><span aria-hidden="true"><?= $t['icon'] ?> </span><?= h($t['label']) ?></h2>
         <p style="margin:.25rem 0 0;color:var(--text-muted);"><?= h(home_section_preview($s)) ?></p>
@@ -169,13 +185,11 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <?php endif; ?>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:.5rem;">
-        <?= hs_action_form('move_up', $s, $rev, '↑ Нагоре', "Премести „{$name}“ нагоре", $i === 0, 'вече е най-горе') ?>
-        <?= hs_action_form('move_down', $s, $rev, '↓ Надолу', "Премести „{$name}“ надолу", $i === $n - 1, 'вече е най-долу') ?>
         <a id="btn-edit-<?= h($s['id']) ?>" href="/admin/home-sections.php?edit=<?= h(rawurlencode($s['id'])) ?>" class="btn btn--outline" style="min-height:44px;" aria-label="<?= h("Редактирай „{$name}“") ?>">Редактирай</a>
         <?= hs_action_form('toggle', $s, $rev, $vis ? 'Скрий' : 'Покажи', ($vis ? 'Скрий' : 'Покажи') . " „{$name}“") ?>
         <?php if (!$t['builtin']): ?>
           <?= hs_action_form('duplicate', $s, $rev, 'Дублирай', "Дублирай „{$name}“") ?>
-          <?= hs_action_form('delete', $s, $rev, 'Изтрий', "Изтрий „{$name}“", false, '', true) ?>
+          <?= hs_action_form('delete', $s, $rev, 'Изтрий', "Изтрий „{$name}“", true) ?>
         <?php endif; ?>
       </div>
     </li>
@@ -226,7 +240,163 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     img.style.display = 'block';
   });
 
-  // Cards: add, remove, reorder (2 to 4).
+  // Drag-to-reorder. The grip ([data-hs-sort-handle]) works three ways: drag it with a
+  // mouse or a finger; or focus it, press Space/Enter, move with ↑ ↓ and press Space/Enter
+  // again (Esc puts the row back). o.label(row, pos, total) names each grip,
+  // o.done(row, before) runs after a move that changed the order.
+  function sortable(list, o) {
+    function items() { return Array.prototype.filter.call(list.children, function (el) { return el.matches(o.item); }); }
+    function grip(row) { return row.querySelector('[data-hs-sort-handle]'); }
+    function relabel() {
+      var r = items();
+      r.forEach(function (row, i) { grip(row).setAttribute('aria-label', o.label(row, i + 1, r.length)); });
+    }
+    function lift(row, on) {
+      row.style.outline = on ? '3px dashed #0f766e' : '';
+      row.style.outlineOffset = on ? '2px' : '';
+      row.style.boxShadow = on ? '0 6px 18px rgba(0,0,0,.18)' : '';
+      grip(row).style.cursor = on ? 'grabbing' : 'grab';
+    }
+    function restore(before) { before.forEach(function (row) { list.appendChild(row); }); relabel(); }
+    function changed(before) { return items().some(function (row, i) { return row !== before[i]; }); }
+    function where(row) { var r = items(); return 'Място ' + (r.indexOf(row) + 1) + ' от ' + r.length + '.'; }
+
+    // Keyboard. Rows around the held one are moved, not the held one itself, so focus stays put.
+    var held = null, heldBefore = null;
+    function pick(row) {
+      held = row; heldBefore = items();
+      grip(row).setAttribute('aria-pressed', 'true'); lift(row, true);
+      announce(o.name(row) + ' — хваната. ' + where(row) + ' Преместете със стрелките, пуснете с интервал.');
+    }
+    function release(cancel) {
+      if (!held) return;
+      var row = held, before = heldBefore;
+      held = heldBefore = null;
+      grip(row).setAttribute('aria-pressed', 'false'); lift(row, false);
+      if (cancel) { restore(before); announce('Преместването е отказано.'); return; }
+      relabel();
+      if (changed(before)) o.done(row, before); else announce('Редът не е променен.');
+    }
+    list.addEventListener('keydown', function (e) {
+      var g = e.target.closest('[data-hs-sort-handle]');
+      if (!g || !list.contains(g)) return;
+      var row = g.closest(o.item);
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        if (held === row) release(false); else { release(false); pick(row); }
+      } else if (held === row && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        e.preventDefault();
+        var prev = row.previousElementSibling, next = row.nextElementSibling;
+        if (e.key === 'ArrowUp' && prev) list.insertBefore(prev, row.nextElementSibling);
+        else if (e.key === 'ArrowDown' && next) list.insertBefore(next, row);
+        else { announce(where(row) + (e.key === 'ArrowUp' ? ' Вече е най-горе.' : ' Вече е най-долу.')); return; }
+        relabel();
+        announce(where(row));
+      } else if (held === row && e.key === 'Escape') {
+        e.preventDefault();
+        release(true);
+      }
+    });
+    list.addEventListener('focusout', function (e) {
+      if (held && e.target === grip(held)) release(false);
+    });
+
+    // Mouse and touch: the row follows the pointer through the list. Moves and the release
+    // are heard on the whole document — moving the row in the page can drop pointer capture.
+    var drag = null;
+    list.addEventListener('pointerdown', function (e) {
+      var g = e.target.closest('[data-hs-sort-handle]');
+      if (!g || !list.contains(g) || e.button !== 0) return;
+      release(false);
+      e.preventDefault();
+      g.focus();
+      g.setPointerCapture(e.pointerId);
+      drag = { row: g.closest(o.item), id: e.pointerId, y: e.clientY, before: items(), moving: false };
+    });
+    document.addEventListener('pointermove', function (e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      if (!drag.moving) {
+        if (Math.abs(e.clientY - drag.y) < 5) return;
+        drag.moving = true; lift(drag.row, true);
+      }
+      // Drop before the first other row whose middle is below the pointer.
+      var ref = null;
+      items().some(function (row) {
+        if (row === drag.row) return false;
+        var b = row.getBoundingClientRect();
+        if (e.clientY < b.top + b.height / 2) { ref = row; return true; }
+        return false;
+      });
+      if (ref !== drag.row.nextElementSibling && ref !== drag.row) {
+        if (ref) list.insertBefore(drag.row, ref); else list.appendChild(drag.row);
+      }
+      // Near the top or bottom of the window, scroll so rows out of view can be reached.
+      var edge = 60;
+      if (e.clientY < edge) window.scrollBy(0, -12);
+      else if (e.clientY > window.innerHeight - edge) window.scrollBy(0, 12);
+    });
+    function end(e, cancel) {
+      if (!drag || e.pointerId !== drag.id) return;
+      var d = drag; drag = null;
+      if (!d.moving) return;
+      lift(d.row, false);
+      var g = grip(d.row);
+      if (g.hasPointerCapture && g.hasPointerCapture(e.pointerId)) g.releasePointerCapture(e.pointerId);
+      g.focus();
+      if (cancel) { restore(d.before); return; }
+      relabel();
+      if (changed(d.before)) o.done(d.row, d.before);
+    }
+    document.addEventListener('pointerup', function (e) { end(e, false); });
+    document.addEventListener('pointercancel', function (e) { end(e, true); });
+
+    relabel();
+    return { restore: restore, relabel: relabel };
+  }
+
+  // The section list: every drop is saved straight away.
+  var sections = document.getElementById('list');
+  if (sections) {
+    var msg = document.getElementById('hsSortMsg'), saving = false;
+    function showMsg(text, ok) {
+      msg.hidden = false;
+      msg.textContent = (ok ? '✓ ' : '⚠ ') + text;
+      msg.setAttribute('role', ok ? 'status' : 'alert');
+      msg.style.borderColor = ok ? '#15803d' : '#b91c1c';
+      msg.style.background  = ok ? '#f0fdf4' : '#fef2f2';
+      msg.style.color       = ok ? '#14532d' : '#7f1d1d';
+      if (flash) flash.hidden = true;
+    }
+    var list_ = sortable(sections, {
+      item: 'li[data-id]',
+      name: function (row) { return '\u201E' + row.dataset.name + '\u201C'; },
+      label: function (row, pos, total) { return 'Премести \u201E' + row.dataset.name + '\u201C (място ' + pos + ' от ' + total + ')'; },
+      done: function (row, before) {
+        if (saving) { list_.restore(before); showMsg('Предишното преместване още се запазва. Опитайте отново след секунда.', false); return; }
+        saving = true;
+        var body = new FormData();
+        body.append('csrf_token', sections.dataset.csrf);
+        body.append('action', 'reorder');
+        body.append('rev', sections.dataset.rev);
+        body.append('id', row.dataset.id);
+        Array.prototype.forEach.call(sections.querySelectorAll('li[data-id]'), function (li) { body.append('order[]', li.dataset.id); });
+        var fail = 'Новият ред не можа да се запази. Презаредете страницата и опитайте отново.';
+        function failed(text) { list_.restore(before); showMsg(text || fail, false); }
+        fetch('/admin/home-sections.php', { method: 'POST', body: body, credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+          .then(function (r) { return r.json().catch(function () { return null; }); })   // e.g. a login page after the session ran out
+          .then(function (d) {
+            if (!d || !d.ok) { failed(d && d.message); return; }
+            // Every other button on the page must now send the new revision.
+            sections.dataset.rev = String(d.rev);
+            Array.prototype.forEach.call(sections.querySelectorAll('input[name="rev"]'), function (i) { i.value = String(d.rev); });
+            showMsg(d.message, true);
+          }, function () { failed('Няма връзка със сървъра. Проверете интернета и опитайте отново.'); })
+          .then(function () { saving = false; });
+      }
+    });
+  }
+
+  // Cards: add, remove, reorder (2 to 4). The order is saved with the form.
   var list = document.querySelector('[data-hs-cards]');
   if (list) {
     var tpl = document.getElementById('hsCardTpl'), add = document.querySelector('[data-hs-card-add]'), next = 100;
@@ -234,40 +404,31 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     function renumber() {
       var r = rows();
       r.forEach(function (row, i) {
-        var n = i + 1;
+        var n = i + 1, rm = row.querySelector('[data-hs-card-remove]');
         row.querySelector('[data-hs-card-legend]').textContent = 'Карта ' + n;
-        var up = row.querySelector('[data-hs-card-up]'), down = row.querySelector('[data-hs-card-down]'), rm = row.querySelector('[data-hs-card-remove]');
-        up.setAttribute('aria-label', 'Премести карта ' + n + ' нагоре');
-        down.setAttribute('aria-label', 'Премести карта ' + n + ' надолу');
         rm.setAttribute('aria-label', 'Премахни карта ' + n);
-        up.disabled = i === 0;
-        down.disabled = i === r.length - 1;
         rm.disabled = r.length <= 2;
       });
       add.disabled = r.length >= 4;
     }
+    var cards = sortable(list, {
+      item: '[data-hs-card]',
+      name: function (row) { return row.querySelector('[data-hs-card-legend]').textContent; },
+      label: function (row, pos) { return 'Премести карта ' + pos; },
+      done: function (row) { renumber(); announce('Картата е на място ' + (Array.prototype.indexOf.call(rows(), row) + 1) + '. Редът се запазва с бутона „Запази“.'); }
+    });
     list.addEventListener('click', function (e) {
       var row = e.target.closest('[data-hs-card]');
-      if (!row) return;
-      if (e.target.closest('[data-hs-card-up]') && row.previousElementSibling) {
-        list.insertBefore(row, row.previousElementSibling); renumber();
-        (row.querySelector('[data-hs-card-up]:not(:disabled)') || row.querySelector('[data-hs-card-down]')).focus();
-        announce('Картата е преместена нагоре.');
-      } else if (e.target.closest('[data-hs-card-down]') && row.nextElementSibling) {
-        list.insertBefore(row.nextElementSibling, row); renumber();
-        (row.querySelector('[data-hs-card-down]:not(:disabled)') || row.querySelector('[data-hs-card-up]')).focus();
-        announce('Картата е преместена надолу.');
-      } else if (e.target.closest('[data-hs-card-remove]') && rows().length > 2) {
-        var to = row.nextElementSibling || row.previousElementSibling;
-        row.remove(); renumber();
-        to.querySelector('input[type=text]').focus();
-        announce('Картата е премахната.');
-      }
+      if (!row || !e.target.closest('[data-hs-card-remove]') || rows().length <= 2) return;
+      var to = row.nextElementSibling || row.previousElementSibling;
+      row.remove(); renumber(); cards.relabel();
+      to.querySelector('input[type=text]').focus();
+      announce('Картата е премахната.');
     });
     add.addEventListener('click', function () {
       if (rows().length >= 4) return;
       list.insertAdjacentHTML('beforeend', tpl.innerHTML.split('__I__').join(String(next++)));
-      renumber();
+      renumber(); cards.relabel();
       list.lastElementChild.querySelector('input[name$="[title][bg]"]').focus();
       announce('Добавена е нова карта.');
     });

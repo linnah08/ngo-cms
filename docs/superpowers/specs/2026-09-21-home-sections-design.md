@@ -118,14 +118,21 @@ section's edit view).
 
 ### List view
 
-- One row per section in order: type icon + name, short preview, status text
-  "Видима / Скрита" (text, not colour alone), buttons ↑ Нагоре, ↓ Надолу, Редактирай,
-  Скрий/Покажи, and for blocks only Дублирай, Изтрий.
-- Each button is its own small POST form (`action=move_up|move_down|toggle|duplicate|delete`,
-  `id`, `rev`). Post-redirect-get back to the list with `#row-<id>`; the status region
-  (`role="status"`) announces the result, e.g. „Мисия" е преместена нагоре; focus returns to
-  the same control on that row.
-- ↑ disabled on first row, ↓ on last, with visually-hidden reason.
+- One row per section in order: "⠿ Премести" grip, type icon + name, short preview, status text
+  "Видима / Скрита" (text, not colour alone), buttons Редактирай, Скрий/Покажи, and for blocks
+  only Дублирай, Изтрий.
+- Reorder by dragging the grip (mouse or finger — pointer events, `touch-action:none` on the
+  grip), or from the keyboard: focus the grip, Space/Enter picks the row up (`aria-pressed`),
+  ↑/↓ move it, Space/Enter drops, Esc puts it back. Instructions sit above the list and are
+  the grip's `aria-describedby`; each move is announced („Място 3 от 7.“).
+- A drop is saved straight away by `fetch` (`action=reorder`, `order[]` = every section id,
+  `id` = the moved one, `rev`, `csrf_token`) and answered in JSON with the new `rev`, which is
+  written into every other form on the page. `home_apply_reorder()` refuses any order that is
+  not exactly the current sections. On a failure (conflict, bad order, session gone, offline)
+  the list snaps back and a persistent `role="alert"` box says what to do.
+- Toggle / duplicate / delete are each a small POST form (`action=toggle|duplicate|delete`,
+  `id`, `rev`). Post-redirect-get back to the list; the status region (`role="status"`)
+  announces the result and focus returns to the same control on that row.
 - Delete uses `_adminConfirm`.
 - "+ Добави секция" → type picker: five labelled buttons with one-line descriptions.
 - "Виж началната страница" opens `/` in a new tab.
@@ -139,7 +146,8 @@ section's edit view).
   `tests/Admin/TranslateButtonCoverageTest.php`, including dynamically added card rows).
   Image fields with upload + cropper (`data-om-crop`) + "Избери от библиотека",
   rich text via TinyMCE using `window._tinyBase` only.
-- Cards: add/remove card (2–4) and ↑/↓ within the form; new card rows get unique ids and
+- Cards: add/remove card (2–4) and reorder with the same grip (drag or keyboard) within the
+  form — the order is saved with the form; new card rows get unique ids and
   `tinymce.init` if they contain rich text.
 - Video: on a valid pasted URL, show a preview thumbnail client-side from the stored/fetched
   one after save; invalid URL → persistent field error.

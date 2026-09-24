@@ -548,7 +548,7 @@ function home_save_error_message(?string $error): string {
 
 // ── List actions ─────────────────────────────────────────────────────────────
 
-const HOME_ACTIONS = ['move_up', 'move_down', 'toggle', 'duplicate', 'delete'];
+const HOME_ACTIONS = ['toggle', 'duplicate', 'delete'];
 
 function home_find(array $doc, string $id): ?int {
     foreach ($doc['sections'] as $i => $s) {
@@ -593,19 +593,8 @@ function home_apply_action(array $doc, string $action, string $id): array {
     $s    = $doc['sections'][$i];
     $name = home_section_name($s);
     $list = $doc['sections'];
-    $last = count($list) - 1;
 
     switch ($action) {
-        case 'move_up':
-            if ($i === 0) return $fail("\u{201E}{$name}\u{201C} вече е най-горе.");
-            [$list[$i - 1], $list[$i]] = [$list[$i], $list[$i - 1]];
-            $msg = "\u{201E}{$name}\u{201C} е преместена нагоре.";
-            break;
-        case 'move_down':
-            if ($i === $last) return $fail("\u{201E}{$name}\u{201C} вече е най-долу.");
-            [$list[$i + 1], $list[$i]] = [$list[$i], $list[$i + 1]];
-            $msg = "\u{201E}{$name}\u{201C} е преместена надолу.";
-            break;
         case 'toggle':
             $list[$i]['visible'] = empty($s['visible']);
             $msg = $list[$i]['visible'] ? "\u{201E}{$name}\u{201C} вече се показва на сайта." : "\u{201E}{$name}\u{201C} е скрита от сайта.";
@@ -627,6 +616,32 @@ function home_apply_action(array $doc, string $action, string $id): array {
     }
     $doc['sections'] = $list;
     return ['ok' => true, 'doc' => $doc, 'message' => $msg, 'focus' => $id];
+}
+
+/**
+ * Put the sections in the order the admin dragged them into. $order must name every
+ * current section exactly once — anything else means the list on screen is out of date.
+ * $moved is the section that was dragged, used only for the message.
+ * @return array{ok: bool, doc: array, message: string, focus: ?string}
+ */
+function home_apply_reorder(array $doc, array $order, string $moved): array {
+    $order   = array_values($order);
+    $current = array_column($doc['sections'], 'id');
+    $valid   = count($order) === count($current)
+            && array_filter($order, 'is_string') === $order
+            && count(array_unique($order)) === count($order)
+            && !array_diff($order, $current);
+    if (!$valid) {
+        return ['ok' => false, 'doc' => $doc, 'focus' => null,
+                'message' => 'Списъкът със секции на екрана не е актуален. Презаредете страницата и опитайте отново.'];
+    }
+    $by_id = array_column($doc['sections'], null, 'id');
+    $doc['sections'] = array_map(fn($id) => $by_id[$id], $order);
+    $pos = array_search($moved, $order, true);
+    $msg = $pos === false
+        ? 'Новият ред на секциите е запазен.'
+        : "\u{201E}" . home_section_name($by_id[$moved]) . "\u{201C} е преместена на място " . ($pos + 1) . ' от ' . count($order) . '.';
+    return ['ok' => true, 'doc' => $doc, 'message' => $msg, 'focus' => $pos === false ? null : $moved];
 }
 
 function home_upsert(array $doc, array $section): array {

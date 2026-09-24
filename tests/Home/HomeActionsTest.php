@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 require_once dirname(__DIR__, 2) . '/includes/home.php';
@@ -18,20 +19,47 @@ final class HomeActionsTest extends TestCase
 
     private function ids(array $doc): array { return array_column($doc['sections'], 'id'); }
 
-    public function test_move_up_and_down(): void
+    public function test_reorder_puts_sections_in_the_given_order(): void
     {
-        $r = home_apply_action($this->doc(), 'move_up', 's_ab12');
+        $r = home_apply_reorder($this->doc(), ['s_cd34', 's_hero', 's_ab12'], 's_cd34');
         $this->assertTrue($r['ok']);
-        $this->assertSame(['s_ab12', 's_hero', 's_cd34'], $this->ids($r['doc']));
-        $this->assertSame("\u{201E}Помогнете\u{201C} е преместена нагоре.", $r['message']);
-        $r = home_apply_action($this->doc(), 'move_down', 's_ab12');
-        $this->assertSame(['s_hero', 's_cd34', 's_ab12'], $this->ids($r['doc']));
+        $this->assertSame(['s_cd34', 's_hero', 's_ab12'], $this->ids($r['doc']));
+        $this->assertFalse($r['doc']['sections'][0]['visible'], 'sections move whole, fields and all');
+        $this->assertSame("\u{201E}Видео\u{201C} е преместена на място 1 от 3.", $r['message']);
+        $this->assertSame('s_cd34', $r['focus']);
     }
 
-    public function test_cannot_move_past_the_ends(): void
+    public function test_reorder_without_a_known_moved_section_still_says_what_happened(): void
     {
-        $this->assertFalse(home_apply_action($this->doc(), 'move_up', 's_hero')['ok']);
-        $this->assertFalse(home_apply_action($this->doc(), 'move_down', 's_cd34')['ok']);
+        $r = home_apply_reorder($this->doc(), ['s_ab12', 's_hero', 's_cd34'], '');
+        $this->assertTrue($r['ok']);
+        $this->assertSame('Новият ред на секциите е запазен.', $r['message']);
+    }
+
+    /** @return iterable<string, array{0: array}> */
+    public static function badOrders(): iterable
+    {
+        yield 'missing one'    => [['s_hero', 's_ab12']];
+        yield 'an extra id'    => [['s_hero', 's_ab12', 's_cd34', 's_zz99']];
+        yield 'a duplicate'    => [['s_hero', 's_ab12', 's_ab12']];
+        yield 'an unknown id'  => [['s_hero', 's_ab12', 's_nope']];
+        yield 'not a string'   => [['s_hero', 's_ab12', ['s_cd34']]];
+        yield 'empty'          => [[]];
+    }
+
+    #[DataProvider('badOrders')]
+    public function test_reorder_refuses_an_order_that_is_not_exactly_the_current_sections(array $order): void
+    {
+        $r = home_apply_reorder($this->doc(), $order, 's_hero');
+        $this->assertFalse($r['ok']);
+        $this->assertSame($this->ids($this->doc()), $this->ids($r['doc']));
+        $this->assertStringContainsString('Презаредете страницата', $r['message']);
+    }
+
+    public function test_arrow_moves_are_gone(): void
+    {
+        $this->assertNotContains('move_up', HOME_ACTIONS);
+        $this->assertNotContains('move_down', HOME_ACTIONS);
     }
 
     public function test_toggle_flips_visibility_with_a_clear_message(): void
