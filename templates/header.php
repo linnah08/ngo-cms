@@ -16,6 +16,8 @@ $_path_map_bg_to_en = [
     '/kak-da-pomogna'            => '/en/how-to-help',
     '/kontakti'                  => '/en/contacts',
     '/magazin'                   => '/en/shop',
+    '/cart'                      => '/en/cart',
+    '/checkout'                  => '/en/checkout',
     '/campaign'                  => '/en/campaign',
     '/politika-za-poveritelnost' => '/en/privacy-policy',
     '/politika-za-biskvitki'     => '/en/cookie-policy',
@@ -71,8 +73,15 @@ $_menus    = load_json(CONTENT_PATH . '/menus.json');
 $nav       = $_menus['header'][$lang] ?? [];
 $_nav_bg   = $_menus['header']['bg'] ?? [];
 $_nav_en   = $_menus['header']['en'] ?? [];
-$shop_url  = $lang === 'bg' ? '/magazin/' : '/en/shop/';
+$shop_url  = shop_path('shop', $lang);
 $cart_n    = cart_count();
+// The icon-only cart link says what it is and how many items are in it —
+// its aria-label replaces the visible count for screen readers.
+$cart_label = match (true) {
+    $cart_n === 1 => t_or('nav.cart_one', 'Количка, 1 артикул', 'Cart, 1 item', $lang),
+    $cart_n > 1   => t_or('nav.cart_count', 'Количка, {n} артикула', 'Cart, {n} items', $lang, ['n' => $cart_n]),
+    default       => t_or('nav.cart', 'Количка', 'Cart', $lang),
+};
 
 // Language switcher target URLs (shared by the in-nav and mobile switchers)
 $bg_href = $lang === 'bg' ? $current_path : _switch_lang($current_path, 'en');
@@ -285,7 +294,7 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
             <a href="<?= $shop_url ?>"><?= t('nav.shop') ?></a>
           </li>
           <li>
-            <a href="/cart/" class="cart-link" aria-label="Количка">
+            <a href="<?= h(shop_path('cart', $lang)) ?>" class="cart-link" aria-label="<?= h($cart_label) ?>">
               <span class="cart-link__icon" aria-hidden="true">🛒</span>
               <?php if ($cart_n > 0): ?>
                 <span class="cart-link__count"><?= $cart_n ?></span>

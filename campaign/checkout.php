@@ -146,7 +146,7 @@ if (!$is_ticket && $reward_id > 0) {
     // Reward pledges use the standard shop checkout from step 1 so the
     // mandatory phone (and contact details) are collected the same way as
     // any order — step 2 then persists them onto the pledge.
-    header('Location: /checkout/?step=1');
+    header('Location: ' . shop_path('checkout', $pledge_lang) . '?step=1');
     exit;
 }
 

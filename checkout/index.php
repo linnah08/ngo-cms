@@ -13,7 +13,7 @@ $pdo  = get_pdo();
 $cart = $_SESSION['cart'] ?? [];
 $_is_pledge_mode = !empty($_SESSION['checkout_data']['_pledge_number']);
 if (empty($cart) && !$_is_pledge_mode) {
-    header('Location: /cart/');
+    header('Location: ' . shop_path('cart'));
     exit;
 }
 
@@ -95,15 +95,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $name  = trim($_POST['customer_name']  ?? '');
         $email = trim($_POST['customer_email'] ?? '');
         $phone = trim($_POST['customer_phone'] ?? '');
-        if (!$name)  $errors[] = 'Моля въведете имена.';
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Невалиден имейл.';
+        if (!$name)  $errors[] = t_or('checkout.err.name', 'Моля въведете имена.', 'Please enter your name.');
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = t_or('checkout.err.email', 'Невалиден имейл.', 'Please enter a valid email address.');
         if (!$phone) {
-            $errors[] = $lang === 'en' ? 'Phone number is required.' : 'Телефонът е задължителен.';
+            $errors[] = t_or('checkout.err.phone_required', 'Телефонът е задължителен.', 'Phone number is required.');
         } else {
             $phone_digits = preg_replace('/\D/', '', $phone);
             $digit_count  = strlen($phone_digits);
             if ($digit_count < 7 || $digit_count > 15) {
-                $errors[] = $lang === 'en' ? 'Please enter a valid phone number.' : 'Моля въведете валиден телефонен номер.';
+                $errors[] = t_or('checkout.err.phone_invalid', 'Моля въведете валиден телефонен номер.', 'Please enter a valid phone number.');
             }
         }
 
@@ -115,10 +115,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $eik       = trim($_POST['invoice_eik']      ?? '');
             $vat       = trim($_POST['invoice_vat']      ?? '');
             $c_address = trim($_POST['invoice_address']  ?? '');
-            if (!$company)   $errors[] = 'Въведете наименование на фирмата.';
-            if (!$mol)       $errors[] = 'Въведете МОЛ (отговорно лице).';
-            if (!$eik)       $errors[] = 'Въведете ЕИК / Булстат.';
-            if (!$c_address) $errors[] = 'Въведете адрес на фирмата.';
+            if (!$company)   $errors[] = t_or('checkout.err.company', 'Въведете наименование на фирмата.', 'Please enter the company name.');
+            if (!$mol)       $errors[] = t_or('checkout.err.mol', 'Въведете МОЛ (отговорно лице).', 'Please enter the person responsible (MOL).');
+            if (!$eik)       $errors[] = t_or('checkout.err.eik', 'Въведете ЕИК / Булстат.', 'Please enter the company ID (EIK / BULSTAT).');
+            if (!$c_address) $errors[] = t_or('checkout.err.company_address', 'Въведете адрес на фирмата.', 'Please enter the company address.');
             if (!$errors) {
                 $invoice_data = [
                     'needs_invoice'   => true,
@@ -138,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'customer_phone' => $phone,
                 'invoice_data'   => $invoice_data,
             ]);
-            header('Location: /checkout/?step=2');
+            header('Location: ' . shop_path('checkout') . '?step=2');
             exit;
         }
         $step = 1;
@@ -155,19 +155,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $city          = trim($_POST['delivery_city']        ?? '');
         $shipping_eur  = (float)($_POST['shipping_eur']      ?? 0);
 
-        if (!in_array($courier, ['speedy','boxnow'])) $errors[] = 'Изберете куриер.';
+        if (!in_array($courier, ['speedy','boxnow'])) $errors[] = t_or('checkout.err.courier', 'Изберете куриер.', 'Please choose a courier.');
 
         $valid_types = ['speedy' => ['office','apt','address'], 'boxnow' => ['locker']];
         if (!isset($valid_types[$courier]) || !in_array($delivery_type, $valid_types[$courier] ?? [])) {
-            $errors[] = 'Изберете тип доставка.';
+            $errors[] = t_or('checkout.err.delivery_type', 'Изберете тип доставка.', 'Please choose a delivery method.');
         }
 
         if (!$errors) {
             if ($delivery_type === 'address') {
-                if (!$address) $errors[] = 'Въведете адрес.';
-                if (!$city)    $errors[] = 'Въведете град.';
+                if (!$address) $errors[] = t_or('checkout.err.address', 'Въведете адрес.', 'Please enter your address.');
+                if (!$city)    $errors[] = t_or('checkout.err.city', 'Въведете град.', 'Please enter your town or city.');
             } else {
-                if (!$office_code) $errors[] = 'Изберете офис/автомат.';
+                if (!$office_code) $errors[] = t_or('checkout.err.office', 'Изберете офис/автомат.', 'Please choose an office or locker.');
             }
         }
 
@@ -267,7 +267,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             }
 
-            header('Location: /checkout/?step=3');
+            header('Location: ' . shop_path('checkout') . '?step=3');
             exit;
         }
         $step = 2;
@@ -277,7 +277,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'confirm') {
         $d = $_SESSION['checkout_data'] ?? [];
         if (empty($d['customer_name']) || empty($d['courier'])) {
-            header('Location: /checkout/?step=1');
+            header('Location: ' . shop_path('checkout') . '?step=1');
             exit;
         }
 
@@ -289,9 +289,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // no order may be created without it, so this bails out before the
         // stock is reserved or the row is written.
         if (empty($_POST['accept_terms'])) {
-            $errors[] = $order_lang === 'en'
-                ? 'Please accept the Terms of Use and the Privacy Policy to place your order.'
-                : 'За да завършите поръчката, приемете Условията за ползване и Политиката за поверителност.';
+            $errors[] = t_or('checkout.err.consent', 'За да завършите поръчката, приемете Условията за ползване и Политиката за поверителност.', 'Please accept the Terms of Use and the Privacy Policy to place your order.', $order_lang);
             $step = 3;
             goto render;
         }
@@ -314,8 +312,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $payment_method = $enabled_methods[0] ?? '';
         }
         if ($payment_method === '') {
-            flash_set('error', 'Онлайн плащането не е налично в момента. Моля свържете се с нас.');
-            header('Location: /cart/');
+            flash_set('error', t_or('checkout.err.no_payment', 'Онлайн плащането не е налично в момента. Моля свържете се с нас.', 'Online payment is not available right now. Please contact us.', $order_lang));
+            header('Location: ' . shop_path('cart', $order_lang));
             exit;
         }
 
@@ -327,8 +325,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $total     = $subtotal + $shipping;
 
         if (empty($rows)) {
-            flash_set('error', 'Количката е празна или продуктите не са налични.');
-            header('Location: /cart/');
+            flash_set('error', t_or('checkout.err.cart_empty', 'Количката е празна или продуктите не са налични.', 'Your cart is empty or the products are no longer available.', $order_lang));
+            header('Location: ' . shop_path('cart', $order_lang));
             exit;
         }
 
@@ -362,6 +360,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $items_json[] = [
                 'type'         => 'donation',
                 'name_bg'      => 'Дарение за ' . SITE_NAME_BG,
+                'name_en'      => 'Donation to ' . SITE_NAME_EN,
                 'amount_eur'   => $donation_amount,
                 'subtotal_eur' => $donation_amount,
             ];
@@ -384,7 +383,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $affected = $pdo->query('SELECT ROW_COUNT()')->fetchColumn();
                 if ((int)$affected === 0) {
-                    throw new RuntimeException($p['name_bg'] . ' вече не е в наличност.');
+                    throw new RuntimeException(t_or('checkout.err.out_of_stock', '{name} вече не е в наличност.', '{name} is no longer in stock.', $order_lang, [
+                        'name' => $order_lang === 'en' ? ($p['name_en'] ?: $p['name_bg']) : $p['name_bg'],
+                    ]));
                 }
             }
 
@@ -435,7 +436,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (Throwable $e) {
             $pdo->rollBack();
             error_log('Checkout error: ' . $e->getMessage());
-            $errors[] = 'Грешка при обработка на поръчката. Моля опитайте отново.';
+            $errors[] = t_or('checkout.err.generic', 'Грешка при обработка на поръчката. Моля опитайте отново.', 'Something went wrong while processing your order. Please try again.', $order_lang);
             $step = 3;
             goto render;
         }
@@ -458,7 +459,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             } catch (Throwable $e) {
                 payment_error_report('DSK не създаде плащане с карта', $order_number, $e);
-                header('Location: /checkout/payment-failed/?order=' . urlencode($order_number) . '&err=1');
+                header('Location: ' . shop_path('payment-failed', $order_lang) . '?order=' . urlencode($order_number) . '&err=1');
                 exit;
             }
         }
@@ -477,8 +478,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $result = $iris->register([
                     'currency'    => 'EUR',
                     'amountEur'   => $total,
-                    'name'        => 'Поръчка ' . $order_number,
-                    'description' => SITE_NAME_BG . ' — поръчка ' . $order_number,
+                    'name'        => shop_payment_title($order_number, $order_lang),
+                    'description' => shop_payment_description($order_number, $order_lang),
                     'orderId'     => $order_number,
                     'redirectUrl' => $redirectUrl,
                     'hookUrl'     => $hookUrl,
@@ -492,7 +493,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             } catch (Throwable $e) {
                 payment_error_report('IRIS не създаде плащане', $order_number, $e);
-                header('Location: /checkout/payment-failed/?order=' . urlencode($order_number) . '&err=1');
+                header('Location: ' . shop_path('payment-failed', $order_lang) . '?order=' . urlencode($order_number) . '&err=1');
                 exit;
             }
         }
@@ -518,14 +519,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ])
         );
 
-        header('Location: /checkout/confirmation/?order=' . urlencode($order_number));
+        header('Location: ' . shop_path('confirmation', $order_lang) . '?order=' . urlencode($order_number));
         exit;
     }
     render:
 }
 
 $d = $_SESSION['checkout_data'] ?? [];
-$page_title = $lang === 'bg' ? 'Поръчка' : 'Checkout';
+$page_title = t_or('checkout.title', 'Поръчка', 'Checkout');
 $page_head_extra = '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@23/build/css/intlTelInput.min.css"><style>@media(max-width:640px){table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;}.checkout-form-row{grid-template-columns:1fr!important;}}.iti{width:100%;}.iti__flag-container+input{width:100%;}</style>';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
@@ -536,12 +537,12 @@ $subtotal  = $cart_info['subtotal'];
 <!-- Progress -->
 <section class="section section--grey" style="padding-bottom:1rem;">
   <div class="container">
-    <h1 style="margin-bottom:1rem;"><?= $lang === 'bg' ? 'Поръчка' : 'Checkout' ?></h1>
+    <h1 style="margin-bottom:1rem;"><?= h($page_title) ?></h1>
     <div style="display:flex;gap:.5rem;font-size:.85rem;">
-      <?php foreach ([1=>'Контакти',2=>'Доставка',3=>'Преглед'] as $s=>$label): ?>
+      <?php foreach ([1 => t_or('checkout.step.contact', 'Контакти', 'Contact'), 2 => t_or('checkout.step.delivery', 'Доставка', 'Delivery'), 3 => t_or('checkout.step.review', 'Преглед', 'Review')] as $s=>$label): ?>
       <div style="padding:.35rem .9rem;border-radius:20px;
         <?= $step === $s ? 'background:var(--teal);color:#fff;font-weight:600;' : ($step > $s ? 'background:var(--teal-light);color:var(--teal);' : 'background:var(--warm-grey);color:var(--text-muted);') ?>">
-        <?= $s ?>. <?= $label ?>
+        <?= $s ?>. <?= h($label) ?>
       </div>
       <?php endforeach; ?>
     </div>
@@ -562,16 +563,16 @@ $subtotal  = $cart_info['subtotal'];
     <form method="POST">
       <?= csrf_field() ?>
       <input type="hidden" name="action" value="contact">
-      <h2 style="margin-bottom:1.5rem;">1. Данни за контакт</h2>
+      <h2 style="margin-bottom:1.5rem;">1. <?= h(t_or('checkout.h.contact', 'Данни за контакт', 'Contact details')) ?></h2>
 
       <!-- Editable cart summary -->
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1.5rem;">
         <table style="width:100%;border-collapse:collapse;">
           <thead>
             <tr style="background:var(--off-white);">
-              <th style="padding:.6rem 1rem;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);">Продукт</th>
-              <th style="padding:.6rem 1rem;text-align:center;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);">Бр.</th>
-              <th style="padding:.6rem 1rem;text-align:right;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);">Сума</th>
+              <th style="padding:.6rem 1rem;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);"><?= h(t_or('checkout.col.product', 'Продукт', 'Product')) ?></th>
+              <th style="padding:.6rem 1rem;text-align:center;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);"><?= h(t_or('checkout.col.qty', 'Бр.', 'Qty')) ?></th>
+              <th style="padding:.6rem 1rem;text-align:right;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);"><?= h(t_or('checkout.col.amount', 'Сума', 'Amount')) ?></th>
               <th style="padding:.6rem 1rem;width:40px;"></th>
             </tr>
           </thead>
@@ -593,7 +594,7 @@ $subtotal  = $cart_info['subtotal'];
                        style="width:60px;text-align:center;padding:.3rem .4rem;border:1px solid var(--border);border-radius:4px;font-size:.875rem;">
                 <?php if ($p['type'] !== 'variant'): ?>
                 <div class="checkout-stock-msg" style="display:none;font-size:.75rem;color:#c0392b;font-weight:600;margin-top:.3rem;white-space:nowrap;">
-                  Налични: <?= (int)$p['stock'] ?> бр.
+                  <?= h(t_or('checkout.stock_max', 'Налични: {n} бр.', 'Only {n} available', vars: ['n' => (int)$p['stock']])) ?>
                 </div>
                 <?php endif; ?>
               </td>
@@ -603,14 +604,14 @@ $subtotal  = $cart_info['subtotal'];
               <td style="padding:.65rem 1rem;text-align:center;">
                 <button type="button" onclick="checkoutRemoveItem(<?= $row['cart_index'] ?>)"
                         style="background:none;border:none;cursor:pointer;color:#c0392b;font-size:1.1rem;padding:0;"
-                        title="Премахни">✕</button>
+                        title="<?= h(t_or('checkout.remove', 'Премахни', 'Remove')) ?>" aria-label="<?= h(t_or('checkout.remove', 'Премахни', 'Remove')) ?>"><span aria-hidden="true">✕</span></button>
               </td>
             </tr>
             <?php endforeach; ?>
           </tbody>
           <tfoot>
             <tr style="border-top:2px solid var(--border);background:var(--off-white);">
-              <td colspan="3" style="padding:.65rem 1rem;text-align:right;font-weight:700;font-size:.9rem;">Сума:</td>
+              <td colspan="3" style="padding:.65rem 1rem;text-align:right;font-weight:700;font-size:.9rem;"><?= h(t_or('checkout.subtotal', 'Сума', 'Subtotal')) ?>:</td>
               <td style="padding:.65rem 1rem;text-align:right;font-weight:700;color:var(--teal);font-size:.95rem;" id="s1Subtotal">
                 <?= (float)$subtotal ?>
               </td>
@@ -620,24 +621,24 @@ $subtotal  = $cart_info['subtotal'];
       </div>
 
       <div class="admin-form-grid">
-        <label style="font-size:.875rem;font-weight:600;">Имена *
+        <label style="font-size:.875rem;font-weight:600;"><?= h(t_or('checkout.f.name', 'Имена', 'Full name')) ?> *
           <input type="text" name="customer_name" value="<?= h($d['customer_name'] ?? '') ?>" required
                  autocomplete="name"
                  style="padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;font-family:inherit;width:100%;box-sizing:border-box;margin-top:.35rem;">
         </label>
-        <label style="font-size:.875rem;font-weight:600;">Имейл *
+        <label style="font-size:.875rem;font-weight:600;"><?= h(t_or('checkout.f.email', 'Имейл', 'Email')) ?> *
           <input type="email" name="customer_email" value="<?= h($d['customer_email'] ?? '') ?>" required
                  autocomplete="email"
                  style="padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;font-family:inherit;width:100%;box-sizing:border-box;margin-top:.35rem;">
         </label>
-        <label style="font-size:.875rem;font-weight:600;"><?= $lang === 'en' ? 'Phone *' : 'Телефон *' ?>
+        <label style="font-size:.875rem;font-weight:600;"><?= h(t_or('checkout.f.phone', 'Телефон', 'Phone')) ?> *
           <div style="margin-top:.35rem;">
             <input type="tel" id="customer_phone" name="customer_phone"
                    value="<?= h($d['customer_phone'] ?? '') ?>" required autocomplete="tel"
                    style="padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;font-family:inherit;box-sizing:border-box;">
           </div>
           <div id="phone_error" style="color:#dc2626;font-size:.8rem;margin-top:.3rem;display:none;">
-            <?= $lang === 'en' ? 'Please enter a valid phone number.' : 'Моля въведете валиден телефонен номер.' ?>
+            <?= h(t_or('checkout.err.phone_invalid', 'Моля въведете валиден телефонен номер.', 'Please enter a valid phone number.')) ?>
           </div>
         </label>
       </div>
@@ -654,29 +655,29 @@ $subtotal  = $cart_info['subtotal'];
                  onchange="toggleInvoiceSection(this.checked)"
                  style="width:1.1rem;height:1.1rem;accent-color:var(--teal);margin-top:.15rem;flex-shrink:0;">
           <div>
-            <div style="font-weight:600;">Нуждая се от фактура</div>
-            <div style="font-size:.85rem;color:var(--text-muted);">За юридически лица с ЕИК — попълнете данните на фирмата</div>
+            <div style="font-weight:600;"><?= h(t_or('checkout.invoice', 'Нуждая се от фактура', 'I need an invoice')) ?></div>
+            <div style="font-size:.85rem;color:var(--text-muted);"><?= h(t_or('checkout.invoice.hint', 'За юридически лица с ЕИК — попълнете данните на фирмата', 'For companies registered in Bulgaria (with an EIK) — fill in the company details')) ?></div>
           </div>
         </label>
         <div id="invoiceSection" style="display:<?= $needs_inv ? '' : 'none' ?>;padding:1.25rem;border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-lg) var(--radius-lg);background:var(--off-white);">
           <div class="admin-form-grid">
-            <label style="font-size:.875rem;font-weight:600;">Наименование на фирмата *
+            <label style="font-size:.875rem;font-weight:600;"><?= h(t_or('checkout.f.company', 'Наименование на фирмата', 'Company name')) ?> *
               <input type="text" name="invoice_company" value="<?= h($inv_data['company_name'] ?? '') ?>"
                      style="<?= $field_style ?>">
             </label>
-            <label style="font-size:.875rem;font-weight:600;">МОЛ (отговорно лице) *
+            <label style="font-size:.875rem;font-weight:600;"><?= h(t_or('checkout.f.mol', 'МОЛ (отговорно лице)', 'Person responsible (MOL)')) ?> *
               <input type="text" name="invoice_mol" value="<?= h($inv_data['mol'] ?? '') ?>"
                      style="<?= $field_style ?>">
             </label>
-            <label style="font-size:.875rem;font-weight:600;">ЕИК / Булстат *
+            <label style="font-size:.875rem;font-weight:600;"><?= h(t_or('checkout.f.eik', 'ЕИК / Булстат', 'Company ID (EIK / BULSTAT)')) ?> *
               <input type="text" name="invoice_eik" value="<?= h($inv_data['eik'] ?? '') ?>"
                      style="<?= $field_style ?>">
             </label>
-            <label style="font-size:.875rem;font-weight:600;">ДДС номер <span style="font-weight:400;color:var(--text-muted);">(ако сте регистрирани)</span>
+            <label style="font-size:.875rem;font-weight:600;"><?= h(t_or('checkout.f.vat', 'ДДС номер', 'VAT number')) ?> <span style="font-weight:400;color:var(--text-muted);">(<?= h(t_or('checkout.f.vat_hint', 'ако сте регистрирани', 'if registered')) ?>)</span>
               <input type="text" name="invoice_vat" value="<?= h($inv_data['vat_number'] ?? '') ?>"
                      style="<?= $field_style ?>">
             </label>
-            <label style="font-size:.875rem;font-weight:600;grid-column:span 2;">Адрес на фирмата *
+            <label style="font-size:.875rem;font-weight:600;grid-column:span 2;"><?= h(t_or('checkout.f.company_address', 'Адрес на фирмата', 'Company address')) ?> *
               <input type="text" name="invoice_address" value="<?= h($inv_data['company_address'] ?? '') ?>"
                      style="<?= $field_style ?>">
             </label>
@@ -685,7 +686,7 @@ $subtotal  = $cart_info['subtotal'];
       </div>
 
       <button type="submit" class="btn btn--primary" style="margin-top:1.5rem;">
-        Продължи към доставка →
+        <?= h(t_or('checkout.btn.to_delivery', 'Продължи към доставка', 'Continue to delivery')) ?> <span aria-hidden="true">→</span>
       </button>
     </form>
     <script>
@@ -697,6 +698,7 @@ $subtotal  = $cart_info['subtotal'];
     <!-- Hidden remove form (shared by both steps) -->
     <form id="checkoutRemoveForm" method="POST" action="/cart/remove.php" style="display:none;">
       <?= csrf_field() ?>
+      <input type="hidden" name="_lang" value="<?= h($lang) ?>">
       <input type="hidden" id="checkoutRemoveIndex" name="cart_index" value="">
     </form>
     <script>
@@ -741,11 +743,11 @@ $subtotal  = $cart_info['subtotal'];
       <input type="hidden" name="action" value="delivery">
       <input type="hidden" name="shipping_eur" id="shippingInput" value="0">
 
-      <h2 style="margin-bottom:1.5rem;">2. Доставка</h2>
+      <h2 style="margin-bottom:1.5rem;">2. <?= h(t_or('checkout.step.delivery', 'Доставка', 'Delivery')) ?></h2>
 
       <!-- Courier selection -->
       <fieldset style="border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.5rem;">
-        <legend style="font-weight:600;padding:0 .5rem;">Куриер</legend>
+        <legend style="font-weight:600;padding:0 .5rem;"><?= h(t_or('checkout.courier', 'Куриер', 'Courier')) ?></legend>
         <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-top:.5rem;">
           <?php foreach (['speedy'=>'Speedy','boxnow'=>'BoxNow'] as $c=>$cl): ?>
           <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
@@ -760,15 +762,15 @@ $subtotal  = $cart_info['subtotal'];
 
       <!-- Delivery type — shown/hidden by JS -->
       <fieldset id="typeSection" style="border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.5rem;display:none;">
-        <legend style="font-weight:600;padding:0 .5rem;">Начин на доставка</legend>
+        <legend style="font-weight:600;padding:0 .5rem;"><?= h(t_or('checkout.delivery_method', 'Начин на доставка', 'Delivery method')) ?></legend>
         <div id="typeOptions" style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-top:.5rem;"></div>
       </fieldset>
 
       <!-- Office selection (Econt / Speedy) — autocomplete city then office dropdown -->
       <div id="officeSection" style="display:none;margin-bottom:1.5rem;">
-        <label style="font-size:.875rem;font-weight:600;display:block;margin-bottom:.4rem;">Град</label>
+        <label for="cityInput" style="font-size:.875rem;font-weight:600;display:block;margin-bottom:.4rem;"><?= h(t_or('checkout.f.city', 'Град', 'Town / city')) ?></label>
         <div style="position:relative;margin-bottom:1rem;">
-          <input type="text" id="cityInput" placeholder="Въведете град..." autocomplete="off"
+          <input type="text" id="cityInput" placeholder="<?= h(t_or('checkout.ph.city', 'Въведете град...', 'Start typing a town...')) ?>" autocomplete="off"
                  oninput="onCityInput(this.value)"
                  style="width:100%;padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;font-family:inherit;box-sizing:border-box;">
           <div id="citySuggestions"
@@ -777,8 +779,8 @@ $subtotal  = $cart_info['subtotal'];
         </div>
 
         <div id="officeWrap" style="display:none;">
-          <label style="font-size:.875rem;font-weight:600;display:block;margin-bottom:.4rem;">Офис</label>
-          <input type="text" id="officeSearch" placeholder="Търси офис по адрес или квартал…"
+          <label for="officeSelect" style="font-size:.875rem;font-weight:600;display:block;margin-bottom:.4rem;"><?= h(t_or('checkout.f.office', 'Офис', 'Office')) ?></label>
+          <input type="text" id="officeSearch" placeholder="<?= h(t_or('checkout.ph.office', 'Търси офис по адрес или квартал…', 'Search offices by address or area…')) ?>" aria-label="<?= h(t_or('checkout.ph.office', 'Търси офис по адрес или квартал…', 'Search offices by address or area…')) ?>"
                  oninput="filterOffices(this.value)"
                  style="width:100%;padding:.45rem .65rem;border:1px solid #d1d5db;border-radius:6px;font-size:.875rem;font-family:inherit;box-sizing:border-box;margin-bottom:.4rem;">
           <div id="officeCitySuggest" style="display:none;margin-bottom:.4rem;font-size:.8rem;color:var(--text-muted);"></div>
@@ -787,7 +789,7 @@ $subtotal  = $cart_info['subtotal'];
           </select>
           <div id="officeSelected" style="margin-top:.5rem;font-size:.875rem;color:var(--teal);font-weight:600;"></div>
         </div>
-        <div id="officeLoading" style="display:none;font-size:.875rem;color:var(--text-muted);">Зарежда офиси...</div>
+        <div id="officeLoading" style="display:none;font-size:.875rem;color:var(--text-muted);" role="status"><?= h(t_or('checkout.office.loading', 'Зарежда офиси...', 'Loading offices...')) ?></div>
 
         <input type="hidden" name="courier_office_code" id="officeCode" value="<?= h($d['courier_office_code'] ?? '') ?>">
         <input type="hidden" name="courier_office_name" id="officeName" value="<?= h($d['courier_office_name'] ?? '') ?>">
@@ -796,10 +798,10 @@ $subtotal  = $cart_info['subtotal'];
 
       <!-- BoxNow locker picker (official widget) -->
       <div id="boxnowSection" style="display:none;margin-bottom:1.5rem;">
-        <label style="font-size:.875rem;font-weight:600;display:block;margin-bottom:.5rem;">Изберете автомат BoxNow</label>
+        <div style="font-size:.875rem;font-weight:600;display:block;margin-bottom:.5rem;"><?= h(t_or('checkout.boxnow.label', 'Изберете автомат BoxNow', 'Choose a BoxNow locker')) ?></div>
         <button type="button" id="boxnowPickerBtn" onclick="openBoxnowWidget()"
                 style="padding:.55rem 1.25rem;background:#6CD04E;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.9rem;font-weight:600;">
-          📦 Изберете автомат от картата
+          <span aria-hidden="true">📦</span> <?= h(t_or('checkout.boxnow.btn', 'Изберете автомат от картата', 'Choose a locker on the map')) ?>
         </button>
         <div id="boxnowSelected" style="display:none;margin-top:.75rem;padding:.75rem 1rem;border-radius:6px;font-size:.875rem;
              background:#f0ffeb;border:2px solid #6CD04E;">
@@ -811,12 +813,12 @@ $subtotal  = $cart_info['subtotal'];
       <!-- Address fields -->
       <div id="addressSection" style="display:none;margin-bottom:1.5rem;">
         <div class="admin-form-grid">
-          <label style="font-size:.875rem;font-weight:600;">Адрес *
+          <label style="font-size:.875rem;font-weight:600;"><?= h(t_or('checkout.f.address', 'Адрес', 'Address')) ?> *
             <input type="text" name="delivery_address" value="<?= h($d['delivery_address'] ?? '') ?>"
                    autocomplete="street-address"
                    style="padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;font-family:inherit;width:100%;box-sizing:border-box;margin-top:.35rem;">
           </label>
-          <label style="font-size:.875rem;font-weight:600;">Град *
+          <label style="font-size:.875rem;font-weight:600;"><?= h(t_or('checkout.f.city', 'Град', 'Town / city')) ?> *
             <input type="text" name="delivery_city" id="deliveryCityInput" value="<?= h($d['delivery_city'] ?? '') ?>"
                    autocomplete="address-level2"
                    onchange="calculateShipping(this.value.trim())"
@@ -828,11 +830,11 @@ $subtotal  = $cart_info['subtotal'];
       <!-- Shipping cost display -->
       <div id="shippingDisplay" style="display:none;padding:1rem 1.25rem;background:var(--teal-light);border-radius:var(--radius-lg);margin-bottom:1.5rem;">
         <div style="display:flex;justify-content:space-between;">
-          <span>Цена за доставка:</span>
+          <span><?= h(t_or('checkout.shipping_price', 'Цена за доставка', 'Delivery cost')) ?>:</span>
           <strong id="shippingCost" style="color:var(--teal);">—</strong>
         </div>
         <div style="display:flex;justify-content:space-between;margin-top:.5rem;font-weight:700;">
-          <span>Общо:</span>
+          <span><?= h(t_or('checkout.total', 'Общо', 'Total')) ?>:</span>
           <strong id="totalCost" style="color:var(--teal);font-size:1.1rem;">—</strong>
         </div>
       </div>
@@ -840,17 +842,17 @@ $subtotal  = $cart_info['subtotal'];
       <input type="hidden" name="delivery_type" id="deliveryTypeInput">
 
       <button type="submit" class="btn btn--primary">
-        <?= !empty($d['_pledge_number']) ? 'Продължи към плащане →' : 'Продължи към преглед →' ?>
+        <?= h(!empty($d['_pledge_number']) ? t_or('checkout.btn.to_payment', 'Продължи към плащане', 'Continue to payment') : t_or('checkout.btn.to_review', 'Продължи към преглед', 'Continue to review')) ?> <span aria-hidden="true">→</span>
       </button>
       <?php if (empty($d['_pledge_number'])): ?>
-      <a href="/checkout/?step=1" style="margin-left:1rem;font-size:.9rem;color:var(--text-muted);">← Назад</a>
+      <a href="<?= h(shop_path('checkout')) ?>?step=1" style="margin-left:1rem;font-size:.9rem;color:var(--text-muted);"><span aria-hidden="true">←</span> <?= h(t_or('checkout.back', 'Назад', 'Back')) ?></a>
       <?php endif; ?>
     </form>
 
     <!-- ── STEP 3: Review ───────────────────────────────────────────────────── -->
     <?php elseif ($step === 3):
       $courier_labels = ['econt'=>'Econt','speedy'=>'Speedy','boxnow'=>'BoxNow'];
-      $type_labels    = ['office'=>'До офис','apt'=>'До автомат','address'=>'До врата','locker'=>'До автомат (BoxNow)'];
+      $type_labels    = checkout_delivery_type_labels();
       $shipping = (float)($d['shipping_eur'] ?? 0);
       $total    = $subtotal + $shipping;
     ?>
@@ -860,8 +862,8 @@ $subtotal  = $cart_info['subtotal'];
       require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/IRISPayment.php';
       // Build the list of available payment methods (order = display order).
       $pay_methods = [];
-      if (DSKBankPayment::isEnabled()) $pay_methods['card'] = ['💳', 'Плащане с карта', 'Visa / Mastercard през DSK Bank'];
-      if (IRISPayment::isEnabled())    $pay_methods['iris'] = ['🏦', 'Банков превод (Pay by Bank)', 'Директно от сметката ви през IRIS'];
+      if (DSKBankPayment::isEnabled()) $pay_methods['card'] = ['💳', t_or('checkout.pay.card', 'Плащане с карта', 'Pay by card'), t_or('checkout.pay.card_hint', 'Visa / Mastercard през DSK Bank', 'Visa / Mastercard via DSK Bank')];
+      if (IRISPayment::isEnabled())    $pay_methods['iris'] = ['🏦', t_or('checkout.pay.iris', 'Банков превод (Pay by Bank)', 'Bank transfer (Pay by Bank)'), t_or('checkout.pay.iris_hint', 'Директно от сметката ви през IRIS', 'Straight from your bank account via IRIS')];
       $pay_default = array_key_first($pay_methods);
     ?>
 
@@ -871,16 +873,16 @@ $subtotal  = $cart_info['subtotal'];
       <input type="hidden" name="lang" value="<?= h($lang) ?>">
       <input type="hidden" name="donation_amount" id="donationAmountHidden" value="0">
 
-      <h2 style="margin-bottom:1.5rem;">3. Преглед и потвърждение</h2>
+      <h2 style="margin-bottom:1.5rem;">3. <?= h(t_or('checkout.h.review', 'Преглед и потвърждение', 'Review and confirm')) ?></h2>
 
       <!-- Order summary with editable quantities -->
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1.5rem;">
         <table style="width:100%;border-collapse:collapse;">
           <thead>
             <tr style="background:var(--off-white);">
-              <th style="padding:.65rem 1rem;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);">Продукт</th>
-              <th style="padding:.65rem 1rem;text-align:center;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);">Бр.</th>
-              <th style="padding:.65rem 1rem;text-align:right;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);">Сума</th>
+              <th style="padding:.65rem 1rem;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);"><?= h(t_or('checkout.col.product', 'Продукт', 'Product')) ?></th>
+              <th style="padding:.65rem 1rem;text-align:center;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);"><?= h(t_or('checkout.col.qty', 'Бр.', 'Qty')) ?></th>
+              <th style="padding:.65rem 1rem;text-align:right;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);"><?= h(t_or('checkout.col.amount', 'Сума', 'Amount')) ?></th>
               <th style="padding:.65rem 1rem;width:40px;"></th>
             </tr>
           </thead>
@@ -902,7 +904,7 @@ $subtotal  = $cart_info['subtotal'];
                        style="width:60px;text-align:center;padding:.3rem .4rem;border:1px solid var(--border);border-radius:4px;font-size:.875rem;">
                 <?php if ($p['type'] !== 'variant'): ?>
                 <div class="checkout-stock-msg" style="display:none;font-size:.75rem;color:#c0392b;font-weight:600;margin-top:.3rem;white-space:nowrap;">
-                  Налични: <?= (int)$p['stock'] ?> бр.
+                  <?= h(t_or('checkout.stock_max', 'Налични: {n} бр.', 'Only {n} available', vars: ['n' => (int)$p['stock']])) ?>
                 </div>
                 <?php endif; ?>
               </td>
@@ -912,20 +914,20 @@ $subtotal  = $cart_info['subtotal'];
               <td style="padding:.75rem 1rem;text-align:center;">
                 <button type="button" onclick="checkoutRemoveItem(<?= $row['cart_index'] ?>)"
                         style="background:none;border:none;cursor:pointer;color:#c0392b;font-size:1.1rem;padding:0;"
-                        title="Премахни">✕</button>
+                        title="<?= h(t_or('checkout.remove', 'Премахни', 'Remove')) ?>" aria-label="<?= h(t_or('checkout.remove', 'Премахни', 'Remove')) ?>"><span aria-hidden="true">✕</span></button>
               </td>
             </tr>
             <?php endforeach; ?>
             <tr style="border-top:1px solid var(--border);">
-              <td colspan="3" style="padding:.75rem 1rem;text-align:right;color:var(--text-muted);">Доставка (<?= h($courier_labels[$d['courier']] ?? '') ?> – <?= h($type_labels[$d['delivery_type']] ?? '') ?>):</td>
+              <td colspan="3" style="padding:.75rem 1rem;text-align:right;color:var(--text-muted);"><?= h(t_or('checkout.shipping', 'Доставка', 'Delivery')) ?> (<?= h($courier_labels[$d['courier']] ?? '') ?> – <?= h($type_labels[$d['delivery_type']] ?? '') ?>):</td>
               <td style="padding:.75rem 1rem;text-align:right;"><?= price_html($shipping) ?></td>
             </tr>
             <tr id="donationRow" style="border-top:1px solid var(--border);display:none;">
-              <td colspan="3" style="padding:.75rem 1rem;text-align:right;color:var(--text-muted);">Дарение:</td>
+              <td colspan="3" style="padding:.75rem 1rem;text-align:right;color:var(--text-muted);"><?= h(t_or('checkout.donation', 'Дарение', 'Donation')) ?>:</td>
               <td style="padding:.75rem 1rem;text-align:right;" id="donationRowAmount"></td>
             </tr>
             <tr style="border-top:2px solid var(--border);background:var(--off-white);">
-              <td colspan="3" style="padding:.75rem 1rem;text-align:right;font-weight:700;">Общо:</td>
+              <td colspan="3" style="padding:.75rem 1rem;text-align:right;font-weight:700;"><?= h(t_or('checkout.total', 'Общо', 'Total')) ?>:</td>
               <td style="padding:.75rem 1rem;text-align:right;font-weight:700;color:var(--teal);font-size:1.1rem;" id="summaryTotal">
                 <?= (float)$total ?>
               </td>
@@ -937,13 +939,13 @@ $subtotal  = $cart_info['subtotal'];
       <!-- Contact + delivery summary -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;" class="checkout-form-row">
         <div style="padding:1rem;background:var(--off-white);border-radius:var(--radius-lg);">
-          <strong style="display:block;margin-bottom:.5rem;font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);">Контакти</strong>
+          <strong style="display:block;margin-bottom:.5rem;font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);"><?= h(t_or('checkout.step.contact', 'Контакти', 'Contact')) ?></strong>
           <?= h($d['customer_name']) ?><br>
           <?= h($d['customer_email']) ?><br>
           <?= h($d['customer_phone']) ?>
         </div>
         <div style="padding:1rem;background:var(--off-white);border-radius:var(--radius-lg);">
-          <strong style="display:block;margin-bottom:.5rem;font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);">Доставка</strong>
+          <strong style="display:block;margin-bottom:.5rem;font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);"><?= h(t_or('checkout.step.delivery', 'Доставка', 'Delivery')) ?></strong>
           <?= h($courier_labels[$d['courier']] ?? '') ?> — <?= h($type_labels[$d['delivery_type']] ?? '') ?><br>
           <?php if ($d['delivery_type'] === 'address'): ?>
             <?= h(($d['delivery_address'] ?? '') . ', ' . ($d['delivery_city'] ?? '')) ?>
@@ -955,19 +957,19 @@ $subtotal  = $cart_info['subtotal'];
 
       <!-- Donation add-on -->
       <div style="margin-bottom:1.5rem;">
-        <div style="font-size:.85rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.75rem;">Добави дарение (по избор)</div>
+        <div style="font-size:.85rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.75rem;"><?= h(t_or('checkout.donation.title', 'Добави дарение (по избор)', 'Add a donation (optional)')) ?></div>
         <label style="display:flex;align-items:center;gap:.75rem;padding:1rem 1.25rem;border:2px solid var(--border);border-radius:var(--radius-lg);cursor:pointer;" id="lbl-donation">
           <input type="checkbox" id="donationToggle" onchange="toggleDonation(this.checked)"
                  style="width:1.1rem;height:1.1rem;accent-color:var(--teal);">
           <div>
-            <div style="font-weight:600;">Искам да добавя дарение към поръчката</div>
-            <div style="font-size:.85rem;color:var(--text-muted);">Сумата ще бъде добавена към общата стойност</div>
+            <div style="font-weight:600;"><?= h(t_or('checkout.donation.toggle', 'Искам да добавя дарение към поръчката', 'I want to add a donation to my order')) ?></div>
+            <div style="font-size:.85rem;color:var(--text-muted);"><?= h(t_or('checkout.donation.hint', 'Сумата ще бъде добавена към общата стойност', 'The amount will be added to your order total')) ?></div>
           </div>
         </label>
         <div id="donationPanel" style="display:none;padding:1.25rem;border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-lg) var(--radius-lg);background:var(--off-white);">
           <div>
-            <div style="font-size:.875rem;font-weight:600;margin-bottom:.5rem;">Сума</div>
-            <input type="number" id="donationAmountInput" min="1" step="1" placeholder="Въведете сума (€)"
+            <label for="donationAmountInput" style="display:block;font-size:.875rem;font-weight:600;margin-bottom:.5rem;"><?= h(t_or('checkout.donation.amount', 'Сума', 'Amount')) ?></label>
+            <input type="number" id="donationAmountInput" min="1" step="1" placeholder="<?= h(t_or('checkout.donation.ph', 'Въведете сума (€)', 'Enter an amount (€)')) ?>"
                    oninput="updateDonationSummary()"
                    style="width:220px;padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;font-family:inherit;">
           </div>
@@ -976,10 +978,10 @@ $subtotal  = $cart_info['subtotal'];
 
       <!-- Payment method -->
       <fieldset style="border:none;padding:0;margin:0 0 1.5rem;">
-        <legend style="font-size:.85rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.75rem;padding:0;">Начин на плащане</legend>
+        <legend style="font-size:.85rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.75rem;padding:0;"><?= h(t_or('checkout.pay.legend', 'Начин на плащане', 'Payment method')) ?></legend>
         <?php if (empty($pay_methods)): ?>
         <p style="padding:1rem 1.25rem;border:2px solid var(--border);border-radius:var(--radius-lg);color:#c0392b;">
-          Онлайн плащането не е налично в момента. Моля свържете се с нас.
+          <?= h(t_or('checkout.err.no_payment', 'Онлайн плащането не е налично в момента. Моля свържете се с нас.', 'Online payment is not available right now. Please contact us.')) ?>
         </p>
         <?php endif; ?>
         <?php foreach ($pay_methods as $pm => $info): ?>
@@ -1002,7 +1004,7 @@ $subtotal  = $cart_info['subtotal'];
         $_c_privacy = $lang === 'en' ? '/en/privacy-policy/'  : '/politika-za-poveritelnost/';
       ?>
       <fieldset style="border:none;padding:0;margin:0 0 1.5rem;">
-        <legend class="sr-only"><?= $lang === 'en' ? 'Consents' : 'Съгласия' ?></legend>
+        <legend class="sr-only"><?= h(t_or('checkout.consents', 'Съгласия', 'Consents')) ?></legend>
 
         <label style="display:flex;align-items:flex-start;gap:.75rem;padding:1rem 1.25rem;border:2px solid var(--border);border-radius:var(--radius-lg);cursor:pointer;margin-bottom:.6rem;">
           <input type="checkbox" name="accept_terms" value="1" required
@@ -1036,9 +1038,9 @@ $subtotal  = $cart_info['subtotal'];
 
       <div style="display:flex;gap:1rem;align-items:center;">
         <button type="submit" class="btn btn--primary" style="padding:.9rem 2rem;font-size:1rem;">
-          Потвърди поръчката →
+          <?= h(t_or('checkout.btn.confirm', 'Потвърди поръчката', 'Confirm order')) ?> <span aria-hidden="true">→</span>
         </button>
-        <a href="/checkout/?step=2" style="font-size:.9rem;color:var(--text-muted);">← Промени доставката</a>
+        <a href="<?= h(shop_path('checkout')) ?>?step=2" style="font-size:.9rem;color:var(--text-muted);"><span aria-hidden="true">←</span> <?= h(t_or('checkout.btn.change_delivery', 'Промени доставката', 'Change delivery')) ?></a>
       </div>
     </form>
 
@@ -1131,10 +1133,19 @@ const subtotal = <?= json_encode($subtotal) ?>;
 let currentCourier = '<?= h($d['courier'] ?? '') ?>';
 let currentType    = '<?= h($d['delivery_type'] ?? '') ?>';
 
+<?php $_js_types = checkout_delivery_type_labels(); $_js_f = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP; ?>
 const typeOptions = {
-    speedy: [{value:'address',label:'До врата'},{value:'office',label:'До офис'},{value:'apt',label:'До автомат'}],
-    boxnow: [{value:'locker',label:'До автомат (BoxNow)'}],
+    speedy: [{value:'address',label:<?= json_encode($_js_types['address'], $_js_f) ?>},{value:'office',label:<?= json_encode($_js_types['office'], $_js_f) ?>},{value:'apt',label:<?= json_encode($_js_types['apt'], $_js_f) ?>}],
+    boxnow: [{value:'locker',label:<?= json_encode($_js_types['locker'], $_js_f) ?>}],
 };
+// Buyer-facing text used by the delivery step (same strings system as the page).
+const coTxt = <?= json_encode([
+    'lockerChosen'  => t_or('checkout.boxnow.chosen', 'Избран автомат', 'Locker chosen'),
+    'loading'       => t_or('checkout.office.loading', 'Зарежда офиси...', 'Loading offices...'),
+    'noOffices'     => t_or('checkout.office.none', 'Няма намерени офиси за този град.', 'No offices found for this town.'),
+    'officeError'   => t_or('checkout.office.error', 'Грешка при зареждане на офиси. Опитайте отново.', 'Could not load the offices. Please try again.'),
+    'otherCity'     => t_or('checkout.office.other_city', 'Търси в друг град', 'Search in another town'),
+], $_js_f) ?>;
 
 // ── BoxNow widget ─────────────────────────────────────────────────────────────
 const boxnowPartnerId = <?= json_encode($boxnow_partner_id) ?>;
@@ -1149,7 +1160,7 @@ function openBoxnowWidget() {
         document.getElementById('officeName').value = name;
 
         const info = document.getElementById('boxnowSelected');
-        info.innerHTML = '<strong style="color:#3a8a2e;">✓ Избран автомат:</strong><br>' +
+        info.innerHTML = '<strong style="color:#3a8a2e;">✓ ' + escHtml(coTxt.lockerChosen) + ':</strong><br>' +
             escHtml(locker.name) + (locker.address ? '<br><span style="color:#555;">' + escHtml(locker.address) + '</span>' : '');
         info.style.display = '';
     });
@@ -1337,7 +1348,7 @@ async function selectCity(city) {
 async function loadOffices(city, restoreCode) {
     const loading = document.getElementById('officeLoading');
     const wrap    = document.getElementById('officeWrap');
-    loading.textContent   = 'Зарежда офиси...';
+    loading.textContent   = coTxt.loading;
     loading.style.display = '';
     wrap.style.display    = 'none';
     document.getElementById('officeSearch').value = '';
@@ -1351,14 +1362,14 @@ async function loadOffices(city, restoreCode) {
             ? all.filter(o => o.type === currentType)
             : all;
         if (!_allOffices.length) {
-            loading.textContent = 'Няма намерени офиси за този град.';
+            loading.textContent = coTxt.noOffices;
             return;
         }
         renderOfficeOptions(_allOffices, restoreCode);
         loading.style.display = 'none';
         wrap.style.display    = '';
     } catch(e) {
-        loading.textContent = 'Грешка при зареждане на офиси. Опитайте отново.';
+        loading.textContent = coTxt.officeError;
     }
 }
 
@@ -1382,7 +1393,7 @@ function filterOffices(q) {
         .then(cities => {
             const matches = cities.filter(c => c.toLowerCase() !== current).slice(0, 4);
             if (!matches.length) { citySuggest.style.display = 'none'; return; }
-            citySuggest.innerHTML = 'Търси в друг град: ' + matches.map(c =>
+            citySuggest.innerHTML = escHtml(coTxt.otherCity) + ': ' + matches.map(c =>
                 `<a href="#" style="margin-left:.4rem;color:var(--teal);text-decoration:underline;"
                     onmousedown="event.preventDefault();switchCityFromOfficeSearch('${c.replace(/'/g, "\\'")}')">${c}</a>`
             ).join('');
@@ -1439,7 +1450,7 @@ if (currentCourier) {
 const savedBoxnowName = document.getElementById('boxnowName')?.value;
 if (savedBoxnowName) {
     const info = document.getElementById('boxnowSelected');
-    if (info) { info.innerHTML = '<strong style="color:#3a8a2e;">✓ Избран автомат:</strong><br>' + escHtml(savedBoxnowName); info.style.display = ''; }
+    if (info) { info.innerHTML = '<strong style="color:#3a8a2e;">✓ ' + escHtml(coTxt.lockerChosen) + ':</strong><br>' + escHtml(savedBoxnowName); info.style.display = ''; }
 }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23/build/js/intlTelInput.min.js"></script>

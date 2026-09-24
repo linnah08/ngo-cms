@@ -27,42 +27,40 @@ $is_donation = $order['type'] === 'donation';
 
 // If already paid somehow (race), send to confirmation
 if ($order['payment_status'] === 'paid') {
-    header('Location: ' . ($is_donation ? '/donation/confirmation/' : '/checkout/confirmation/') . '?order=' . urlencode($order_number));
+    header('Location: ' . ($is_donation ? '/donation/confirmation/' : shop_path('confirmation', $order['lang'] ?? 'bg')) . '?order=' . urlencode($order_number));
     exit;
 }
 
-// This page is reached from the bank / our payment endpoints, not a language-prefixed URL,
-// so the order's own language decides the text.
-$lang    = ($order['lang'] ?? 'bg') === 'en' ? 'en' : 'bg';
+// The order's own language decides the text. The bank and our payment
+// endpoints may land here on the BG path, so an English order is moved to the
+// /en/ path — that way the header, footer and <html lang> are English too.
+$lang = ($order['lang'] ?? 'bg') === 'en' ? 'en' : 'bg';
+if ($lang !== get_lang()) {
+    $qs = $_SERVER['QUERY_STRING'] ?? '';
+    header('Location: ' . shop_path('payment-failed', $lang) . ($qs !== '' ? '?' . $qs : ''));
+    exit;
+}
 $expired = !empty($order['unpaid_cancelled_at']) || !empty($order['stock_returned_at']);
 $is_iris = $order['payment_method'] === 'iris';
 
 $retry_url = ($is_iris ? '/api/iris-payment-return.php' : '/api/payment-return.php')
            . '?retry=1&order=' . urlencode($order_number);
-$back_url  = $lang === 'en' ? '/en/shop/' : '/magazin/';
+$back_url  = shop_path('shop', $lang);
 
-$t = $lang === 'en' ? [
-    'title'      => 'Payment failed',
+$_num = '<strong>#' . h($order['order_number']) . '</strong>';
+$t = [
+    'title'      => t_or('payfail.title', 'Плащането не бе успешно', 'Payment failed'),
     'saved'      => $is_donation
-        ? 'Your donation was not completed. You can try the payment again.'
-        : 'Order <strong>#' . h($order['order_number']) . '</strong> is saved. You can try the payment again.',
+        ? h(t_or('payfail.saved_donation', 'Дарението не беше завършено. Можете да опитате плащането отново.', 'Your donation was not completed. You can try the payment again.'))
+        : strtr(h(t_or('payfail.saved', 'Поръчка {order} е запазена. Можете да опитате плащането отново.', 'Order {order} is saved. You can try the payment again.')), ['{order}' => $_num]),
     'expired'    => $is_donation
-        ? 'This donation was not completed in time. Please start a new donation.'
-        : 'Order <strong>#' . h($order['order_number']) . '</strong> has been cancelled and can no longer be paid. Please place a new order.',
-    'bank_error' => 'We couldn’t open the bank’s payment page. Please try again in a moment.',
-    'retry'      => $is_iris ? 'Try again with bank transfer' : 'Try again with card',
-    'back'       => '← Back to the shop',
-] : [
-    'title'      => 'Плащането не бе успешно',
-    'saved'      => $is_donation
-        ? 'Дарението не беше завършено. Можете да опитате плащането отново.'
-        : 'Поръчка <strong>#' . h($order['order_number']) . '</strong> е запазена. Можете да опитате плащането отново.',
-    'expired'    => $is_donation
-        ? 'Дарението не беше завършено навреме. Моля, направете ново дарение.'
-        : 'Поръчка <strong>#' . h($order['order_number']) . '</strong> е отменена и вече не може да бъде платена. Моля, направете нова поръчка.',
-    'bank_error' => 'Не успяхме да отворим страницата за плащане на банката. Моля, опитайте отново след малко.',
-    'retry'      => $is_iris ? 'Опитай отново с банков превод' : 'Опитай отново с карта',
-    'back'       => '← Към магазина',
+        ? h(t_or('payfail.expired_donation', 'Дарението не беше завършено навреме. Моля, направете ново дарение.', 'This donation was not completed in time. Please start a new donation.'))
+        : strtr(h(t_or('payfail.expired', 'Поръчка {order} е отменена и вече не може да бъде платена. Моля, направете нова поръчка.', 'Order {order} has been cancelled and can no longer be paid. Please place a new order.')), ['{order}' => $_num]),
+    'bank_error' => t_or('payfail.bank_error', 'Не успяхме да отворим страницата за плащане на банката. Моля, опитайте отново след малко.', 'We couldn’t open the bank’s payment page. Please try again in a moment.'),
+    'retry'      => $is_iris
+        ? t_or('payfail.retry_iris', 'Опитай отново с банков превод', 'Try again with bank transfer')
+        : t_or('payfail.retry_card', 'Опитай отново с карта', 'Try again with card'),
+    'back'       => '← ' . t_or('confirm.back_to_shop', 'Към магазина', 'Back to the shop'),
 ];
 
 $page_title = $t['title'];
@@ -71,7 +69,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
 <section class="section section--grey" style="padding-bottom:1.5rem;">
   <div class="container" style="text-align:center;max-width:600px;margin:0 auto;">
-    <div style="font-size:3rem;margin-bottom:1rem;">❌</div>
+    <div style="font-size:3rem;margin-bottom:1rem;" aria-hidden="true">❌</div>
     <h1 style="color:#c0392b;"><?= h($t['title']) ?></h1>
     <p style="color:var(--text-muted);">
       <?= $expired ? $t['expired'] : $t['saved'] ?>

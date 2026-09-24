@@ -4,8 +4,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/print_helpers.php';
 start_session();
 
-$lang     = ($_POST['_lang'] ?? 'bg') === 'en' ? 'en' : 'bg';
-$shop_url = $lang === 'en' ? '/en/shop/' : '/magazin/';
+$lang     = post_lang();
+$shop_url = shop_path('shop', $lang);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: ' . $shop_url);
@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 if (!csrf_verify()) {
-    flash_set('error', 'Невалидна заявка.');
+    flash_set('error', t_or('cart.err.invalid_request', 'Невалидна заявка.', 'Invalid request. Please try again.', $lang));
     header('Location: ' . $shop_url);
     exit;
 }
@@ -22,21 +22,21 @@ $product_id = (int)($_POST['product_id'] ?? 0);
 $qty        = max(1, (int)($_POST['quantity'] ?? 1));
 $redirect_param = $_POST['redirect'] ?? '';
 $home_url   = $lang === 'en' ? '/en/' : '/';
-$redirect   = $redirect_param === 'cart' ? '/cart/' : ($redirect_param === 'home' ? $home_url : $shop_url);
+$redirect   = $redirect_param === 'cart' ? shop_path('cart', $lang) : ($redirect_param === 'home' ? $home_url : $shop_url);
 
 if (!$product_id) {
-    flash_set('error', 'Невалиден продукт.');
+    flash_set('error', t_or('cart.err.invalid_product', 'Невалиден продукт.', 'Invalid product.', $lang));
     header('Location: ' . $redirect);
     exit;
 }
 
 $pdo  = get_pdo();
-$stmt = $pdo->prepare('SELECT id, slug, name_bg, stock, active, `type`, variants FROM products WHERE id = ? AND active = 1');
+$stmt = $pdo->prepare('SELECT id, slug, name_bg, name_en, stock, active, `type`, variants FROM products WHERE id = ? AND active = 1');
 $stmt->execute([$product_id]);
 $product = $stmt->fetch();
 
 if (!$product) {
-    flash_set('error', 'Продуктът не е намерен.');
+    flash_set('error', t_or('cart.err.product_not_found', 'Продуктът не е намерен.', 'Product not found.', $lang));
     header('Location: ' . $redirect);
     exit;
 }
@@ -48,22 +48,23 @@ $variant_label = '';
 if ($product['type'] === 'variant') {
     $variant_id = (int)($_POST['variant_id'] ?? 0);
     if (!$variant_id) {
-        flash_set('error', 'Моля изберете вариант.');
+        flash_set('error', t_or('cart.err.choose_variant', 'Моля изберете вариант.', 'Please choose an option.', $lang));
         header('Location: ' . $redirect);
         exit;
     }
     $pv_stmt = $pdo->prepare(
-        'SELECT id, label_bg, stock, active FROM product_variants WHERE id = ? AND product_id = ?'
+        'SELECT id, label_bg, label_en, stock, active FROM product_variants WHERE id = ? AND product_id = ?'
     );
     $pv_stmt->execute([$variant_id, $product_id]);
     $pv = $pv_stmt->fetch();
     if (!$pv || !$pv['active']) {
-        flash_set('error', 'Вариантът не е намерен.');
+        flash_set('error', t_or('cart.err.variant_not_found', 'Вариантът не е намерен.', 'That option was not found.', $lang));
         header('Location: ' . $redirect);
         exit;
     }
     if ((int)$pv['stock'] <= 0) {
-        flash_set('error', h($pv['label_bg']) . ' е изчерпан.');
+        $_label = $lang === 'en' ? (($pv['label_en'] ?? '') ?: $pv['label_bg']) : $pv['label_bg'];
+        flash_set('error', t_or('cart.err.sold_out', '{name} е изчерпан.', '{name} is sold out.', $lang, ['name' => $_label]));
         header('Location: ' . $redirect . '?out=1');
         exit;
     }
@@ -72,7 +73,8 @@ if ($product['type'] === 'variant') {
 
 // For standard/print products, check product-level stock
 if ($product['type'] !== 'variant' && (int)$product['stock'] <= 0) {
-    flash_set('error', h($product['name_bg']) . ' е изчерпан.');
+    $_name = $lang === 'en' ? (($product['name_en'] ?? '') ?: $product['name_bg']) : $product['name_bg'];
+    flash_set('error', t_or('cart.err.sold_out', '{name} е изчерпан.', '{name} is sold out.', $lang, ['name' => $_name]));
     header('Location: ' . $redirect . '?out=1');
     exit;
 }
@@ -88,7 +90,7 @@ if ($product['type'] === 'print') {
     $colour   = trim($_POST['colour'] ?? '');
     $size     = trim($_POST['size']   ?? '');
 
-    $v_errors = print_validate_item($variants, $colour, $size);
+    $v_errors = print_validate_item($variants, $colour, $size, $lang);
     if ($v_errors) {
         flash_set('error', implode(' ', $v_errors));
         header('Location: ' . $redirect);
@@ -98,7 +100,7 @@ if ($product['type'] === 'print') {
     // Handle design file upload (custom products only)
     if (!empty($_FILES['design']['name'])) {
         if (($_FILES['design']['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
-            flash_set('error', 'Грешка при качване на файла (код ' . (int)$_FILES['design']['error'] . ').');
+            flash_set('error', t_or('cart.err.upload_failed', 'Файлът не можа да се качи. Моля, опитай отново.', 'The file could not be uploaded. Please try again.', $lang));
             header('Location: ' . $redirect);
             exit;
         }
@@ -107,7 +109,7 @@ if ($product['type'] === 'print') {
         $file_errors   = print_validate_design_file([
             'type' => $detected_mime,
             'size' => $_FILES['design']['size'],
-        ]);
+        ], $lang);
         if ($file_errors) {
             flash_set('error', implode(' ', $file_errors));
             header('Location: ' . $redirect);
@@ -119,7 +121,7 @@ if ($product['type'] === 'print') {
         $upload_dir = $_SERVER['DOCUMENT_ROOT'] . '/uploads/print-designs/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         if (!move_uploaded_file($_FILES['design']['tmp_name'], $upload_dir . $safe_name)) {
-            flash_set('error', 'Грешка при качване на дизайна.');
+            flash_set('error', t_or('cart.err.upload_failed', 'Файлът не можа да се качи. Моля, опитай отново.', 'The file could not be uploaded. Please try again.', $lang));
             header('Location: ' . $redirect);
             exit;
         }
@@ -152,15 +154,11 @@ foreach ($cart as &$item) {
         if ($new_qty === $item['quantity']) {
             // Already at stock limit — nothing added
             $actually_added = false;
-            $msg = $lang === 'en'
-                ? 'Sorry, no more units available for this item.'
-                : 'Няма повече налични бройки за този артикул.';
+            $msg = t_or('cart.err.no_more_stock', 'Няма повече налични бройки за този артикул.', 'Sorry, no more units available for this item.', $lang);
             flash_set('error', $msg);
         } elseif ($new_qty < $item['quantity'] + $qty) {
             // Partially capped
-            $msg = $lang === 'en'
-                ? "Only {$stock_limit} unit(s) available — quantity adjusted."
-                : "Налични са само {$stock_limit} бр. — количеството е коригирано.";
+            $msg = t_or('cart.err.capped', 'Налични са само {n} бр. — количеството е коригирано.', 'Only {n} available — quantity adjusted.', $lang, ['n' => $stock_limit]);
             flash_set('error', $msg);
         }
         $item['quantity'] = $new_qty;
@@ -185,9 +183,7 @@ unset($item);
 if (!$found) {
     $capped_qty = min($qty, $stock_limit);
     if ($capped_qty < $qty) {
-        $msg = $lang === 'en'
-            ? "Only {$stock_limit} unit(s) available — quantity adjusted."
-            : "Налични са само {$stock_limit} бр. — количеството е коригирано.";
+        $msg = t_or('cart.err.capped', 'Налични са само {n} бр. — количеството е коригирано.', 'Only {n} available — quantity adjusted.', $lang, ['n' => $stock_limit]);
         flash_set('error', $msg);
     }
     $entry = ['product_id' => $product_id, 'quantity' => $capped_qty];
@@ -208,11 +204,11 @@ $_SESSION['cart'] = $cart;
 if ($redirect_param === 'product') {
     $back = $shop_url . rawurlencode($product['slug']) . '/';
     if ($actually_added) {
-        flash_set('success', ($lang === 'en' ? 'Added to cart!' : 'Добавено в количката!'));
+        flash_set('success', t_or('cart.added', 'Добавено в количката!', 'Added to cart!', $lang));
         $back .= '?gads=atc';
     }
     header('Location: ' . $back);
 } else {
-    header('Location: /cart/?gads=atc');
+    header('Location: ' . shop_path('cart', $lang) . '?gads=atc');
 }
 exit;

@@ -11,18 +11,19 @@
  * @param array  $variants  Decoded variants JSON array
  * @param string $colour    Submitted colour name (e.g. "navy")
  * @param string $size      Submitted size (e.g. "L")
+ * @param string $lang      'bg' | 'en' — language of the messages
  */
-function print_validate_item(array $variants, string $colour, string $size): array
+function print_validate_item(array $variants, string $colour, string $size, string $lang = 'bg'): array
 {
     $errors        = [];
     $valid_colours = array_column($variants['colours'] ?? [], 'name');
     $valid_sizes   = $variants['sizes'] ?? [];
 
     if ($colour === '' || !in_array($colour, $valid_colours, true)) {
-        $errors[] = 'Моля изберете валиден цвят.';
+        $errors[] = t_or('cart.err.choose_colour', 'Моля изберете валиден цвят.', 'Please choose a colour.', $lang);
     }
     if ($size === '' || !in_array($size, $valid_sizes, true)) {
-        $errors[] = 'Моля изберете валиден размер.';
+        $errors[] = t_or('cart.err.choose_size', 'Моля изберете валиден размер.', 'Please choose a size.', $lang);
     }
     return $errors;
 }
@@ -36,16 +37,16 @@ function print_validate_item(array $variants, string $colour, string $size): arr
  *           Callers should use mime_content_type($file['tmp_name']) and pass the
  *           server-detected MIME as 'type' instead of relying on the browser value.
  */
-function print_validate_design_file(array $file): array
+function print_validate_design_file(array $file, string $lang = 'bg'): array
 {
     $errors  = [];
     $allowed = ['image/jpeg', 'image/png', 'image/webp'];
 
     if (!in_array($file['type'] ?? '', $allowed, true)) {
-        $errors[] = 'Неподдържан формат. Разрешени: JPEG, PNG, WebP.';
+        $errors[] = t_or('cart.err.file_type', 'Неподдържан формат. Разрешени: JPEG, PNG, WebP.', 'This file type is not supported. Please upload a JPEG, PNG or WebP image.', $lang);
     }
     if (($file['size'] ?? 0) > 10 * 1024 * 1024) {
-        $errors[] = 'Файлът е прекалено голям. Максимум 10 MB.';
+        $errors[] = t_or('cart.err.file_size', 'Файлът е прекалено голям. Максимум 10 MB.', 'The file is too large. The maximum is 10 MB.', $lang);
     }
     return $errors;
 }

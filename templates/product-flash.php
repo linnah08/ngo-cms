@@ -16,6 +16,9 @@
  *     to the "Add to cart" button, or to the page's <h1> when there is none;
  *   - no animation, so nothing to switch off for prefers-reduced-motion.
  *
+ * Copy: t_or() — content/{lang}/strings.json, with built-in BG/EN defaults.
+ * Links: shop_path() — /en/cart/ and /en/checkout/ for English buyers.
+ *
  * Inline styles only (see CLAUDE.md — main.css may be stale-cached).
  *
  * Expects: $flash (array of ['type' => ..., 'message' => ...]).
@@ -24,14 +27,6 @@ $flash = $flash ?? [];
 if (!$flash) return;
 $_pf_has_success = false;
 
-// Copy comes from content/{lang}/strings.json. A site that customised its
-// strings.json keeps its own copy through updates (the updater skips files the
-// owner changed), so it may not have these keys yet — fall back to the
-// defaults rather than printing the raw key.
-$_pf_t = static function (string $key, string $bg, string $en): string {
-    $v = t($key);
-    return $v !== $key ? $v : (get_lang() === 'en' ? $en : $bg);
-};
 ?>
 <?php foreach ($flash as $f):
     $_pf_success = ($f['type'] ?? '') === 'success';
@@ -44,17 +39,17 @@ $_pf_t = static function (string $key, string $bg, string $en): string {
       <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
         <span style="font-weight:600;"><span aria-hidden="true">✓ </span><?= h($f['message']) ?></span>
         <span style="display:flex;gap:.6rem;flex-wrap:wrap;">
-          <a href="/cart/" class="btn btn--outline"
+          <a href="<?= h(shop_path('cart')) ?>" class="btn btn--outline"
              style="display:inline-flex;align-items:center;min-height:44px;padding:.45rem 1.1rem;font-size:.9rem;">
-            <?= h($_pf_t('shop.added.view_cart', 'Виж количката', 'View cart')) ?>
+            <?= h(t_or('shop.added.view_cart', 'Виж количката', 'View cart')) ?>
           </a>
-          <a href="/checkout/" class="btn btn--primary"
+          <a href="<?= h(shop_path('checkout')) ?>" class="btn btn--primary"
              style="display:inline-flex;align-items:center;min-height:44px;padding:.45rem 1.1rem;font-size:.9rem;">
-            <?= h($_pf_t('shop.added.checkout', 'Завърши поръчката', 'Checkout now')) ?> <span aria-hidden="true">&nbsp;→</span>
+            <?= h(t_or('shop.added.checkout', 'Завърши поръчката', 'Checkout now')) ?> <span aria-hidden="true">&nbsp;→</span>
           </a>
         </span>
       </div>
-      <button type="button" data-cart-notice-close aria-label="<?= h($_pf_t('shop.added.dismiss', 'Затвори съобщението', 'Dismiss message')) ?>"
+      <button type="button" data-cart-notice-close aria-label="<?= h(t_or('shop.added.dismiss', 'Затвори съобщението', 'Dismiss message')) ?>"
               style="position:absolute;top:.25rem;right:.25rem;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:transparent;border:0;border-radius:6px;color:inherit;font-size:1.4rem;line-height:1;cursor:pointer;">
         <span aria-hidden="true">×</span>
       </button>

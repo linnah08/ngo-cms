@@ -353,14 +353,95 @@ function other_lang(): string {
     return get_lang() === 'bg' ? 'en' : 'bg';
 }
 
-function t(string $key): string {
-    static $strings = null;
-    if ($strings === null) {
-        $lang = get_lang();
+/** The site's UI strings for one language (content/{lang}/strings.json), cached per language. */
+function lang_strings(string $lang): array {
+    static $cache = [];
+    $lang = $lang === 'en' ? 'en' : 'bg';
+    if (!isset($cache[$lang])) {
         $file = __DIR__ . "/content/{$lang}/strings.json";
-        $strings = file_exists($file) ? json_decode(file_get_contents($file), true) : [];
+        $data = file_exists($file) ? json_decode((string) file_get_contents($file), true) : null;
+        $cache[$lang] = is_array($data) ? $data : [];
     }
-    return $strings[$key] ?? $key;
+    return $cache[$lang];
+}
+
+function t(string $key): string {
+    $v = lang_strings(get_lang())[$key] ?? null;
+    return is_string($v) ? $v : $key;
+}
+
+/**
+ * A UI string with its built-in BG/EN text.
+ *
+ * The site's strings.json wins when it has the key, so an NGO can reword it;
+ * otherwise the default here is used. A site that customised strings.json
+ * keeps its own copy through updates (the updater skips owner-changed files),
+ * so new keys may be missing there — this never prints a raw key.
+ *
+ * $lang defaults to the page's language; pass it explicitly where the
+ * language comes from elsewhere (a POST field, an order).
+ *
+ * $vars fills {name} placeholders — plain replacement, not sprintf, so a
+ * reworded string with a stray "%" can never break the page.
+ */
+function t_or(string $key, string $bg, string $en, ?string $lang = null, array $vars = []): string {
+    $lang = ($lang ?? get_lang()) === 'en' ? 'en' : 'bg';
+    $v    = lang_strings($lang)[$key] ?? null;
+    $text = (is_string($v) && $v !== '') ? $v : ($lang === 'en' ? $en : $bg);
+    if ($vars) {
+        $map = [];
+        foreach ($vars as $k => $val) $map['{' . $k . '}'] = (string) $val;
+        $text = strtr($text, $map);
+    }
+    return $text;
+}
+
+/**
+ * Language of a shop POST handler (cart/add.php, update.php, remove.php).
+ * Those URLs have no /en/ prefix, so the form says which language it came from.
+ */
+function post_lang(): string {
+    return ($_POST['_lang'] ?? '') === 'en' ? 'en' : 'bg';
+}
+
+/**
+ * Buyer-facing shop URLs, in the buyer's language. One PHP file serves each
+ * page; the /en/... paths are thin wrappers so get_lang() and the header see
+ * English.
+ */
+function shop_path(string $page, ?string $lang = null): string {
+    $lang = ($lang ?? get_lang()) === 'en' ? 'en' : 'bg';
+    $paths = [
+        'shop'           => ['/magazin/',                 '/en/shop/'],
+        'cart'           => ['/cart/',                    '/en/cart/'],
+        'checkout'       => ['/checkout/',                '/en/checkout/'],
+        'confirmation'   => ['/checkout/confirmation/',   '/en/checkout/confirmation/'],
+        'payment-failed' => ['/checkout/payment-failed/', '/en/checkout/payment-failed/'],
+    ];
+    if (!isset($paths[$page])) {
+        throw new InvalidArgumentException("Unknown shop page: $page");
+    }
+    return $paths[$page][$lang === 'en' ? 1 : 0];
+}
+
+/** What the buyer's bank shows for a shop order (IRIS Pay by Bank). */
+function shop_payment_title(string $order_number, string $lang): string {
+    return t_or('checkout.pay.title', 'Поръчка', 'Order', $lang) . ' ' . $order_number;
+}
+
+function shop_payment_description(string $order_number, string $lang): string {
+    $site = $lang === 'en' ? SITE_NAME_EN : SITE_NAME_BG;
+    return $site . ' — ' . mb_strtolower(t_or('checkout.pay.title', 'Поръчка', 'Order', $lang)) . ' ' . $order_number;
+}
+
+/** Buyer-facing names of the delivery types (checkout and order confirmation). */
+function checkout_delivery_type_labels(?string $lang = null): array {
+    return [
+        'office'  => t_or('checkout.type.office',  'До офис',             'To an office',           $lang),
+        'apt'     => t_or('checkout.type.apt',     'До автомат',          'To a parcel locker',     $lang),
+        'address' => t_or('checkout.type.address', 'До врата',            'To your door',           $lang),
+        'locker'  => t_or('checkout.type.locker',  'До автомат (BoxNow)', 'To a BoxNow locker',     $lang),
+    ];
 }
 
 // ============================================

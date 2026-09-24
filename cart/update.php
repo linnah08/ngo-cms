@@ -3,12 +3,13 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 start_session();
 
+$lang = post_lang();
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_verify()) {
-    header('Location: /cart/');
+    header('Location: ' . shop_path('cart', $lang));
     exit;
 }
 
-$lang = get_lang();
 $quantities = $_POST['quantity'] ?? [];
 $cart = $_SESSION['cart'] ?? [];
 
@@ -56,11 +57,9 @@ foreach ($cart as $i => $item) {
 $_SESSION['cart'] = $new_cart;
 
 if ($capped) {
-    $msg = $lang === 'en'
-        ? 'Some quantities were adjusted to match available stock.'
-        : 'Количествата са коригирани според наличността.';
+    $msg = t_or('cart.err.quantities_adjusted', 'Количествата са коригирани според наличността.', 'Some quantities were adjusted to match available stock.', $lang);
     flash_set('error', $msg);
 }
 
-header('Location: /cart/');
+header('Location: ' . shop_path('cart', $lang));
 exit;

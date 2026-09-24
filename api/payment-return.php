@@ -31,9 +31,9 @@ if (!$order || $order['payment_method'] !== 'card') {
 
 $confirm_url = $order['type'] === 'donation'
     ? '/donation/confirmation/?order=' . urlencode($order_number)
-    : '/checkout/confirmation/?order=' . urlencode($order_number);
+    : shop_path('confirmation', $order['lang'] ?? 'bg') . '?order=' . urlencode($order_number);
 
-$failed_url = '/checkout/payment-failed/?order=' . urlencode($order_number);
+$failed_url = shop_path('payment-failed', $order['lang'] ?? 'bg') . '?order=' . urlencode($order_number);
 
 // ── Retry: re-register the same order with DSK Bank ──────────────────────────
 if (isset($_GET['retry'])) {

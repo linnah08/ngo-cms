@@ -2,8 +2,11 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 start_session();
 
+// The form says which language it came from; go back to that cart.
+$back = shop_path('cart', post_lang());
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_verify()) {
-    header('Location: /cart/');
+    header('Location: ' . $back);
     exit;
 }
 
@@ -14,5 +17,5 @@ if ($idx >= 0 && isset($cart[$idx])) {
 }
 $_SESSION['cart'] = array_values($cart);
 
-header('Location: /cart/');
+header('Location: ' . $back);
 exit;

@@ -38,8 +38,8 @@ if (!$order || $order['payment_method'] !== 'iris') {
 
 $confirm_url = $order['type'] === 'donation'
     ? '/donation/confirmation/?order=' . urlencode($order_number)
-    : '/checkout/confirmation/?order=' . urlencode($order_number);
-$failed_url  = '/checkout/payment-failed/?order=' . urlencode($order_number);
+    : shop_path('confirmation', $order['lang'] ?? 'bg') . '?order=' . urlencode($order_number);
+$failed_url  = shop_path('payment-failed', $order['lang'] ?? 'bg') . '?order=' . urlencode($order_number);
 
 // ── Retry: re-register the same order with IRIS ──────────────────────────────
 if (isset($_GET['retry'])) {
@@ -63,8 +63,8 @@ if (isset($_GET['retry'])) {
         $result = $iris->register([
             'currency'    => 'EUR',
             'amountEur'   => (float)$order['total_eur'],
-            'name'        => 'Поръчка ' . $order_number,
-            'description' => SITE_NAME_BG . ' — поръчка ' . $order_number,
+            'name'        => shop_payment_title($order_number, $order['lang'] ?? 'bg'),
+            'description' => shop_payment_description($order_number, $order['lang'] ?? 'bg'),
             'orderId'     => $order_number,
             'redirectUrl' => $redirectUrl,
             'hookUrl'     => $hookUrl,

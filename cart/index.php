@@ -6,7 +6,7 @@ start_session();
 $lang = get_lang();
 $pdo  = get_pdo();
 
-$shop_url = $lang === 'en' ? '/en/shop/' : '/magazin/';
+$shop_url = shop_path('shop', $lang);
 
 // Redirect to shop if cart is empty
 $cart = $_SESSION['cart'] ?? [];
@@ -98,11 +98,13 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     <!-- Hidden form used by JS remove buttons (must be outside the update form) -->
     <form id="removeForm" method="POST" action="/cart/remove.php">
       <?= csrf_field() ?>
+      <input type="hidden" name="_lang" value="<?= h($lang) ?>">
       <input type="hidden" id="removeIndex" name="cart_index" value="">
     </form>
 
     <form method="POST" action="/cart/update.php">
       <?= csrf_field() ?>
+      <input type="hidden" name="_lang" value="<?= h($lang) ?>">
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1.5rem;">
         <table style="width:100%;border-collapse:collapse;">
           <thead>
@@ -206,7 +208,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
               <td style="padding:.75rem 1rem;text-align:center;vertical-align:middle;">
                 <button type="button" onclick="removeItem(<?= $ri ?>)"
                         style="background:none;border:none;cursor:pointer;color:#c0392b;font-size:1.1rem;padding:0;"
-                        title="<?= $lang === 'bg' ? 'Премахни' : 'Remove' ?>">✕</button>
+                        title="<?= $lang === 'bg' ? 'Премахни' : 'Remove' ?>"
+                        aria-label="<?= $lang === 'bg' ? 'Премахни' : 'Remove' ?>"><span aria-hidden="true">✕</span></button>
               </td>
             </tr>
             <?php endforeach; ?>
@@ -252,7 +255,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     </script>
 
     <div style="text-align:right;">
-      <a href="/checkout/" class="btn btn--primary" style="padding:.9rem 2rem;font-size:1rem;">
+      <a href="<?= h(shop_path('checkout', $lang)) ?>" class="btn btn--primary" style="padding:.9rem 2rem;font-size:1rem;">
         <?= $lang === 'bg' ? 'Продължи към поръчка →' : 'Proceed to checkout →' ?>
       </a>
     </div>
