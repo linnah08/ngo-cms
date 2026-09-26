@@ -1,5 +1,8 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/legal_pages.php';
+// The English saved in the admin wins; the text below is the fallback for a site that has none yet.
+$admin_en = legal_en_content('privacy');
 $page_title       = 'Privacy Policy';
 $page_description = 'Privacy policy of ' . SITE_NAME_EN . '.';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
@@ -9,23 +12,28 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
   <div class="container">
     <span class="section-label">Legal</span>
     <h1>Privacy Policy</h1>
+    <?php if ($admin_en === ''): ?>
     <p style="margin-top:0.5rem;color:var(--text-muted);font-size:0.9rem;">Last updated: 5 October 2025</p>
+    <?php endif; ?>
   </div>
 </section>
 
 <section class="section">
   <div class="container container--narrow">
+<?php if ($admin_en !== ''): ?>
+    <?= $admin_en ?>
+<?php else: ?>
 
     <h2>1. Introduction</h2>
-    <p><?= h(SITE_NAME_EN) ?> ("Foundation", "we", "us") is committed to protecting the personal data of our donors, volunteers, partners and website visitors. This privacy policy describes how we collect, use, store and protect your personal information in accordance with Regulation (EU) 2016/679 (GDPR) and the Personal Data Protection Act of the Republic of Bulgaria.</p>
+    <p><?= h(legal_en_org_name()) ?> ("Foundation", "we", "us") is committed to protecting the personal data of our donors, volunteers, partners and website visitors. This privacy policy describes how we collect, use, store and protect your personal information in accordance with Regulation (EU) 2016/679 (GDPR) and the Personal Data Protection Act of the Republic of Bulgaria.</p>
 
     <h2>2. Data Controller</h2>
     <p>
-      <?= h(SITE_NAME_EN) ?><br>
-      Address: ul. Varovita 12, Lozen<br>
-      Phone: 0896670346<br>
-      Email: <a href="mailto:<?= h(SITE_EMAIL) ?>"><?= h(SITE_EMAIL) ?></a><br>
-      UIC: 208453360
+      <?= h(legal_en_org_name()) ?><br>
+<?php if (legal_const('SITE_PHONE') !== ''): ?>
+      Phone: <?= h(legal_const('SITE_PHONE')) ?><br>
+<?php endif; ?>
+      Email: <a href="mailto:<?= h(SITE_EMAIL) ?>"><?= h(SITE_EMAIL) ?></a>
     </p>
 
     <h2>3. What personal data we collect</h2>
@@ -65,8 +73,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
     <h2>12. Contact and complaints</h2>
     <p>
-      Email: <a href="mailto:<?= h(SITE_EMAIL) ?>"><?= h(SITE_EMAIL) ?></a><br>
-      Phone: 0896670346
+      Email: <a href="mailto:<?= h(SITE_EMAIL) ?>"><?= h(SITE_EMAIL) ?></a><?php if (legal_const('SITE_PHONE') !== ''): ?><br>
+      Phone: <?= h(legal_const('SITE_PHONE')) ?>
+<?php endif; ?>
     </p>
     <p>
       Commission for Personal Data Protection<br>
@@ -74,6 +83,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
       <a href="https://www.cpdp.bg" target="_blank" rel="noopener">www.cpdp.bg</a>
     </p>
 
+<?php endif; ?>
   </div>
 </section>
 

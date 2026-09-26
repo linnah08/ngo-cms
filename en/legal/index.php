@@ -1,5 +1,8 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/legal_pages.php';
+// The English saved in the admin wins; the text below is the fallback for a site that has none yet.
+$admin_en = legal_en_content('legal_info');
 $page_title       = 'Legal Information';
 $page_description = 'Legal information of ' . SITE_NAME_EN . '.';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
@@ -9,25 +12,31 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
   <div class="container">
     <span class="section-label">Legal</span>
     <h1>Legal Information</h1>
+    <?php if ($admin_en === ''): ?>
     <p style="margin-top:0.5rem;color:var(--text-muted);font-size:0.9rem;">Last updated: 5 October 2025</p>
+    <?php endif; ?>
   </div>
 </section>
 
 <section class="section">
   <div class="container container--narrow">
+<?php if ($admin_en !== ''): ?>
+    <?= $admin_en ?>
+<?php else: ?>
 
     <h2>1. Publisher information</h2>
     <p>
-      <?= h(SITE_NAME_EN) ?><br>
-      Address: ul. Varovita 12, Lozen<br>
-      Phone: +359896670346<br>
-      Email: <a href="mailto:<?= h(SITE_EMAIL) ?>"><?= h(SITE_EMAIL) ?></a><br>
-      Representative: Detelina Boyanova Vasileva, Director<br>
-      IBAN: BG40STSA93000032062526, BIC: STSABGSF, Bank: DSK
+      <?= h(legal_en_org_name()) ?><br>
+<?php if (legal_const('SITE_PHONE') !== ''): ?>
+      Phone: <?= h(legal_const('SITE_PHONE')) ?><br>
+<?php endif; ?>
+      Email: <a href="mailto:<?= h(SITE_EMAIL) ?>"><?= h(SITE_EMAIL) ?></a><?php if (legal_const('SITE_IBAN') !== ''): ?><br>
+      IBAN: <?= h(legal_const('SITE_IBAN')) ?><?php if (legal_const('SITE_BIC') !== ''): ?>, BIC: <?= h(legal_const('SITE_BIC')) ?><?php endif; ?><?php if (legal_const('SITE_BANK_NAME') !== ''): ?>, Bank: <?= h(legal_const('SITE_BANK_NAME')) ?><?php endif; ?>
+<?php endif; ?>
     </p>
 
     <h2>2. Purpose and activities</h2>
-    <p><?= h(SITE_NAME_EN) ?> is a non-profit legal entity operating in the public interest in accordance with the Non-Profit Legal Entities Act of the Republic of Bulgaria.</p>
+    <p><?= h(legal_en_org_name()) ?> is a non-profit legal entity operating in the public interest in accordance with the Non-Profit Legal Entities Act of the Republic of Bulgaria.</p>
 
     <h2>3. Copyright</h2>
     <p>All content is the property of the Foundation. Personal non-commercial use is permitted with retention of copyright notices. Copying for commercial purposes without written permission is prohibited.</p>
@@ -55,10 +64,12 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
     <h2>11. Contacts</h2>
     <p>
-      Email: <a href="mailto:<?= h(SITE_EMAIL) ?>"><?= h(SITE_EMAIL) ?></a><br>
-      Phone: +359896670346
+      Email: <a href="mailto:<?= h(SITE_EMAIL) ?>"><?= h(SITE_EMAIL) ?></a><?php if (legal_const('SITE_PHONE') !== ''): ?><br>
+      Phone: <?= h(legal_const('SITE_PHONE')) ?>
+<?php endif; ?>
     </p>
 
+<?php endif; ?>
   </div>
 </section>
 

@@ -1,5 +1,8 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/legal_pages.php';
+// The English saved in the admin wins; the text below is the fallback for a site that has none yet.
+$admin_en = legal_en_content('terms');
 $page_title       = 'Terms of Use';
 $page_description = 'Terms of use for the ' . SITE_NAME_EN . ' online shop.';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
@@ -14,9 +17,12 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
 <section class="section">
   <div class="container container--narrow">
+<?php if ($admin_en !== ''): ?>
+    <?= $admin_en ?>
+<?php else: ?>
 
     <h2>I. General provisions</h2>
-    <p>These Terms govern the relationship between <?= h(SITE_NAME_EN) ?> and any natural person who uses the online shop at <?= h(SITE_URL) ?>/. By using the site, the User declares that they accept these Terms.</p>
+    <p>These Terms govern the relationship between <?= h(legal_en_org_name()) ?> and any natural person who uses the online shop at <?= h(SITE_URL) ?>/. By using the site, the User declares that they accept these Terms.</p>
 
     <h2>II. Subject of activity</h2>
     <p>The online shop offers paper napkins with creative and communication content. Net revenues fund the Foundation's projects. Purchasing a product does not constitute a donation unless explicitly stated otherwise.</p>
@@ -53,11 +59,11 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
     <h2>XIII. Contacts</h2>
     <p>
-      <?= h(SITE_NAME_EN) ?><br>
-      Lozen village, ul. Varovita 12<br>
+      <?= h(legal_en_org_name()) ?><br>
       <a href="mailto:<?= h(SITE_EMAIL) ?>"><?= h(SITE_EMAIL) ?></a>
     </p>
 
+<?php endif; ?>
   </div>
 </section>
 
