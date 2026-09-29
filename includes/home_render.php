@@ -100,8 +100,26 @@ function home_shared_head(): string {
 <style id="home-sections-css">
 .home-video__play:focus-visible{outline:4px solid #fff;outline-offset:-8px;box-shadow:inset 0 0 0 8px #000}
 .home-rich>*:first-child{margin-top:0}.home-rich>*+*{margin-top:1rem}
+/* Single-product spotlight (templates/home/product-spotlight.php). A site theme
+   stylesheet restyles it without touching this shared file: set the --spot-* variables
+   on .home-spot, or override a part with one extra class (.home-spot .home-spot__title). */
+.home-spot{display:grid;grid-template-columns:var(--spot-columns,minmax(0,1fr) minmax(0,1fr));gap:var(--spot-gap,clamp(1.5rem,4vw,4rem));align-items:center;background:var(--spot-bg,var(--off-white));border:var(--spot-border,1px solid var(--border));border-radius:var(--spot-radius,calc(var(--radius-lg) * 2));padding:var(--spot-padding,clamp(1.25rem,4vw,3.5rem))}
+.home-spot__media{display:block;aspect-ratio:var(--spot-img-ratio,1);overflow:hidden;border-radius:var(--spot-img-radius,var(--radius-lg));background:var(--white);box-shadow:var(--spot-img-shadow,0 12px 32px rgba(0,0,0,.10))}
+.home-spot__media img{width:100%;height:100%;object-fit:cover;display:block}
+.home-spot__body{display:flex;flex-direction:column;align-items:flex-start}
+.home-spot__label{margin:0 0 1rem}
+.home-spot__title{font-size:var(--spot-title-size,clamp(1.75rem,3.5vw,2.75rem));line-height:1.15;margin:0 0 1rem}
+.home-spot__title a{color:inherit;text-decoration:none}
+.home-spot__desc{font-size:1rem;color:var(--text-muted);line-height:1.7;margin:0 0 1.5rem;white-space:pre-line;display:-webkit-box;-webkit-line-clamp:var(--spot-desc-lines,8);-webkit-box-orient:vertical;overflow:hidden}
+.home-spot__price{margin:0 0 .5rem}
+.home-spot__price .price{font-size:1.5rem;font-weight:700}
+.home-spot__low{font-size:.85rem;color:#b45309;font-weight:600;margin:0 0 .5rem}
+.home-spot__actions{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:1rem}
+.home-spot__actions form{margin:0}
+.home-spot__actions .btn{justify-content:center;font-size:1rem;padding:.8rem 1.6rem;min-height:44px;box-sizing:border-box}
+.home-spot__soldout{margin:0;padding:.8rem 1.6rem;border-radius:var(--radius);background:#fdf0ef;border:1px solid #f0c4c0;color:#c0392b;font-weight:600}
 @media(max-width:640px){
-  .home-ti,.campaign-block-grid{grid-template-columns:1fr!important}
+  .home-ti,.campaign-block-grid,.home-spot{grid-template-columns:1fr!important}
   .home-ti>div{order:0!important}
   .home-cards{grid-template-columns:1fr!important}
 }
