@@ -432,6 +432,9 @@ body.nav-open {
   font-weight: 400;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  /* Set explicitly: otherwise an <a class="btn"> inherits the body's 1.8 while a
+     <button class="btn"> doesn't, and the two come out different heights side by side. */
+  line-height: 1.25;
   padding: 0.7rem 1.6rem;
   border-radius: var(--radius);
   border: 2px solid transparent;
