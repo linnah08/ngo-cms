@@ -486,6 +486,55 @@ final class AdminUpdatesPageTest extends TestCase
         $this->assertSame(403, $code);
     }
 
+    /**
+     * An update that did not load was undone automatically. The admin is told
+     * so in plain words — which version the site is on, that it works, that
+     * nothing is needed — and the outcome is shown once, then cleared.
+     */
+    public function testRolledBackUpdateTellsTheAdminTheSiteWorks(): void
+    {
+        $body = $this->renderFinishedState([
+            'phase' => 'failed', 'percent' => 100, 'status' => 'rolled_back',
+            'to_version' => '9.9.9', 'from_version' => '9.9.8', 'skipped' => [], 'backup' => 'pre-update-9.9.8-x.zip',
+        ]);
+        $this->assertStringContainsString('Обновяването до версия 9.9.9 не беше приложено', $body);
+        $this->assertStringContainsString('върнат автоматично на предишната версия', $body);
+        $this->assertStringContainsString('(9.9.8) и работи нормално', $body);
+        $this->assertStringContainsString('Не е нужно да правите нищо', $body);
+        $this->assertStringNotContainsString('pre-update-9.9.8-x.zip', $body, 'A working site needs no backup name');
+    }
+
+    public function testFailedRollbackNamesTheBackupForSupport(): void
+    {
+        $body = $this->renderFinishedState([
+            'phase' => 'failed', 'percent' => 95, 'status' => 'rollback_failed',
+            'to_version' => '9.9.9', 'from_version' => '9.9.8', 'skipped' => [],
+            'backup' => 'pre-update-9.9.8-20261003-120000.zip',
+        ]);
+        $this->assertStringContainsString('не можа да бъде върнат автоматично', $body);
+        $this->assertStringContainsString('pre-update-9.9.8-20261003-120000.zip', $body);
+    }
+
+    private function renderFinishedState(array $state): string
+    {
+        $this->requireServer();
+        $file = self::$root . '/logs/update-progress.json';
+        if (is_file($file)) {
+            $this->markTestSkipped('An update state already exists in this checkout — not overwriting it.');
+        }
+        @mkdir(dirname($file), 0755, true);
+        file_put_contents($file, json_encode($state + ['updated_at' => time()], JSON_UNESCAPED_UNICODE));
+        try {
+            $jar = $this->loginAs(self::$adminEmail, self::$adminPassword);
+            [$code, $body] = $this->getRaw('/admin/updates.php', $jar);
+            @unlink($jar);
+        } finally {
+            @unlink($file);
+        }
+        $this->assertSame(200, $code);
+        return (string) $body;
+    }
+
     public function testProgressEndpointReportsIdleWhenNothingIsRunning(): void
     {
         $this->requireServer();

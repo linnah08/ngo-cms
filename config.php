@@ -269,10 +269,24 @@ define('ROOT_PATH',     $_SERVER['DOCUMENT_ROOT']);
 // needed for a check this simple) — a mistake here would break the whole site,
 // not just this feature. It is a strict no-op whenever `.maintenance` is
 // absent, which is the case for every request today.
+//
+// The one request let through is the updater's own check that the updated site
+// still loads (includes/updater.php, updater_boot_check()). It carries a
+// one-time token that only exists in logs/ — never web-readable — for the few
+// seconds of the check.
+function _om_boot_check_allowed(string $root, string $given): bool
+{
+    $file = $root . '/logs/boot-check.token';
+    if (strlen($given) < 32 || !is_file($file) || time() - (int) @filemtime($file) > 300) {
+        return false;
+    }
+    $token = trim((string) @file_get_contents($file));
+    return strlen($token) >= 32 && hash_equals($token, $given);
+}
 if (PHP_SAPI !== 'cli' && file_exists(ROOT_PATH . '/.maintenance')) {
     $_om_maint_uri = $_SERVER['REQUEST_URI'] ?? '/';
     $_om_is_admin  = $_om_maint_uri === '/admin' || str_starts_with($_om_maint_uri, '/admin/');
-    if (!$_om_is_admin) {
+    if (!$_om_is_admin && !_om_boot_check_allowed(ROOT_PATH, (string) ($_SERVER['HTTP_X_NGO_BOOT_CHECK'] ?? ''))) {
         http_response_code(503);
         header('Retry-After: 120');
         // The branded page picks BG/EN from the URL. The inline fallback covers

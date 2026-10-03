@@ -24,6 +24,13 @@
  *   - updater_progress_clear(): void
  *   - updater_progress_is_stale(array $state, int $maxAge = 90, ?int $now = null): bool
  *
+ * Boot check + rollback (see the sections of the same names below): after
+ * applying, the site's key pages are loaded in a separate PHP process; if they
+ * no longer load, every file the update wrote is put back automatically.
+ *   - updater_boot_check(string $root, ?array $pages = null, ?string $method = null, array $opts = []): array
+ *   - updater_boot_check_verdict(array $baseline, array $after): array
+ *   - updater_restore_backup(string $root, string $backupZip, array $journal): array
+ *
  * A couple of small pure helpers are also exposed for testability:
  *   - updater_version_needs_update(string $local, string $latest): bool
  *   - updater_diff_conflicts(array $oldChecksums, array $newFiles, callable $liveHasher): array
@@ -574,8 +581,10 @@ function updater_progress_phases(): array
         'backup'   => [5, 30],
         'download' => [30, 55],
         'extract'  => [55, 65],
-        'apply'    => [65, 90],
-        'migrate'  => [90, 100],
+        'apply'    => [65, 85],
+        'migrate'  => [85, 90],
+        'verify'   => [90, 95],
+        'restore'  => [95, 100],
         'done'     => [100, 100],
     ];
 }
@@ -677,6 +686,23 @@ function updater_backup_excludes(): array
 }
 
 /**
+ * backups/, created on first use and locked against web access. The backup zip
+ * holds db.config.php, and its name (version + timestamp) is guessable, so it
+ * must never be downloadable — the same "Require all denied" logs/ gets.
+ */
+function updater_backups_dir(): ?string
+{
+    $dir = updater_root() . '/backups';
+    if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
+        return null;
+    }
+    if (!is_file($dir . '/.htaccess')) {
+        @file_put_contents($dir . '/.htaccess', "Require all denied\n");
+    }
+    return $dir;
+}
+
+/**
  * Zips the current live codebase (application code only — see
  * updater_backup_excludes()) into backups/pre-update-{from}-{timestamp}.zip.
  * Returns the backup file path, or null if ZipArchive is unavailable or the
@@ -695,8 +721,8 @@ function updater_create_backup(string $fromVersion, ?callable $onProgress = null
     }
 
     $root       = updater_root();
-    $backupsDir = $root . '/backups';
-    if (!is_dir($backupsDir) && !@mkdir($backupsDir, 0755, true) && !is_dir($backupsDir)) {
+    $backupsDir = updater_backups_dir();
+    if ($backupsDir === null) {
         return null;
     }
 
@@ -780,6 +806,502 @@ function updater_log_attempt(string $from, string $to, string $status, array $sk
     }
 }
 
+// ── Boot check ─────────────────────────────────────────────────────────────────
+// After an update is applied, and before the site leaves maintenance mode, the
+// new tree has to prove it still serves pages. v0.17.0 showed why: a release
+// whose files were all written correctly still took a site down, because the
+// site's own kept config.php and a new file declared the same function. Only
+// actually loading the site finds that.
+//
+// The pages are rendered in a SEPARATE PHP process, so a fatal error in them
+// kills that process and not the updater, which then still has the chance to
+// put the old files back. Two ways to get such a process, in order:
+//   - cli:  the PHP command-line binary via proc_open(), with $_SERVER set up
+//           the way a web request would have it. Works without any network.
+//   - http: a request to SITE_URL, for hosts that disable proc_open(). The
+//           site is in maintenance mode at that point, so the request carries
+//           a one-time token that config.php accepts in its place.
+// With neither, the check is recorded as "not checked" — never as a failure.
+//
+// The same check runs on the OLD tree first (the baseline). A page that does
+// not pass there — the CLI lacks an extension, the home page needs a database
+// the CLI cannot reach, the host cannot reach its own domain — says something
+// about this server, not about the release, so only pages that pass the
+// baseline can fail the update. Without that, an environment quirk would roll
+// back every good release.
+
+/** URL => script (relative to the site root) that serves it. */
+function updater_boot_check_pages(): array
+{
+    return [
+        '/'               => 'index.php',
+        '/en/'            => 'en/index.php',
+        '/admin/login.php' => 'admin/login.php',
+    ];
+}
+
+function updater_proc_open_enabled(): bool
+{
+    if (!function_exists('proc_open') || !function_exists('proc_close')) {
+        return false;
+    }
+    $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+    return !in_array('proc_open', $disabled, true);
+}
+
+/**
+ * Runs $argv (no shell) and waits at most $timeout seconds. Null when the
+ * process could not be started at all.
+ *
+ * @return array{exit:int, stdout:string, stderr:string, timed_out:bool}|null
+ */
+function updater_run_process(array $argv, int $timeout, ?string $cwd = null): ?array
+{
+    if (!updater_proc_open_enabled()) {
+        return null;
+    }
+    $proc = @proc_open($argv, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $cwd);
+    if (!is_resource($proc)) {
+        return null;
+    }
+    fclose($pipes[0]);
+    stream_set_blocking($pipes[1], false);
+    stream_set_blocking($pipes[2], false);
+
+    $out = $err = '';
+    $limit    = 4 * 1024 * 1024;
+    $deadline = microtime(true) + $timeout;
+    $timedOut = false;
+    while (!feof($pipes[1]) || !feof($pipes[2])) {
+        $read = [];
+        if (!feof($pipes[1])) $read[] = $pipes[1];
+        if (!feof($pipes[2])) $read[] = $pipes[2];
+        $w = $e = null;
+        if (@stream_select($read, $w, $e, 0, 200000) === false) {
+            usleep(50000);
+        }
+        foreach ($read as $pipe) {
+            $chunk = (string) fread($pipe, 65536);
+            if ($pipe === $pipes[1]) {
+                if (strlen($out) < $limit) $out .= $chunk;
+            } elseif (strlen($err) < $limit) {
+                $err .= $chunk;
+            }
+        }
+        if (microtime(true) > $deadline) {
+            $timedOut = true;
+            @proc_terminate($proc, 9);
+            break;
+        }
+    }
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    $exit = proc_close($proc);
+
+    return ['exit' => (int) $exit, 'stdout' => $out, 'stderr' => $err, 'timed_out' => $timedOut];
+}
+
+/**
+ * The PHP command-line binary matching the running PHP's version, or null.
+ *
+ * Under PHP-FPM / LiteSpeed, PHP_BINARY is the FastCGI server, not a CLI, so
+ * the CLI is looked for next to it (cPanel's ea-phpXX keeps both in one bin/).
+ * A candidate counts only if it really runs code and reports the same
+ * major.minor — the system /usr/bin/php is often a different version.
+ */
+function updater_php_cli_binary(): ?string
+{
+    static $cache = [];
+    $key = PHP_BINARY . '|' . PHP_BINDIR;
+    if (array_key_exists($key, $cache)) {
+        return $cache[$key];
+    }
+    $cache[$key] = null;
+    if (!updater_proc_open_enabled()) {
+        return null;
+    }
+
+    $want       = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;
+    $candidates = [];
+    if (PHP_BINARY !== '' && preg_match('/^php[0-9.]*$/', basename(PHP_BINARY))) {
+        $candidates[] = PHP_BINARY;
+    }
+    $candidates[] = PHP_BINDIR . '/php';
+    $candidates[] = PHP_BINDIR . '/php' . $want;
+    $candidates[] = '/usr/local/bin/php';
+    $candidates[] = '/usr/bin/php';
+
+    foreach (array_unique($candidates) as $bin) {
+        $r = updater_run_process([$bin, '-r', 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;'], 10);
+        if ($r !== null && !$r['timed_out'] && $r['exit'] === 0 && trim($r['stdout']) === $want) {
+            return $cache[$key] = $bin;
+        }
+    }
+    return null;
+}
+
+/**
+ * The child script for the cli method. It is written to the system temp
+ * directory for one check and deleted straight after — it never exists under
+ * the web root, so no visitor can ever request it — and it refuses to run
+ * under anything but the CLI regardless.
+ */
+function updater_boot_runner_source(): string
+{
+    return <<<'PHP'
+<?php
+// Boot check for one page, written by includes/updater.php and deleted after use.
+if (PHP_SAPI !== 'cli') { exit; }
+$root   = (string) ($argv[1] ?? '');
+$script = (string) ($argv[2] ?? '');
+$uri    = (string) ($argv[3] ?? '/');
+$host   = (string) ($argv[4] ?? 'localhost');
+$https  = ($argv[5] ?? '0') === '1';
+$file   = $root . '/' . $script;
+
+$_SERVER = array_merge($_SERVER, [
+    'DOCUMENT_ROOT'   => $root,
+    'REQUEST_URI'     => $uri,
+    'REQUEST_METHOD'  => 'GET',
+    'QUERY_STRING'    => '',
+    'HTTP_HOST'       => $host,
+    'SERVER_NAME'     => $host,
+    'SERVER_PORT'     => $https ? '443' : '80',
+    'SERVER_PROTOCOL' => 'HTTP/1.1',
+    'SCRIPT_NAME'     => '/' . $script,
+    'PHP_SELF'        => '/' . $script,
+    'SCRIPT_FILENAME' => $file,
+    'REMOTE_ADDR'     => '127.0.0.1',
+    'HTTP_USER_AGENT' => 'ngo-cms-boot-check',
+]);
+if ($https) { $_SERVER['HTTPS'] = 'on'; }
+$_GET = $_POST = $_COOKIE = $_FILES = $_REQUEST = [];
+
+// Registered from inside a shutdown function, so it runs after every handler
+// the page registers itself (config.php's own fatal handler included).
+register_shutdown_function(static function (): void {
+    register_shutdown_function(static function (): void {
+        $err   = error_get_last();
+        $fatal = null;
+        if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR, E_RECOVERABLE_ERROR], true)) {
+            $fatal = $err['message'] . ' in ' . $err['file'] . ':' . $err['line'];
+        }
+        $body = '';
+        while (ob_get_level() > 0) { $body = (string) ob_get_clean() . $body; }
+        $code = http_response_code();
+        fwrite(STDOUT, $body . "\n@@NGO_BOOT_CHECK@@" . json_encode([
+            'status' => $code === false ? 200 : (int) $code,
+            'fatal'  => $fatal,
+        ]));
+    });
+});
+
+if (!is_file($file)) {
+    http_response_code(404);
+    exit;
+}
+chdir(dirname($file));
+ob_start();
+require $file;
+PHP;
+}
+
+/** PHP error text in a rendered page — what a host with display_errors on shows. */
+function updater_page_has_error_text(string $html): bool
+{
+    return (bool) preg_match(
+        '/(?:^|\n|<br\s*\/?>)\s*(?:<b>)?(?:PHP )?(?:Fatal error|Parse error|Warning)(?:<\/b>)?:\s/i',
+        $html
+    );
+}
+
+/**
+ * One page through the cli method.
+ *
+ * @return array{ok:bool, status:int, error:?string}
+ */
+function updater_boot_check_cli_page(string $php, string $runner, string $root, string $uri, string $script): array
+{
+    $host  = 'localhost';
+    $https = '0';
+    if (defined('SITE_URL')) {
+        $parts = parse_url((string) SITE_URL);
+        if (!empty($parts['host'])) $host = (string) $parts['host'];
+        $https = (($parts['scheme'] ?? '') === 'https') ? '1' : '0';
+    }
+    $r = updater_run_process([$php, $runner, $root, $script, $uri, $host, $https], 30, $root);
+    if ($r === null) {
+        return ['ok' => false, 'status' => 0, 'error' => 'could not start PHP'];
+    }
+    if ($r['timed_out']) {
+        return ['ok' => false, 'status' => 0, 'error' => 'timed out'];
+    }
+    $pos = strrpos($r['stdout'], "\n@@NGO_BOOT_CHECK@@");
+    if ($pos === false) {
+        $why = trim(substr($r['stderr'] !== '' ? $r['stderr'] : $r['stdout'], 0, 500));
+        return ['ok' => false, 'status' => 0, 'error' => 'PHP exited with code ' . $r['exit'] . ($why !== '' ? ': ' . $why : '')];
+    }
+    $html = substr($r['stdout'], 0, $pos);
+    $meta = json_decode(substr($r['stdout'], $pos + strlen("\n@@NGO_BOOT_CHECK@@")), true);
+    $status = is_array($meta) ? (int) ($meta['status'] ?? 0) : 0;
+    $fatal  = is_array($meta) ? ($meta['fatal'] ?? null) : 'unreadable result';
+
+    if ($fatal !== null) {
+        return ['ok' => false, 'status' => $status, 'error' => 'PHP fatal error: ' . $fatal];
+    }
+    if ($status < 200 || $status >= 400) {
+        return ['ok' => false, 'status' => $status, 'error' => 'HTTP ' . $status];
+    }
+    if (updater_page_has_error_text($html)) {
+        return ['ok' => false, 'status' => $status, 'error' => 'PHP error shown on the page'];
+    }
+    return ['ok' => true, 'status' => $status, 'error' => null];
+}
+
+/** Where the one-time token for an http boot check lives: logs/, never web-readable. */
+function updater_boot_token_file(string $root): string
+{
+    return $root . '/logs/boot-check.token';
+}
+
+/**
+ * Default transport for the http method: a plain GET that never follows
+ * redirects, with a short timeout. Status 0 = the site could not be reached.
+ *
+ * @return array{status:int, body:string}
+ */
+function updater_boot_http_probe(string $url, array $headers): array
+{
+    if (!function_exists('curl_init')) {
+        return ['status' => 0, 'body' => ''];
+    }
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_CONNECTTIMEOUT => 5,
+        CURLOPT_TIMEOUT        => 15,
+        CURLOPT_HTTPHEADER     => array_merge(['User-Agent: ngo-cms-boot-check'], $headers),
+    ]);
+    $body = curl_exec($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return ['status' => $body === false ? 0 : $code, 'body' => (string) $body];
+}
+
+/**
+ * Renders the site's key pages in a separate process and reports each one.
+ *
+ * $pages: URL => script; null means updater_boot_check_pages().
+ * $method: 'cli' | 'http' | null (null picks the first that is available).
+ * $opts (test seams): 'php' => CLI binary, 'site_url' => base URL for http,
+ * 'http' => callable(string $url, array $headers): array{status:int, body:string}.
+ *
+ * @return array{method:string, pages:array<string,array{ok:bool,status:int,error:?string}>}
+ *         method 'none' (and no pages) when there is no way to run the check.
+ */
+function updater_boot_check(string $root, ?array $pages = null, ?string $method = null, array $opts = []): array
+{
+    $pages ??= updater_boot_check_pages();
+    $root    = rtrim($root, '/');
+    $siteUrl = (string) ($opts['site_url'] ?? (defined('SITE_URL') ? SITE_URL : ''));
+
+    $php = null;
+    if ($method === null || $method === 'cli') {
+        $php = $opts['php'] ?? updater_php_cli_binary();
+        if ($php !== null) {
+            $method = 'cli';
+        } elseif ($method === 'cli') {
+            return ['method' => 'none', 'pages' => []];
+        }
+    }
+    if ($method === null || $method === 'http') {
+        $canHttp = $siteUrl !== '' && (isset($opts['http']) || function_exists('curl_init'));
+        $method  = $canHttp ? 'http' : 'none';
+    }
+    if ($method === 'none' || $pages === []) {
+        return ['method' => 'none', 'pages' => []];
+    }
+
+    $results = [];
+
+    if ($method === 'cli') {
+        $runner = updater_tmp_dir('ngo-cms-boot-check-') . '.php';
+        if (@file_put_contents($runner, updater_boot_runner_source()) === false) {
+            return ['method' => 'none', 'pages' => []];
+        }
+        try {
+            foreach ($pages as $uri => $script) {
+                $results[$uri] = updater_boot_check_cli_page($php, $runner, $root, (string) $uri, (string) $script);
+            }
+        } finally {
+            @unlink($runner);
+        }
+        return ['method' => 'cli', 'pages' => $results];
+    }
+
+    // http: config.php lets a request through maintenance mode only when it
+    // carries the token that is in this file at that moment.
+    $probe     = $opts['http'] ?? 'updater_boot_http_probe';
+    $tokenFile = updater_boot_token_file($root);
+    $logsDir   = dirname($tokenFile);
+    if (!is_dir($logsDir)) {
+        @mkdir($logsDir, 0755, true);
+    }
+    if (is_dir($logsDir) && !is_file($logsDir . '/.htaccess')) {
+        @file_put_contents($logsDir . '/.htaccess', "Require all denied\n");
+    }
+    $token = bin2hex(random_bytes(24));
+    if (@file_put_contents($tokenFile, $token, LOCK_EX) === false) {
+        $token = '';
+    }
+    try {
+        foreach ($pages as $uri => $script) {
+            $resp   = $probe(rtrim($siteUrl, '/') . $uri, $token !== '' ? ['X-NGO-Boot-Check: ' . $token] : []);
+            $status = (int) ($resp['status'] ?? 0);
+            $body   = (string) ($resp['body'] ?? '');
+            if ($status === 0) {
+                $results[$uri] = ['ok' => false, 'status' => 0, 'error' => 'site not reachable'];
+            } elseif ($status < 200 || $status >= 400) {
+                $results[$uri] = ['ok' => false, 'status' => $status, 'error' => 'HTTP ' . $status];
+            } elseif (updater_page_has_error_text($body)) {
+                $results[$uri] = ['ok' => false, 'status' => $status, 'error' => 'PHP error shown on the page'];
+            } else {
+                $results[$uri] = ['ok' => true, 'status' => $status, 'error' => null];
+            }
+        }
+    } finally {
+        @unlink($tokenFile);
+    }
+    return ['method' => 'http', 'pages' => $results];
+}
+
+/**
+ * Pure verdict: does $after still serve every page that $baseline served?
+ *
+ * @return array{ok:?bool, reason:string} ok null = could not be checked.
+ */
+function updater_boot_check_verdict(array $baseline, array $after): array
+{
+    $trusted = array_keys(array_filter((array) ($baseline['pages'] ?? []), static fn($p) => !empty($p['ok'])));
+    if (($baseline['method'] ?? 'none') === 'none' || $trusted === []) {
+        return ['ok' => null, 'reason' => 'Boot check not run: this server offers no way to load the site in a separate process.'];
+    }
+    if (($after['method'] ?? 'none') === 'none') {
+        return ['ok' => null, 'reason' => 'Boot check not run after the update.'];
+    }
+    $failures = [];
+    foreach ($trusted as $uri) {
+        $page = $after['pages'][$uri] ?? null;
+        if (!is_array($page) || empty($page['ok'])) {
+            $failures[] = $uri . ' → ' . (is_array($page) ? (string) ($page['error'] ?? 'failed') : 'not checked');
+        }
+    }
+    if ($failures !== []) {
+        return ['ok' => false, 'reason' => 'The site did not load after the update (' . $after['method'] . '): ' . implode('; ', $failures)];
+    }
+    return ['ok' => true, 'reason' => ''];
+}
+
+/**
+ * Lets PHP-FPM drop its cached copy of each changed file at once. Without it
+ * opcache can keep serving the previous code for a couple of seconds — long
+ * enough for an http boot check to pass on code that is no longer there.
+ */
+function updater_opcache_invalidate(string $root, array $relPaths): void
+{
+    if (!function_exists('opcache_invalidate')) {
+        return;
+    }
+    foreach ($relPaths as $rel) {
+        if (str_ends_with((string) $rel, '.php')) {
+            @opcache_invalidate($root . '/' . $rel, true);
+        }
+    }
+}
+
+// ── Rollback ───────────────────────────────────────────────────────────────────
+// What the apply step changed is recorded as it goes (the "journal"), so a
+// failed update can be undone exactly:
+//   - a file that existed before comes back from the pre-update backup zip;
+//   - a file outside the backup (vendor/, content/ — see
+//     updater_backup_excludes()) that existed before is copied aside into the
+//     journal just before it is overwritten, and comes back from there;
+//   - a file the release ADDED is deleted, and so are the folders the apply
+//     created for it, if they are empty again.
+// Only files the update itself wrote are touched. Restoring the whole zip, or
+// deleting everything "not in the backup", would also hit what the backup
+// leaves out on purpose — uploads written by visitors between the backup and
+// now, logs, content — and gain nothing: nothing else changed those files.
+
+/** Is $rel inside the pre-update backup zip? (Its top folder is not excluded.) */
+function updater_backup_covers(string $rel): bool
+{
+    if (!str_contains($rel, '/')) {
+        return true; // files in the site root are always in the backup
+    }
+    $top = explode('/', $rel, 2)[0];
+    return !in_array($top, updater_backup_excludes(), true);
+}
+
+/**
+ * Puts every file the update wrote back the way it was.
+ *
+ * $journal: ['written' => [rel => bool existedBefore], 'created_dirs' => [abs dir, ...],
+ *            'saved_dir' => ?string, 'saved' => [rel => true]]
+ *
+ * @return array{ok:bool, error:?string}
+ */
+function updater_restore_backup(string $root, string $backupZip, array $journal): array
+{
+    $zip = null;
+    if (is_file($backupZip)) {
+        $zip = new ZipArchive();
+        if ($zip->open($backupZip) !== true) {
+            $zip = null;
+        }
+    }
+
+    $failed = [];
+    foreach ((array) ($journal['written'] ?? []) as $rel => $existed) {
+        $rel = (string) $rel;
+        $dst = $root . '/' . $rel;
+
+        if (!empty($journal['saved'][$rel]) && !empty($journal['saved_dir'])) {
+            $src = $journal['saved_dir'] . '/' . $rel;
+            if (!is_file($src) || !@copy($src, $dst)) $failed[] = $rel;
+            continue;
+        }
+        if ($existed) {
+            $data = $zip !== null ? $zip->getFromName($rel) : false;
+            if ($data === false || @file_put_contents($dst, $data) === false) {
+                $failed[] = $rel;
+            }
+            continue;
+        }
+        // Added by the release: it was not there before, so it goes.
+        if (is_file($dst) && !@unlink($dst)) {
+            $failed[] = $rel;
+        }
+    }
+    if ($zip !== null) {
+        $zip->close();
+    }
+
+    // Deepest first, and only if empty — rmdir refuses anything else.
+    $dirs = (array) ($journal['created_dirs'] ?? []);
+    usort($dirs, static fn($a, $b) => strlen((string) $b) <=> strlen((string) $a));
+    foreach ($dirs as $dir) {
+        if (is_dir($dir)) @rmdir($dir);
+    }
+
+    if ($failed !== []) {
+        return ['ok' => false, 'error' => 'Could not restore: ' . implode(', ', array_slice($failed, 0, 20))
+            . (count($failed) > 20 ? ' (+' . (count($failed) - 20) . ' more)' : '')];
+    }
+    return ['ok' => true, 'error' => null];
+}
+
 // ── Apply ──────────────────────────────────────────────────────────────────────
 
 function updater_tmp_dir(string $prefix): string
@@ -787,11 +1309,53 @@ function updater_tmp_dir(string $prefix): string
     return rtrim(sys_get_temp_dir(), '/') . '/' . $prefix . bin2hex(random_bytes(8));
 }
 
+
+/**
+ * A boot check that can never throw: anything unexpected means "not checked".
+ */
+function updater_safe_boot_check(callable $bootCheck, string $root, ?array $pages, ?string $method): array
+{
+    try {
+        $r = $bootCheck($root, $pages, $method);
+        return is_array($r) ? $r : ['method' => 'none', 'pages' => []];
+    } catch (\Throwable $e) {
+        return ['method' => 'none', 'pages' => []];
+    }
+}
+
+/**
+ * The boot check again, on the pages that passed $baseline and with the same
+ * method — nothing else can tell a broken release from a quirk of this server.
+ */
+function updater_boot_check_again(callable $bootCheck, string $root, array $baseline): array
+{
+    $trusted = array_keys(array_filter((array) ($baseline['pages'] ?? []), static fn($p) => !empty($p['ok'])));
+    $pages   = array_intersect_key(updater_boot_check_pages(), array_flip($trusted));
+    if ($pages === [] || ($baseline['method'] ?? 'none') === 'none') {
+        return ['method' => 'none', 'pages' => []];
+    }
+    return updater_safe_boot_check($bootCheck, $root, $pages, (string) $baseline['method']);
+}
+
 /**
  * Orchestrates a full self-update. Never throws — every failure path (network,
  * missing ZipArchive, backup failure, download/extract errors, migration
- * failure) is caught and returned as a result array instead. Always leaves
- * `.maintenance` removed, even on failure, so the site is never stuck down.
+ * failure, a site that no longer loads) is caught and returned as a result
+ * array instead. Always leaves `.maintenance` removed, even on failure, so the
+ * site is never stuck down.
+ *
+ * Order, once the backup exists: maintenance on → baseline boot check of the
+ * current site → download + extract → apply (journalled) → migrations → boot
+ * check → finalize. If the boot check fails, or anything throws after the
+ * first file was written, every file the update wrote is put back (see
+ * updater_restore_backup()), the restored site is checked again, and the run
+ * ends as 'rolled_back' — or 'rollback_failed' if even that does not load.
+ *
+ * The boot check runs AFTER the migrations on purpose: a new release may need
+ * its new columns to render the home page, and checking before them would
+ * roll back good releases. The database is not rolled back with the files —
+ * it is not in the backup, and migrations here only ever add (columns,
+ * tables), which the previous code simply does not use.
  *
  * $onProgress is an optional reporting hook, called as the update moves
  * through its phases with one array per step:
@@ -802,21 +1366,27 @@ function updater_tmp_dir(string $prefix): string
  * never fail the update.
  *
  * $deps is a test seam; production calls updater_apply() with no arguments:
- *   'http'     => callable(string $url): array — stands in for every network call
- *   'migrator' => callable(): array{success: bool, error: ?string}
- *   'logger'   => callable(string, string, string, array, ?string): void
+ *   'http'       => callable(string $url): array — stands in for every network call
+ *   'migrator'   => callable(): array{success: bool, error: ?string}
+ *   'logger'     => callable(string, string, string, array, ?string): void
+ *   'boot_check' => callable(string $root, ?array $pages, ?string $method): array
+ *                   — see updater_boot_check()
  * Combined with updater_set_root_override(), that makes a full run exercisable
  * against a throwaway directory with no network and no database.
  *
  * Return shape:
- *   ['status' => 'success'|'partial'|'failed', 'from_version' => string,
- *    'to_version' => string, 'skipped' => string[], 'error' => string|null]
+ *   ['status' => 'success'|'partial'|'failed'|'rolled_back'|'rollback_failed',
+ *    'from_version' => string, 'to_version' => string, 'skipped' => string[],
+ *    'error' => string|null,
+ *    'backup' => string|null      — file name of the pre-update backup,
+ *    'boot_check' => 'passed'|'failed'|'not_checked'|null]
  */
 function updater_apply(?callable $onProgress = null, array $deps = []): array
 {
-    $http     = $deps['http']     ?? null;
-    $migrator = $deps['migrator'] ?? null;
-    $logger   = $deps['logger']   ?? 'updater_log_attempt';
+    $http      = $deps['http']       ?? null;
+    $migrator  = $deps['migrator']   ?? null;
+    $logger    = $deps['logger']     ?? 'updater_log_attempt';
+    $bootCheck = $deps['boot_check'] ?? 'updater_boot_check';
 
     $root = updater_root();
     $from = updater_get_local_version();
@@ -827,6 +1397,8 @@ function updater_apply(?callable $onProgress = null, array $deps = []): array
         'to_version'   => '',
         'skipped'      => [],
         'error'        => null,
+        'backup'       => null,
+        'boot_check'   => null,
     ];
 
     // Checked here, not only in the UI, so no caller can overwrite a site that
@@ -907,12 +1479,62 @@ function updater_apply(?callable $onProgress = null, array $deps = []): array
         $logger($from, $to, 'failed', [], $result['error']);
         return $result;
     }
+    $result['backup'] = basename($backupPath);
 
     $stagingDir = null;
+    $skipped    = [];
+    $baseline   = ['method' => 'none', 'pages' => []];
+    // What the apply step changed, so it can be undone exactly — see
+    // updater_restore_backup().
+    $journal = ['written' => [], 'created_dirs' => [], 'saved_dir' => null, 'saved' => []];
+
+    // Puts the previous version back, checks it loads, and records the outcome.
+    $rollBack = static function (string $reason) use (
+        $emit, $logger, $bootCheck, $root, $backupPath, $from, $to,
+        &$journal, &$skipped, &$baseline, &$result
+    ): array {
+        // The log is for support: paths relative to the site read the same on any host.
+        $reason = str_replace($root . '/', '', $reason);
+        $emit('restore', 'Връщане на предишната версия…');
+        try {
+            $restore = updater_restore_backup($root, $backupPath, $journal);
+            updater_opcache_invalidate($root, array_keys($journal['written']));
+            $verdict = ['ok' => false, 'reason' => (string) $restore['error']];
+            if ($restore['ok']) {
+                $verdict = updater_boot_check_verdict($baseline, updater_boot_check_again($bootCheck, $root, $baseline));
+            }
+        } catch (\Throwable $e) {
+            $restore = ['ok' => false, 'error' => $e->getMessage()];
+            $verdict = ['ok' => false, 'reason' => $e->getMessage()];
+        } finally {
+            updater_set_maintenance(false);
+        }
+
+        $result['skipped'] = [];
+        if ($restore['ok'] && $verdict['ok'] !== false) {
+            // Only once the old site is back: the set-aside copies are no
+            // longer needed. After a failed restore they are kept for support.
+            if (!empty($journal['saved_dir'])) {
+                updater_rrmdir($journal['saved_dir']);
+            }
+            $result['status'] = 'rolled_back';
+            $result['error']  = $reason . ' The previous version (' . $from . ') was restored'
+                . ($verdict['ok'] === true ? ' and loads normally.' : '. ' . $verdict['reason']);
+        } else {
+            $result['status'] = 'rollback_failed';
+            $result['error']  = $reason . ' Restoring the previous version (' . $from . ') from '
+                . $result['backup'] . ' did not work either: '
+                . ($restore['ok'] ? $verdict['reason'] : (string) $restore['error']);
+        }
+        $logger($from, $to, $result['status'], $skipped, $result['error']);
+        return $result;
+    };
 
     try {
-        // (c) Maintenance mode on.
+        // (c) Maintenance mode on, then note which pages load on the site as it
+        // is now — the baseline the updated site is held to.
         updater_set_maintenance(true);
+        $baseline = updater_safe_boot_check($bootCheck, $root, null, null);
 
         // (d) Download + fully extract the new release into a staging dir —
         // never extract in place.
@@ -994,14 +1616,60 @@ function updater_apply(?callable $onProgress = null, array $deps = []): array
             $src    = $stagingDir . '/' . $rel;
             $dst    = $root . '/' . $rel;
             $dstDir = dirname($dst);
-            if (!is_dir($dstDir) && !@mkdir($dstDir, 0755, true) && !is_dir($dstDir)) {
-                throw new RuntimeException("Could not create directory for: {$rel}");
+            if (!is_dir($dstDir)) {
+                // Every folder this creates is noted, so a rollback can remove it again.
+                $missing = [];
+                for ($d = $dstDir; strlen($d) > strlen($root) && !is_dir($d); $d = dirname($d)) {
+                    $missing[] = $d;
+                }
+                if (!@mkdir($dstDir, 0755, true) && !is_dir($dstDir)) {
+                    throw new RuntimeException("Could not create directory for: {$rel}");
+                }
+                array_push($journal['created_dirs'], ...$missing);
             }
-            $blocks = (updater_is_host_managed($rel) && is_file($dst))
+            $existed = is_file($dst);
+            $blocks  = (updater_is_host_managed($rel) && $existed)
                 ? updater_host_blocks((string) file_get_contents($dst)) : [];
-            $written = $blocks === []
+            $merged  = $blocks === []
+                ? null
+                : updater_merge_host_blocks((string) file_get_contents($src), $blocks);
+
+            if ($existed) {
+                // Already identical (most of vendor/, on most updates): nothing
+                // to write, so nothing to undo either.
+                $same = $merged === null
+                    ? (filesize($src) === filesize($dst) && hash_file('sha256', $src) === hash_file('sha256', $dst))
+                    : hash('sha256', $merged) === hash_file('sha256', $dst);
+                if ($same) {
+                    $emit('apply', 'Обновяване на файловете…', $doneFiles, $totalFiles);
+                    continue;
+                }
+                // Not in the backup zip (vendor/, content/): set the current
+                // copy aside first, or a rollback could not bring it back.
+                if (!updater_backup_covers($rel)) {
+                    if ($journal['saved_dir'] === null) {
+                        $backupsDir = updater_backups_dir();
+                        if ($backupsDir === null) {
+                            throw new RuntimeException("Could not set aside: {$rel}");
+                        }
+                        $journal['saved_dir'] = $backupsDir . '/rollback-' . date('Ymd-His') . '-' . bin2hex(random_bytes(4));
+                    }
+                    $saved    = $journal['saved_dir'] . '/' . $rel;
+                    $savedDir = dirname($saved);
+                    if ((!is_dir($savedDir) && !@mkdir($savedDir, 0755, true) && !is_dir($savedDir))
+                        || !@copy($dst, $saved)) {
+                        throw new RuntimeException("Could not set aside: {$rel}");
+                    }
+                    $journal['saved'][$rel] = true;
+                }
+            }
+
+            // Recorded before the write: a file that fails half-way through
+            // writing has to be undone as well.
+            $journal['written'][$rel] = $existed;
+            $written = $merged === null
                 ? @copy($src, $dst)
-                : @file_put_contents($dst, updater_merge_host_blocks((string) file_get_contents($src), $blocks)) !== false;
+                : @file_put_contents($dst, $merged) !== false;
             if (!$written) {
                 throw new RuntimeException("Could not write file: {$rel}");
             }
@@ -1010,6 +1678,7 @@ function updater_apply(?callable $onProgress = null, array $deps = []): array
 
         updater_rrmdir($stagingDir);
         $stagingDir = null;
+        updater_opcache_invalidate($root, array_keys($journal['written']));
 
         // (f) Run any new migrations in-process. run_migrations() is opaque —
         // it reports nothing per-step — so this phase parks the bar at the
@@ -1024,16 +1693,35 @@ function updater_apply(?callable $onProgress = null, array $deps = []): array
                 : ['success' => true, 'error' => null];
         }
 
-        // (g) Finalize: stamp VERSION, drop maintenance mode, audit log.
+        // (g) Does the site still load? Only the pages that loaded before the
+        // update are held to it.
+        $emit('verify', 'Проверка дали сайтът работи…');
+        $verdict = updater_boot_check_verdict($baseline, updater_boot_check_again($bootCheck, $root, $baseline));
+        $result['boot_check'] = $verdict['ok'] === true ? 'passed' : ($verdict['ok'] === null ? 'not_checked' : 'failed');
+
+        if ($verdict['ok'] === false) {
+            $reason = $verdict['reason'];
+            if (!$migrationResult['success']) {
+                $reason .= ' A database migration had also failed: ' . ($migrationResult['error'] ?? 'unknown error');
+            }
+            return $rollBack($reason);
+        }
+
+        // (h) Finalize: stamp VERSION, drop maintenance mode, audit log.
         file_put_contents($root . '/VERSION', $to . "\n");
         updater_set_maintenance(false);
+        if (!empty($journal['saved_dir'])) {
+            updater_rrmdir($journal['saved_dir']);
+        }
+        // "Could not check" is written down, never treated as a failure.
+        $note = $verdict['ok'] === null ? $verdict['reason'] : null;
 
         if (!$migrationResult['success']) {
             $result['status']  = 'failed';
             $result['skipped'] = array_values($skipped);
             $result['error']   = 'Files were updated but a database migration failed: '
                                 . ($migrationResult['error'] ?? 'unknown error');
-            $logger($from, $to, 'failed', $skipped, $result['error']);
+            $logger($from, $to, 'failed', $skipped, $result['error'] . ($note !== null ? ' ' . $note : ''));
             return $result;
         }
 
@@ -1050,18 +1738,24 @@ function updater_apply(?callable $onProgress = null, array $deps = []): array
         $result['status']  = $status;
         $result['skipped'] = $reportable;
         $emit('done', 'Готово.');
-        $logger($from, $to, $status, $skipped, null);
+        $logger($from, $to, $status, $skipped, $note);
         return $result;
 
     } catch (\Throwable $e) {
-        // Never leave the site stuck in maintenance mode.
-        updater_set_maintenance(false);
         if ($stagingDir !== null) {
             updater_rrmdir($stagingDir);
             @unlink($stagingDir . '.zip');
         }
+        $reason = 'The update failed: ' . $e->getMessage();
+        // Files were already written: a half-applied release is exactly the
+        // state that takes a site down, so put the old one back.
+        if ($journal['written'] !== [] || $journal['created_dirs'] !== []) {
+            return $rollBack($reason);
+        }
+        // Never leave the site stuck in maintenance mode.
+        updater_set_maintenance(false);
         $result['status'] = 'failed';
-        $result['error']  = 'The update failed: ' . $e->getMessage();
+        $result['error']  = $reason;
         $logger($from, $to, 'failed', $result['skipped'], $result['error']);
         return $result;
     }

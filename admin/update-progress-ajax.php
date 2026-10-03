@@ -42,6 +42,8 @@ echo json_encode([
     'message'     => (string) ($state['message'] ?? ''),
     'status'      => (string) ($state['status'] ?? 'running'),
     'to_version'  => (string) ($state['to_version'] ?? ''),
+    'from_version' => (string) ($state['from_version'] ?? ''),
+    'backup'      => ($state['status'] ?? '') === 'rollback_failed' ? basename((string) ($state['backup'] ?? '')) : '',
     'skipped'     => array_values((array) ($state['skipped'] ?? [])),
     'stale'       => updater_progress_is_stale($state),
     'maintenance' => updater_is_maintenance_mode(),

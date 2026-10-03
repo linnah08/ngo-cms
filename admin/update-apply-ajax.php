@@ -12,7 +12,8 @@
  *   { "csrf_token": "..." }
  *
  * Response (JSON):
- *   { "ok": true,  "status": "success"|"partial"|"failed", "to_version": "...", "skipped": [...] }
+ *   { "ok": true,  "status": "success"|"partial"|"failed"|"rolled_back"|"rollback_failed",
+ *     "to_version": "...", "from_version": "...", "skipped": [...], "backup": "" }
  *   { "ok": false, "error": "..." }
  *
  * Failure details are deliberately not returned: they can name server paths.
@@ -91,19 +92,28 @@ $result = updater_apply(static function (array $state) use (&$last_percent): voi
 // The terminal state is persisted too: the apply is no longer a form POST that
 // renders its own outcome, so admin/updates.php picks the result up from here
 // on the next plain GET. A failed run keeps the percent it reached rather than
-// snapping to 100.
+// snapping to 100. A rolled-back run did finish — the old site is back and
+// works — so its bar is full, and the wording says what happened.
+$finished_ok = in_array($result['status'], ['success', 'partial'], true);
 updater_progress_write([
-    'phase'      => $result['status'] === 'failed' ? 'failed' : 'done',
-    'percent'    => $result['status'] === 'failed' ? $last_percent : 100,
-    'message'    => '',
-    'status'     => $result['status'],
-    'to_version' => $result['to_version'],
-    'skipped'    => $result['skipped'],
+    'phase'            => $finished_ok ? 'done' : 'failed',
+    'percent'          => ($finished_ok || $result['status'] === 'rolled_back') ? 100 : $last_percent,
+    'message'          => '',
+    'status'           => $result['status'],
+    'to_version'       => $result['to_version'],
+    'from_version'     => $result['from_version'],
+    'skipped'          => $result['skipped'],
+    'backup'           => (string) ($result['backup'] ?? ''),
 ]);
 
+// 'backup' is a bare file name, never a path. When even the restore failed,
+// the admin page itself may not load any more, so this response is the only
+// place the admin can learn which backup support needs.
 echo json_encode([
-    'ok'         => true,
-    'status'     => $result['status'],
-    'to_version' => $result['to_version'],
-    'skipped'    => $result['skipped'],
+    'ok'           => true,
+    'status'       => $result['status'],
+    'to_version'   => $result['to_version'],
+    'from_version' => $result['from_version'],
+    'skipped'      => $result['skipped'],
+    'backup'       => $result['status'] === 'rollback_failed' ? (string) ($result['backup'] ?? '') : '',
 ], JSON_UNESCAPED_UNICODE);

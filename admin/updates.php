@@ -47,11 +47,13 @@ if ($is_post) {
 if ($apply_result === null) {
     $finished = updater_progress_read();
     $status   = is_array($finished) ? (string) ($finished['status'] ?? '') : '';
-    if (in_array($status, ['success', 'partial', 'failed'], true)) {
+    if (in_array($status, ['success', 'partial', 'failed', 'rolled_back', 'rollback_failed'], true)) {
         $apply_result = [
-            'status'     => $status,
-            'to_version' => (string) ($finished['to_version'] ?? ''),
-            'skipped'    => array_values((array) ($finished['skipped'] ?? [])),
+            'status'       => $status,
+            'to_version'   => (string) ($finished['to_version'] ?? ''),
+            'from_version' => (string) ($finished['from_version'] ?? ''),
+            'skipped'      => array_values((array) ($finished['skipped'] ?? [])),
+            'backup'       => basename((string) ($finished['backup'] ?? '')),
         ];
         $did_apply = true;
         updater_progress_clear();
@@ -88,6 +90,22 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <?php if ($apply_result['status'] === 'success' || $apply_result['status'] === 'partial'): ?>
     <div class="admin-alert admin-alert--success" style="margin-bottom:1.5rem;">
       Обновяването завърши успешно. Сайтът вече е на версия <?= h($apply_result['to_version'] ?? '') ?>.
+    </div>
+  <?php elseif ($apply_result['status'] === 'rolled_back'): ?>
+    <?php /* The update was undone automatically and the old site checked to
+             load again. Nothing is asked of the admin: the reason is in
+             platform_updates for support, not something they can act on. */ ?>
+    <div class="admin-alert admin-alert--error" role="status" style="margin-bottom:1.5rem;">
+      <strong>Обновяването до версия <?= h($apply_result['to_version'] ?? '') ?> не беше приложено.</strong>
+      Новата версия не се зареди правилно на вашия сайт, затова сайтът беше върнат автоматично на предишната версия
+      (<?= h(($apply_result['from_version'] ?? '') !== '' ? $apply_result['from_version'] : $local_version) ?>) и работи нормално.
+      Не е нужно да правите нищо — проблемът е записан, за да бъде отстранен.
+    </div>
+  <?php elseif ($apply_result['status'] === 'rollback_failed'): ?>
+    <div class="admin-alert admin-alert--error" role="alert" style="margin-bottom:1.5rem;">
+      <strong>Обновяването не успя и сайтът не можа да бъде върнат автоматично на предишната версия.</strong>
+      Възможно е части от сайта да не работят. Свържете се с поддръжката веднага и им кажете името на резервното копие:
+      <strong><?= h($apply_result['backup'] ?? '') ?></strong> (в папка backups на сайта).
     </div>
   <?php else: /* failed */ ?>
     <div class="admin-alert admin-alert--error" style="margin-bottom:1.5rem;">
@@ -276,7 +294,25 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     document.addEventListener('keydown', onKeydown, true);
   }
 
+  var keepMessage = false;
+
   closeBtn.addEventListener('click', function () {
+    if (keepMessage) {
+      // The restore failed too, so a reload may not load at all. The message
+      // (with the backup name support needs) stays on this page instead.
+      var alertBox = document.createElement('div');
+      alertBox.className = 'admin-alert admin-alert--error';
+      alertBox.setAttribute('role', 'alert');
+      alertBox.setAttribute('tabindex', '-1');
+      alertBox.style.marginBottom = '1.5rem';
+      alertBox.textContent = statusEl.textContent + ' ' + noteEl.textContent;
+      var header = document.querySelector('.admin-page-header');
+      if (header && header.parentNode) header.parentNode.insertBefore(alertBox, header.nextSibling);
+      document.removeEventListener('keydown', onKeydown, true);
+      overlay.style.display = 'none';
+      alertBox.focus();
+      return;
+    }
     // A reload is what renders the outcome: admin/updates.php reads the
     // finished state once and shows the same alerts the POST flow always did.
     window.location.href = '/admin/updates.php';
@@ -289,14 +325,42 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   }
 
   /**
-   * kind: 'success' | 'failed' | 'stalled'. The wording carries the outcome on
-   * its own — the bar colour is only ever a second signal, never the only one.
+   * kind: 'success' | 'failed' | 'stalled' | 'rolled_back' | 'rollback_failed'.
+   * The wording carries the outcome on its own — the bar colour is only ever a
+   * second signal, never the only one.
    */
-  function finish(kind) {
+  function finish(kind, info) {
     if (finished) return;
     finished = true;
     stopPolling();
     stopIndeterminate();
+    info = info || {};
+
+    if (kind === 'rolled_back') {
+      // Finished, just not with the new version: a full grey bar, not a red one.
+      fill.style.background = '#5f6b7a';
+      setPercent(100);
+      setStatus('Обновяването не беше приложено. Сайтът е върнат на предишната версия'
+        + (info.from_version ? ' (' + info.from_version + ')' : '') + ' и работи нормално.');
+      noteEl.textContent = 'Новата версия не се зареди правилно на вашия сайт, затова предишната беше възстановена автоматично. '
+        + 'Не е нужно да правите нищо — проблемът е записан, за да бъде отстранен.';
+      actions.style.display = 'block';
+      closeBtn.focus();
+      return;
+    }
+    if (kind === 'rollback_failed') {
+      fill.style.background = '#b3261e';
+      bar.setAttribute('aria-valuenow', String(lastPercent));
+      pctEl.textContent = lastPercent + '%';
+      setStatus('Обновяването не успя и сайтът не можа да бъде върнат автоматично на предишната версия.');
+      noteEl.textContent = 'Възможно е части от сайта да не работят. Свържете се с поддръжката веднага'
+        + (info.backup ? ' и им кажете името на резервното копие: ' + info.backup + ' (в папка backups на сайта).' : '.');
+      keepMessage = true;
+      closeBtn.textContent = 'Затвори';
+      actions.style.display = 'block';
+      closeBtn.focus();
+      return;
+    }
 
     if (kind === 'success') {
       setPercent(100);
@@ -326,6 +390,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     stopIndeterminate();
 
     if (st.status === 'success' || st.status === 'partial') { finish('success'); return; }
+    if (st.status === 'rolled_back' || st.status === 'rollback_failed') { finish(st.status, st); return; }
     if (st.status === 'failed') { finish('failed'); return; }
     if (st.stale) { finish('stalled'); return; }
 
@@ -376,7 +441,11 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       return res.json();
     }).then(function (data) {
       if (!data) return;
-      finish(data.ok === true && data.status !== 'failed' ? 'success' : 'failed');
+      if (data.ok === true && (data.status === 'rolled_back' || data.status === 'rollback_failed')) {
+        finish(data.status, data);
+        return;
+      }
+      finish(data.ok === true && (data.status === 'success' || data.status === 'partial') ? 'success' : 'failed');
     }).catch(function () {
       // The request died (dropped connection, recycled worker) but the update
       // itself may still be running, so let the poll decide: it reports the

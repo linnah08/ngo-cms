@@ -375,16 +375,16 @@ final class UpdaterTest extends TestCase
 
     public function test_progress_percent_interpolates_within_a_phase(): void
     {
-        // 'apply' owns 65..90, so halfway through the files is halfway through
-        // that 25-point band.
+        // 'apply' owns 65..85, so halfway through the files is halfway through
+        // that 20-point band.
         $this->assertSame(65,  updater_progress_percent('apply', 0,   100));
-        $this->assertSame(77,  updater_progress_percent('apply', 50,  100));
-        $this->assertSame(90,  updater_progress_percent('apply', 100, 100));
+        $this->assertSame(75,  updater_progress_percent('apply', 50,  100));
+        $this->assertSame(85,  updater_progress_percent('apply', 100, 100));
     }
 
     public function test_progress_percent_never_exceeds_its_phase(): void
     {
-        $this->assertSame(90, updater_progress_percent('apply', 999, 100));
+        $this->assertSame(85, updater_progress_percent('apply', 999, 100));
     }
 
     public function test_progress_percent_of_unknown_phase_is_zero(): void
@@ -406,6 +406,7 @@ final class UpdaterTest extends TestCase
             ['apply',    1, 10],
             ['apply',   10, 10],
             ['migrate',  0,  0],
+            ['verify',   0,  0],
             ['done',     0,  0],
         ];
         $prev = -1;
@@ -541,7 +542,7 @@ final class UpdaterTest extends TestCase
 
         // Progress
         $phases = array_values(array_unique(array_column($states, 'phase')));
-        $this->assertSame(['check', 'backup', 'download', 'extract', 'apply', 'migrate', 'done'], $phases);
+        $this->assertSame(['check', 'backup', 'download', 'extract', 'apply', 'migrate', 'verify', 'done'], $phases);
 
         $percents = array_column($states, 'percent');
         $this->assertSame($percents, $this->sortedCopy($percents), 'Reported progress must never go backwards');
@@ -783,7 +784,324 @@ final class UpdaterTest extends TestCase
         $this->assertSame('false', trim((string) $out));
     }
 
+    // ── Boot check + automatic rollback ─────────────────────────────────────────
+
+    /**
+     * The v0.17.0 incident, reproduced: the site's own customised config.php
+     * (which the updater keeps) declares feature_enabled(), and the release's
+     * new includes/organisation.php declares it too. Every page fatals with
+     * "Cannot redeclare". The update must notice, put the previous files back,
+     * prove the old site loads again, and record why.
+     */
+    public function test_a_release_that_does_not_boot_is_rolled_back(): void
+    {
+        $this->requireZip();
+        $this->requireCli();
+
+        $root = $this->makeTempRoot();
+        $this->writeBootableSite($root);
+        @mkdir($root . '/vendor', 0755, true);
+        file_put_contents($root . '/vendor/lib.php', '<?php // vendor as installed');
+
+        $zip = $this->makeReleaseZip([
+            'VERSION'                   => "2.0.0\n",
+            'config.php'                => "<?php\nrequire_once __DIR__ . '/includes/organisation.php';\n",
+            'includes/organisation.php' => "<?php\nfunction org_name(): string { return 'NGO'; }\n"
+                                         . "function feature_enabled(string \$n): bool { return true; }\n",
+            'includes/brand-new.php'    => '<?php // added by the release',
+            'lib/deep/new/thing.php'    => '<?php // in folders the release creates',
+            'vendor/lib.php'            => '<?php // vendor from the release',
+        ]);
+
+        updater_set_root_override($root);
+        $logged = [];
+        $states = [];
+        $result = updater_apply(
+            function (array $s) use (&$states): void { $states[] = $s; },
+            $this->deps($zip, $logged)
+        );
+
+        $this->assertSame('rolled_back', $result['status'], (string) $result['error']);
+        $this->assertSame('failed', $result['boot_check']);
+        $this->assertStringContainsString('Cannot redeclare', (string) $result['error']);
+
+        // Back exactly as it was.
+        $this->assertSame("1.0.0\n", file_get_contents($root . '/VERSION'), 'The version must be unchanged');
+        $this->assertSame(self::ORG_V1, file_get_contents($root . '/includes/organisation.php'));
+        $this->assertSame(self::FORK_CONFIG, file_get_contents($root . '/config.php'));
+        $this->assertSame('<?php // vendor as installed', file_get_contents($root . '/vendor/lib.php'),
+            'vendor/ is not in the backup zip, so it must come back from the set-aside copy');
+        $this->assertFileDoesNotExist($root . '/includes/brand-new.php', 'A file the release added must go');
+        $this->assertDirectoryDoesNotExist($root . '/lib', 'Folders the release created must go when empty');
+        $this->assertSame([], glob($root . '/backups/rollback-*'), 'Set-aside copies are removed once the site is back');
+        $this->assertFalse(updater_is_maintenance_mode());
+
+        // And it really loads again.
+        $check = updater_boot_check($root);
+        foreach ($check['pages'] as $uri => $page) {
+            $this->assertTrue($page['ok'], "{$uri} must load after the rollback: " . ($page['error'] ?? ''));
+        }
+
+        // Recorded for support, with the reason.
+        $this->assertCount(1, $logged);
+        $this->assertSame('rolled_back', $logged[0][2]);
+        $this->assertStringContainsString('Cannot redeclare', (string) $logged[0][4]);
+        $this->assertStringContainsString('1.0.0', (string) $logged[0][4]);
+
+        // The bar ends in a final state, through the checking and restoring steps.
+        $phases = array_values(array_unique(array_column($states, 'phase')));
+        $this->assertContains('verify', $phases);
+        $this->assertSame('restore', end($phases));
+        $this->assertNotEmpty($result['backup']);
+        $this->assertFileExists($root . '/backups/' . $result['backup']);
+    }
+
+    public function test_a_release_that_boots_passes_the_check_and_stays(): void
+    {
+        $this->requireZip();
+        $this->requireCli();
+
+        $root = $this->makeTempRoot();
+        $this->writeBootableSite($root);
+
+        $orgV2 = "<?php\nfunction org_name(): string { return 'NGO v2'; }\n"
+               . "if (!function_exists('feature_enabled')) { function feature_enabled(string \$n): bool { return true; } }\n";
+        $zip = $this->makeReleaseZip([
+            'VERSION'                   => "2.0.0\n",
+            'config.php'                => "<?php\nrequire_once __DIR__ . '/includes/organisation.php';\n",
+            'includes/organisation.php' => $orgV2,
+        ]);
+
+        updater_set_root_override($root);
+        $logged = [];
+        $result = updater_apply(null, $this->deps($zip, $logged));
+
+        // 'partial' only because the fork's config.php was kept, as designed.
+        $this->assertSame('partial', $result['status'], (string) $result['error']);
+        $this->assertSame(['config.php'], $result['skipped']);
+        $this->assertSame('passed', $result['boot_check']);
+        $this->assertSame("2.0.0\n", file_get_contents($root . '/VERSION'));
+        $this->assertSame($orgV2, file_get_contents($root . '/includes/organisation.php'));
+        $this->assertSame(self::FORK_CONFIG, file_get_contents($root . '/config.php'), 'The customised config.php is still kept');
+        $this->assertSame('partial', $logged[0][2]);
+        $this->assertNull($logged[0][4]);
+    }
+
+    public function test_a_write_failure_half_way_puts_the_written_files_back(): void
+    {
+        $this->requireZip();
+
+        $root = $this->makeTempRoot();
+        file_put_contents($root . '/VERSION', "1.0.0\n");
+        @mkdir($root . '/includes/zz-blocker.php', 0755, true); // a folder where the release has a file
+
+        $zip = $this->makeReleaseZip([
+            'VERSION'                 => "2.0.0\n",
+            'includes/added.php'      => '<?php // new',
+            'includes/zz-blocker.php' => '<?php // cannot be written over a folder',
+        ]);
+
+        updater_set_root_override($root);
+        $logged = [];
+        $result = updater_apply(null, $this->deps($zip, $logged));
+
+        $this->assertSame('rolled_back', $result['status']);
+        $this->assertStringContainsString('Could not write file', (string) $result['error']);
+        $this->assertSame("1.0.0\n", file_get_contents($root . '/VERSION'));
+        $this->assertFileDoesNotExist($root . '/includes/added.php');
+        $this->assertFalse(updater_is_maintenance_mode());
+        $this->assertSame('rolled_back', $logged[0][2]);
+    }
+
+    public function test_a_restore_that_still_does_not_boot_says_so_and_names_the_backup(): void
+    {
+        $this->requireZip();
+
+        $root = $this->makeTempRoot();
+        file_put_contents($root . '/VERSION', "1.0.0\n");
+        $zip = $this->makeReleaseZip(['VERSION' => "2.0.0\n"]);
+
+        $logged = [];
+        $deps   = $this->deps($zip, $logged);
+        // Loads before the update, and never again after it.
+        $calls = 0;
+        $deps['boot_check'] = static function (string $r, ?array $pages, ?string $method) use (&$calls): array {
+            $calls++;
+            return ['method' => 'cli', 'pages' => ['/' => $calls === 1
+                ? ['ok' => true, 'status' => 200, 'error' => null]
+                : ['ok' => false, 'status' => 500, 'error' => 'HTTP 500']]];
+        };
+
+        updater_set_root_override($root);
+        $result = updater_apply(null, $deps);
+
+        $this->assertSame(3, $calls, 'Checked before, after the update, and after the restore');
+        $this->assertSame('rollback_failed', $result['status']);
+        $this->assertStringStartsWith('pre-update-1.0.0-', (string) $result['backup']);
+        $this->assertStringContainsString((string) $result['backup'], (string) $result['error']);
+        $this->assertFalse(updater_is_maintenance_mode(), 'Even now the site must not be left in maintenance mode');
+        $this->assertSame('rollback_failed', $logged[0][2]);
+    }
+
+    public function test_no_way_to_check_is_recorded_not_failed(): void
+    {
+        $this->requireZip();
+
+        $root = $this->makeTempRoot();
+        file_put_contents($root . '/VERSION', "1.0.0\n");
+        $zip = $this->makeReleaseZip(['VERSION' => "2.0.0\n"]);
+
+        updater_set_root_override($root);
+        $logged = [];
+        $deps = $this->deps($zip, $logged);
+        $deps['boot_check'] = static fn(): array => ['method' => 'none', 'pages' => []];
+        $result = updater_apply(null, $deps);
+
+        $this->assertSame('success', $result['status']);
+        $this->assertSame('not_checked', $result['boot_check']);
+        $this->assertSame("2.0.0\n", file_get_contents($root . '/VERSION'));
+        $this->assertStringContainsString('not run', (string) $logged[0][4], 'The log must say the site was not checked');
+    }
+
+    public function test_a_backup_that_cannot_be_made_stops_the_update_before_anything_changes(): void
+    {
+        $this->requireZip();
+
+        $root = $this->makeTempRoot();
+        file_put_contents($root . '/VERSION', "1.0.0\n");
+        file_put_contents($root . '/backups', 'a file where the backups folder should be');
+        $zip = $this->makeReleaseZip(['VERSION' => "2.0.0\n"]);
+
+        updater_set_root_override($root);
+        $logged = [];
+        $result = updater_apply(null, $this->deps($zip, $logged));
+
+        $this->assertSame('failed', $result['status']);
+        $this->assertStringContainsString('Could not create a backup', (string) $result['error']);
+        $this->assertSame("1.0.0\n", file_get_contents($root . '/VERSION'));
+        $this->assertFalse(updater_is_maintenance_mode());
+    }
+
+    public function test_cli_boot_check_reports_a_fatal_page(): void
+    {
+        $this->requireCli();
+
+        $root = $this->makeTempRoot();
+        $this->writeBootableSite($root);
+        file_put_contents($root . '/en/index.php', '<?php undefined_function_here();');
+
+        $check = updater_boot_check($root);
+
+        $this->assertSame('cli', $check['method']);
+        $this->assertTrue($check['pages']['/']['ok'], (string) $check['pages']['/']['error']);
+        $this->assertFalse($check['pages']['/en/']['ok']);
+        $this->assertStringContainsString('undefined_function_here', (string) $check['pages']['/en/']['error']);
+        $this->assertTrue($check['pages']['/admin/login.php']['ok']);
+    }
+
+    public function test_http_boot_check_sends_a_one_time_token_and_removes_it(): void
+    {
+        $root  = $this->makeTempRoot();
+        $seen  = [];
+        $probe = function (string $url, array $headers) use ($root, &$seen): array {
+            $token = (string) @file_get_contents(updater_boot_token_file($root));
+            $seen[$url] = $headers === ['X-NGO-Boot-Check: ' . $token] && strlen($token) >= 32;
+            return str_ends_with($url, '/admin/login.php')
+                ? ['status' => 500, 'body' => '']
+                : ['status' => 200, 'body' => '<html>ok</html>'];
+        };
+
+        $check = updater_boot_check($root, null, 'http', ['site_url' => 'https://ngo.example', 'http' => $probe]);
+
+        $this->assertSame('http', $check['method']);
+        $this->assertSame(['https://ngo.example/', 'https://ngo.example/en/', 'https://ngo.example/admin/login.php'], array_keys($seen));
+        $this->assertNotContains(false, $seen, 'Every request must carry the token that is on disk at that moment');
+        $this->assertTrue($check['pages']['/']['ok']);
+        $this->assertFalse($check['pages']['/admin/login.php']['ok']);
+        $this->assertFileDoesNotExist(updater_boot_token_file($root), 'The token must not outlive the check');
+        $this->assertFileExists($root . '/logs/.htaccess', 'logs/ must be locked against the web');
+    }
+
+    public function test_maintenance_gate_lets_through_only_the_current_token(): void
+    {
+        $root = $this->makeTempRoot();
+        mkdir($root . '/logs');
+        $token = bin2hex(random_bytes(24));
+        file_put_contents($root . '/logs/boot-check.token', $token);
+
+        $this->assertTrue(_om_boot_check_allowed($root, $token));
+        $this->assertFalse(_om_boot_check_allowed($root, strrev($token)));
+        $this->assertFalse(_om_boot_check_allowed($root, ''));
+
+        touch($root . '/logs/boot-check.token', time() - 600);
+        $this->assertFalse(_om_boot_check_allowed($root, $token), 'An old token must not work');
+
+        unlink($root . '/logs/boot-check.token');
+        $this->assertFalse(_om_boot_check_allowed($root, $token));
+
+        file_put_contents($root . '/logs/boot-check.token', '');
+        $this->assertFalse(_om_boot_check_allowed($root, ''), 'An empty token file must not match an empty header');
+    }
+
+    public function test_verdict_only_holds_the_update_to_pages_that_loaded_before(): void
+    {
+        $ok  = ['ok' => true, 'status' => 200, 'error' => null];
+        $bad = ['ok' => false, 'status' => 500, 'error' => 'HTTP 500'];
+
+        // The home page needs a database the CLI cannot reach on this host:
+        // it fails before and after, which says nothing about the release.
+        $baseline = ['method' => 'cli', 'pages' => ['/' => $bad, '/admin/login.php' => $ok]];
+        $this->assertTrue(updater_boot_check_verdict($baseline, ['method' => 'cli', 'pages' => ['/admin/login.php' => $ok]])['ok']);
+
+        $v = updater_boot_check_verdict($baseline, ['method' => 'cli', 'pages' => ['/admin/login.php' => $bad]]);
+        $this->assertFalse($v['ok']);
+        $this->assertStringContainsString('/admin/login.php', $v['reason']);
+
+        $this->assertNull(updater_boot_check_verdict(['method' => 'none', 'pages' => []], ['method' => 'none', 'pages' => []])['ok']);
+        $this->assertNull(updater_boot_check_verdict(['method' => 'cli', 'pages' => ['/' => $bad]], ['method' => 'none', 'pages' => []])['ok']);
+    }
+
+    public function test_backups_folder_is_locked_against_the_web(): void
+    {
+        $root = $this->makeTempRoot();
+        updater_set_root_override($root);
+        $this->assertNotNull(updater_backups_dir());
+        $this->assertStringContainsString('Require all denied', (string) file_get_contents($root . '/backups/.htaccess'));
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────────
+
+    private const FORK_CONFIG = "<?php\nrequire_once __DIR__ . '/includes/organisation.php';\n"
+        . "// this site's own change, kept by the updater\n"
+        . "function feature_enabled(string \$n): bool { return true; }\n";
+    private const ORG_V1 = "<?php\nfunction org_name(): string { return 'NGO'; }\n";
+
+    /**
+     * A tiny site that boots like the real one: every page requires config.php,
+     * which pulls in includes/organisation.php. config.php is the fork's own
+     * (its checksum no longer matches what shipped), so the updater keeps it.
+     */
+    private function writeBootableSite(string $root): void
+    {
+        $page = "<?php\nrequire \$_SERVER['DOCUMENT_ROOT'] . '/config.php';\necho '<h1>' . org_name() . '</h1>';\n";
+        foreach (['VERSION' => "1.0.0\n", 'config.php' => self::FORK_CONFIG,
+                  'includes/organisation.php' => self::ORG_V1, 'index.php' => $page,
+                  'en/index.php' => $page, 'admin/login.php' => $page] as $rel => $content) {
+            @mkdir(dirname($root . '/' . $rel), 0755, true);
+            file_put_contents($root . '/' . $rel, $content);
+        }
+        file_put_contents($root . '/checksums.json', json_encode([
+            'config.php'                => hash('sha256', "<?php\nrequire_once __DIR__ . '/includes/organisation.php';\n// as shipped\n"),
+            'includes/organisation.php' => hash('sha256', self::ORG_V1),
+        ]));
+    }
+
+    private function requireCli(): void
+    {
+        if (updater_php_cli_binary() === null) {
+            $this->markTestSkipped('No PHP CLI binary reachable through proc_open().');
+        }
+    }
 
     private function requireZip(): void
     {
