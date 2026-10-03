@@ -10,13 +10,15 @@
  * with `.home-spot .home-spot__<part>` rules. Keep styles out of inline
  * attributes here, or themes can no longer override them.
  *
- * Vars: $p $sid $f $lang $variant_images $variant_stock $card_redirect $show_admin
+ * Vars: $p $sid $f $lang $variant_images $variant_stock $variant_single $card_redirect $show_admin
  */
 $name     = h($lang === 'bg' ? $p['name_bg'] : ($p['name_en'] ?: $p['name_bg']));
 $desc     = $lang === 'bg' ? $p['description_bg'] : ($p['description_en'] ?: $p['description_bg']);
 $prod_url = ($lang === 'bg' ? '/magazin/' : '/en/shop/') . h($p['slug']) . '/';
 $img      = $p['type'] === 'variant' ? ($variant_images[$p['id']] ?? '') : $p['image'];
 $stock    = $p['type'] === 'variant' ? (int) ($variant_stock[$p['id']] ?? 0) : (int) $p['stock'];
+// Exactly one active variant: nothing to choose, add it directly (as product-card.php does).
+$single_vid = $p['type'] === 'variant' ? (int) (($variant_single ?? [])[$p['id']] ?? 0) : 0;
 // Rich text → plain paragraphs: block ends become blank lines, which pre-line keeps.
 $desc_text = html_entity_decode(
     strip_tags(preg_replace('#</(p|div|li|h[1-6])>|<br\s*/?>#i', "\n\n", (string) $desc)),
@@ -57,12 +59,15 @@ $desc_text = trim(preg_replace("/[ \t]*\n\s*\n\s*/", "\n\n", str_replace("\u{00A
     <?php endif; ?>
 
     <div class="home-spot__actions">
-      <?php if ($p['type'] === 'variant'): ?>
+      <?php if ($p['type'] === 'variant' && !$single_vid): ?>
         <a href="<?= $prod_url ?>" class="btn btn--primary"><?= $lang === 'bg' ? 'Избери вариант' : 'Choose variant' ?></a>
       <?php elseif ($stock > 0): ?>
         <form method="POST" action="/cart/add.php">
           <?= csrf_field() ?>
           <input type="hidden" name="product_id" value="<?= (int) $p['id'] ?>">
+          <?php if ($single_vid): ?>
+          <input type="hidden" name="variant_id" value="<?= $single_vid ?>">
+          <?php endif; ?>
           <input type="hidden" name="redirect" value="<?= h($card_redirect) ?>">
           <input type="hidden" name="_lang" value="<?= h($lang) ?>">
           <button type="submit" class="btn btn--primary"><?= $lang === 'bg' ? 'Добави в количката' : 'Add to cart' ?></button>

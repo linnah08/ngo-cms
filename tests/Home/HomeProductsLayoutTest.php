@@ -32,14 +32,14 @@ final class HomeProductsLayoutTest extends TestCase
         ], $o);
     }
 
-    private function render(array $products, string $lang = 'bg', bool $admin = false): string
+    private function render(array $products, string $lang = 'bg', bool $admin = false, array $ctx_extra = []): string
     {
         $s   = ['id' => 's_products', 'type' => 'products', 'visible' => true, 'fields' => [
             'heading'    => ['bg' => 'Продукти', 'en' => 'Products'],
             'btn1_label' => ['bg' => 'Виж всички продукти', 'en' => 'All products'],
             'btn1_url'   => ['bg' => '/magazin/', 'en' => '/en/shop/'],
         ]];
-        $ctx = ['featured_products' => $products, 'variant_images' => [], 'variant_stock' => []];
+        $ctx = $ctx_extra + ['featured_products' => $products, 'variant_images' => [], 'variant_stock' => []];
         ob_start();
         home_render_section($s, $lang, $ctx, $admin);
         return (string) ob_get_clean();
@@ -84,6 +84,18 @@ final class HomeProductsLayoutTest extends TestCase
         $html = $this->render([$this->product(['type' => 'variant', 'stock' => 0, 'image' => ''])]);
         $this->assertStringContainsString('Избери вариант', $html);
         $this->assertStringNotContainsString('/cart/add.php', $html);
+    }
+
+    public function test_spotlight_single_variant_product_adds_that_variant_directly(): void
+    {
+        $p    = $this->product(['type' => 'variant', 'stock' => 0, 'image' => '']);
+        $html = $this->render([$p], 'bg', false, [
+            'variant_stock'  => [$p['id'] => 4],
+            'variant_single' => [$p['id'] => 77],
+        ]);
+        $this->assertStringNotContainsString('Избери вариант', $html, 'one variant: nothing to choose');
+        $this->assertStringContainsString('/cart/add.php', $html);
+        $this->assertStringContainsString('name="variant_id" value="77"', $html);
     }
 
     public function test_spotlight_hides_other_language_copy_from_visitors(): void
