@@ -1,5 +1,6 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/articles.php';
 
 // Route: /novini/SLUG/ → single article; /novini/ → listing
 $raw  = basename(str_replace(['..', "\0"], '', rawurldecode(explode('/', trim(strtok($_SERVER['REQUEST_URI'], '?'), '/'))[1] ?? '')));
@@ -71,13 +72,14 @@ if ($slug) {
           data-cms-bg="<?= h($article['title'] ?? '') ?>"
           data-cms-en="<?= h($article['title'] ?? '') ?>"><?= h($article['title']) ?></h1>
 
-      <?php if (!empty($article['image'])): ?>
+      <?php $lang = 'bg'; ?>
+      <?php if (count(article_photos($article)) <= 1 && !empty($article['image'])): ?>
         <span class="om-img-wrap" data-cms-field="image" data-cms-section="article">
-          <img src="<?= asset_url($article['image']) ?>"
-               alt="<?= h($article['title']) ?>"
-               style="width:100%;height:auto;border-radius:var(--radius-lg);margin-bottom:2rem;display:block;">
+          <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/article-carousel.php'; ?>
           <?php if ($_show_admin_bar): ?><span class="om-img-overlay">📷 Replace</span><?php endif; ?>
         </span>
+      <?php else: ?>
+        <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/article-carousel.php'; ?>
       <?php endif; ?>
 
       <div class="article-content"

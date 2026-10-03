@@ -1,5 +1,6 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/articles.php';
 
 // Route: /en/news/SLUG/ → single article; /en/news/ → listing
 $raw  = basename(str_replace(['..', "\0"], '', rawurldecode(explode('/', trim(strtok($_SERVER['REQUEST_URI'], '?'), '/'))[2] ?? '')));
@@ -73,11 +74,7 @@ if ($slug) {
 
       <h1 style="margin-bottom:2rem;"><?= h($article['title']) ?></h1>
 
-      <?php if (!empty($article['image'])): ?>
-        <img src="<?= asset_url($article['image']) ?>"
-             alt="<?= h($article['title']) ?>"
-             style="width:100%;height:auto;border-radius:var(--radius-lg);margin-bottom:2rem;display:block;">
-      <?php endif; ?>
+      <?php $lang = 'en'; require $_SERVER['DOCUMENT_ROOT'] . '/templates/article-carousel.php'; ?>
 
       <div class="article-content" style="line-height:1.9;font-size:1.05rem;">
         <?= $article['content'] ?? '' ?>
