@@ -122,10 +122,12 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
       <div>
         <h3 style="margin-bottom:1.5rem;">Информация за контакт</h3>
         <div style="display:flex;flex-direction:column;gap:1.5rem;">
+          <?php if (site_phone_public() !== ''): ?>
           <div>
             <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:0.35rem;">Телефон</div>
-            <a href="tel:<?= SITE_PHONE ?>" style="font-size:1.1rem;"><?= SITE_PHONE ?></a>
+            <a href="tel:<?= h(site_phone_public()) ?>" style="font-size:1.1rem;"><?= h(site_phone_public()) ?></a>
           </div>
+          <?php endif; ?>
           <div>
             <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:0.35rem;">Имейл</div>
             <a href="mailto:<?= SITE_EMAIL ?>" style="font-size:1.1rem;"><?= SITE_EMAIL ?></a>

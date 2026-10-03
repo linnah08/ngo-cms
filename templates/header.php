@@ -112,13 +112,8 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
     seo_render_jsonld(array_merge([seo_org_jsonld()], $seo_jsonld ?? []));
   ?>
 
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=<?= h(current_theme()['font_url']) ?>&display=swap" rel="stylesheet">
-
-  <!-- Styles -->
-  <link rel="stylesheet" href="/assets/css/main.css">
+  <!-- Fonts + styles (the theme's fonts, main.css, the theme's own stylesheet) -->
+<?= theme_stylesheet_links(current_theme()) ?>
   <?php if (!empty($extra_css)): ?>
     <link rel="stylesheet" href="<?= h($extra_css) ?>">
   <?php endif; ?>
@@ -168,16 +163,21 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
     $_theme   = current_theme();
     $_primary = (defined('BRAND_PRIMARY') && BRAND_PRIMARY !== '') ? BRAND_PRIMARY : $_theme['primary'];
     $_accent  = (defined('BRAND_ACCENT')  && BRAND_ACCENT  !== '') ? BRAND_ACCENT  : $_theme['accent'];
+    // A theme may set separate display and body faces; older ones use one font
+    // for both roles, which is what these fallbacks preserve.
+    $_font_body    = $_theme['font_body']    ?? $_theme['font'];
+    $_font_display = $_theme['font_display'] ?? $_theme['font'];
   ?>
   <!-- Theme + brand (install wizard) -->
   <style>:root{
     --teal:<?= h($_primary) ?>;
     --teal-dark:<?= h($_accent) ?>;
     --teal-light:color-mix(in srgb, <?= h($_primary) ?> 12%, #ffffff);
-    --font-body:'<?= h($_theme['font']) ?>',sans-serif;
-    --font-display:'<?= h($_theme['font']) ?>',sans-serif;
+    --font-body:'<?= h($_font_body) ?>',sans-serif;
+    --font-display:'<?= h($_font_display) ?>',sans-serif;
     --radius:<?= h($_theme['radius']) ?>;
     --radius-lg:<?= h($_theme['radius_lg']) ?>;
+<?= theme_palette_css($_theme) ?>
   }</style>
 </head>
 <body<?= $_show_admin_bar ? ' class="om-admin"' : '' ?>>
@@ -222,16 +222,16 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
        Rendered inside .site-header on purpose: that element is already
        position:sticky, so the band travels with it and needs no z-index or
        top-offset maths of its own.
-       Gold field with ink type — the brand's loudest pairing that is still
-       safe for text (8.99:1, see assets/css/theme-lafetki.css). A pale band on
-       this paper ground would be invisible, which was the first version's
+       The theme's amber field with its body-text colour: a strong band that
+       stays readable (a theme sets both through --amber and --text). A pale
+       band on a light page would be invisible, which was the first version's
        whole problem.
        No dismiss control: a notice worth showing is not worth losing to a
        stray tap, and it must not go missing mid-review.
        Styles are inline — main.css can be stale-cached on the server. -->
   <div id="om-launch-banner" role="status"
-       style="background:var(--lf-gold,var(--amber,#e8a020));
-              color:var(--lf-ink,var(--text,#1a1916));">
+       style="background:var(--amber,#e8a020);
+              color:var(--text,#1a1916);">
     <p style="max-width:1200px;margin:0 auto;padding:.75rem 1rem;
               font-size:.95rem;font-weight:600;line-height:1.4;text-align:center;">
       <?= h(launch_banner_text(get_lang())) ?>
@@ -242,11 +242,15 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
   <div class="header-top">
     <div class="container">
       <div class="header-top__contact">
-        <a href="tel:<?= SITE_PHONE ?>"><?= SITE_PHONE ?></a>
+        <?php if (site_phone_public() !== ''): ?>
+        <a href="tel:<?= h(site_phone_public()) ?>"><?= h(site_phone_public()) ?></a>
+        <?php endif; ?>
         <a href="mailto:<?= SITE_EMAIL ?>"><?= SITE_EMAIL ?></a>
       </div>
       <div class="header-top__right">
-        <span><?= t('header.donate_iban') ?>: <strong><?= SITE_IBAN ?></strong></span>
+        <?php if (feature_enabled('donations') && trim((string) SITE_IBAN) !== ''): ?>
+        <span><?= t('header.donate_iban') ?>: <strong><?= h(SITE_IBAN) ?></strong></span>
+        <?php endif; ?>
         <span class="header-top__social">
           <?php $social_variant = 'bar'; require __DIR__ . '/social-links.php'; ?>
         </span>

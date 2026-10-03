@@ -102,3 +102,7 @@ define('FEATURE_SELF_UPDATE', true);
 define('SITE_LAUNCH_BANNER',    false);
 define('SITE_LAUNCH_BANNER_BG', '');
 define('SITE_LAUNCH_BANNER_EN', '');
+
+// Keep every public page out of search results (a robots "noindex, nofollow"
+// tag) while the site is publicly reachable but not finished. Remove on launch.
+// define('SITE_NOINDEX', true);

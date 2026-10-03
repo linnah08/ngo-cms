@@ -139,6 +139,7 @@
   "checkout.office.none": "No offices found for this town.",
   "checkout.office.error": "Could not load the offices. Please try again.",
   "checkout.office.other_city": "Search in another town",
+  "checkout.newsletter_optin": "Send me news from {name}.",
   "confirm.title": "Order confirmed",
   "confirm.thanks": "Thank you for your order!",
   "confirm.order": "Order",

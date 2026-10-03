@@ -371,7 +371,7 @@ function other_lang(): string {
     return get_lang() === 'bg' ? 'en' : 'bg';
 }
 
-/** The site's UI strings for one language (content/{lang}/strings.json), cached per language. */
+/** The site's UI strings for one language (content/{lang}/strings.json + strings.site.json), cached per language. */
 function lang_strings(string $lang): array {
     static $cache = [];
     $lang = $lang === 'en' ? 'en' : 'bg';
@@ -379,6 +379,18 @@ function lang_strings(string $lang): array {
         $file = __DIR__ . "/content/{$lang}/strings.json";
         $data = file_exists($file) ? json_decode((string) file_get_contents($file), true) : null;
         $cache[$lang] = is_array($data) ? $data : [];
+        // A site's own wording lives in strings.site.json beside it — a file no
+        // release ships — so strings.json itself can take every update unchanged
+        // (a kept strings.json would miss each new key). Its keys win.
+        $site = $GLOBALS['_om_site_strings_dir'] ?? __DIR__ . '/content';
+        $file = "{$site}/{$lang}/strings.site.json";
+        $over = file_exists($file) ? json_decode((string) file_get_contents($file), true) : null;
+        if (is_array($over)) {
+            $cache[$lang] = array_filter($over, fn($v, $k) => is_string($k) && is_string($v) && $v !== '', ARRAY_FILTER_USE_BOTH)
+                          + $cache[$lang];
+        } elseif (file_exists($file)) {
+            error_log("lang_strings: content/{$lang}/strings.site.json is not valid JSON — ignored");
+        }
     }
     return $cache[$lang];
 }
@@ -391,8 +403,8 @@ function t(string $key): string {
 /**
  * A UI string with its built-in BG/EN text.
  *
- * The site's strings.json wins when it has the key, so an NGO can reword it;
- * otherwise the default here is used. A site that customised strings.json
+ * The site's strings.json (or its own strings.site.json) wins when it has the
+ * key, so an NGO can reword it; otherwise the default here is used. A site that customised strings.json
  * keeps its own copy through updates (the updater skips owner-changed files),
  * so new keys may be missing there — this never prints a raw key.
  *

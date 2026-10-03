@@ -69,6 +69,13 @@ function seo_render_meta(array $ctx): void {
     $img   = seo_abs_url($ctx['image'] ?? '/assets/images/og-default.png');
     $alts  = $ctx['alternates'] ?? [];
 
+    // Pre-launch: the site must be publicly reachable — a payment provider
+    // reviewing it cannot be handed a password — while not being indexed with
+    // placeholder prices and unfinished copy. Drop SITE_NOINDEX on launch day.
+    if (defined('SITE_NOINDEX') && SITE_NOINDEX) {
+        echo "  <meta name=\"robots\" content=\"noindex, nofollow\">\n";
+    }
+
     echo '  <link rel="canonical" href="' . $h($url) . "\">\n";
     foreach ($alts as $lg => $u) {
         echo '  <link rel="alternate" hreflang="' . $h($lg) . '" href="' . $h($u) . "\">\n";
@@ -96,7 +103,7 @@ function seo_render_meta(array $ctx): void {
 
 /** Organization/NGO JSON-LD — emitted on every page. */
 function seo_org_jsonld(): array {
-    return [
+    $org = [
         '@context'      => 'https://schema.org',
         '@type'         => 'NGO',
         'name'          => SITE_NAME_EN,
@@ -104,9 +111,13 @@ function seo_org_jsonld(): array {
         'url'           => rtrim(SITE_URL, '/') . '/',
         'logo'          => seo_abs_url('/assets/images/logo.png'),
         'email'         => SITE_EMAIL,
-        'telephone'     => SITE_PHONE,
+        // Machine-readable, and the easiest thing on the page for a scraper to
+        // harvest — so it follows the same setting as the visible number.
+        'telephone'     => site_phone_public(),
         'sameAs'        => [SOCIAL_FACEBOOK, SOCIAL_INSTAGRAM, SOCIAL_LINKEDIN],
     ];
+    if ($org['telephone'] === '') unset($org['telephone']);
+    return $org;
 }
 
 /** Render an array of JSON-LD blocks (skips falsy entries). */

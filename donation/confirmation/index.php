@@ -4,6 +4,11 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/donation.php';
 start_session();
 
+if (!feature_enabled('donations')) {
+    require $_SERVER['DOCUMENT_ROOT'] . '/errors/404.php';
+    exit;
+}
+
 $lang         = get_lang();
 $order_number = trim($_GET['order'] ?? '');
 

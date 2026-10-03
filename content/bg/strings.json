@@ -139,6 +139,7 @@
   "checkout.office.none": "Няма намерени офиси за този град.",
   "checkout.office.error": "Грешка при зареждане на офиси. Опитайте отново.",
   "checkout.office.other_city": "Търси в друг град",
+  "checkout.newsletter_optin": "Искам да получавам новини от {name}.",
   "confirm.title": "Поръчката е потвърдена",
   "confirm.thanks": "Благодарим за поръчката!",
   "confirm.order": "Поръчка",

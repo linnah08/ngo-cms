@@ -43,6 +43,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
             'style' => 'outline',
         ],
     ];
+    if (!feature_enabled('donations')) unset($_way_ctas['Become a donor']);
     // See the note in kak-da-pomogna/index.php.
     if (!feature_enabled('campaign')) {
         unset($_way_ctas['Support our campaign']);
@@ -75,10 +76,12 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     <div style="margin-top:3rem;padding:2.5rem;background:var(--off-white);border-radius:8px;">
       <h3 style="margin-bottom:1.5rem;">Get in touch</h3>
       <div style="display:flex;gap:3rem;flex-wrap:wrap;">
+        <?php if (site_phone_public() !== ''): ?>
         <div>
           <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:0.35rem;">Phone</div>
-          <a href="tel:<?= SITE_PHONE ?>"><?= SITE_PHONE ?></a>
+          <a href="tel:<?= h(site_phone_public()) ?>"><?= h(site_phone_public()) ?></a>
         </div>
+        <?php endif; ?>
         <div>
           <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:0.35rem;">Email</div>
           <a href="mailto:<?= SITE_EMAIL ?>"><?= SITE_EMAIL ?></a>

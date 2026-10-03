@@ -24,10 +24,12 @@ $_show_nl_banner = empty($_COOKIE['om_nl_sub']) && !str_starts_with($_SERVER['RE
 </div>
 <?php endif; ?>
 <?php endforeach; ?>
-<section class="newsletter-banner" style="background:#0387A5;padding:3rem 0;">
+<?php // A theme can recolour the band (--newsletter-bg / --newsletter-fg in its
+      // palette); without them it keeps the original teal and white. ?>
+<section class="newsletter-banner" style="background:var(--newsletter-bg,#0387A5);padding:3rem 0;">
   <div class="container" style="max-width:680px;text-align:center;">
-    <h3 style="color:#fff;margin:0 0 .5rem;font-size:1.3rem;"><?= t('newsletter.banner.title') ?></h3>
-    <p style="color:rgba(255,255,255,.85);margin:0 0 1.5rem;font-size:.95rem;"><?= t('newsletter.banner.text') ?></p>
+    <h3 style="color:var(--newsletter-fg,#fff);margin:0 0 .5rem;font-size:1.3rem;"><?= t('newsletter.banner.title') ?></h3>
+    <p style="color:var(--newsletter-fg,#fff);opacity:.85;margin:0 0 1.5rem;font-size:.95rem;"><?= t('newsletter.banner.text') ?></p>
     <form method="POST" action="/newsletter/subscribe.php"
           style="display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap;">
       <?= csrf_field() ?>
@@ -35,7 +37,7 @@ $_show_nl_banner = empty($_COOKIE['om_nl_sub']) && !str_starts_with($_SERVER['RE
              placeholder="<?= h(t('newsletter.banner.placeholder')) ?>"
              style="padding:.6rem 1rem;border:none;border-radius:4px;font-size:1rem;font-family:inherit;width:280px;max-width:100%;">
       <button type="submit" class="btn btn--primary"
-              style="background:#fff;color:#0387A5;border:none;font-weight:700;padding:.6rem 1.5rem;">
+              style="background:var(--newsletter-fg,#fff);color:var(--newsletter-bg,#0387A5);border:none;font-weight:700;padding:.6rem 1.5rem;">
         <?= t('newsletter.banner.submit') ?>
       </button>
     </form>
@@ -54,12 +56,16 @@ $_show_nl_banner = empty($_COOKIE['om_nl_sub']) && !str_starts_with($_SERVER['RE
               data-cms-type="text"
               data-cms-bg="<?= h($pages['footer']['tagline'] ?? '') ?>"
               data-cms-en="<?= h($pages['footer']['tagline_en'] ?? '') ?>"><?= h($pages['footer']['tagline'] ?? t('footer.tagline')) ?></span></p>
+        <?php // No bank account to show when donations are off, and an empty
+              // IBAN would otherwise render as a blank labelled box. ?>
+        <?php if (feature_enabled('donations') && trim((string) SITE_IBAN) !== ''): ?>
         <div style="margin-top:1.5rem;">
           <div style="font-size:0.8rem;opacity:0.7;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.5rem;">
             <?= t('footer.donate') ?>
           </div>
-          <div class="footer-iban"><?= SITE_IBAN ?></div>
+          <div class="footer-iban"><?= h(SITE_IBAN) ?></div>
         </div>
+        <?php endif; ?>
       </div>
 
       <!-- Navigation -->
@@ -100,7 +106,9 @@ $_show_nl_banner = empty($_COOKIE['om_nl_sub']) && !str_starts_with($_SERVER['RE
       <div class="footer-col">
         <h4><?= t('footer.contact') ?></h4>
         <ul>
-          <li><a href="tel:<?= SITE_PHONE ?>"><?= SITE_PHONE ?></a></li>
+          <?php if (site_phone_public() !== ''): ?>
+          <li><a href="tel:<?= h(site_phone_public()) ?>"><?= h(site_phone_public()) ?></a></li>
+          <?php endif; ?>
           <li><a href="mailto:<?= SITE_EMAIL ?>"><?= SITE_EMAIL ?></a></li>
         </ul>
         <!-- Social profile URLs live in config.php (SOCIAL_* constants) -->
@@ -132,15 +140,17 @@ $_show_nl_banner = empty($_COOKIE['om_nl_sub']) && !str_starts_with($_SERVER['RE
   <p style="margin:0;font-size:.875rem;line-height:1.5;flex:1;min-width:200px;">
     <?= h(t('cookies.banner.text')) ?>
     <a href="<?= $lang === 'bg' ? '/politika-za-biskvitki/' : '/en/cookie-policy/' ?>"
-       style="color:#4dc8e0;white-space:nowrap;margin-left:.35rem;"><?= h(t('cookies.banner.learn_more')) ?></a>
+       style="color:var(--banner-accent,#4dc8e0);white-space:nowrap;margin-left:.35rem;"><?= h(t('cookies.banner.learn_more')) ?></a>
   </p>
   <div style="display:flex;gap:.5rem;flex-shrink:0;">
     <button onclick="cookieConsent('essential')"
             style="padding:.45rem 1rem;border:1px solid #555;border-radius:5px;background:transparent;color:#f0f0f0;cursor:pointer;font-size:.85rem;font-family:inherit;">
       <?= h(t('cookies.banner.decline')) ?>
     </button>
+    <?php // The banner sits on near-black: a theme with a dark primary sets
+          // --banner-accent / --banner-accent-fg so the button does not vanish into it. ?>
     <button onclick="cookieConsent('all')"
-            style="padding:.45rem 1rem;border:none;border-radius:5px;background:#0387A5;color:#fff;cursor:pointer;font-size:.85rem;font-weight:600;font-family:inherit;">
+            style="padding:.45rem 1rem;border:none;border-radius:5px;background:var(--banner-accent,#0387A5);color:var(--banner-accent-fg,#fff);cursor:pointer;font-size:.85rem;font-weight:600;font-family:inherit;">
       <?= h(t('cookies.banner.accept')) ?>
     </button>
   </div>

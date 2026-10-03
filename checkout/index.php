@@ -1020,7 +1020,7 @@ $subtotal  = $cart_info['subtotal'];
               и <a href="<?= $_c_privacy ?>" target="_blank" rel="noopener">Политиката за поверителност</a>
               и съм запознат/а с правото си на отказ в 14-дневен срок.
             <?php endif; ?>
-            <span aria-hidden="true" style="color:#a4243d;">*</span>
+            <span aria-hidden="true" style="color:var(--required-ink,#a4243d);">*</span>
           </span>
         </label>
 
@@ -1029,9 +1029,8 @@ $subtotal  = $cart_info['subtotal'];
                  <?= !empty($_POST['accept_newsletter']) ? 'checked' : '' ?>
                  style="width:1.1rem;height:1.1rem;margin-top:.15rem;flex-shrink:0;accent-color:var(--teal);">
           <span style="font-size:.9rem;line-height:1.6;text-transform:none;letter-spacing:normal;">
-            <?= $lang === 'en'
-                ? 'Send me news from ' . h(SITE_NAME_EN) . '.'
-                : 'Искам да получавам новини от ' . h(SITE_NAME_BG) . '.' ?>
+            <?= h(t_or('checkout.newsletter_optin', 'Искам да получавам новини от {name}.', 'Send me news from {name}.',
+                       null, ['name' => $lang === 'en' ? SITE_NAME_EN : SITE_NAME_BG])) ?>
           </span>
         </label>
       </fieldset>
