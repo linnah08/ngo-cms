@@ -167,6 +167,8 @@ photos never reach a post that's already scheduled.
 
 - `includes/articles.php` — `article_photos()`, `article_main_photo_index()`
 - `admin/article-edit.php` — photo grid, saving
+- `admin/translate-article-ajax.php` — the ✦ translate-to-English button copies the photos and translates captions
+- `admin/inline-save-article.php` — the public page's "📷 Replace" swaps the main photo inside `photos`
 - `templates/article-carousel.php` — new, shared by both article pages
 - `novini/index.php`, `en/news/index.php` — use the carousel
 - `admin/social-ajax.php` — multiple assets, Instagram carousel
