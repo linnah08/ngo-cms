@@ -100,3 +100,24 @@ function social_fb_insta_request(array $article, string $channel): array {
         : 'instagram: { type: post, shouldShareToFeed: true }';   // several assets make the carousel; Buffer refuses type: carousel
     return ['urls' => $urls, 'metadata' => $metadata];
 }
+
+/**
+ * LinkedIn: several photos go as one PDF "document" — LinkedIn shows it as a swipeable
+ * carousel; one photo stays an ordinary image post.
+ */
+function social_linkedin_assets_gql(array $bg, array $en): string {
+    $paths = social_photo_paths($bg);
+    if (count($paths) > 1) {
+        require_once __DIR__ . '/documents/LinkedInCarouselGenerator.php';
+        $pdf = LinkedInCarouselGenerator::save($bg, $en);
+        if ($pdf !== null) {
+            $thumb = social_prepare_image($paths[0], 'square') ?? $paths[0];
+            return 'assets: [{ document: { url: ' . json_encode(social_image_url($pdf), JSON_UNESCAPED_SLASHES)
+                 . ', title: ' . json_encode((string) ($en['title'] ?? $bg['title'] ?? ''), JSON_UNESCAPED_UNICODE)
+                 . ', thumbnailUrl: ' . json_encode(social_image_url($thumb), JSON_UNESCAPED_SLASHES) . ' } }],';
+        }
+    }
+    if (!$paths) return '';
+    $one = social_prepare_image($paths[0], 'fit');
+    return $one === null ? '' : social_buffer_assets_gql([social_image_url($one)]);
+}

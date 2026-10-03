@@ -87,4 +87,20 @@ final class LinkedInCarouselTest extends TestCase
         $this->assertNotSame($p1, $p2);
         foreach ([$p1, $p2] as $p) { $this->assertFileExists($_SERVER['DOCUMENT_ROOT'] . $p); unlink($_SERVER['DOCUMENT_ROOT'] . $p); }
     }
+
+    public function testSeveralPhotosGoAsOneDocument(): void
+    {
+        $a = $this->photo('a.jpg'); $b = $this->photo('b.jpg');
+        $bg = ['slug' => 'tst', 'title' => 'Т', 'image' => $a, 'photos' => [['src' => $a, 'caption' => ''], ['src' => $b, 'caption' => '']]];
+        $gql = social_linkedin_assets_gql($bg, ['title' => 'Camp "2026"']);
+        $this->assertMatchesRegularExpression('#^assets: \[\{ document: \{ url: "[^"]+\.pdf", title: "Camp \\\\"2026\\\\"", thumbnailUrl: "[^"]+" \} \}\],$#', $gql);
+        foreach (glob($_SERVER['DOCUMENT_ROOT'] . '/assets/images/articles/linkedin-tst-*.pdf') as $f) unlink($f);
+    }
+
+    public function testOnePhotoStaysAnImagePost(): void
+    {
+        $a = $this->photo('a.jpg');
+        $gql = social_linkedin_assets_gql(['slug' => 't', 'image' => $a], []);
+        $this->assertStringStartsWith('assets: [{ image: { url: ', $gql);
+    }
 }

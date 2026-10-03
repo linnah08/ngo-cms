@@ -17,6 +17,7 @@
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/social_images.php';
 admin_require_login();
 
 header('Content-Type: application/json; charset=UTF-8');
@@ -314,55 +315,9 @@ if ($action === 'schedule') {
 
     // No existing post — create fresh
     $article_data = load_json($file);
-    $image_path   = $article_data['image'] ?? '';
-    $image_url    = '';
-    if ($image_path !== '' && is_file($_SERVER['DOCUMENT_ROOT'] . $image_path)) {
-        $encoded   = implode('/', array_map('rawurlencode', explode('/', ltrim($image_path, '/'))));
-        $image_url = SITE_URL . '/' . $encoded;
-    }
-    _om_log('INFO', "linkedin-ajax schedule: image_path={$image_path} image_url={$image_url}");
-
-    // Resize image if wider than 4800px (Buffer max is 5000px)
-    if ($image_url !== '') {
-        $abs_path = $_SERVER['DOCUMENT_ROOT'] . $image_path;
-        $size     = @getimagesize($abs_path);
-        if ($size && $size[0] > 4800) {
-            $ext     = strtolower(pathinfo($abs_path, PATHINFO_EXTENSION));
-            $ig_path = preg_replace('/\.' . preg_quote($ext, '/') . '$/', '-ig.' . $ext, $image_path);
-            $ig_abs  = $_SERVER['DOCUMENT_ROOT'] . $ig_path;
-            $resized = false;
-            $src     = match($ext) {
-                'jpg', 'jpeg' => @imagecreatefromjpeg($abs_path),
-                'png'         => @imagecreatefrompng($abs_path),
-                'webp'        => @imagecreatefromwebp($abs_path),
-                default       => false,
-            };
-            if ($src) {
-                $new_w = 4800;
-                $new_h = (int)round($size[1] * $new_w / $size[0]);
-                $dst   = imagecreatetruecolor($new_w, $new_h);
-                if ($ext === 'png') { imagealphablending($dst, false); imagesavealpha($dst, true); }
-                imagecopyresampled($dst, $src, 0, 0, 0, 0, $new_w, $new_h, $size[0], $size[1]);
-                $resized = match($ext) {
-                    'jpg', 'jpeg' => imagejpeg($dst, $ig_abs, 90),
-                    'png'         => imagepng($dst, $ig_abs),
-                    'webp'        => imagewebp($dst, $ig_abs, 90),
-                    default       => false,
-                };
-                imagedestroy($src);
-                imagedestroy($dst);
-            }
-            if ($resized) {
-                $encoded   = implode('/', array_map('rawurlencode', explode('/', ltrim($ig_path, '/'))));
-                $image_url = SITE_URL . '/' . $encoded;
-                _om_log('INFO', "linkedin-ajax schedule: resized to {$ig_path}");
-            }
-        }
-    }
-
-    $assets_gql   = $image_url !== ''
-        ? 'assets: [{ image: { url: ' . json_encode($image_url) . ' } }],'
-        : '';
+    $en_data      = load_json(ARTICLES_PATH . '/en/' . basename((string) ($article_data['slug_en'] ?? $slug)) . '.json') ?: [];
+    $assets_gql   = social_linkedin_assets_gql($article_data, $en_data);
+    _om_log('INFO', 'linkedin-ajax schedule: ' . (str_contains($assets_gql, 'document:') ? 'PDF carousel' : ($assets_gql ? 'one image' : 'no image')));
     $query = 'mutation CreatePost {
   createPost(input: {
     ' . $assets_gql . '
