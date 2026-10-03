@@ -492,6 +492,20 @@ function home_load(): array {
 }
 
 /**
+ * Is a section of this type switched on on the front page? The admin menu uses it to
+ * leave out pages that only feed a section the site does not show (Партньори).
+ * An unreadable home.json counts as "on", so a menu item is never lost to a broken file.
+ */
+function home_section_on(string $type): bool {
+    $loaded = home_load();
+    if ($loaded['corrupt']) return true;
+    foreach ($loaded['doc']['sections'] as $s) {
+        if ($s['type'] === $type && !empty($s['visible'])) return true;
+    }
+    return false;
+}
+
+/**
  * Write the whole document if nobody saved since $expected_rev was read.
  * @return array{ok: bool, error: ?string, doc?: array}
  */

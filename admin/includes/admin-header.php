@@ -121,10 +121,26 @@ $current_user = admin_user();
       </a>
       <?php endif; ?>
       <?php if (admin_is_admin()): ?>
+      <?php
+      // Partners only ever appear in the front page's Партньори section, so the menu
+      // item follows that section: switch it on in Начална страница and it is back.
+      // The page itself always works at /admin/partners.php.
+      $_nav_partners = ($active_nav ?? '') === 'partners';
+      if (!$_nav_partners) {
+          try {
+              require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/home.php';
+              $_nav_partners = home_section_on('partners');
+          } catch (Throwable $e) {
+              $_nav_partners = true;
+          }
+      }
+      ?>
+      <?php if ($_nav_partners): ?>
       <a href="/admin/partners.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'partners' ? 'active' : '' ?>">
         Партньори
       </a>
+      <?php endif; ?>
       <a href="/admin/pages.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'pages' ? 'active' : '' ?>">
         Съдържание
