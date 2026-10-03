@@ -141,3 +141,47 @@ function article_is_scheduled(array $a, ?int $mtime = null): bool {
 function article_due_for_publish(array $a, ?int $mtime, string $today): bool {
     return article_is_scheduled($a, $mtime) && $a['date'] <= $today;
 }
+
+/** Most photos a post can have — Instagram's carousel limit, so nothing is dropped on the way there. */
+const ARTICLE_PHOTOS_MAX = 10;
+
+/**
+ * Is $src a site image a post may use? Under /assets/images/, no "..", no scheme,
+ * and present on disk ($exists is injectable for tests).
+ */
+function article_photo_path_ok(string $src, ?callable $exists = null): bool {
+    if (!preg_match('#^/assets/images/[a-zA-Z0-9_\-][a-zA-Z0-9/_.\-]*$#', $src)) return false;
+    if (str_contains($src, '..')) return false;
+    $exists ??= static fn(string $p): bool => is_file($_SERVER['DOCUMENT_ROOT'] . $p);
+    return $exists($src);
+}
+
+/**
+ * The post's photos in display order: [['src' => ..., 'caption' => ...], ...].
+ * A post saved before photos existed has only `image` — it reads as one photo.
+ * Invalid or missing files are skipped; at most ARTICLE_PHOTOS_MAX are returned.
+ */
+function article_photos(array $article, ?callable $exists = null): array {
+    $raw = $article['photos'] ?? null;
+    if (!is_array($raw)) {
+        $img = is_string($article['image'] ?? null) ? $article['image'] : '';
+        $raw = $img !== '' ? [['src' => $img, 'caption' => '']] : [];
+    }
+    $out = [];
+    foreach ($raw as $p) {
+        if (!is_array($p) || !is_string($p['src'] ?? null)) continue;
+        if (!article_photo_path_ok($p['src'], $exists)) continue;
+        $out[] = ['src' => $p['src'], 'caption' => is_string($p['caption'] ?? null) ? $p['caption'] : ''];
+        if (count($out) === ARTICLE_PHOTOS_MAX) break;
+    }
+    return $out;
+}
+
+/** Index in $photos of the post's main photo (its `image`), or 0 when it isn't there. */
+function article_main_photo_index(array $article, array $photos): int {
+    $main = $article['image'] ?? '';
+    foreach ($photos as $i => $p) {
+        if ($p['src'] === $main) return $i;
+    }
+    return 0;
+}
