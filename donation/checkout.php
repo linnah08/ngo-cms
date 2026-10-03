@@ -6,19 +6,21 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/IRISPayment.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/donation.php';
 start_session();
 
-$order_lang = ($_POST['_lang'] ?? 'bg') === 'en' ? 'en' : 'bg';
-$shop_url   = $order_lang === 'en' ? '/en/shop/' : '/magazin/';
+// This URL has no /en/ prefix, so the form says which language it came from.
+$order_lang = post_lang();
+$form_url   = donation_path('form', $order_lang);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: ' . $shop_url);
+    header('Location: ' . $form_url);
     exit;
 }
 
 if (!csrf_verify()) {
-    flash_set('error', 'Невалидна заявка.');
-    header('Location: ' . $shop_url);
+    donation_form_fail([t_or('donation.err.csrf', 'Формата изтече. Моля, опитайте отново.', 'The form expired. Please try again.', $order_lang)], $_POST);
+    header('Location: ' . $form_url);
     exit;
 }
 
@@ -30,12 +32,6 @@ $donor_type = in_array($_POST['donor_type'] ?? '', ['individual', 'company'], tr
     ? $_POST['donor_type']
     : 'individual';
 
-$errors = [];
-if ($amount < 1)                                $errors[] = 'Сумата трябва да е поне 1 €.';
-if ($amount > 50000)                            $errors[] = 'Максималната сума за онлайн дарение е 50 000 €.';
-if (!$name)                                     $errors[] = 'Моля въведете вашите имена.';
-if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Невалиден имейл адрес.';
-
 $enabled_methods = [];
 if (DSKBankPayment::isEnabled()) $enabled_methods[] = 'card';
 if (IRISPayment::isEnabled())    $enabled_methods[] = 'iris';
@@ -45,33 +41,29 @@ if (!in_array($payment_method, $enabled_methods, true)) {
     $payment_method = $enabled_methods[0] ?? '';
 }
 if ($payment_method === '') {
-    flash_set('error', 'Онлайн плащането не е налично в момента. Моля свържете се с нас.');
-    header('Location: ' . $shop_url . '#donation');
+    donation_form_fail([t_or('donation.pay.unavailable', 'Онлайн плащането не е налично в момента. Моля свържете се с нас.', 'Online payment is not available right now. Please get in touch with us.', $order_lang)], $_POST);
+    header('Location: ' . $form_url);
     exit;
 }
 
 // Build invoice_data for donation certificate
 $invoice_data = ['donor_type' => $donor_type];
+$company = trim($_POST['invoice_company'] ?? '');
+$eik     = trim($_POST['invoice_eik']     ?? '');
 if ($donor_type === 'company') {
-    $company   = trim($_POST['invoice_company']  ?? '');
-    $mol       = trim($_POST['invoice_mol']      ?? '');
-    $eik       = trim($_POST['invoice_eik']      ?? '');
-    $vat       = trim($_POST['invoice_vat']      ?? '');
-    $c_address = trim($_POST['invoice_address']  ?? '');
-    if (!$company) $errors[] = 'Въведете наименование на фирмата.';
-    if (!$eik)     $errors[] = 'Въведете ЕИК / Булстат.';
     $invoice_data += [
         'company_name'    => $company,
-        'mol'             => $mol,
+        'mol'             => trim($_POST['invoice_mol'] ?? ''),
         'eik'             => $eik,
-        'vat_number'      => $vat ?: null,
-        'company_address' => $c_address,
+        'vat_number'      => trim($_POST['invoice_vat'] ?? '') ?: null,
+        'company_address' => trim($_POST['invoice_address'] ?? ''),
     ];
 }
 
+$errors = donation_validate($amount, $name, $email, $donor_type, $company, $eik, $order_lang);
 if ($errors) {
-    foreach ($errors as $e) flash_set('error', $e);
-    header('Location: ' . $shop_url . '#donation');
+    donation_form_fail($errors, $_POST);
+    header('Location: ' . $form_url);
     exit;
 }
 
@@ -113,7 +105,7 @@ if ($payment_method === 'card') {
         exit;
     } catch (Throwable $e) {
         payment_error_report('DSK не създаде плащане с карта (дарение)', $order_number, $e);
-        header('Location: /checkout/payment-failed/?order=' . urlencode($order_number) . '&err=1');
+        header('Location: ' . shop_path('payment-failed', $order_lang) . '?order=' . urlencode($order_number) . '&err=1');
         exit;
     }
 }
@@ -132,8 +124,8 @@ if ($payment_method === 'iris') {
         $result = $iris->register([
             'currency'    => 'EUR',
             'amountEur'   => $amount,
-            'name'        => 'Дарение ' . $order_number,
-            'description' => SITE_NAME_BG . ' — дарение ' . $order_number,
+            'name'        => donation_payment_title($order_number, $order_lang),
+            'description' => donation_payment_description($order_number, $order_lang),
             'orderId'     => $order_number,
             'redirectUrl' => $redirectUrl,
             'hookUrl'     => $hookUrl,
@@ -147,7 +139,7 @@ if ($payment_method === 'iris') {
         exit;
     } catch (Throwable $e) {
         payment_error_report('IRIS не създаде плащане (дарение)', $order_number, $e);
-        header('Location: /checkout/payment-failed/?order=' . urlencode($order_number) . '&err=1');
+        header('Location: ' . shop_path('payment-failed', $order_lang) . '?order=' . urlencode($order_number) . '&err=1');
         exit;
     }
 }

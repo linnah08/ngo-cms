@@ -16,6 +16,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/payment_errors.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/donation.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/IRISPayment.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/process_iris_result.php';
 
@@ -37,7 +38,7 @@ if (!$order || $order['payment_method'] !== 'iris') {
 }
 
 $confirm_url = $order['type'] === 'donation'
-    ? '/donation/confirmation/?order=' . urlencode($order_number)
+    ? donation_path('confirmation', $order['lang'] ?? 'bg') . '?order=' . urlencode($order_number)
     : shop_path('confirmation', $order['lang'] ?? 'bg') . '?order=' . urlencode($order_number);
 $failed_url  = shop_path('payment-failed', $order['lang'] ?? 'bg') . '?order=' . urlencode($order_number);
 
@@ -63,8 +64,12 @@ if (isset($_GET['retry'])) {
         $result = $iris->register([
             'currency'    => 'EUR',
             'amountEur'   => (float)$order['total_eur'],
-            'name'        => shop_payment_title($order_number, $order['lang'] ?? 'bg'),
-            'description' => shop_payment_description($order_number, $order['lang'] ?? 'bg'),
+            'name'        => $order['type'] === 'donation'
+                ? donation_payment_title($order_number, $order['lang'] ?? 'bg')
+                : shop_payment_title($order_number, $order['lang'] ?? 'bg'),
+            'description' => $order['type'] === 'donation'
+                ? donation_payment_description($order_number, $order['lang'] ?? 'bg')
+                : shop_payment_description($order_number, $order['lang'] ?? 'bg'),
             'orderId'     => $order_number,
             'redirectUrl' => $redirectUrl,
             'hookUrl'     => $hookUrl,

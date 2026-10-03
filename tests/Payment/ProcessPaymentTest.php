@@ -61,17 +61,18 @@ final class ProcessPaymentTest extends TestCase
             'payment_method'   => 'card',
             'payment_status'   => 'pending',
             'dsk_order_id'     => null,
+            'lang'             => 'bg',
         ];
         $d = array_merge($defaults, $overrides);
 
         self::$pdo->prepare("
             INSERT INTO orders
-              (order_number, type, status, customer_name, customer_email,
+              (order_number, type, status, lang, customer_name, customer_email,
                items, subtotal_eur, shipping_eur, total_eur, donation_message,
                payment_method, payment_status, dsk_order_id)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ")->execute([
-            $d['order_number'], $d['type'], $d['status'],
+            $d['order_number'], $d['type'], $d['status'], $d['lang'],
             $d['customer_name'], $d['customer_email'],
             $d['items'], $d['subtotal_eur'], $d['shipping_eur'], $d['total_eur'],
             $d['donation_message'],
@@ -209,6 +210,39 @@ final class ProcessPaymentTest extends TestCase
         $fresh = $this->freshOrder((int)$order['id']);
         $this->assertSame('paid', $fresh['payment_status']);
         $this->assertSame('confirmed', $fresh['status']);
+    }
+
+    // ── donation: the donor's email follows the donation's language ─────────
+
+    private function donorEmail(int $order_id): array
+    {
+        $stmt = self::$pdo->prepare("SELECT subject, body FROM order_emails WHERE order_id = ? AND template_key = 'donation-confirmation-customer'");
+        $stmt->execute([$order_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $this->assertNotFalse($row, 'the donor confirmation email is recorded on the donation');
+        return $row;
+    }
+
+    public function testEnglishDonationGetsAnEnglishConfirmationEmail(): void
+    {
+        $order = $this->insertDonationOrder(['lang' => 'en', 'customer_name' => 'Test Donor', 'donation_message' => 'For the kids']);
+        process_dsk_result(self::$pdo, $order, 'dsk-uuid-en-1', $this->paidStatus());
+
+        $mail = $this->donorEmail((int)$order['id']);
+        $this->assertSame(email_tpl_get('donation-confirmation-customer', 'en', ['donor_name' => 'Test Donor'])['subject'], $mail['subject']);
+        $this->assertNotSame(email_tpl_get('donation-confirmation-customer', 'bg', [])['subject'], $mail['subject']);
+        $this->assertStringContainsString('Your message', $mail['body']);
+        $this->assertStringContainsString('Questions?', $mail['body']);
+    }
+
+    public function testBulgarianDonationKeepsTheBulgarianConfirmationEmail(): void
+    {
+        $order = $this->insertDonationOrder(['donation_message' => 'За децата']);
+        process_dsk_result(self::$pdo, $order, 'dsk-uuid-bg-1', $this->paidStatus());
+
+        $mail = $this->donorEmail((int)$order['id']);
+        $this->assertSame(email_tpl_get('donation-confirmation-customer', 'bg', ['donor_name' => $order['customer_name']])['subject'], $mail['subject']);
+        $this->assertStringContainsString('Вашето послание', $mail['body']);
     }
 
     // ── donation: declined ────────────────────────────────────────────────────

@@ -84,6 +84,9 @@ require_once $root . '/includes/payment/process_payment.php';
 // ── Print helpers ─────────────────────────────────────────────────────────────
 require_once $root . '/includes/print_helpers.php';
 
+// ── Donation flow helpers (donation_path(), donation_validate()) ──────────────
+require_once $root . '/includes/donation.php';
+
 // ── Test DB helper ────────────────────────────────────────────────────────────
 function test_db_available(): bool {
     if (!defined('DB_HOST')) return false;

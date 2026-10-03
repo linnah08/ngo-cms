@@ -327,9 +327,19 @@ final class ApiLogicTest extends TestCase
         $order        = ['type' => 'donation'];
         // Replicates api/payment-return.php (and iris-payment-return.php)
         $confirm_url = $order['type'] === 'donation'
-            ? '/donation/confirmation/?order=' . urlencode($order_number)
+            ? donation_path('confirmation', $order['lang'] ?? 'bg') . '?order=' . urlencode($order_number)
             : shop_path('confirmation', $order['lang'] ?? 'bg') . '?order=' . urlencode($order_number);
         $this->assertStringStartsWith('/donation/confirmation/', $confirm_url);
+    }
+
+    public function test_english_donation_uses_english_donation_confirm_url(): void
+    {
+        $order_number = 'OM-20260101-A1B2';
+        $order        = ['type' => 'donation', 'lang' => 'en'];
+        $confirm_url = $order['type'] === 'donation'
+            ? donation_path('confirmation', $order['lang'] ?? 'bg') . '?order=' . urlencode($order_number)
+            : shop_path('confirmation', $order['lang'] ?? 'bg') . '?order=' . urlencode($order_number);
+        $this->assertStringStartsWith('/en/donation/confirmation/', $confirm_url);
     }
 
     public function test_shop_order_uses_checkout_confirm_url(): void
@@ -337,7 +347,7 @@ final class ApiLogicTest extends TestCase
         $order_number = 'OM-20260101-A1B2';
         $order        = ['type' => 'shop'];
         $confirm_url = $order['type'] === 'donation'
-            ? '/donation/confirmation/?order=' . urlencode($order_number)
+            ? donation_path('confirmation', $order['lang'] ?? 'bg') . '?order=' . urlencode($order_number)
             : shop_path('confirmation', $order['lang'] ?? 'bg') . '?order=' . urlencode($order_number);
         $this->assertStringStartsWith('/checkout/confirmation/', $confirm_url);
     }
@@ -347,7 +357,7 @@ final class ApiLogicTest extends TestCase
         $order_number = 'OM-20260101-A1B2';
         $order        = ['type' => 'shop', 'lang' => 'en'];
         $confirm_url = $order['type'] === 'donation'
-            ? '/donation/confirmation/?order=' . urlencode($order_number)
+            ? donation_path('confirmation', $order['lang'] ?? 'bg') . '?order=' . urlencode($order_number)
             : shop_path('confirmation', $order['lang'] ?? 'bg') . '?order=' . urlencode($order_number);
         $this->assertStringStartsWith('/en/checkout/confirmation/', $confirm_url);
     }
@@ -357,7 +367,7 @@ final class ApiLogicTest extends TestCase
         $order_number = 'OM-20260101-A1B2';
         $order        = ['type' => 'shop'];
         $confirm_url = $order['type'] === 'donation'
-            ? '/donation/confirmation/?order=' . urlencode($order_number)
+            ? donation_path('confirmation', $order['lang'] ?? 'bg') . '?order=' . urlencode($order_number)
             : shop_path('confirmation', $order['lang'] ?? 'bg') . '?order=' . urlencode($order_number);
         $this->assertStringContainsString(urlencode($order_number), $confirm_url);
     }

@@ -18,6 +18,7 @@ $_path_map_bg_to_en = [
     '/magazin'                   => '/en/shop',
     '/cart'                      => '/en/cart',
     '/checkout'                  => '/en/checkout',
+    '/donation'                  => '/en/donation',
     '/campaign'                  => '/en/campaign',
     '/politika-za-poveritelnost' => '/en/privacy-policy',
     '/politika-za-biskvitki'     => '/en/cookie-policy',

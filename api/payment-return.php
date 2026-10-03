@@ -8,6 +8,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/payment_errors.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/donation.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/process_payment.php';
 start_session();
@@ -30,7 +31,7 @@ if (!$order || $order['payment_method'] !== 'card') {
 }
 
 $confirm_url = $order['type'] === 'donation'
-    ? '/donation/confirmation/?order=' . urlencode($order_number)
+    ? donation_path('confirmation', $order['lang'] ?? 'bg') . '?order=' . urlencode($order_number)
     : shop_path('confirmation', $order['lang'] ?? 'bg') . '?order=' . urlencode($order_number);
 
 $failed_url = shop_path('payment-failed', $order['lang'] ?? 'bg') . '?order=' . urlencode($order_number);

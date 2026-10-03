@@ -18,16 +18,19 @@ function notify_order_paid(array $order): void
     if ($order['type'] === 'donation') {
         $items   = json_decode($order['items'] ?? '[]', true) ?? [];
         $don     = $items[0] ?? [];
-        $reference = $order['customer_name'] . ' — дарение';
+        // The donor gets the email in the language they donated in.
+        $lang      = ($order['lang'] ?? 'bg') === 'en' ? 'en' : 'bg';
+        $reference = $order['customer_name'] . ' — ' . ($lang === 'en' ? 'donation' : 'дарение');
         send_order_mail(
             (int)$order['id'],
             $order['customer_email'],
-            'Благодарим за вашето дарение!',
+            render_email_subject('donation-confirmation-customer', $lang, ['donor_name' => $order['customer_name']]),
             render_email('donation-confirmation-customer', [
                 'donor_name'       => $order['customer_name'],
                 'amount_eur'       => (float)$order['total_eur'],
                 'donation_message' => $order['donation_message'] ?? '',
                 'reference'        => $reference,
+                'lang'             => $lang,
             ]),
             ['template_key' => 'donation-confirmation-customer']
         );

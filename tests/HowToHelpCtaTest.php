@@ -131,9 +131,9 @@ final class HowToHelpCtaTest extends TestCase
     {
         $body = $this->getBody('/kak-da-pomogna/');
         $this->assertStringContainsString(
-            '/donation/checkout.php',
+            'href="/magazin/#donation"',
             $body,
-            'BG page should have donation checkout link for donor way'
+            'BG page should link the donor way to the donation form'
         );
     }
 
@@ -188,9 +188,9 @@ final class HowToHelpCtaTest extends TestCase
     {
         $body = $this->getBody('/en/how-to-help/');
         $this->assertStringContainsString(
-            '/donation/checkout.php',
+            'href="/en/shop/#donation"',
             $body,
-            'EN page should have donation checkout link for donor way'
+            'EN page should link the donor way to the English donation form'
         );
     }
 

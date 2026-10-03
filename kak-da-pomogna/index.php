@@ -1,5 +1,6 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/donation.php';
 $pages = load_json(CONTENT_PATH . '/pages.json');
 $help = $pages['how_to_help'] ?? [];
 $page_title = 'Как да помогна';
@@ -34,7 +35,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
         ],
         'Стани дарител' => [
             'label' => 'Дари сега',
-            'href'  => '/donation/checkout.php',
+            'href'  => donation_path('form', 'bg'),
             'style' => 'primary',
         ],
         'Стани наш приятел в социалните мрежи' => ['social' => true],

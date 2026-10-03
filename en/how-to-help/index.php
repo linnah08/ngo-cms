@@ -1,5 +1,6 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/donation.php';
 $pages            = load_json(CONTENT_PATH . '/pages.json');
 $how              = $pages['how_to_help'] ?? [];
 $ways             = $how['ways'] ?? [];
@@ -32,7 +33,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
         ],
         'Become a donor' => [
             'label' => 'Donate now',
-            'href'  => '/donation/checkout.php',
+            'href'  => donation_path('form', 'en'),
             'style' => 'primary',
         ],
         'Follow us on social media' => ['social' => true],

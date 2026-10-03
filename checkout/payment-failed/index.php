@@ -1,6 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/donation.php';
 start_session();
 
 $order_number = trim($_GET['order'] ?? '');
@@ -27,7 +28,7 @@ $is_donation = $order['type'] === 'donation';
 
 // If already paid somehow (race), send to confirmation
 if ($order['payment_status'] === 'paid') {
-    header('Location: ' . ($is_donation ? '/donation/confirmation/' : shop_path('confirmation', $order['lang'] ?? 'bg')) . '?order=' . urlencode($order_number));
+    header('Location: ' . ($is_donation ? donation_path('confirmation', $order['lang'] ?? 'bg') : shop_path('confirmation', $order['lang'] ?? 'bg')) . '?order=' . urlencode($order_number));
     exit;
 }
 
@@ -45,7 +46,8 @@ $is_iris = $order['payment_method'] === 'iris';
 
 $retry_url = ($is_iris ? '/api/iris-payment-return.php' : '/api/payment-return.php')
            . '?retry=1&order=' . urlencode($order_number);
-$back_url  = shop_path('shop', $lang);
+// A donor goes back to the donation form, a buyer to the shop.
+$back_url  = $is_donation ? donation_path('form', $lang) : shop_path('shop', $lang);
 
 $_num = '<strong>#' . h($order['order_number']) . '</strong>';
 $t = [
@@ -60,7 +62,9 @@ $t = [
     'retry'      => $is_iris
         ? t_or('payfail.retry_iris', 'Опитай отново с банков превод', 'Try again with bank transfer')
         : t_or('payfail.retry_card', 'Опитай отново с карта', 'Try again with card'),
-    'back'       => '← ' . t_or('confirm.back_to_shop', 'Към магазина', 'Back to the shop'),
+    'back'       => '← ' . ($is_donation
+        ? t_or('payfail.back_donation', 'Към формата за дарение', 'Back to the donation form')
+        : t_or('confirm.back_to_shop', 'Към магазина', 'Back to the shop')),
 ];
 
 $page_title = $t['title'];
