@@ -19,6 +19,35 @@ $lang = ($path === '/en' || str_starts_with($path, '/en/')) ? 'en' : 'bg';
 $is_en = $lang === 'en';
 $display_title   = $is_en ? $title_en   : $title;
 $display_message = $is_en ? $message_en : $message;
+
+// The site theme's fonts, loaded the way every page loads them — so a theme
+// that self-hosts its fonts makes no Google request here either. An error page
+// must never fail itself: if anything about the theme cannot be read, it falls
+// back to the system font and still renders.
+$err_font_links = '';
+$err_font       = '';
+try {
+    $err_root = dirname(__DIR__);
+    if (!function_exists('current_theme')) {
+        // Reached straight from the web server (ErrorDocument), without
+        // config.php: read only the theme choice, the same way config.php does.
+        require_once $err_root . '/includes/organisation.php';
+        require_once $err_root . '/includes/themes.php';
+        if (!defined('BRAND_THEME')) {
+            $err_pre = org_define_overrides(array_intersect_key(org_load_overrides(), ['BRAND_THEME' => 1]));
+            if (!defined('BRAND_THEME') && is_file($err_root . '/site.config.php')) {
+                $err_src = (string) @file_get_contents($err_root . '/site.config.php');
+                if (preg_match("/define\(\s*'BRAND_THEME'\s*,\s*'([a-z0-9_-]+)'\s*\)/i", $err_src, $err_m)) define('BRAND_THEME', $err_m[1]);
+            }
+        }
+    }
+    $err_theme      = current_theme();
+    $err_font_links = theme_font_links($err_theme);
+    $err_font       = theme_font_family($err_theme, 'body');
+} catch (Throwable $e) {
+    $err_font_links = '';
+    $err_font       = '';
+}
 ?>
 <!DOCTYPE html>
 <html lang="<?= $lang ?>">
@@ -27,13 +56,11 @@ $display_message = $is_en ? $message_en : $message;
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= $code ?> — <?= htmlspecialchars($display_title, ENT_QUOTES, 'UTF-8') ?></title>
   <link rel="icon" href="/assets/images/favicon.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Jura:wght@300;400;500;600&display=swap" rel="stylesheet">
+<?= $err_font_links ?>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'Jura', system-ui, sans-serif;
+      font-family: <?= $err_font !== '' ? "'" . $err_font . "', " : '' ?>system-ui, sans-serif;
       background: #f7f5f2;
       color: #1a2e2c;
       min-height: 100vh;

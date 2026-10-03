@@ -148,7 +148,7 @@ final class ThemeExtensionsTest extends TestCase
     {
         $src = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/templates/header.php');
         $this->assertStringContainsString('theme_stylesheet_links(current_theme())', $src);
-        $this->assertStringContainsString('theme_palette_css($_theme)', $src);
+        $this->assertStringContainsString('theme_palette_css($_theme, ', $src);
         $this->assertStringContainsString("\$_theme['font_body']    ?? \$_theme['font']", $src);
         $this->assertStringContainsString("\$_theme['font_display'] ?? \$_theme['font']", $src);
         $this->assertStringNotContainsString('href="/assets/css/main.css"', $src, 'main.css goes through versioned_asset()');
