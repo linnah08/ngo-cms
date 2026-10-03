@@ -53,6 +53,7 @@ if (!isset($themes[$current['brand_theme']])) $current['brand_theme'] = 'classic
 $active_theme = $themes[$current['brand_theme']];
 if (!org_color_valid($current['brand_primary'])) $current['brand_primary'] = $active_theme['primary'];
 if (!org_color_valid($current['brand_accent']))  $current['brand_accent']  = $active_theme['accent'];
+$nl_choices = newsletter_band_choices();
 // A module with no saved switch and no FEATURE_* constant is on.
 $modules = org_modules();
 foreach ($modules as $mname => $mod) $current[$mod['field']] = feature_enabled($mname) ? '1' : '0';
@@ -199,7 +200,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <?php foreach ($themes as $tk => $tv): $checked = $val('brand_theme') === $tk; ?>
           <label style="display:flex;align-items:center;gap:.5rem;padding:.6rem .75rem;border:2px solid <?= $checked ? 'var(--teal,#0387A5)' : 'var(--border,#ddd)' ?>;border-radius:8px;cursor:pointer;margin:0;font-weight:500;">
             <input type="radio" name="brand_theme" value="<?= h($tk) ?>" <?= $checked ? 'checked' : '' ?>
-                   data-primary="<?= h($tv['primary']) ?>" data-accent="<?= h($tv['accent']) ?>" style="margin:0;flex-shrink:0;">
+                   data-primary="<?= h($tv['primary']) ?>" data-accent="<?= h($tv['accent']) ?>"
+                   data-nl-bg="<?= h(theme_newsletter_default($tv)['bg']) ?>" data-nl-fg="<?= h(theme_newsletter_default($tv)['fg']) ?>"
+                   style="margin:0;flex-shrink:0;">
             <span style="width:18px;height:18px;border-radius:50%;flex-shrink:0;background:<?= h($tv['primary']) ?>;"></span>
             <span><?= h($theme_bg[$tk] ?? $tv['label']) ?></span>
           </label>
@@ -221,6 +224,54 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <?= $ferr('brand_accent') ?>
       </label>
     </div>
+
+    <?php
+    // Newsletter band: the coloured strip above the footer on every public page.
+    // The admin picks only the background; the text colour follows for contrast.
+    $nl_choice = $val('newsletter_band');
+    if (!isset($nl_choices[$nl_choice])) $nl_choice = 'default';
+    $nl_custom = org_color_valid($val('newsletter_band_color')) ? $val('newsletter_band_color') : $val('brand_primary');
+    $nl_now    = newsletter_band_colors($nl_choice, $nl_custom, $val('brand_primary'), $val('brand_accent'))
+              ?? theme_newsletter_default($themes[$val('brand_theme')] ?? $active_theme);
+    $nl_read   = 'Текстът се чете добре.';
+    $nl_hard   = 'Текстът се чете трудно — изберете по-тъмен или по-светъл цвят.';
+    ?>
+    <fieldset id="f-newsletter_band" style="border:none;margin:1.5rem 0 0;padding:0;min-width:0;">
+      <legend style="font-weight:600;margin-bottom:.25rem;padding:0;">Цвят на лентата за бюлетина</legend>
+      <small id="nlHint" style="<?= $hint ?>margin:0 0 .6rem;">Цветната лента над долната част на всяка страница, в която посетителите се записват за бюлетина. Цветът на текста се избира сам, така че да се чете.</small>
+      <div style="display:flex;flex-wrap:wrap;gap:.5rem 1.25rem;">
+        <?php foreach ($nl_choices as $ck => $clabel): ?>
+          <label style="display:flex;align-items:center;gap:.5rem;min-height:44px;margin:0;font-weight:500;cursor:pointer;">
+            <input type="radio" name="newsletter_band" value="<?= h($ck) ?>" <?= $nl_choice === $ck ? 'checked' : '' ?>
+                   aria-describedby="nlHint" style="margin:0;width:1.1rem;height:1.1rem;">
+            <span><?= h($clabel) ?></span>
+          </label>
+        <?php endforeach; ?>
+      </div>
+      <?= $ferr('newsletter_band') ?>
+      <label id="f-newsletter_band_color" for="nlColor" style="display:<?= $nl_choice === 'custom' ? 'block' : 'none' ?>;margin-top:.75rem;max-width:20rem;">Цвят на лентата
+        <input type="color" name="newsletter_band_color" id="nlColor" value="<?= h($nl_custom) ?>"
+               style="height:44px;padding:3px;width:100%;box-sizing:border-box;cursor:pointer;"<?= $fattr('newsletter_band_color') ?>>
+        <?= $ferr('newsletter_band_color') ?>
+      </label>
+
+      <div style="margin-top:1rem;">
+        <div style="font-size:.85rem;font-weight:600;margin-bottom:.4rem;">Как ще изглежда:</div>
+        <div id="nlPreview" aria-hidden="true"
+             style="background:<?= h($nl_now['bg']) ?>;color:<?= h($nl_now['fg']) ?>;padding:1.25rem 1rem;border-radius:8px;text-align:center;border:1px solid var(--border,#ddd);">
+          <div style="font-weight:700;font-size:1.05rem;margin-bottom:.3rem;"><?= h(t_or('newsletter.banner.title', 'Бъдете в течение', 'Stay in touch', 'bg')) ?></div>
+          <div style="font-size:.85rem;margin-bottom:.8rem;"><?= h(t_or('newsletter.banner.text', 'Получавайте новини и истории директно в пощата си.', 'Get news and stories straight to your inbox.', 'bg')) ?></div>
+          <div style="display:flex;gap:.4rem;justify-content:center;flex-wrap:wrap;">
+            <span style="display:inline-block;background:#fff;color:#6b7280;border-radius:4px;padding:.4rem .75rem;font-size:.85rem;min-width:10rem;text-align:left;"><?= h(t_or('newsletter.banner.placeholder', 'Вашият имейл адрес', 'Your email address', 'bg')) ?></span>
+            <span id="nlPreviewBtn" style="display:inline-block;border-radius:4px;padding:.4rem 1rem;font-size:.85rem;font-weight:700;background:<?= h($nl_now['fg']) ?>;color:<?= h($nl_now['bg']) ?>;"><?= h(t_or('newsletter.banner.submit', 'Запишете се', 'Subscribe', 'bg')) ?></span>
+          </div>
+        </div>
+        <p id="nlReadable" role="status" aria-live="polite" style="margin:.5rem 0 0;font-size:.9rem;font-weight:600;color:<?= $nl_now['readable'] ? '#2d6a35' : '#c0392b' ?>;">
+          <span aria-hidden="true"><?= $nl_now['readable'] ? '✓' : '⚠' ?></span>
+          <span data-nl-msg><?= h($nl_now['readable'] ? $nl_read : $nl_hard) ?></span>
+        </p>
+      </div>
+    </fieldset>
 
     <div id="f-logo" style="margin-top:1.5rem;">
       <div style="font-weight:600;margin-bottom:.5rem;">Лого</div>
@@ -336,6 +387,56 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
                 o.closest('label').style.borderColor = o.checked ? 'var(--teal,#0387A5)' : 'var(--border,#ddd)';
             });
         });
+    });
+    // Newsletter band preview: the same rules as theme_text_on() in
+    // includes/themes.php — white or dark text, whichever contrasts more, and
+    // "readable" at WCAG AA 4.5:1.
+    var nlColor = document.getElementById('nlColor'), nlColorWrap = document.getElementById('f-newsletter_band_color');
+    var nlBox = document.getElementById('nlPreview'), nlBtn = document.getElementById('nlPreviewBtn');
+    var nlLine = document.getElementById('nlReadable');
+    var LIGHT = <?= json_encode(THEME_TEXT_LIGHT) ?>, DARK = <?= json_encode(THEME_TEXT_DARK) ?>;
+    var MSG_OK = <?= json_encode($nl_read, JSON_UNESCAPED_UNICODE) ?>, MSG_HARD = <?= json_encode($nl_hard, JSON_UNESCAPED_UNICODE) ?>;
+    function lum(hex) {
+        var c = [1, 3, 5].map(function (i) {
+            var v = parseInt(hex.substr(i, 2), 16) / 255;
+            return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+        });
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    }
+    function contrast(a, b) {
+        var l1 = lum(a), l2 = lum(b);
+        return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+    }
+    function nlUpdate() {
+        if (!nlBox) return;
+        var pick = document.querySelector('input[name="newsletter_band"]:checked');
+        var choice = pick ? pick.value : 'default', bg, fg;
+        if (nlColorWrap) nlColorWrap.style.display = choice === 'custom' ? 'block' : 'none';
+        if (choice === 'primary') bg = primary.value;
+        else if (choice === 'accent') bg = accent.value;
+        else if (choice === 'custom') bg = nlColor.value;
+        if (bg && /^#[0-9a-fA-F]{6}$/.test(bg)) {
+            fg = contrast(bg, LIGHT) >= contrast(bg, DARK) ? LIGHT : DARK;
+        } else {
+            var theme = document.querySelector('input[name="brand_theme"]:checked');
+            bg = (theme && theme.dataset.nlBg) || '#0387A5';
+            fg = (theme && theme.dataset.nlFg) || LIGHT;
+        }
+        var ok = contrast(bg, fg) >= 4.5;
+        nlBox.style.background = bg; nlBox.style.color = fg;
+        nlBtn.style.background = fg; nlBtn.style.color = bg;
+        var msg = ok ? MSG_OK : MSG_HARD, msgEl = nlLine.querySelector('[data-nl-msg]');
+        nlLine.style.color = ok ? '#2d6a35' : '#c0392b';
+        nlLine.querySelector('[aria-hidden]').textContent = ok ? '✓' : '⚠';
+        // Only rewrite the live region when the verdict changes, so a screen
+        // reader is not told the same thing on every step of a colour drag.
+        if (msgEl.textContent !== msg) msgEl.textContent = msg;
+    }
+    document.querySelectorAll('input[name="newsletter_band"], input[name="brand_theme"]').forEach(function (r) {
+        r.addEventListener('change', function () { nlUpdate(); });
+    });
+    [primary, accent, nlColor].forEach(function (el) {
+        if (el) el.addEventListener('input', function () { nlUpdate(); });
     });
     // Module switches: say in words what will change, and confirm before a
     // module is switched off (it disappears for visitors).

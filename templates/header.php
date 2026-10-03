@@ -177,7 +177,7 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
     --font-display:'<?= h($_font_display) ?>',sans-serif;
     --radius:<?= h($_theme['radius']) ?>;
     --radius-lg:<?= h($_theme['radius_lg']) ?>;
-<?= theme_palette_css($_theme) ?>
+<?= theme_palette_css($_theme, site_newsletter_band($_primary, $_accent)) ?>
   }</style>
 </head>
 <body<?= $_show_admin_bar ? ' class="om-admin"' : '' ?>>

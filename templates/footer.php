@@ -24,12 +24,14 @@ $_show_nl_banner = empty($_COOKIE['om_nl_sub']) && !str_starts_with($_SERVER['RE
 </div>
 <?php endif; ?>
 <?php endforeach; ?>
-<?php // A theme can recolour the band (--newsletter-bg / --newsletter-fg in its
-      // palette); without them it keeps the original teal and white. ?>
+<?php // The band colour is chosen in Admin → Организация → Визия (text colour follows
+      // for contrast); else a theme's palette sets --newsletter-bg / --newsletter-fg;
+      // else the original teal and white. Full-strength text, never faded: a faded
+      // line would no longer meet the contrast the admin preview promises. ?>
 <section class="newsletter-banner" style="background:var(--newsletter-bg,#0387A5);padding:3rem 0;">
   <div class="container" style="max-width:680px;text-align:center;">
     <h3 style="color:var(--newsletter-fg,#fff);margin:0 0 .5rem;font-size:1.3rem;"><?= t('newsletter.banner.title') ?></h3>
-    <p style="color:var(--newsletter-fg,#fff);opacity:.85;margin:0 0 1.5rem;font-size:.95rem;"><?= t('newsletter.banner.text') ?></p>
+    <p style="color:var(--newsletter-fg,#fff);margin:0 0 1.5rem;font-size:.95rem;"><?= t('newsletter.banner.text') ?></p>
     <form method="POST" action="/newsletter/subscribe.php"
           style="display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap;">
       <?= csrf_field() ?>

@@ -32,6 +32,8 @@ function org_fields(): array
         'brand_theme'      => 'BRAND_THEME',
         'brand_primary'    => 'BRAND_PRIMARY',
         'brand_accent'     => 'BRAND_ACCENT',
+        'newsletter_band'  => 'BRAND_NEWSLETTER_BAND',   // see newsletter_band_choices()
+        'newsletter_band_color' => 'BRAND_NEWSLETTER_COLOR',
         'social_facebook'  => 'SOCIAL_FACEBOOK',
         'social_instagram' => 'SOCIAL_INSTAGRAM',
         'social_linkedin'  => 'SOCIAL_LINKEDIN',
@@ -297,6 +299,23 @@ function org_validate(array $in, array $themeKeys): array
         } else {
             $v[$k] = strtoupper($v[$k]);
         }
+    }
+
+    // Newsletter band: one of the fixed choices (newsletter_band_choices() in
+    // includes/themes.php); nothing chosen yet means "as it is now". Only "Друг
+    // цвят" needs a colour; with another choice a colour still in the picker is
+    // kept when valid, so switching back finds it again.
+    if ($v['newsletter_band'] === '') $v['newsletter_band'] = 'default';
+    if (!in_array($v['newsletter_band'], ['default', 'primary', 'accent', 'custom'], true)) {
+        $v['newsletter_band'] = 'default';
+        $e['newsletter_band'] = 'Моля, изберете цвят за лентата за бюлетина от вариантите.';
+    }
+    if (org_color_valid($v['newsletter_band_color'])) {
+        $v['newsletter_band_color'] = strtoupper($v['newsletter_band_color']);
+    } elseif ($v['newsletter_band'] === 'custom') {
+        $e['newsletter_band_color'] = 'Моля, изберете цвят за лентата за бюлетина от палитрата.';
+    } else {
+        $v['newsletter_band_color'] = '';
     }
 
     foreach (['social_facebook' => 'Facebook', 'social_instagram' => 'Instagram', 'social_linkedin' => 'LinkedIn'] as $k => $label) {

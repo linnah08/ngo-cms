@@ -256,4 +256,52 @@ final class ModuleSwitchesHttpTest extends TestCase
         $this->assertStringContainsString('Невалидна стойност за „Дарения“', $body);
         $this->assertSame($before, $this->saved());
     }
+
+    // ── Newsletter band colour (Визия) ──────────────────────────────────────
+
+    public function test_admin_sees_the_newsletter_band_choice_as_labelled_radios_with_a_preview(): void
+    {
+        $jar = $this->login(self::$adminEmail);
+        [$code, $body] = $this->http('/admin/organisation.php', $jar);
+        @unlink($jar);
+        $this->assertSame(200, $code);
+        $this->assertStringContainsString('<legend style="font-weight:600;margin-bottom:.25rem;padding:0;">Цвят на лентата за бюлетина</legend>', $body);
+        foreach (newsletter_band_choices() as $value => $label) {
+            $this->assertMatchesRegularExpression(
+                '/<label[^>]*>\s*<input type="radio" name="newsletter_band" value="' . $value . '"[^>]*>\s*<span>' . preg_quote($label, '/') . '<\/span>/u',
+                $body
+            );
+        }
+        $this->assertMatchesRegularExpression('/<label id="f-newsletter_band_color" for="nlColor"[^>]*>Цвят на лентата\s*<input type="color" name="newsletter_band_color" id="nlColor"/u', $body);
+        $this->assertStringContainsString('id="nlPreview"', $body);
+        $this->assertMatchesRegularExpression('/id="nlReadable" role="status" aria-live="polite"[^>]*>.*Текстът се чете (добре|трудно)/su', $body);
+    }
+
+    public function test_a_saved_band_colour_reaches_the_public_page_with_contrasting_text(): void
+    {
+        $jar = $this->login(self::$adminEmail);
+        [, $page] = $this->http('/admin/organisation.php', $jar);
+        [$code] = $this->http('/admin/organisation.php', $jar, $this->validForm($this->csrf($page), [
+            'feature_donations' => '1', 'feature_campaign' => '1',
+            'newsletter_band' => 'custom', 'newsletter_band_color' => '#fbb04a',
+        ]));
+        $this->assertSame(302, $code);
+        $saved = $this->saved();
+        $this->assertSame('custom', $saved['newsletter_band'] ?? null);
+        $this->assertSame('#FBB04A', $saved['newsletter_band_color'] ?? null);
+
+        [, $home] = $this->http('/kontakti/');
+        $this->assertStringContainsString('--newsletter-bg:#FBB04A;', $home);
+        $this->assertStringContainsString('--newsletter-fg:' . THEME_TEXT_DARK . ';', $home, 'a light band gets dark text');
+
+        // A custom choice with no valid colour is refused, and nothing changes.
+        [, $page] = $this->http('/admin/organisation.php', $jar);
+        [$code, $body] = $this->http('/admin/organisation.php', $jar, $this->validForm($this->csrf($page), [
+            'newsletter_band' => 'custom', 'newsletter_band_color' => 'red',
+        ]));
+        @unlink($jar);
+        $this->assertSame(200, $code);
+        $this->assertStringContainsString('Моля, изберете цвят за лентата за бюлетина от палитрата.', $body);
+        $this->assertSame('#FBB04A', $this->saved()['newsletter_band_color'] ?? null);
+    }
 }
