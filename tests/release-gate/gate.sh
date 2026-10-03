@@ -78,6 +78,13 @@ if [[ -z "$VERSION" ]]; then
   echo "--version is required with --new-zip" >&2
   exit 2
 fi
+if [[ ! -f "$NEW_ZIP" ]]; then
+  echo "New release ZIP not found: $NEW_ZIP" >&2
+  exit 2
+fi
+# Absolute: the updater runs from inside the test site, where a relative path
+# (the release workflow passes one) points at nothing.
+NEW_ZIP="$(cd "$(dirname "$NEW_ZIP")" && pwd)/$(basename "$NEW_ZIP")"
 
 php "$HERE/gate.php" --prev-zip="$PREV_ZIP" --new-zip="$NEW_ZIP" --new-version="$VERSION" \
   --work="$WORK/sites" $KEEP
