@@ -15,6 +15,13 @@ module.exports = defineConfig({
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    // Most traffic is mobile: the public flows run again at phone width.
+    // Admin specs stay desktop-only.
+    {
+      name: 'mobile',
+      use: { ...devices['Pixel 5'] },
+      testMatch: ['checkout.spec.js', 'mobile-layout.spec.js'],
+    },
   ],
   // Start a local PHP server before running tests
   webServer: {
