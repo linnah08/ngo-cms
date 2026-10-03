@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') rm_json(['ok' => false, 'error' => 'm
 $raw  = $GLOBALS['_om_raw_input'] ?? file_get_contents('php://input');
 $body = json_decode($raw, true) ?? [];
 
-if (!hash_equals(csrf_token(), $body['csrf_token'] ?? '')) rm_json(['ok' => false, 'error' => 'csrf']);
+if (!csrf_matches($body['csrf_token'] ?? '')) rm_json(['ok' => false, 'error' => 'csrf']);
 
 $type    = $body['type'] ?? '';
 $id      = $body['id']   ?? '';

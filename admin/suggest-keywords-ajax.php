@@ -26,6 +26,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $body       = json_decode(file_get_contents('php://input'), true) ?? [];
+if (!csrf_matches($body['csrf_token'] ?? '')) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Сесията изтече. Презаредете страницата и опитайте пак.']);
+    exit;
+}
 $title_bg   = trim($body['title_bg']   ?? '');
 $content_bg = trim($body['content_bg'] ?? '');
 $title_en   = trim($body['title_en']   ?? '');

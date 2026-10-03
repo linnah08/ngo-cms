@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $body  = file_get_contents('php://input');
 $data  = json_decode($body, true);
 
-if (!isset($data['csrf_token']) || !hash_equals(csrf_token(), $data['csrf_token'])) {
+if (!csrf_matches($data['csrf_token'] ?? '')) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Invalid token']);
     exit;

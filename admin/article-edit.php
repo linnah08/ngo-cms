@@ -5,6 +5,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/ai_keywords.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/articles.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
+admin_require_editorial();
 
 $slug_param = basename(str_replace(['..', "\0"], '', $_GET['slug'] ?? ''));
 $lang_param = ($_GET['lang'] ?? 'bg') === 'en' ? 'en' : 'bg';
@@ -20,7 +21,6 @@ if (!$is_new) {
     $article_en     = get_article($slug_en_stored, 'en') ?? [];
 }
 
-admin_require_editorial();
 $current = admin_user();
 $error   = '';
 $success = false;
@@ -837,6 +837,7 @@ if (suggestBtn) {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
+        csrf_token: '<?= csrf_token() ?>',
         title_bg:   document.getElementById('title').value,
         content_bg: _tinyGet('content'),
         title_en:   document.getElementById('title_en').value,

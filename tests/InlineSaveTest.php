@@ -88,7 +88,10 @@ class InlineSaveTest extends TestCase
 
     public function test_bad_csrf_fails(): void
     {
-        $this->assertFalse(hash_equals(csrf_token(), 'badtoken'));
+        csrf_token();
+        $this->assertFalse(csrf_matches('badtoken'));
+        $this->assertFalse(csrf_matches(['badtoken']), 'a non-string token from a JSON body must fail, not throw');
+        $this->assertStringContainsString('csrf_matches(', (string) file_get_contents(ROOT_PATH . '/admin/inline-save.php'));
     }
 
     // ── Integration: actually write to pages.json ────────────────────────────

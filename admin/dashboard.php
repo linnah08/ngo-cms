@@ -4,6 +4,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/articles.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_view.php';
+admin_require_login();
 
 $page_title_admin = 'Начало';
 $active_nav       = 'dashboard';

@@ -41,7 +41,7 @@ $raw   = $GLOBALS['_om_raw_input'] ?? file_get_contents('php://input');
 $body  = json_decode($raw, true) ?? [];
 
 // CSRF is only required for session auth; token auth is CSRF-safe via SameSite=Lax + CORS allowlist
-if ($_session_auth && !hash_equals(csrf_token(), $body['csrf_token'] ?? '')) {
+if ($_session_auth && !csrf_matches($body['csrf_token'] ?? '')) {
     save_json_response(['ok' => false, 'error' => 'csrf']);
 }
 
