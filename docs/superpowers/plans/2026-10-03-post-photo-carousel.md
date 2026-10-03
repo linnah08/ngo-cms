@@ -50,7 +50,7 @@
 | `templates/article-carousel.php` (create) | Hero: single image or carousel; shared by both article pages |
 | `novini/index.php`, `en/news/index.php` (modify) | Use the template |
 | `includes/social_images.php` (create) | `social_image_url()`, `social_prepare_image()`, `social_buffer_assets_gql()` |
-| `admin/social-ajax.php` (modify) | FB / IG: all photos; IG `type: carousel` when > 1 |
+| `admin/social-ajax.php` (modify) | FB / IG: all photos; IG square slides when > 1 (Buffer makes the carousel from several assets; `type` stays `post`) |
 | `includes/documents/LinkedInCarouselGenerator.php` (create) | The square-page PDF |
 | `admin/linkedin-ajax.php` (modify) | LinkedIn: one `document` asset when > 1 photo |
 | `tests/Admin/ArticlePhotosTest.php`, `tests/Admin/ArticleCarouselTemplateTest.php`, `tests/SocialImagesTest.php`, `tests/LinkedInCarouselTest.php` (create) | Tests |
@@ -1410,7 +1410,8 @@ git commit -m "refactor(social): one helper prepares any post photo for Buffer, 
         $r = social_fb_insta_request(['image' => $a, 'photos' => [['src' => $a, 'caption' => ''], ['src' => $b, 'caption' => '']]], 'insta');
         $this->assertCount(2, $r['urls']);
         $this->assertStringEndsWith('a-sq.jpg', $r['urls'][0]);
-        $this->assertSame('instagram: { type: carousel, shouldShareToFeed: true }', $r['metadata']);
+        // Buffer refuses type: carousel (verified 03.10.2026) — several assets on a post make the carousel.
+        $this->assertSame('instagram: { type: post, shouldShareToFeed: true }', $r['metadata']);
     }
 
     public function testInstagramSinglePhotoStaysAPost(): void
@@ -1451,7 +1452,7 @@ function social_fb_insta_request(array $article, string $channel): array {
     }
     $metadata = $channel === 'fb'
         ? 'facebook: { type: post }'
-        : 'instagram: { type: ' . ($carousel ? 'carousel' : 'post') . ', shouldShareToFeed: true }';
+        : 'instagram: { type: post, shouldShareToFeed: true }';   // several assets make the carousel; Buffer refuses type: carousel
     return ['urls' => $urls, 'metadata' => $metadata];
 }
 ```

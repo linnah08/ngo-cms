@@ -137,6 +137,19 @@ Per CLAUDE.md (Buffer returns HTTP 200 for errors — read the body):
 If LinkedIn refuses documents, stop and ask: fall back to a multi-photo post or
 to the main photo only.
 
+**Verified 03.10.2026** (drafts on the real channels, deleted afterwards):
+
+- Instagram `type: carousel` is **refused**: "Instagram does not support the
+  'carousel' post type. Valid types are post, story, or reel." Several image
+  assets with `type: post` are accepted — that is how Buffer makes an Instagram
+  carousel. So an Instagram post keeps `type: post`; the photo count makes it a
+  carousel.
+- Facebook (page): 3 image assets with `type: post` — accepted.
+- LinkedIn (company page "Odd Minds Foundation"): one `document` asset (url,
+  title, thumbnailUrl) — accepted.
+- Not yet seen: how each looks once actually published (drafts are not sent).
+  Tasks 7 and 9 end with one scheduled test post each, checked in Buffer.
+
 ### Related
 
 Rescheduling an already-scheduled post calls Buffer's removed `updatePost`
