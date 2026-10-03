@@ -16,6 +16,7 @@ function seo_static_alt_map(): array {
         '/kontakti/'           => '/en/contacts/',
         '/kak-da-pomogna/'     => '/en/how-to-help/',
         '/magazin/'            => '/en/shop/',
+        '/donation/'           => '/en/donation/',
         '/usloviya/'           => '/en/terms/',
         '/pravna-informaciya/' => '/en/legal/',
     ];

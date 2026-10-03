@@ -45,6 +45,18 @@ function home_bg_class(array $f, string $default = 'white', array $allowed = HOM
 }
 
 /**
+ * A front-page link saved before a page moved, pointed at where it lives now.
+ * The donation form used to sit on the shop page (#donation); sites set up
+ * before /donation/ existed still have that link in content/home.json.
+ */
+function home_current_link(string $url): string {
+    return [
+        '/magazin/#donation' => '/donation/',
+        '/en/shop/#donation' => '/en/donation/',
+    ][$url] ?? $url;
+}
+
+/**
  * Up to two buttons. $styles: [[class, inline style], [class, inline style]].
  * A button renders only with both a label and a link.
  */
@@ -53,7 +65,7 @@ function home_buttons(string $sid, array $f, string $lang, array $styles, string
     foreach ([1, 2] as $n) {
         if (!isset($f["btn{$n}_label"], $styles[$n - 1])) continue;
         $label = hf($f, "btn{$n}_label", $lang);
-        $url   = hf($f, "btn{$n}_url", $lang);
+        $url   = home_current_link(hf($f, "btn{$n}_url", $lang));
         if ($label === '' || $url === '' || home_clean_link($url) === null) continue;
         [$class, $style] = $styles[$n - 1];
         $ext  = preg_match('#^https?://#i', $url) ? ' target="_blank" rel="noopener noreferrer"' : '';

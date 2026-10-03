@@ -100,7 +100,7 @@ if ($slug) {
         <div style="font-size:2rem;">❤️</div>
         <h3 style="margin:0;font-size:1.05rem;">Make a donation</h3>
         <p style="margin:0;font-size:.88rem;color:var(--text-muted);text-align:center;">Support the children and foundation programmes directly.</p>
-        <a href="/en/shop/#donation" class="btn btn--primary" style="margin-top:auto;width:100%;text-align:center;justify-content:center;">Donate now</a>
+        <a href="/en/donation/" class="btn btn--primary" style="margin-top:auto;width:100%;text-align:center;justify-content:center;">Donate now</a>
       </div>
 
       <!-- Shop -->

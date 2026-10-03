@@ -1,6 +1,6 @@
 <?php
 /**
- * The standalone donation flow (the form on the shop page → donation/checkout.php
+ * The standalone donation flow (the donation page /donation/ → donation/checkout.php
  * → the bank → donation/confirmation/), in the donor's language.
  *
  * Same pattern as the shop (shop_path(), t_or()): one PHP file per page, the
@@ -9,16 +9,39 @@
  */
 
 /**
- * Donor-facing donation URLs. The form lives on the shop page (#donation);
- * the payment-failed page is the shared one from shop_path().
+ * Donor-facing donation URLs. The form lives on its own page, /donation/
+ * (older links to the shop's #donation anchor are forwarded there by the shop
+ * page); the payment-failed page is the shared one from shop_path().
  */
 function donation_path(string $page, ?string $lang = null): string {
     $lang = ($lang ?? get_lang()) === 'en' ? 'en' : 'bg';
     return match ($page) {
-        'form'         => shop_path('shop', $lang) . '#donation',
+        'form'         => $lang === 'en' ? '/en/donation/' : '/donation/',
         'confirmation' => $lang === 'en' ? '/en/donation/confirmation/' : '/donation/confirmation/',
         default        => throw new InvalidArgumentException("Unknown donation page: $page"),
     };
+}
+
+/**
+ * Title and intro of the donation page, in $lang, with generic defaults for a
+ * site that has not written its own yet. Stored in pages.json where the shop's
+ * donation block always kept them: donation.title(_en) and
+ * shop.donation_text_bg/_en (rich text from the admin editor).
+ *
+ * @return array{title: string, intro_html: string}
+ */
+function donation_page_content(array $pages, string $lang): array {
+    $en    = $lang === 'en';
+    $title = trim((string) ($pages['donation'][$en ? 'title_en' : 'title'] ?? ''));
+    $intro = trim((string) ($pages['shop'][$en ? 'donation_text_en' : 'donation_text_bg'] ?? ''));
+    if ($title === '') {
+        $title = t_or('donation.page.title', 'Направи дарение', 'Make a donation', $lang);
+    }
+    if ($intro === '') {
+        $site  = $en ? SITE_NAME_EN : SITE_NAME_BG;
+        $intro = '<p>' . h(t_or('donation.page.intro', 'Вашето дарение подкрепя дейността и програмите на {site}. Всяка сума има значение — благодарим ви!', 'Your donation supports the work and programmes of {site}. Every amount makes a difference — thank you!', $lang, ['site' => $site])) . '</p>';
+    }
+    return ['title' => $title, 'intro_html' => $intro];
 }
 
 /** What the donor's bank shows for a donation (IRIS Pay by Bank). */

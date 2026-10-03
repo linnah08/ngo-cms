@@ -128,7 +128,7 @@ if ($slug) {
         <div style="font-size:2rem;">❤️</div>
         <h3 style="margin:0;font-size:1.05rem;">Направи дарение</h3>
         <p style="margin:0;font-size:.88rem;color:var(--text-muted);text-align:center;">Подкрепете директно децата и програмите на фондацията.</p>
-        <a href="/magazin/#donation" class="btn btn--primary" style="margin-top:auto;width:100%;text-align:center;justify-content:center;">Дари сега</a>
+        <a href="/donation/" class="btn btn--primary" style="margin-top:auto;width:100%;text-align:center;justify-content:center;">Дари сега</a>
       </div>
 
       <!-- Shop -->

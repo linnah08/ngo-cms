@@ -53,6 +53,7 @@ final class HttpTest extends TestCase
             ['/how-to-help/', 'How to help BG'],
             ['/contact/', 'Contact BG'],
             ['/shop/', 'Shop BG'],
+            ['/donation/', 'Donation BG'],
             ['/campaign/', 'Campaign BG'],
             ['/tickets/', 'Tickets'],
             ['/articles/', 'Articles BG'],
@@ -63,6 +64,7 @@ final class HttpTest extends TestCase
             ['/en/how-to-help/', 'How to help EN'],
             ['/en/contact/', 'Contact EN'],
             ['/en/shop/', 'Shop EN'],
+            ['/en/donation/', 'Donation EN'],
             ['/en/campaign/', 'Campaign EN'],
             ['/en/articles/', 'Articles EN'],
             // ── Legal ──────────────────────────────────────────────────────

@@ -8,7 +8,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * English donors stay in English from the donation form to the thank-you page:
- * the form on /en/shop/#donation, its validation errors, the bank's payment
+ * the form on /en/donation/, its validation errors, the bank's payment
  * title, the payment returns, /en/donation/confirmation/ (a thin wrapper) and
  * the payment-failed page. Same pattern as EnglishCheckoutTest: t_or() for the
  * text, the order's stored language for everything after the bank.
@@ -30,8 +30,8 @@ final class EnglishDonationTest extends TestCase
 
     public function testDonationPathPerLanguage(): void
     {
-        $this->assertSame('/magazin/#donation', donation_path('form', 'bg'));
-        $this->assertSame('/en/shop/#donation', donation_path('form', 'en'));
+        $this->assertSame('/donation/', donation_path('form', 'bg'));
+        $this->assertSame('/en/donation/', donation_path('form', 'en'));
         $this->assertSame('/donation/confirmation/', donation_path('confirmation', 'bg'));
         $this->assertSame('/en/donation/confirmation/', donation_path('confirmation', 'en'));
         $this->assertSame('/donation/confirmation/', donation_path('confirmation', 'nonsense'), 'anything but en is BG');
@@ -119,7 +119,7 @@ final class EnglishDonationTest extends TestCase
         $this->assertStringContainsString("donation_validate(", $src);
         $this->assertStringContainsString("shop_path('payment-failed', \$order_lang)", $src);
         $this->assertStringContainsString('donation_payment_title($order_number, $order_lang)', $src);
-        $this->assertStringContainsString('<input type="hidden" name="_lang" value="<?= h($lang) ?>">', self::src('magazin/index.php'));
+        $this->assertStringContainsString('<input type="hidden" name="_lang" value="<?= h($lang) ?>">', self::src('templates/donation-form.php'));
     }
 
     public function testPaymentReturnsSendTheDonorBackInTheirLanguage(): void
@@ -180,6 +180,8 @@ final class EnglishDonationTest extends TestCase
             ['donation/checkout.php', null],
             ['donation/confirmation/index.php', null],
             ['includes/donation.php', null],
+            ['templates/donation-form.php', null],
+            ['donation/index.php', null],
             ['magazin/index.php', '<!-- ── SECTION B: Donations'],
         ];
     }
@@ -236,7 +238,7 @@ final class EnglishDonationTest extends TestCase
     {
         if (!test_db_available()) $this->markTestSkipped('No DB configured.');
         if (!feature_enabled('donations')) $this->markTestSkipped('Donations are switched off on this site (FEATURE_DONATIONS).');
-        $_SERVER['REQUEST_URI']    = '/en/shop/';
+        $_SERVER['REQUEST_URI']    = '/en/donation/';
         $_SERVER['REQUEST_METHOD'] = 'GET';
         start_session();
         donation_form_fail(donation_validate(0, 'Ann', 'ann@example.com', 'individual', '', '', 'en'), [
@@ -244,7 +246,7 @@ final class EnglishDonationTest extends TestCase
         ]);
         global $_path_map_bg_to_en;
         ob_start();
-        require self::root() . '/magazin/index.php';
+        require self::root() . '/en/donation/index.php';
         $html = (string) ob_get_clean();
 
         $section = substr($html, (int) strpos($html, '<section id="donation"'));
@@ -261,10 +263,7 @@ final class EnglishDonationTest extends TestCase
         }
         $this->assertStringContainsString('Donate now', $section);
 
-        // Visible text only: the CMS editing attributes carry the BG title on purpose.
-        $visible = preg_replace('/\sdata-cms-bg="[^"]*"/u', '', $section);
-        $visible = preg_replace('#<div style="color:rgba\(255,255,255,.85\);margin-bottom:2rem;".*?</div>#su', '', $visible);
-        $this->assertDoesNotMatchRegularExpression('/[\x{0400}-\x{04FF}]/u', strip_tags((string) $visible), 'no Bulgarian in the English donation form');
+        $this->assertDoesNotMatchRegularExpression('/[\x{0400}-\x{04FF}]/u', strip_tags($section), 'no Bulgarian in the English donation form');
     }
 
     // ── rendered: the English thank-you page ─────────────────────────────────

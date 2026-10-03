@@ -20,6 +20,9 @@ $static = [
     '/en/', '/en/about/', '/en/projects/', '/en/news/', '/en/contacts/',
     '/en/how-to-help/', '/en/shop/', '/en/terms/', '/en/legal/',
 ];
+if (feature_enabled('donations')) {
+    array_push($static, '/donation/', '/en/donation/');
+}
 foreach ($static as $p) {
     $urls[] = [$base . $p, null];
 }

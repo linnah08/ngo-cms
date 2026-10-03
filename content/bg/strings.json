@@ -215,5 +215,9 @@
   "donation.err.email": "Невалиден имейл адрес.",
   "donation.err.company": "Въведете наименование на фирмата.",
   "donation.err.eik": "Въведете ЕИК / Булстат.",
+  "donation.page.title": "Направи дарение",
+  "donation.page.intro": "Вашето дарение подкрепя дейността и програмите на {site}. Всяка сума има значение — благодарим ви!",
+  "donation.page.description": "Направете дарение в подкрепа на {site}.",
+  "donation.form_label": "Форма за дарение",
   "payfail.back_donation": "Към формата за дарение"
 }

@@ -22,7 +22,7 @@ $page_labels = [
     'about'         => 'За нас',
     'projects'      => 'Проекти',
     'how_to_help'   => 'Как да помогна',
-    'shop'          => 'Магазин — текст за дарения',
+    'shop'          => 'Страница за дарение',
     'legal_privacy' => 'Политика за поверителност',
     'legal_info'    => 'Правна информация',
     'legal_terms'   => 'Условия за ползване',
@@ -36,7 +36,7 @@ $page_urls = [
     'about'         => '/za-nas/',
     'projects'      => '/proekti/',
     'how_to_help'   => '/kak-da-pomogna/',
-    'shop'          => '/magazin/',
+    'shop'          => '/donation/',
     'legal_privacy' => '/politika-za-poveritelnost/',
     'legal_info'    => '/pravna-informaciya/',
     'legal_terms'   => '/usloviya/',
@@ -300,6 +300,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } elseif ($section === 'shop') {
         $pages = load_json(CONTENT_PATH . '/pages.json');
+        // The donation page (/donation/): its title is stored under 'donation',
+        // its intro under 'shop' — where the shop's donation block kept them.
+        $pages['donation']['title']        = mb_substr(trim(strip_tags($_POST['donation_title'] ?? '')), 0, 200);
+        $pages['donation']['title_en']     = mb_substr(trim(strip_tags($_POST['donation_title_en'] ?? '')), 0, 200);
         $pages['shop']['donation_text_bg'] = trim($_POST['donation_text_bg'] ?? '');
         $pages['shop']['donation_text_en'] = trim($_POST['donation_text_en'] ?? '');
         save_json(CONTENT_PATH . '/pages.json', $pages);
@@ -359,6 +363,7 @@ $about     = $all_pages['about']       ?? [];
 $projects  = $all_pages['projects']    ?? [];
 $help      = $all_pages['how_to_help'] ?? [];
 $shop      = $all_pages['shop']        ?? [];
+$donation  = $all_pages['donation']    ?? [];
 $legal     = $all_pages['legal']       ?? [];
 
 $saved        = isset($_GET['saved']);
@@ -399,7 +404,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
           ['about',         'За нас',                          '/za-nas/'],
           ['projects',      'Проекти',                         '/proekti/'],
           ['how_to_help',   'Как да помогна',                  '/kak-da-pomogna/'],
-          ['shop',          'Магазин — текст за дарения',      '/magazin/'],
+          ['shop',          'Страница за дарение',             '/donation/'],
           ['legal_privacy', 'Политика за поверителност',       '/politika-za-poveritelnost/'],
           ['legal_info',    'Правна информация',               '/pravna-informaciya/'],
           ['legal_terms',   'Условия за ползване',             '/usloviya/'],
@@ -1937,7 +1942,11 @@ usort($ways_list, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
   <div>
     <a href="/admin/pages.php" style="color:var(--text-muted);font-size:0.9rem;display:block;margin-bottom:.25rem;">← Назад</a>
-    <h1 style="margin:0;">Магазин — текст за дарения</h1>
+    <h1 style="margin:0;">Страница за дарение</h1>
+    <p style="margin:.35rem 0 0;color:var(--text-muted);font-size:.9rem;">
+      Заглавието и текстът над формата за дарение на <a href="/donation/" target="_blank" rel="noopener">/donation/</a>.
+      Оставено празно, полето показва общ текст по подразбиране.
+    </p>
   </div>
   <button type="submit" form="shopForm" class="btn btn--primary">Запази</button>
 </div>
@@ -1945,12 +1954,22 @@ usort($ways_list, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
   <?= csrf_field() ?>
   <input type="hidden" name="section" value="shop">
   <div class="form-group">
-    <label>Текст <?= $lbl_bg_badge ?></label>
+    <label for="donationTitleBg">Заглавие <?= $lbl_bg_badge ?></label>
+    <input type="text" id="donationTitleBg" name="donation_title" maxlength="200"
+           value="<?= h($donation['title'] ?? '') ?>" placeholder="Направи дарение">
+  </div>
+  <div class="form-group">
+    <label for="donationTitleEn">Title <?= $lbl_en_badge ?></label>
+    <input type="text" id="donationTitleEn" name="donation_title_en" maxlength="200" data-translate-from="donation_title"
+           value="<?= h($donation['title_en'] ?? '') ?>" placeholder="Make a donation">
+  </div>
+  <div class="form-group">
+    <label for="shopBg">Текст <?= $lbl_bg_badge ?></label>
     <textarea id="shopBg" name="donation_text_bg" rows="4"><?= h($shop['donation_text_bg'] ?? '') ?></textarea>
   </div>
   <div class="form-group">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
-      <label style="margin:0;">Text <?= $lbl_en_badge ?></label>
+      <label for="shopEn" style="margin:0;">Text <?= $lbl_en_badge ?></label>
       <button type="button" class="btn btn--outline translate-legal-btn" data-src="shopBg" data-tgt="shopEn" style="font-size:.78rem;padding:.25rem .6rem;">✦ Translate from BG</button>
     </div>
     <textarea id="shopEn" name="donation_text_en" rows="4"><?= h($shop['donation_text_en'] ?? '') ?></textarea>

@@ -215,5 +215,9 @@
   "donation.err.email": "Please enter a valid email address.",
   "donation.err.company": "Please enter the company name.",
   "donation.err.eik": "Please enter the company ID (EIK / BULSTAT).",
+  "donation.page.title": "Make a donation",
+  "donation.page.intro": "Your donation supports the work and programmes of {site}. Every amount makes a difference — thank you!",
+  "donation.page.description": "Make a donation in support of {site}.",
+  "donation.form_label": "Donation form",
   "payfail.back_donation": "Back to the donation form"
 }

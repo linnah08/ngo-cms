@@ -437,7 +437,7 @@ function home_seed(array $home, array $sbg, array $sen, ?array $start_hidden = n
                 'С вашата подкрепа можем да достигнем до повече деца, да финансираме повече терапии и да изградим по-добро бъдеще за всяко от тях.',
                 'With your support we can reach more children, fund more therapies, and build a better future for each of them.'),
             'btn1_label' => $p('cta_btn_donate', '', 'Дарете сега', 'Donate now'),
-            'btn1_url'   => $pair('/magazin/#donation', '/en/shop/#donation'),
+            'btn1_url'   => $pair('/donation/', '/en/donation/'),
             'btn2_label' => $p('cta_btn_help', '', 'Как да помогна', 'How to help'),
             'btn2_url'   => $pair('/kak-da-pomogna/', '/en/how-to-help/'),
             'background' => 'teal',
