@@ -74,7 +74,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
 <?php if ($maintenance): ?>
   <div class="admin-alert admin-alert--error" style="margin-bottom:1.5rem;">
-    В момента се извършва обновяване на сайта. Моля, изчакайте — не затваряйте и не презареждайте тази страница.
+    В момента се извършва обновяване на сайта. То продължава на сървъра — можете да затворите или презаредите страницата, а когато я отворите отново, ще видите докъде е стигнало.
   </div>
 <?php endif; ?>
 
@@ -131,7 +131,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <button type="button" class="btn btn--primary"
                 onclick="_adminConfirm(<?= h(json_encode(
                   'Ще обновите сайта до версия ' . (string)($check['latest_version'] ?? '') . '. '
-                  . 'Преди това автоматично се прави резервно копие, но моля не затваряйте тази страница, докато обновяването не приключи.'
+                  . 'Преди това автоматично се прави резервно копие. Обновяването продължава на сървъра, дори да затворите страницата.'
                 , JSON_UNESCAPED_UNICODE)) ?>, 'Обнови сега').then(function(ok){ if(ok){ startUpdate(); } })">
           Обнови сега
         </button>
@@ -181,7 +181,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <p id="updateOverlayPercent" style="margin:.5rem 0 0;font-size:.85rem;color:#555;">0%</p>
 
     <p id="updateOverlayNote" style="margin:1rem 0 0;font-size:.85rem;line-height:1.45;color:#666;">
-      Моля, не затваряйте този прозорец. Ако все пак го затворите, обновяването ще продължи.
+      Обновяването продължава на сървъра, дори да затворите или презаредите страницата. Когато отворите отново „Обновления“, ще видите докъде е стигнало. Не натискайте „Обнови сега“ втори път.
     </p>
 
     <div id="updateOverlayActions" style="display:none;margin-top:1.25rem;">

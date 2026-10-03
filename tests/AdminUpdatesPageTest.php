@@ -191,6 +191,15 @@ final class AdminUpdatesPageTest extends TestCase
 
     // ── Access control ───────────────────────────────────────────────────────
 
+    public function testOverlayTellsTheAdminTheyMayLeave(): void
+    {
+        // The update runs on the server and the page reattaches on reload, so the
+        // overlay must not ask people to stay put (it made a stalled bar look fatal).
+        $src = file_get_contents(dirname(__DIR__) . '/admin/updates.php');
+        $this->assertStringNotContainsString('не затваряйте', $src);
+        $this->assertStringContainsString('дори да затворите или презаредите страницата', $src);
+    }
+
     public function testUnauthenticatedGetIsRejected(): void
     {
         $this->requireServer();
