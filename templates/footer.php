@@ -28,7 +28,7 @@ $_show_nl_banner = empty($_COOKIE['om_nl_sub']) && !str_starts_with($_SERVER['RE
       // for contrast); else a theme's palette sets --newsletter-bg / --newsletter-fg;
       // else the original teal and white. Full-strength text, never faded: a faded
       // line would no longer meet the contrast the admin preview promises. ?>
-<section class="newsletter-banner" style="background:var(--newsletter-bg,#0387A5);padding:3rem 0;">
+<section class="newsletter-banner" style="background:var(--newsletter-bg,#037F9B);padding:3rem 0;">
   <div class="container" style="max-width:680px;text-align:center;">
     <h3 style="color:var(--newsletter-fg,#fff);margin:0 0 .5rem;font-size:1.3rem;"><?= t('newsletter.banner.title') ?></h3>
     <p style="color:var(--newsletter-fg,#fff);margin:0 0 1.5rem;font-size:.95rem;"><?= t('newsletter.banner.text') ?></p>
@@ -39,7 +39,7 @@ $_show_nl_banner = empty($_COOKIE['om_nl_sub']) && !str_starts_with($_SERVER['RE
              placeholder="<?= h(t('newsletter.banner.placeholder')) ?>"
              style="padding:.6rem 1rem;border:none;border-radius:4px;font-size:1rem;font-family:inherit;width:280px;max-width:100%;">
       <button type="submit" class="btn btn--primary"
-              style="background:var(--newsletter-fg,#fff);color:var(--newsletter-bg,#0387A5);border:none;font-weight:700;padding:.6rem 1.5rem;">
+              style="background:var(--newsletter-fg,#fff);color:var(--newsletter-bg,#037F9B);border:none;font-weight:700;padding:.6rem 1.5rem;">
         <?= t('newsletter.banner.submit') ?>
       </button>
     </form>

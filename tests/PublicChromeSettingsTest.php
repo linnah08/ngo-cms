@@ -131,7 +131,7 @@ final class PublicChromeSettingsTest extends TestCase
     public function test_footer_bands_take_theme_colours_with_the_original_fallbacks(): void
     {
         $src = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/templates/footer.php');
-        $this->assertStringContainsString('background:var(--newsletter-bg,#0387A5)', $src);
+        $this->assertStringContainsString('background:var(--newsletter-bg,#037F9B)', $src);
         $this->assertStringContainsString('color:var(--newsletter-fg,#fff)', $src);
         $this->assertStringContainsString('background:var(--banner-accent,#0387A5);color:var(--banner-accent-fg,#fff)', $src);
     }

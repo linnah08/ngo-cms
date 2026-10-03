@@ -160,7 +160,7 @@ const THEME_TEXT_LIGHT = '#FFFFFF';
 const THEME_TEXT_DARK  = '#1A1916';
 
 /** The band colour the shared footer falls back to when nothing else sets it. */
-const THEME_NEWSLETTER_FALLBACK = '#0387A5';
+const THEME_NEWSLETTER_FALLBACK = '#037F9B';
 
 /** WCAG 2 contrast ratio between two #RRGGBB colours (1.0 – 21.0). */
 function theme_contrast(string $a, string $b): float {

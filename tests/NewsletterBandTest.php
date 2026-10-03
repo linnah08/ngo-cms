@@ -89,6 +89,15 @@ final class NewsletterBandTest extends TestCase
         $this->assertSame(THEME_TEXT_DARK, theme_text_on('#FFFFFF')['fg']);
     }
 
+    public function test_the_default_band_reads_well_with_white_text(): void
+    {
+        // The default was #0387A5 (4.2:1 with white, under AA); it was darkened so
+        // a site that never picks a colour does not ship hard-to-read text.
+        $r = theme_text_on(THEME_NEWSLETTER_FALLBACK);
+        $this->assertTrue($r['readable']);
+        $this->assertSame(THEME_TEXT_LIGHT, $r['fg']);
+    }
+
     public function test_a_mid_tone_that_neither_text_colour_reads_on_is_flagged(): void
     {
         // Neither white nor dark reaches 4.5:1 here — the better one is still used,
