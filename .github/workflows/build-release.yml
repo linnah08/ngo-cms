@@ -3,6 +3,12 @@ name: Build release ZIP
 # Builds a ready-to-upload package (application + vendor/) so non-technical
 # users can install without git or composer: download the ZIP, upload it to
 # their hosting's File Manager, extract, and open the site to run the wizard.
+#
+# Before anything is published, the release gate installs the PREVIOUS release,
+# updates it to this ZIP with the site's own updater, and checks the site still
+# loads — as a fresh install and as a fork that keeps its own config.php (the
+# case that took a site down with v0.17.0). If the gate fails, no release asset
+# is published. Run the same gate locally with tests/release-gate/gate.sh.
 
 on:
   push:
@@ -15,12 +21,26 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    # The gate installs real sites, so it needs a real database — the same
+    # engine production runs.
+    services:
+      mariadb:
+        image: mariadb:10.5
+        env:
+          MARIADB_ROOT_PASSWORD: release-gate
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -prelease-gate"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
+          extensions: zip, pdo_mysql, mbstring, intl, gd, curl
 
       - name: Install production dependencies
         run: composer install --no-dev --optimize-autoloader --no-interaction
@@ -34,59 +54,28 @@ jobs:
             VER="0.0.0-dev"
           fi
           echo "$VER" > VERSION
+          echo "VER=$VER" >> "$GITHUB_ENV"
           echo "Stamped VERSION: $VER"
-
-      - name: Generate checksums.json
-        run: |
-          cat > /tmp/gen-checksums.php <<'PHP'
-          <?php
-          // Hashes every file that will end up in the release ZIP, so a future
-          // self-update (includes/updater.php) can detect locally-customized
-          // files by diffing live file hashes against this baseline before
-          // overwriting anything. Exclusions here MUST stay in sync with the
-          // `zip -x` list in the "Build ZIP" step below — the checksums must
-          // describe exactly what's in the zip.
-          $root        = getcwd();
-          $dirPrefixes = ['.git', '.github', 'tests', 'node_modules', '.githooks', 'relay', 'docs'];
-          $exactFiles  = ['phpunit.xml', 'playwright.config.js', 'package.json', 'package-lock.json', 'deploy.php',
-                          'CLAUDE.md', '.gitignore'];
-
-          function should_exclude(string $rel, array $dirPrefixes, array $exactFiles): bool {
-              if (in_array($rel, $exactFiles, true)) return true;
-              if (str_ends_with($rel, '.zip')) return true;
-              if (str_starts_with(basename($rel), '.phpunit')) return true;
-              foreach ($dirPrefixes as $p) {
-                  if ($rel === $p || str_starts_with($rel, $p . '/')) return true;
-              }
-              return false;
-          }
-
-          $checksums = [];
-          $it = new RecursiveIteratorIterator(
-              new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
-              RecursiveIteratorIterator::LEAVES_ONLY
-          );
-          foreach ($it as $file) {
-              if (!$file->isFile()) continue;
-              $rel = ltrim(substr($file->getPathname(), strlen($root)), '/');
-              if (should_exclude($rel, $dirPrefixes, $exactFiles)) continue;
-              $checksums[$rel] = hash_file('sha256', $file->getPathname());
-          }
-          ksort($checksums);
-          file_put_contents($root . '/checksums.json', json_encode($checksums, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
-          fwrite(STDERR, 'Generated checksums.json with ' . count($checksums) . " entries\n");
-          PHP
-          php /tmp/gen-checksums.php
 
       - name: Build ZIP
         run: |
           ZIP="ngo-platform-${GITHUB_REF_NAME:-manual}.zip"
-          zip -rq "$ZIP" . \
-            -x ".git/*" ".github/*" "tests/*" "node_modules/*" \
-               "*.zip" ".phpunit*" "phpunit.xml" "playwright.config.js" \
-               "package.json" "package-lock.json" ".githooks/*" "deploy.php" \
-               "relay/*" "docs/*" "CLAUDE.md" ".gitignore"
+          bash tests/release-gate/build-zip.sh "$ZIP"
           echo "ZIP=$ZIP" >> "$GITHUB_ENV"
+
+      - name: Release gate (update the previous release to this one)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GATE_GH_REPO: ${{ github.repository }}
+          GATE_DB_HOST: 127.0.0.1
+          GATE_DB_USER: root
+          GATE_DB_PASS: release-gate
+        run: |
+          # A manual build is 0.0.0-dev, which no site would update to; gate it
+          # as a version above every published one.
+          GATE_VER="$VER"
+          if [[ "$VER" == "0.0.0-dev" ]]; then GATE_VER="99.0.0"; fi
+          bash tests/release-gate/gate.sh --new-zip "$ZIP" --version "$GATE_VER"
 
       - name: Attach to the release (tag builds)
         if: startsWith(github.ref, 'refs/tags/')
