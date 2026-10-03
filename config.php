@@ -107,19 +107,8 @@ unset($_org_predefined);
 // Visual theme presets (brand_themes() / current_theme()).
 require_once __DIR__ . '/includes/themes.php';
 
-/**
- * Is an optional feature module switched on?
- *
- * Reads the FEATURE_<NAME> constant from site.config.php. A missing constant
- * means "on", so installs that predate a flag keep working exactly as before
- * and an adopter only has to think about a flag when they want to turn it off.
- *
- *     feature_enabled('campaign')  →  bool, from FEATURE_CAMPAIGN
- */
-function feature_enabled(string $name): bool {
-    $const = 'FEATURE_' . strtoupper($name);
-    return !defined($const) || (bool) constant($const);
-}
+// feature_enabled('<module>') lives in includes/organisation.php (loaded above),
+// next to the admin switch that sets it.
 
 /**
  * Pre-launch notice shown as a strip at the top of every public page, switched

@@ -68,8 +68,10 @@ Each config below is gitignored. Copy the matching `*.example` file and fill it 
 
 `site.config.php` is the one file you edit to rebrand the site — name, base URL,
 contact details, bank account, social links, Google Analytics/Ads IDs, and
-feature toggles (e.g. `FEATURE_CAMPAIGN`). Leave any analytics ID empty (`''`)
-to disable that tag entirely.
+initial feature toggles (`FEATURE_DONATIONS`, `FEATURE_CAMPAIGN`). Leave any
+analytics ID empty (`''`) to disable that tag entirely. After install, the
+modules are switched on and off in Admin → Организация → Модули, which wins over
+the constants.
 
 ### 3. Create and install the database
 

@@ -9,6 +9,12 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/IRISPayment.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/donation.php';
 start_session();
 
+// Donations switched off in Admin → Организация → Модули — nothing to post to.
+if (!feature_enabled('donations')) {
+    require $_SERVER['DOCUMENT_ROOT'] . '/errors/404.php';
+    exit;
+}
+
 // This URL has no /en/ prefix, so the form says which language it came from.
 $order_lang = post_lang();
 $form_url   = donation_path('form', $order_lang);

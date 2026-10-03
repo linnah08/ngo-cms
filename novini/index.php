@@ -123,6 +123,7 @@ if ($slug) {
     <p style="color:var(--text-muted);font-size:1rem;margin:0 0 2.5rem;max-width:560px;margin-left:auto;margin-right:auto;">Всеки принос — голям или малък — помага на деца с различия в развитието да получат подкрепата, от която се нуждаят.</p>
     <div style="display:flex;flex-wrap:wrap;gap:1.25rem;justify-content:center;align-items:stretch;">
 
+      <?php if (feature_enabled('donations')): ?>
       <!-- Donate -->
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem 1.75rem;flex:1;min-width:220px;max-width:280px;display:flex;flex-direction:column;align-items:center;gap:1rem;">
         <div style="font-size:2rem;">❤️</div>
@@ -130,6 +131,7 @@ if ($slug) {
         <p style="margin:0;font-size:.88rem;color:var(--text-muted);text-align:center;">Подкрепете директно децата и програмите на фондацията.</p>
         <a href="/donation/" class="btn btn--primary" style="margin-top:auto;width:100%;text-align:center;justify-content:center;">Дари сега</a>
       </div>
+      <?php endif; ?>
 
       <!-- Shop -->
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem 1.75rem;flex:1;min-width:220px;max-width:280px;display:flex;flex-direction:column;align-items:center;gap:1rem;">

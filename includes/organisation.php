@@ -38,6 +38,35 @@ function org_fields(): array
         'launch_banner'    => 'SITE_LAUNCH_BANNER',
         'launch_banner_bg' => 'SITE_LAUNCH_BANNER_BG',
         'launch_banner_en' => 'SITE_LAUNCH_BANNER_EN',
+        'feature_donations' => 'FEATURE_DONATIONS',
+        'feature_campaign'  => 'FEATURE_CAMPAIGN',
+    ];
+}
+
+/**
+ * Optional modules an admin can switch on and off in Admin → Организация →
+ * Модули. Module name (as passed to feature_enabled()) => its org_fields() key
+ * plus the copy shown next to the switch.
+ *
+ * The switch is saved like every other field here, so it wins over the
+ * FEATURE_<NAME> constant in site.config.php; that constant is only the initial
+ * value until the admin saves the page once.
+ */
+function org_modules(): array
+{
+    return [
+        'donations' => [
+            'field' => 'feature_donations',
+            'label' => 'Дарения',
+            'hint'  => 'Ако изключите даренията, от сайта изчезват страницата за дарение, формата за дарение в магазина и бутоните „Дари сега“ под новините.',
+            'off_warning' => 'Изключвате даренията. Страницата за дарение, формата за дарение и бутоните „Дари сега“ ще изчезнат от сайта и посетителите няма да могат да даряват онлайн.',
+        ],
+        'campaign' => [
+            'field' => 'feature_campaign',
+            'label' => 'Кампании',
+            'hint'  => 'Ако изключите кампаниите, от сайта изчезват страниците на кампанията за набиране на средства и връзките към тях.',
+            'off_warning' => 'Изключвате кампаниите. Страниците на кампанията ще изчезнат от сайта и посетителите няма да могат да ги отварят.',
+        ],
     ];
 }
 
@@ -56,6 +85,33 @@ function org_legal_name(string $lang = 'bg'): string
     if ($name !== '') return $name;
     $site  = $en && defined('SITE_NAME_EN') ? 'SITE_NAME_EN' : 'SITE_NAME_BG';
     return defined($site) ? trim((string) constant($site)) : '';
+}
+
+/**
+ * Is an optional feature module switched on?
+ *
+ * Reads the FEATURE_<NAME> constant. Its value comes, in order of precedence,
+ * from:
+ *   1. the switch in Admin → Организация → Модули, saved to
+ *      content/organisation.json and defined before site.config.php is loaded
+ *      (see includes/organisation.php) — stored as '1' / '0';
+ *   2. FEATURE_<NAME> in site.config.php — the initial value until an admin
+ *      saves that page;
+ *   3. nothing set at all → on, so installs that predate a flag keep working.
+ *
+ * Costs nothing per call: the JSON file is read once per request by
+ * config.php's bootstrap, and no database is involved, so it is safe on every public
+ * page and keeps working when the database is down.
+ *
+ *     feature_enabled('campaign')  →  bool, from FEATURE_CAMPAIGN
+ */
+function feature_enabled(string $name): bool {
+    $const = 'FEATURE_' . strtoupper($name);
+    if (!defined($const)) return true;
+    $value = constant($const);
+    // The admin switch saves '1' / '0'; a hand-edited "false" / "off" means off too.
+    if (is_string($value)) return filter_var(trim($value), FILTER_VALIDATE_BOOLEAN);
+    return (bool) $value;
 }
 
 function org_overrides_path(): string
@@ -247,6 +303,22 @@ function org_validate(array $in, array $themeKeys): array
     // turns into ''. Store an explicit '0' instead — otherwise the saved value
     // reads as "not set", and the banner could never be switched back off.
     $v['launch_banner'] = ($in['launch_banner'] ?? '') === '1' ? '1' : '0';
+
+    // Module switches: same explicit '1' / '0' as the banner, so "off" is saved
+    // and wins over FEATURE_<NAME> in site.config.php. Anything other than the
+    // checkbox's own value is refused instead of being guessed at.
+    foreach (org_modules() as $mod) {
+        $k   = $mod['field'];
+        $raw = $in[$k] ?? null;
+        if ($raw === null) {
+            $v[$k] = '0';
+        } elseif ($raw === '1') {
+            $v[$k] = '1';
+        } else {
+            $v[$k] = '0';
+            $e[$k] = 'Невалидна стойност за „' . $mod['label'] . '“. Презаредете страницата и опитайте отново.';
+        }
+    }
 
     foreach (['launch_banner_bg' => 'на български', 'launch_banner_en' => 'на английски'] as $k => $lang) {
         if (mb_strlen($v[$k]) > 200) {

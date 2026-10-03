@@ -53,6 +53,9 @@ if (!isset($themes[$current['brand_theme']])) $current['brand_theme'] = 'classic
 $active_theme = $themes[$current['brand_theme']];
 if (!org_color_valid($current['brand_primary'])) $current['brand_primary'] = $active_theme['primary'];
 if (!org_color_valid($current['brand_accent']))  $current['brand_accent']  = $active_theme['accent'];
+// A module with no saved switch and no FEATURE_* constant is on.
+$modules = org_modules();
+foreach ($modules as $mname => $mod) $current[$mod['field']] = feature_enabled($mname) ? '1' : '0';
 
 $val = static fn(string $k): string => (string) (($form ?? $current)[$k] ?? '');
 
@@ -106,7 +109,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   (фактури, сертификати за дарение). Промените важат веднага. Вече издадените документи не се променят.
 </p>
 
-<form method="post" enctype="multipart/form-data" novalidate>
+<form method="post" enctype="multipart/form-data" novalidate id="orgForm">
   <?= csrf_field() ?>
 
   <!-- ── Name ──────────────────────────────────────────────────────────────── -->
@@ -285,6 +288,37 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </div>
   </section>
 
+  <!-- ── Optional modules ──────────────────────────────────────────────────── -->
+  <section class="admin-card" style="<?= $card ?>" aria-labelledby="modules-title">
+    <h2 class="admin-card__title" id="modules-title">Модули</h2>
+    <p class="admin-meta" style="margin:0 0 1rem;line-height:1.6;">
+      Включете само частите от сайта, които организацията ви използва. Изключеният модул
+      изчезва от сайта за посетителите, но нищо не се изтрива — можете да го включите отново по всяко време.
+    </p>
+    <?php foreach ($modules as $mname => $mod):
+        $mk     = $mod['field'];
+        $on_now = feature_enabled($mname);
+        $on_val = $val($mk) === '1'; ?>
+      <div id="f-<?= h($mk) ?>" style="padding:.85rem 1rem;border:1px solid var(--border,#ddd);border-radius:8px;margin-bottom:.75rem;">
+        <label for="mod-<?= h($mname) ?>" style="display:flex;align-items:center;gap:.75rem;min-height:44px;margin:0;cursor:pointer;font-weight:600;text-transform:none;letter-spacing:normal;">
+          <input type="checkbox" id="mod-<?= h($mname) ?>" name="<?= h($mk) ?>" value="1" <?= $on_val ? 'checked' : '' ?>
+                 data-module-switch data-was-on="<?= $on_now ? '1' : '0' ?>"
+                 data-off-warning="<?= h($mod['off_warning']) ?>"
+                 aria-describedby="hint-<?= h($mname) ?> state-<?= h($mname) ?><?= isset($errors[$mk]) ? ' err-' . h($mk) : '' ?>"
+                 style="width:22px;height:22px;margin:0;flex-shrink:0;cursor:pointer;">
+          <span><?= h($mod['label']) ?></span>
+        </label>
+        <small id="hint-<?= h($mname) ?>" style="<?= $hint ?>"><?= h($mod['hint']) ?></small>
+        <p id="state-<?= h($mname) ?>" style="margin:.4rem 0 0;font-size:.85rem;line-height:1.5;">
+          Сега на сайта: <strong><?= $on_now ? '✓ включено' : '✕ изключено' ?></strong>
+          <span data-module-pending style="color:#92400e;"></span>
+        </p>
+        <?= $ferr($mk) ?>
+      </div>
+    <?php endforeach; ?>
+    <p id="modules-live" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;"></p>
+  </section>
+
   <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;margin-bottom:2rem;">
     <button type="submit" class="btn btn--primary">Запази</button>
   </div>
@@ -301,6 +335,34 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
             document.querySelectorAll('input[name="brand_theme"]').forEach(function (o) {
                 o.closest('label').style.borderColor = o.checked ? 'var(--teal,#0387A5)' : 'var(--border,#ddd)';
             });
+        });
+    });
+    // Module switches: say in words what will change, and confirm before a
+    // module is switched off (it disappears for visitors).
+    var form = document.getElementById('orgForm'), live = document.getElementById('modules-live');
+    var switches = Array.prototype.slice.call(document.querySelectorAll('[data-module-switch]'));
+    switches.forEach(function (cb) {
+        cb.addEventListener('change', function () {
+            var pending = cb.closest('[id^="f-"]').querySelector('[data-module-pending]');
+            var wasOn = cb.dataset.wasOn === '1', msg = '';
+            if (wasOn && !cb.checked) msg = '— ще се изключи, когато натиснете „Запази“.';
+            if (!wasOn && cb.checked) msg = '— ще се включи, когато натиснете „Запази“.';
+            if (pending) pending.textContent = msg;
+            if (live) live.textContent = msg ? cb.closest('label').textContent.trim() + ' ' + msg : '';
+        });
+    });
+    var confirmed = false;
+    if (form) form.addEventListener('submit', function (e) {
+        if (confirmed) return;
+        var turningOff = switches.filter(function (cb) { return cb.dataset.wasOn === '1' && !cb.checked; });
+        if (!turningOff.length || !window._adminConfirm) return;
+        e.preventDefault();
+        var msg = turningOff.map(function (cb) { return cb.dataset.offWarning; }).join(' ')
+                + ' Нищо не се изтрива — можете да ги включите отново по всяко време. Да запазим ли?';
+        window._adminConfirm(msg, 'Да, изключи').then(function (ok) {
+            if (!ok) return;
+            confirmed = true;
+            if (form.requestSubmit) form.requestSubmit(); else form.submit();
         });
     });
     // Preview the chosen logo before saving.

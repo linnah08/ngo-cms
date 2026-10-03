@@ -105,3 +105,29 @@ test('admin sidebar navigation links are present', async ({ page }) => {
   await expect(page.locator('.admin-sidebar')).toBeVisible();
   await expect(page.locator('.admin-nav__link').first()).toBeVisible();
 });
+
+// ── Organisation → Модули ─────────────────────────────────────────────────────
+
+test('switching a module off asks first, and Cancel saves nothing', async ({ page }) => {
+  await page.goto('/admin/organisation.php');
+  const sw = page.locator('#mod-donations');
+  await expect(sw).toBeVisible();
+  await expect(page.getByLabel('Дарения', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Кампании', { exact: true })).toBeVisible();
+
+  // Needs the module on to begin with (no save is made to get there).
+  if (!(await sw.isChecked())) test.skip(true, 'Donations are switched off on this site.');
+
+  await sw.uncheck();
+  await expect(page.locator('#state-donations')).toContainText('ще се изключи');
+  await page.locator('#orgForm button[type="submit"]').click();
+
+  const modal = page.locator('#adminConfirmOverlay');
+  await expect(modal).toBeVisible();
+  await expect(page.locator('#adminConfirmMsg')).toContainText('Изключвате даренията');
+  await page.locator('#adminConfirmCancel').click();
+  await expect(modal).toBeHidden();
+  await expect(page).toHaveURL(/\/admin\/organisation\.php$/);
+  // Still the unsaved page: no success message.
+  await expect(page.locator('.admin-alert--success')).toHaveCount(0);
+});

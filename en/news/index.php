@@ -95,6 +95,7 @@ if ($slug) {
     <p style="color:var(--text-muted);font-size:1rem;margin:0 0 2.5rem;max-width:560px;margin-left:auto;margin-right:auto;">Every contribution — large or small — helps children with developmental differences get the support they need.</p>
     <div style="display:flex;flex-wrap:wrap;gap:1.25rem;justify-content:center;align-items:stretch;">
 
+      <?php if (feature_enabled('donations')): ?>
       <!-- Donate -->
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem 1.75rem;flex:1;min-width:220px;max-width:280px;display:flex;flex-direction:column;align-items:center;gap:1rem;">
         <div style="font-size:2rem;">❤️</div>
@@ -102,6 +103,7 @@ if ($slug) {
         <p style="margin:0;font-size:.88rem;color:var(--text-muted);text-align:center;">Support the children and foundation programmes directly.</p>
         <a href="/en/donation/" class="btn btn--primary" style="margin-top:auto;width:100%;text-align:center;justify-content:center;">Donate now</a>
       </div>
+      <?php endif; ?>
 
       <!-- Shop -->
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem 1.75rem;flex:1;min-width:220px;max-width:280px;display:flex;flex-direction:column;align-items:center;gap:1rem;">
