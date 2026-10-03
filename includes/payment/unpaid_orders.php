@@ -15,6 +15,7 @@
  */
 require_once __DIR__ . '/payment_errors.php';
 require_once dirname(__DIR__) . '/order_stock.php';
+require_once dirname(__DIR__) . '/couriers/order_shipment.php';
 
 /**
  * Minutes after checkout before a still-pending order counts as unpaid, per
@@ -187,12 +188,14 @@ function send_payment_failed_email(PDO $pdo, array $order, ?callable $mailer = n
 }
 
 /**
- * Cancel an order that stayed unpaid for 3 days and put its items back in stock.
+ * Cancel an order that stayed unpaid for 3 days, put its items back in stock
+ * and cancel its courier shipment, if one was created.
  * Safe to call repeatedly — restocks at most once.
  *
+ * @param callable|null $cancel_shipment see order_cancel_shipment()
  * @return bool true when the order was cancelled by this call
  */
-function cancel_unpaid_order(PDO $pdo, array $order): bool
+function cancel_unpaid_order(PDO $pdo, array $order, ?callable $cancel_shipment = null): bool
 {
     $pdo->beginTransaction();
     try {
@@ -208,11 +211,13 @@ function cancel_unpaid_order(PDO $pdo, array $order): bool
         }
         order_return_stock($pdo, $order);
         $pdo->commit();
-        return true;
     } catch (Throwable $e) {
         $pdo->rollBack();
         throw $e;
     }
+    // After the commit: a courier API call must not hold the transaction open.
+    order_cancel_shipment_or_alert($pdo, $order, $cancel_shipment);
+    return true;
 }
 
 /**

@@ -53,10 +53,12 @@ function process_iris_result(PDO $pdo, array $order, array $status): void
             notify_order_paid($order);
         }
     } elseif ($state === 'FAILED') {
-        $pdo->prepare(
+        $stmt = $pdo->prepare(
             "UPDATE orders SET status = 'cancelled', updated_at = NOW()
              WHERE id = ? AND payment_status = 'pending'"
-        )->execute([$order['id']]);
+        );
+        $stmt->execute([$order['id']]);
+        if ($stmt->rowCount() > 0) order_cancel_shipment_or_alert($pdo, $order);
         send_payment_failed_email($pdo, $order);
     }
     // WAITING (or anything else) → leave the order pending.

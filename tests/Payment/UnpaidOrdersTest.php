@@ -547,6 +547,21 @@ final class UnpaidOrdersTest extends TestCase
         $this->assertSame(1, $this->stock('products', $pid));
     }
 
+    public function testAutoCancelAlsoCancelsTheSpeedyShipment(): void
+    {
+        $this->requireDb();
+        $order = $this->insertOrder(73 * 60);
+        self::$pdo->prepare("UPDATE orders SET courier = 'speedy', speedy_shipment_id = '63748913025' WHERE id = ?")
+            ->execute([$order['id']]);
+
+        $calls = [];
+        $this->assertTrue(cancel_unpaid_order(self::$pdo, $this->reload((int)$order['id']),
+            function (string $courier, string $id) use (&$calls): void { $calls[] = [$courier, $id]; }));
+
+        $this->assertSame([['speedy', '63748913025']], $calls);
+        $this->assertNull($this->reload((int)$order['id'])['speedy_shipment_id']);
+    }
+
     public function testShippedOrderIsNeverAutoCancelled(): void
     {
         $this->requireDb();

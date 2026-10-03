@@ -82,8 +82,9 @@ function process_dsk_result(PDO $pdo, array $order, string $dskOrderId, array $s
         }
     } elseif ($orderStatus === 3) {
         // Declined
-        $pdo->prepare("UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = ? AND payment_status = 'pending'")
-            ->execute([$order['id']]);
+        $stmt = $pdo->prepare("UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = ? AND payment_status = 'pending'");
+        $stmt->execute([$order['id']]);
+        if ($stmt->rowCount() > 0) order_cancel_shipment_or_alert($pdo, $order);
         send_payment_failed_email($pdo, $order);
     }
 }

@@ -146,6 +146,9 @@ function pledge_create_speedy_label(
     if (($pledge['delivery_courier'] ?? '') !== 'speedy') {
         throw new RuntimeException('Тази награда не е за доставка със Speedy.');
     }
+    if (($pledge['payment_status'] ?? '') !== 'paid') {
+        throw new RuntimeException('Дарението още не е платено. Създайте товарителница, след като плащането пристигне.');
+    }
     if (!empty(pledge_current_shipment($pdo, $pledge)['speedy_shipment_id'])) {
         throw new RuntimeException('Товарителницата вече е създадена.');
     }
@@ -211,6 +214,9 @@ function pledge_create_boxnow_label(PDO $pdo, array $pledge, int $compartment_si
 {
     if (($pledge['delivery_courier'] ?? '') !== 'boxnow') {
         throw new RuntimeException('Тази награда не е за доставка с BoxNow.');
+    }
+    if (($pledge['payment_status'] ?? '') !== 'paid') {
+        throw new RuntimeException('Дарението още не е платено. Създайте товарителница, след като плащането пристигне.');
     }
     if (!empty(pledge_current_shipment($pdo, $pledge)['boxnow_parcel_id'])) {
         throw new RuntimeException('Товарителницата вече е създадена.');

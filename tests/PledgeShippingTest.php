@@ -64,7 +64,7 @@ final class PledgeShippingTest extends TestCase
               delivery_address, delivery_courier, delivery_type, office_code, office_name, office_city,
               reward_shipped, payment_status)
              VALUES (?, 'donation', 'bg', 'Тест', 'ship-test@example.com', ?, 25.0, 1, NULL,
-                     ?, ?, ?, ?, ?, ?, 0, 'paid')"
+                     ?, ?, ?, ?, ?, ?, 0, ?)"
         )->execute([
             $num,
             $o['phone'] ?? null,
@@ -74,6 +74,7 @@ final class PledgeShippingTest extends TestCase
             $o['office_code'] ?? null,
             $o['office_name'] ?? null,
             $o['office_city'] ?? null,
+            $o['payment_status'] ?? 'paid',
         ]);
         $id = (int)self::$pdo->lastInsertId();
         self::$pledge_ids[]    = $id;
@@ -287,6 +288,29 @@ final class PledgeShippingTest extends TestCase
         ]);
         $this->expectExceptionMessageMatches('/телефон/u');
         pledge_create_speedy_label(self::$pdo, $pledge, 1.0, 1);
+    }
+
+    public function test_speedy_label_refused_for_unpaid_pledge(): void
+    {
+        $this->requireDb();
+        $pledge = $this->insertDeliveryPledge([
+            'delivery_courier' => 'speedy', 'delivery_type' => 'office', 'phone' => '+359877',
+            'office_code' => 'SOF42', 'office_name' => 'Speedy НДК', 'office_city' => 'София',
+            'payment_status' => 'pending',
+        ]);
+        $this->expectExceptionMessageMatches('/не е платено/u');
+        pledge_create_speedy_label(self::$pdo, $pledge, 1.0, 1);
+    }
+
+    public function test_boxnow_label_refused_for_unpaid_pledge(): void
+    {
+        $this->requireDb();
+        $pledge = $this->insertDeliveryPledge([
+            'delivery_courier' => 'boxnow', 'delivery_type' => 'locker', 'phone' => '+359877',
+            'office_code' => '8910', 'payment_status' => 'pending',
+        ]);
+        $this->expectExceptionMessageMatches('/не е платено/u');
+        pledge_create_boxnow_label(self::$pdo, $pledge, 1);
     }
 
     public function test_shipment_description_falls_back_without_reward(): void

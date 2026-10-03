@@ -11,6 +11,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_shipping.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_view.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/unpaid_orders.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_email_composer.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/couriers/order_shipment.php';
 
 admin_require_shop();
 
@@ -137,29 +138,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ->execute([$shipped_flag, (int)$pledge_row['id']]);
             }
 
-            // Cancel BoxNow parcel when order is cancelled
+            // Cancel the Speedy / BoxNow shipment when the order is cancelled
             if ($new_status === 'cancelled' && $order['status'] !== 'cancelled'
-                && $order['courier'] === 'boxnow' && !empty($order['boxnow_parcel_id'])) {
-                try {
-                    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/couriers/BoxNowCourier.php';
-                    (new BoxNowCourier())->cancelShipment($order['boxnow_parcel_id']);
-                } catch (Throwable $e) {
-                    error_log('BoxNow cancel on order cancel: ' . $e->getMessage());
-                }
-            }
-
-            // Cancel Speedy shipment when order is cancelled
-            if ($new_status === 'cancelled' && $order['status'] !== 'cancelled'
-                && $order['courier'] === 'speedy' && !empty($order['speedy_shipment_id'])) {
-                try {
-                    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/couriers/SpeedyCourier.php';
-                    (new SpeedyCourier())->cancelShipment($order['speedy_shipment_id']);
-                    $pdo->prepare(
-                        'UPDATE orders SET speedy_shipment_id=NULL, tracking_number=NULL, updated_at=NOW() WHERE id=?'
-                    )->execute([$id]);
-                } catch (Throwable $e) {
-                    error_log('Speedy cancel on order cancel: ' . $e->getMessage());
-                }
+                && ($shipment_error = order_cancel_shipment($pdo, $order)) !== null) {
+                $errors[] = 'Поръчката е отменена, но: ' . $shipment_error;
             }
 
             // Initiate DSK Bank refund when cancelling a paid order
@@ -215,6 +197,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'create_boxnow_label') {
         if ($order['courier'] !== 'boxnow' || empty($order['courier_office_code'])) {
             $errors[] = 'Невалидна поръчка за BoxNow.';
+        } elseif (($label_block = order_label_block_reason($order)) !== null) {
+            $errors[] = $label_block;
         } elseif (!empty($order['boxnow_parcel_id'])) {
             $errors[] = 'Товарителницата вече е създадена.';
         } else {
@@ -276,6 +260,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'create_speedy_label') {
         if ($order['courier'] !== 'speedy' || $order['type'] !== 'physical') {
             $errors[] = 'Невалидна поръчка за Speedy.';
+        } elseif (($label_block = order_label_block_reason($order)) !== null) {
+            $errors[] = $label_block;
         } elseif (!empty($order['speedy_shipment_id'])) {
             $errors[] = 'Товарителницата вече е създадена.';
         } else {
@@ -950,6 +936,11 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <p style="font-size:.85rem;color:var(--text-muted);margin:.25rem 0 1rem;">
           Автомат: <?= h($order['courier_office_name'] ?: $order['courier_office_code']) ?>
         </p>
+        <?php if ($label_block = order_label_block_reason($order)): ?>
+          <p id="boxnow-label-blocked" role="note" style="font-size:.85rem;margin:0 0 .75rem;padding:.6rem .75rem;border:1px solid #b45309;border-left-width:4px;border-radius:6px;background:#fffbeb;color:#78350f;">
+            ⚠ <?= h($label_block) ?>
+          </p>
+        <?php endif; ?>
         <form method="POST">
           <?= csrf_field() ?>
           <input type="hidden" name="action" value="create_boxnow_label">
@@ -959,7 +950,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
             <option value="2">Средно (до 17 см)</option>
             <option value="3">Голямо (до 36 см)</option>
           </select>
-          <button type="submit" class="btn btn--primary" style="width:100%;justify-content:center;">
+          <button type="submit" class="btn btn--primary" style="width:100%;justify-content:center;<?= $label_block ? 'opacity:.5;cursor:not-allowed;' : '' ?>"
+                  <?= $label_block ? 'disabled aria-describedby="boxnow-label-blocked"' : '' ?>>
             📦 Създай товарителница
           </button>
         </form>
@@ -993,6 +985,11 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
               ? 'Офис: ' . h($order['courier_office_name'] ?: $order['courier_office_code'])
               : 'Адрес: ' . h($order['delivery_address'] . ', ' . $order['delivery_city']) ?>
         </p>
+        <?php if ($label_block = order_label_block_reason($order)): ?>
+          <p id="speedy-label-blocked" role="note" style="font-size:.85rem;margin:0 0 .75rem;padding:.6rem .75rem;border:1px solid #b45309;border-left-width:4px;border-radius:6px;background:#fffbeb;color:#78350f;">
+            ⚠ <?= h($label_block) ?>
+          </p>
+        <?php endif; ?>
         <form method="POST">
           <?= csrf_field() ?>
           <input type="hidden" name="action" value="create_speedy_label">
@@ -1008,7 +1005,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
                      style="width:100%;box-sizing:border-box;padding:.45rem .65rem;border:1px solid #d1d5db;border-radius:6px;font-size:.875rem;font-family:inherit;">
             </div>
           </div>
-          <button type="submit" class="btn btn--primary" style="width:100%;justify-content:center;">
+          <button type="submit" class="btn btn--primary" style="width:100%;justify-content:center;<?= $label_block ? 'opacity:.5;cursor:not-allowed;' : '' ?>"
+                  <?= $label_block ? 'disabled aria-describedby="speedy-label-blocked"' : '' ?>>
             📦 Създай товарителница
           </button>
         </form>
