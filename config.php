@@ -111,6 +111,21 @@ require_once __DIR__ . '/includes/themes.php';
 // next to the admin switch that sets it.
 
 /**
+ * The phone number where it is shown by choice — header, footer, contact pages
+ * — as opposed to where it has to appear regardless.
+ *
+ * Setting SITE_PHONE_PUBLIC to false returns '' here, which hides it in those
+ * places while leaving it in the legal pages, whose text is content rather than
+ * template, and on invoices and receipts. A card acquirer requires a published
+ * telephone number; an owner who does not want it on every page still has to
+ * have it somewhere. Undefined means shown, so existing sites do not change.
+ */
+function site_phone_public(): string {
+    if (defined('SITE_PHONE_PUBLIC') && !SITE_PHONE_PUBLIC) return '';
+    return defined('SITE_PHONE') ? (string) SITE_PHONE : '';
+}
+
+/**
  * Pre-launch notice shown as a strip at the top of every public page, switched
  * on in Admin → Организация while the site is still being filled in.
  *
@@ -474,7 +489,17 @@ function price_html(float $eur): string {
 // ============================================
 
 function load_json(string $path): array {
-    if (!file_exists($path)) return [];
+    // Admin-editable content files are gitignored — the server owns them — so a
+    // fresh checkout has none, and pages that read them straight out (the legal
+    // pages especially) render blank. A tracked "<name>.seed.json" beside the
+    // file supplies the starting text until an admin saves for the first time,
+    // at which point the real file exists and takes over. save_json() always
+    // writes the real path, so a seed is never overwritten.
+    if (!file_exists($path)) {
+        $seed = preg_replace('/\.json$/', '.seed.json', $path);
+        if ($seed === null || !file_exists($seed)) return [];
+        $path = $seed;
+    }
     $data = json_decode(file_get_contents($path), true);
     return is_array($data) ? $data : [];
 }

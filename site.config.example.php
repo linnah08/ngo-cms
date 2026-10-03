@@ -68,6 +68,10 @@ define('GOOGLE_ADS_PURCHASE_LABEL', '');  // add-to-cart conversion label
 define('EUR_BGN_RATE',        1.95583);
 define('DUAL_CURRENCY_UNTIL', '2026-07-01');
 
+// Hide the phone number from the header, footer and contact pages while keeping
+// it on invoices and the legal pages (a card acquirer requires one published).
+// define('SITE_PHONE_PUBLIC', false);
+
 // ── Optional feature modules ──────────────────────────────────────────────────
 // Initial values only: an admin switches these on and off in Admin →
 // Организация → Модули, and once that page is saved its choice wins over the
