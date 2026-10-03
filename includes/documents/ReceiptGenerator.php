@@ -4,7 +4,7 @@ require_once __DIR__ . '/DocumentGenerator.php';
 class ReceiptGenerator extends DocumentGenerator {
 
     protected function buildHtml(array $order, array $items, array $document): string {
-        $f    = self::FOUNDATION;
+        $f    = self::foundation();
         $date = self::fmtDate($order['created_at']);
         $num  = $document['formatted_number'];
         $c    = self::COLORS;

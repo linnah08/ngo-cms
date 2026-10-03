@@ -88,6 +88,8 @@ if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // Organisation
     $name_bg = $p('site_name_bg');
     $name_en = $p('site_name_en');
+    $legal_bg = $p('site_legal_name_bg');   // optional: the registered entity, if the site is its brand/project
+    $legal_en = $p('site_legal_name_en');
     $site_url = rtrim($p('site_url'), '/');
     $email   = $p('site_email');
     $phone   = $p('site_phone');
@@ -116,6 +118,8 @@ if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // Validate org + admin
     if ($name_bg === '')                                    $errors[] = 'Моля, въведете името на организацията на български.';
     if ($name_en === '')                                    $errors[] = 'Моля, въведете името на организацията на английски.';
+    if (($legal_bg === '') !== ($legal_en === ''))          $errors[] = 'Моля, въведете юридическото име и на двата езика — или оставете и двете полета празни.';
+    if (mb_strlen($legal_bg) > 150 || mb_strlen($legal_en) > 150) $errors[] = 'Юридическото име е твърде дълго (най-много 150 знака).';
     if (!filter_var($site_url, FILTER_VALIDATE_URL))        $errors[] = 'Моля, въведете правилен адрес на сайта, например https://vashata-organizacia.bg';
     if (!filter_var($email, FILTER_VALIDATE_EMAIL))         $errors[] = 'Моля, въведете правилен имейл за контакт.';
     if (!filter_var($admin_email, FILTER_VALIDATE_EMAIL))   $errors[] = 'Моля, въведете правилен имейл за вход на администратора.';
@@ -184,6 +188,8 @@ if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
         write_config($ROOT . '/site.config.php', [
             'SITE_NAME_BG' => $name_bg,
             'SITE_NAME_EN' => $name_en,
+            'SITE_LEGAL_NAME_BG' => $legal_bg,
+            'SITE_LEGAL_NAME_EN' => $legal_en,
             'SITE_URL'     => $site_url,
             'SITE_EMAIL'   => $email,
             'SITE_PHONE'   => $phone,
@@ -347,6 +353,11 @@ $v = fn(string $k, string $d = '') => e((string) ($_POST[$k] ?? $d));
         <div><label>Име на организацията (на български)</label><input type="text" name="site_name_bg" value="<?= $v('site_name_bg') ?>" required></div>
         <div><label>Име на организацията (на английски)</label><input type="text" name="site_name_en" value="<?= $v('site_name_en') ?>" required></div>
       </div>
+      <div class="row">
+        <div><label for="legalBg">Юридическо име (на български)</label><input type="text" id="legalBg" name="site_legal_name_bg" maxlength="150" value="<?= $v('site_legal_name_bg') ?>" aria-describedby="legalHint"></div>
+        <div><label for="legalEn">Юридическо име (на английски)</label><input type="text" id="legalEn" name="site_legal_name_en" maxlength="150" value="<?= $v('site_legal_name_en') ?>" aria-describedby="legalHint"></div>
+      </div>
+      <div class="hint" id="legalHint">Не е задължително. Попълнете, ако сайтът е марка или проект на друго юридическо лице — например „Фондация Пример“. Това име се печата на сертификатите за дарение, фактурите и разписките. Празно — използва се името на организацията.</div>
       <label>Адрес на сайта</label>
       <input type="url" name="site_url" value="<?= $v('site_url', $guess_url) ?>" required>
       <div class="hint">Пълният адрес с <code>https://</code>, без наклонена черта накрая. Използва се във всички имейли и плащания.</div>

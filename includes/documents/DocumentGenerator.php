@@ -5,23 +5,29 @@ abstract class DocumentGenerator {
 
     const EUR_TO_BGN = 1.95583;
 
-    // Issuer details printed on documents. Identity/bank fields come from
-    // site.config (set by the wizard); the legal-registry fields (address, MOL,
-    // EIK, registration note) are filled from ORG_* constants when present —
-    // see org() below. TODO: add these to the install wizard for tax-correct docs.
-    const FOUNDATION = [
-        'name'         => SITE_NAME_BG,
-        'bank'         => SITE_BANK_NAME,
-        'bic'          => SITE_BIC,
-        'iban'         => SITE_IBAN,
-        'phone'        => SITE_PHONE,
-        'email'        => SITE_EMAIL,
-        'website'      => SITE_URL,
-        'address'      => '',
-        'mol'          => '',
-        'eik'          => '',
-        'registration' => '',
-    ];
+    /**
+     * Issuer details printed on documents, in $lang. The name is the legal
+     * entity's (org_legal_name(): Admin → Организация → "Юридическо име",
+     * falling back to the site name) — a site run as a brand or project of a
+     * foundation issues its documents in the foundation's name. Bank and
+     * contact fields come from site.config / Admin → Организация. TODO: the
+     * legal-registry fields (address, MOL, EIK) are not configurable yet.
+     */
+    protected static function foundation(string $lang = 'bg'): array {
+        return [
+            'name'         => self::h(org_legal_name($lang)),   // HTML-escaped: printed straight into the templates
+            'bank'         => SITE_BANK_NAME,
+            'bic'          => SITE_BIC,
+            'iban'         => SITE_IBAN,
+            'phone'        => SITE_PHONE,
+            'email'        => SITE_EMAIL,
+            'website'      => SITE_URL,
+            'address'      => '',
+            'mol'          => '',
+            'eik'          => '',
+            'registration' => '',
+        ];
+    }
 
     const COLORS = [
         'teal'       => '#1b998b',

@@ -17,7 +17,7 @@ class IrisCertGenerator extends DonationCertGenerator {
         'registration' => '',
     ];
 
-    protected function getOrg(): array {
+    protected function getOrg(bool $en = false): array {
         return self::IRIS;
     }
 

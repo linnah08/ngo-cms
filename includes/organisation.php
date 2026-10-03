@@ -41,6 +41,23 @@ function org_fields(): array
     ];
 }
 
+/**
+ * The registered legal name of whoever issues documents and receives the
+ * money — printed on donation certificates, invoices and receipts. Set in
+ * Admin → Организация ("Юридическо име"). A site that is a brand or project
+ * of a foundation puts the foundation's name there; left empty, it is the
+ * site's own name, so a site whose name is its legal name needs nothing.
+ */
+function org_legal_name(string $lang = 'bg'): string
+{
+    $en    = $lang === 'en';
+    $legal = $en ? 'SITE_LEGAL_NAME_EN' : 'SITE_LEGAL_NAME_BG';
+    $name  = defined($legal) ? trim((string) constant($legal)) : '';
+    if ($name !== '') return $name;
+    $site  = $en && defined('SITE_NAME_EN') ? 'SITE_NAME_EN' : 'SITE_NAME_BG';
+    return defined($site) ? trim((string) constant($site)) : '';
+}
+
 function org_overrides_path(): string
 {
     return dirname(__DIR__) . '/content/organisation.json';

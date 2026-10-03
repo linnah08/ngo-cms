@@ -21,7 +21,7 @@ use chillerlan\QRCode\Output\QRGdImagePNG;
 class TicketGenerator extends DocumentGenerator {
 
     protected function buildHtml(array $order, array $items, array $document): string {
-        $f   = self::FOUNDATION;
+        $f   = self::foundation();
         $c   = self::COLORS;
         $t   = $c['teal'];
         $tl  = $c['teal_light'];

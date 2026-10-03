@@ -9,30 +9,32 @@ class DonationCertGenerator extends DocumentGenerator {
         return $mpdf->Output('', 'S');
     }
 
-    protected function getOrg(): array {
-        return self::FOUNDATION;
+    /** Who issues the certificate: the legal entity that received the donation. */
+    protected function getOrg(bool $en = false): array {
+        return self::foundation($en ? 'en' : 'bg');
     }
 
     protected function getOrgText(bool $en): array {
+        $legal = self::h(org_legal_name($en ? 'en' : 'bg'));
         return [
             'reg_note'  => $en
                 ? 'Reg. in the Central Register of Non-Profit Legal Entities in the public benefit, Ministry of Justice of Bulgaria'
                 : 'Регистрирана в обществена полза в Централния регистър на ЮЛНЦ към Министерство на правосъдието',
             'intro'     => $en
-                ? 'This certificate is issued by ' . SITE_NAME_EN . ', registered in the Central Register of Non-Profit Legal Entities in the public benefit at the Bulgarian Ministry of Justice, confirming receipt of a donation under the following terms:'
-                : 'С настоящия сертификат ' . SITE_NAME_BG . ', вписана в Централния регистър на юридическите лица с нестопанска цел в обществена полза към Министерство на правосъдието, удостоверява, че е получила дарение при следните условия:',
+                ? 'This certificate is issued by ' . $legal . ', registered in the Central Register of Non-Profit Legal Entities in the public benefit at the Bulgarian Ministry of Justice, confirming receipt of a donation under the following terms:'
+                : 'С настоящия сертификат ' . $legal . ', вписана в Централния регистър на юридическите лица с нестопанска цел в обществена полза към Министерство на правосъдието, удостоверява, че е получила дарение при следните условия:',
             'sig_label' => $en ? 'Foundation Director:' : 'Управител на фондацията:',
         ];
     }
 
     protected function buildHtml(array $order, array $items, array $document, ?string $signature_b64 = null): string {
-        $f    = $this->getOrg();
         $num  = $document['formatted_number'];
         $c    = self::COLORS;
 
         $inv  = json_decode($order['invoice_data'] ?? '{}', true) ?? [];
         $lang = $inv['lang'] ?? 'bg';
         $en   = $lang === 'en';
+        $f    = $this->getOrg($en);
 
         // Donation amount: from items or from total
         $don_amount = 0.0;
@@ -78,6 +80,8 @@ class DonationCertGenerator extends DocumentGenerator {
         $pay_label = $pay_labels[$order['payment_method'] ?? 'card'] ?? ($en ? 'Bank card' : 'Банкова карта');
 
         // Purpose — a single configurable line (all donations fund the org).
+        // The fallback names the site (the brand or project the donor gave to);
+        // the intro above already names the legal entity that received it.
         $purpose = self::h($en
             ? (defined('DONATION_PURPOSE_EN') ? DONATION_PURPOSE_EN : 'For the activities and programmes of ' . (defined('SITE_NAME_EN') ? SITE_NAME_EN : ''))
             : (defined('DONATION_PURPOSE_BG') ? DONATION_PURPOSE_BG : 'За дейността и програмите на ' . (defined('SITE_NAME_BG') ? SITE_NAME_BG : '')));

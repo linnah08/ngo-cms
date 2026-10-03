@@ -4,7 +4,7 @@ require_once __DIR__ . '/DocumentGenerator.php';
 class CreditNoteGenerator extends DocumentGenerator {
 
     protected function buildHtml(array $order, array $items, array $document): string {
-        $f    = self::FOUNDATION;
+        $f    = self::foundation();
         $date = self::fmtDate(date('Y-m-d H:i:s')); // credit note date = today
         $num  = $document['formatted_number'];
         $c    = self::COLORS;

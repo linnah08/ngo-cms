@@ -17,6 +17,9 @@
 define('SITE_NAME_BG', 'Вашата организация');   // name shown on the Bulgarian site
 define('SITE_NAME_EN', 'Your Organisation');     // name shown on the English site
 // Registered legal name, e.g. 'Фондация „Пример“' / 'Example Foundation'. Optional.
+// Donation certificates, invoices and receipts are issued in this name — set it
+// when the site is a brand or project of another legal entity. Empty = the site
+// name above. Also editable in Admin → Организация.
 // Automatic translation always renders it exactly as written here.
 define('SITE_LEGAL_NAME_BG', '');
 define('SITE_LEGAL_NAME_EN', '');
