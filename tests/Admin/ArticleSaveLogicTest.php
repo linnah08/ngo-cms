@@ -117,7 +117,7 @@ final class ArticleSaveLogicTest extends TestCase
             'image' => '/i.jpg', 'tags' => ['t'], 'content' => '<p>en</p>',
         ]);
         $this->assertSame(
-            ['title', 'slug', 'date', 'author', 'status', 'excerpt', 'image', 'tags', 'content', 'scheduled'],
+            ['title', 'slug', 'date', 'author', 'status', 'excerpt', 'image', 'photos', 'tags', 'content', 'scheduled'],
             array_keys($data)
         );
         $this->assertSame('EN T', $data['title']);
@@ -137,5 +137,23 @@ final class ArticleSaveLogicTest extends TestCase
     public function testHtmlToSocialTextDecodesEntities(): void
     {
         $this->assertSame('Tom & Jerry', html_to_social_text('Tom &amp; Jerry'));
+    }
+
+    public function testBuildersCarryThePhotoList(): void
+    {
+        $photos = [['src' => '/assets/images/articles/a.jpg', 'caption' => 'Лагер']];
+        $f = ['title' => 'T', 'slug' => 't', 'slug_en' => 't', 'date' => '2026-10-03', 'author' => '',
+              'status' => 'draft', 'excerpt' => '', 'image' => '/assets/images/articles/a.jpg',
+              'tags' => [], 'content' => '', 'scheduled' => false, 'photos' => $photos];
+        $this->assertSame($photos, article_build_bg_data($f)['photos']);
+        $this->assertSame($photos, article_build_en_data($f)['photos']);
+    }
+
+    public function testOldPostSavedWithoutTheGridKeepsItsImageAsOnePhoto(): void
+    {
+        // Review Focus 1: a typo fix on a pre-carousel post must not lose its picture.
+        $stored = ['image' => '/assets/images/articles/old.jpg'];
+        $photos = article_photos($stored, static fn() => true);
+        $this->assertSame([['src' => '/assets/images/articles/old.jpg', 'caption' => '']], $photos);
     }
 }

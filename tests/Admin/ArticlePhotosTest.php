@@ -88,4 +88,67 @@ final class ArticlePhotosTest extends TestCase
         $a = ['photos' => [['src' => '/assets/images/articles/a.jpg', 'caption' => ['x']]]];
         $this->assertSame('', article_photos($a, self::all())[0]['caption']);
     }
+
+    public function testPostedGridBuildsBothLanguagesAndTheMainImage(): void
+    {
+        $r = article_photos_from_post([
+            'photos_present'   => '1',
+            'photo_src'        => ['/assets/images/articles/a.jpg', '/assets/images/articles/b.jpg'],
+            'photo_caption_bg' => ['Лагер', ''],
+            'photo_caption_en' => ['Camp', ''],
+            'photo_main'       => '1',
+        ], self::all());
+
+        $this->assertSame('/assets/images/articles/b.jpg', $r['image']);
+        $this->assertSame(array_column($r['bg'], 'src'), array_column($r['en'], 'src'));
+        $this->assertSame('Лагер', $r['bg'][0]['caption']);
+        $this->assertSame('Camp', $r['en'][0]['caption']);
+    }
+
+    public function testRemovingTheMainPhotoPromotesTheFirstRemaining(): void
+    {
+        // The main photo's row was removed in the browser, so photo_main points past the end.
+        $r = article_photos_from_post([
+            'photos_present' => '1',
+            'photo_src'      => ['/assets/images/articles/a.jpg'],
+            'photo_main'     => '3',
+        ], self::all());
+        $this->assertSame('/assets/images/articles/a.jpg', $r['image']);
+    }
+
+    public function testEmptyGridClearsTheImage(): void
+    {
+        $r = article_photos_from_post(['photos_present' => '1'], self::all());
+        $this->assertSame(['bg' => [], 'en' => [], 'image' => ''], $r);
+    }
+
+    public function testDroppedPathKeepsCaptionsAlignedWithTheirPhotos(): void
+    {
+        $r = article_photos_from_post([
+            'photos_present'   => '1',
+            'photo_src'        => ['/etc/passwd', '/assets/images/articles/b.jpg'],
+            'photo_caption_bg' => ['лошо', 'добро'],
+            'photo_main'       => '1',
+        ], self::all());
+        $this->assertSame([['src' => '/assets/images/articles/b.jpg', 'caption' => 'добро']], $r['bg']);
+        $this->assertSame('/assets/images/articles/b.jpg', $r['image']);
+    }
+
+    public function testMoreThanTenPostedPhotosAreCapped(): void
+    {
+        $src = [];
+        for ($i = 1; $i <= 11; $i++) $src[] = "/assets/images/articles/$i.jpg";
+        $r = article_photos_from_post(['photos_present' => '1', 'photo_src' => $src], self::all());
+        $this->assertCount(10, $r['bg']);
+    }
+
+    public function testCaptionsAreTrimmedAndLimited(): void
+    {
+        $r = article_photos_from_post([
+            'photos_present'   => '1',
+            'photo_src'        => ['/assets/images/articles/a.jpg'],
+            'photo_caption_bg' => ['  ' . str_repeat('я', 400) . '  '],
+        ], self::all());
+        $this->assertSame(300, mb_strlen($r['bg'][0]['caption']));
+    }
 }

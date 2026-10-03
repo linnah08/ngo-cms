@@ -88,6 +88,7 @@ function article_build_bg_data(array $f, array $existing = []): array {
         'status'  => $f['status'],
         'excerpt' => $f['excerpt'],
         'image'   => $f['image'],
+        'photos'  => $f['photos'] ?? [],
         'tags'    => $f['tags'],
         'content' => $f['content'],
         'scheduled' => article_scheduled_flag($f),
@@ -111,6 +112,7 @@ function article_build_en_data(array $f): array {
         'status'  => $f['status'],
         'excerpt' => $f['excerpt'],
         'image'   => $f['image'],
+        'photos'  => $f['photos'] ?? [],
         'tags'    => $f['tags'],
         'content' => $f['content'],
         'scheduled' => article_scheduled_flag($f),
@@ -184,4 +186,34 @@ function article_main_photo_index(array $article, array $photos): int {
         if ($p['src'] === $main) return $i;
     }
     return 0;
+}
+
+/** Longest caption kept — enough for a sentence, short enough for a slide. */
+const ARTICLE_PHOTO_CAPTION_MAX = 300;
+
+/**
+ * Rebuild a post's photos from the editor's grid. Paths are re-checked here — the
+ * browser only ever sends paths, never trusted ones. A dropped path drops its captions
+ * with it, so captions never slide onto the wrong photo.
+ *
+ * @return array{bg: array, en: array, image: string}
+ */
+function article_photos_from_post(array $post, ?callable $exists = null): array {
+    $src  = is_array($post['photo_src'] ?? null) ? array_values($post['photo_src']) : [];
+    $capB = is_array($post['photo_caption_bg'] ?? null) ? array_values($post['photo_caption_bg']) : [];
+    $capE = is_array($post['photo_caption_en'] ?? null) ? array_values($post['photo_caption_en']) : [];
+    $main = filter_var($post['photo_main'] ?? 0, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+    $clean = static fn($c): string => is_string($c) ? mb_substr(trim($c), 0, ARTICLE_PHOTO_CAPTION_MAX) : '';
+
+    $bg = $en = [];
+    $image = '';
+    foreach ($src as $i => $s) {
+        if (!is_string($s) || !article_photo_path_ok($s, $exists)) continue;
+        if (count($bg) === ARTICLE_PHOTOS_MAX) break;
+        $bg[] = ['src' => $s, 'caption' => $clean($capB[$i] ?? '')];
+        $en[] = ['src' => $s, 'caption' => $clean($capE[$i] ?? '')];
+        if ($main === $i) $image = $s;
+    }
+    if ($image === '' && $bg) $image = $bg[0]['src'];
+    return ['bg' => $bg, 'en' => $en, 'image' => $image];
 }

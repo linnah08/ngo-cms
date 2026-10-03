@@ -95,6 +95,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $image_error = $codes[$_FILES['image']['error']] ?? 'Грешка при качване на снимката (код ' . $_FILES['image']['error'] . ').';
         }
 
+        // The photo grid (Task 4) posts paths only — each file was already uploaded
+        // through /admin/inline-upload.php. Without the grid, keep what is stored.
+        if (($_POST['photos_present'] ?? '') === '1') {
+            $grid      = article_photos_from_post($_POST);
+            $photos_bg = $grid['bg'];
+            $photos_en = $grid['en'];
+            $image     = $grid['image'];
+        } else {
+            $photos_bg = article_photos(array_merge($article, ['image' => $image]));
+            $photos_en = $article_en ? article_photos(array_merge($article_en, ['image' => $image])) : $photos_bg;
+            // A photo replaced through the old single field becomes the main photo.
+            if ($image !== '' && !in_array($image, array_column($photos_bg, 'src'), true)) {
+                array_unshift($photos_bg, ['src' => $image, 'caption' => '']);
+                array_unshift($photos_en, ['src' => $image, 'caption' => '']);
+                $photos_bg = array_slice($photos_bg, 0, ARTICLE_PHOTOS_MAX);
+                $photos_en = array_slice($photos_en, 0, ARTICLE_PHOTOS_MAX);
+            }
+            if ($image === '') { $photos_bg = []; $photos_en = []; }
+        }
+
         // If editing and BG slug changed, delete old BG + EN files
         if (!$is_new && $slug_param !== $new_slug) {
             $old_bg = ARTICLES_PATH . '/bg/' . $slug_param . '.json';
@@ -112,6 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'title'   => $title,   'slug'    => $new_slug, 'slug_en' => $new_slug_en,
             'date'    => $date,    'author'  => $author,   'status'  => $status,
             'excerpt' => $excerpt, 'image'   => $image,    'tags'    => $tags,
+            'photos'  => $photos_bg,
             'content' => $content, 'scheduled' => $scheduled,
         ], $article);
         $dir_bg = ARTICLES_PATH . '/bg';
@@ -124,6 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'title'   => $title_en ?: $title, 'slug'    => $new_slug_en,
                 'date'    => $date,    'author'  => $author,   'status'  => $status,
                 'excerpt' => $excerpt_en, 'image' => $image,   'tags'    => $tags,
+                'photos'  => $photos_en,
                 'content' => $content_en, 'scheduled' => $scheduled,
             ]);
             $dir_en = ARTICLES_PATH . '/en';
