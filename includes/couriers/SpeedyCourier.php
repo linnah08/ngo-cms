@@ -241,7 +241,7 @@ class SpeedyCourier
      * }
      * @param  string $toCity        Destination city name (BG)
      * @param  string $deliveryType  'door' | 'office' | 'apt'
-     * @return float  Price in EUR (API returns EUR or BGN; BGN is converted at fixed peg 1.95583)
+     * @return float  Price in EUR including VAT (API returns EUR or BGN; BGN is converted at fixed peg 1.95583)
      */
     public function calculateShipping(array $parcel, string $toCity, string $deliveryType): float
     {
@@ -301,12 +301,34 @@ class SpeedyCourier
         if (!empty($calculation['error'])) {
             throw new RuntimeException('Speedy calculate error: ' . ($calculation['error']['message'] ?? json_encode($calculation['error'])));
         }
-        $price    = $calculation['price'] ?? [];
-        $currency = strtoupper($price['currency'] ?? 'BGN');
-        $amount   = (float)($price['amount'] ?? $price['total'] ?? 0.0); // net before VAT
-        return $currency === 'EUR'
-            ? round($amount, 2)
-            : round($amount / 1.95583, 2); // BGN → EUR (fixed peg)
+        return self::priceEur($calculation['price'] ?? []);
+    }
+
+    /**
+     * What the customer pays for shipping: Speedy's price WITH VAT, in EUR.
+     *
+     * Speedy bills the sender the price plus 20% VAT, which an organisation
+     * that isn't VAT-registered can't reclaim — charging the net `amount`
+     * left every Speedy order ~20% short.
+     *
+     * Pure: no API — extracted so the price choice is unit-testable.
+     *
+     * @param  array $price Speedy calculation `price` object (amount, vat, total, currency)
+     * @throws RuntimeException when the reply carries no price with VAT
+     *         (checkout then falls back to the flat rate from the admin)
+     */
+    public static function priceEur(array $price): float
+    {
+        if (isset($price['total'])) {
+            $gross = (float)$price['total'];
+        } elseif (isset($price['amount'], $price['vat'])) {
+            $gross = (float)$price['amount'] + (float)$price['vat'];
+        } else {
+            throw new RuntimeException('Speedy calculate: no price with VAT in the reply');
+        }
+        return strtoupper($price['currency'] ?? 'BGN') === 'EUR'
+            ? round($gross, 2)
+            : round($gross / 1.95583, 2); // BGN → EUR (fixed peg)
     }
 
     /**
