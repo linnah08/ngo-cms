@@ -3,7 +3,7 @@ require_once __DIR__ . '/DocumentGenerator.php';
 
 use chillerlan\QRCode\QRCode;
 use chillerlan\QRCode\QROptions;
-use chillerlan\QRCode\Output\QRGdImagePNG;
+use chillerlan\QRCode\Output\QRMarkupSVG;
 
 /**
  * Generates a PDF event ticket for a campaign pledge.
@@ -47,14 +47,15 @@ class TicketGenerator extends DocumentGenerator {
 
         $when_line = $event_date . ($event_time ? ', ' . $event_time . ' ч.' : '');
 
-        // Generate QR code as base64 PNG data URI
+        // Generate QR code as base64 SVG data URI
         $qr_img_tag = '';
         $raw_code = $document['ticket_code'] ?? '';
         if ($raw_code !== '') {
             try {
                 $options = new QROptions;
-                $options->outputType  = QRGdImagePNG::class;
-                $options->scale       = 6;
+                // SVG: mPDF draws it as vectors, so it stays sharp when printed.
+                // (php-qrcode v6 ignores the old `outputType` option name.)
+                $options->outputInterface = QRMarkupSVG::class;
                 $options->imageBase64 = true;
                 $options->quietzoneSize = 2;
                 $qr_data_uri = (new QRCode($options))->render($raw_code);
