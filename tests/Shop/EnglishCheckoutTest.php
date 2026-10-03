@@ -302,6 +302,7 @@ final class EnglishCheckoutTest extends TestCase
     {
         $_SERVER['REQUEST_URI'] = '/en/shop/some-product/';
         $flash = [['type' => 'success', 'message' => 'Added to cart!']];
+        $just_added = true; // as after cart/add.php's ?gads=atc redirect
         ob_start();
         require self::root() . '/templates/product-flash.php';
         $html = (string) ob_get_clean();
