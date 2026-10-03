@@ -144,3 +144,19 @@ function test_courier_live(string $settingKey): bool {
         return false;
     }
 }
+
+/**
+ * Run $fn with a setting temporarily overridden, restoring the original even if
+ * an assertion inside fails — the local DB holds real API keys and a lost one
+ * silently breaks the dev site. Without a DB, setting_get() already returns ''.
+ */
+function with_setting(string $key, string $value, callable $fn): mixed {
+    if (!test_db_available()) return $fn();
+    $original = setting_get($key);
+    setting_set($key, $value);
+    try {
+        return $fn();
+    } finally {
+        setting_set($key, $original);
+    }
+}

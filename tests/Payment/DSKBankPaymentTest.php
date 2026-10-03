@@ -10,9 +10,6 @@ final class DSKBankPaymentTest extends TestCase
     #[Group('dsk-unit')]
     public function testIsEnabledReturnsFalseWithoutCredentials(): void
     {
-        if (test_dsk_available()) {
-            $this->markTestSkipped('DSK credentials are configured — isEnabled() will return true when dsk_enabled=1.');
-        }
-        $this->assertFalse(DSKBankPayment::isEnabled());
+        $this->assertFalse(with_setting('dsk_merchant', '', fn() => DSKBankPayment::isEnabled()));
     }
 }

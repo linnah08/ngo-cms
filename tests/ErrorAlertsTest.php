@@ -7,6 +7,13 @@ final class ErrorAlertsTest extends TestCase
 {
     private static \PDO $pdo;
 
+    /** The local DB may hold a real config — put it back afterwards. */
+    private const SETTINGS = [
+        'error_alert_enabled', 'error_alert_email', 'error_alert_frequency',
+        'error_alert_api_token', 'error_alert_last_hash', 'error_alert_last_hash_at',
+    ];
+    private static array $saved = [];
+
     public static function setUpBeforeClass(): void
     {
         if (!test_db_available()) {
@@ -14,6 +21,7 @@ final class ErrorAlertsTest extends TestCase
         }
         require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/error-alerts.php';
         self::$pdo = get_pdo();
+        foreach (self::SETTINGS as $key) self::$saved[$key] = setting_get($key);
         error_alert_ensure_table();
         self::$pdo->exec("DELETE FROM error_alerts WHERE error_class = 'TestCapture'");
     }
@@ -148,9 +156,6 @@ final class ErrorAlertsTest extends TestCase
     {
         if (!isset(self::$pdo)) return;
         self::$pdo->exec("DELETE FROM error_alerts WHERE error_class = 'TestCapture'");
-        setting_set('error_alert_enabled',   '0');
-        setting_set('error_alert_email',     '');
-        setting_set('error_alert_frequency', 'immediate');
-        setting_set('error_alert_api_token', '');
+        foreach (self::$saved as $key => $value) setting_set($key, $value);
     }
 }

@@ -92,15 +92,16 @@ final class HelperTest extends TestCase
         $this->assertStringContainsString('class="price"', $html);
     }
 
-    public function testPriceHtmlShowsDualCurrencyBeforeJuly2026(): void
+    public function testPriceHtmlShowsBgnOnlyDuringDualCurrencyPeriod(): void
     {
-        // As of test authoring date (2026-04-05) dual display is still active
-        if (!SHOW_DUAL_CURRENCY) {
-            $this->markTestSkipped('Dual currency period has ended.');
-        }
         $html = price_html(10.0);
-        $this->assertStringContainsString('лв', $html);
-        $this->assertStringContainsString('price__bgn', $html);
+        if (SHOW_DUAL_CURRENCY) {
+            $this->assertStringContainsString('price__bgn', $html);
+            $this->assertStringContainsString('лв', $html);
+        } else {
+            $this->assertStringNotContainsString('price__bgn', $html);
+            $this->assertStringNotContainsString('лв', $html);
+        }
     }
 
     public function testPriceHtmlIsValidHtml(): void

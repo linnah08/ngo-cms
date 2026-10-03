@@ -194,15 +194,7 @@ final class SpamFilterTest extends TestCase
 
     public function test_verify_returns_false_when_not_configured(): void
     {
-        if (test_db_available()) {
-            $original = setting_get('turnstile_secret_key');
-            setting_set('turnstile_secret_key', '');
-            $this->assertFalse(turnstile_verify('some-token', '127.0.0.1'));
-            setting_set('turnstile_secret_key', $original);
-        } else {
-            // Without DB, setting_get() always returns '' — still no network call.
-            $this->assertFalse(turnstile_verify('some-token', '127.0.0.1'));
-        }
+        $this->assertFalse(with_setting('turnstile_secret_key', '', fn() => turnstile_verify('some-token', '127.0.0.1')));
     }
 
     // ── spam_mark_comments_as_spam / spam_mark_contacts_as_spam (DB-gated) ────

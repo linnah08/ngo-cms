@@ -33,13 +33,10 @@ final class TranslatorTest extends TestCase
 
     public function test_missing_api_key_returns_empty_and_sets_error(): void
     {
-        // Only meaningful without a real key in the DB; skip if configured
-        if (function_exists('setting_get') && setting_get('deepl_api_key') !== '') {
-            $this->markTestSkipped('DeepL API key is configured — skipping missing-key test.');
-        }
-
         $error  = null;
-        $result = deepl_translate('Здравей', 'EN-GB', false, $error);
+        $result = with_setting('deepl_api_key', '', function () use (&$error) {
+            return deepl_translate('Здравей', 'EN-GB', false, $error);
+        });
 
         $this->assertSame('', $result);
         $this->assertNotNull($error);
