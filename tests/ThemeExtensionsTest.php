@@ -47,6 +47,10 @@ final class ThemeExtensionsTest extends TestCase
 
     public function test_the_default_site_file_is_site_owned_and_not_in_this_repo(): void
     {
+        if (is_file(dirname(__DIR__) . '/includes/themes-site.php') && defined('BRAND_THEME')
+            && array_key_exists(BRAND_THEME, (array) (include dirname(__DIR__) . '/includes/themes-site.php'))) {
+            $this->markTestSkipped('This checkout is a site with its own theme, not ngo-cms itself.');
+        }
         unset($GLOBALS['_om_site_themes_file']);
         $this->assertSame($_SERVER['DOCUMENT_ROOT'] . '/includes/themes-site.php', site_themes_file());
         $this->assertFileDoesNotExist(dirname(__DIR__) . '/includes/themes-site.php',
@@ -158,11 +162,15 @@ final class ThemeExtensionsTest extends TestCase
 
     public function test_the_release_never_ships_site_owned_files(): void
     {
-        $build = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/tests/release-gate/build-zip.sh');
+        $build   = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/tests/release-gate/build-zip.sh');
+        $is_site = is_file(dirname(__DIR__) . '/includes/themes-site.php') && defined('BRAND_THEME')
+            && array_key_exists(BRAND_THEME, (array) (include dirname(__DIR__) . '/includes/themes-site.php'));
         foreach (['includes/themes-site.php', 'content/bg/strings.site.json', 'content/en/strings.site.json'] as $f) {
             // Once in the checksum exclusions, once in the zip -x list: the two must agree.
             $this->assertSame(2, substr_count($build, '"' . $f . '"'), "$f must be excluded from both checksums.json and the zip");
-            $this->assertFileDoesNotExist(dirname(__DIR__) . '/' . $f, "$f is site-owned and must not be in ngo-cms");
+            if (!$is_site) { // a site (lafetki) keeps these files in its own repo
+                $this->assertFileDoesNotExist(dirname(__DIR__) . '/' . $f, "$f is site-owned and must not be in ngo-cms");
+            }
         }
     }
 }

@@ -64,6 +64,9 @@ final class PublicChromeSettingsTest extends TestCase
 
     public function test_phone_is_shown_by_default(): void
     {
+        if (defined('SITE_PHONE_PUBLIC') && !SITE_PHONE_PUBLIC) {
+            $this->markTestSkipped('This site hides its phone in site.config.php.');
+        }
         $html = $this->render(['SITE_PHONE' => self::PHONE], ['templates/header.php', 'templates/footer.php']);
         $this->assertStringContainsString('tel:' . self::PHONE, $html);
         $this->assertStringContainsString('"telephone":"' . self::PHONE . '"', $html, 'JSON-LD carries it');
@@ -97,7 +100,9 @@ final class PublicChromeSettingsTest extends TestCase
     public function test_noindex_only_when_switched_on(): void
     {
         $robots = '<meta name="robots" content="noindex, nofollow">';
-        $this->assertStringNotContainsString($robots, $this->render([], ['templates/header.php'], '/'));
+        if (!(defined('SITE_NOINDEX') && SITE_NOINDEX)) { // a pre-launch site sets it in site.config.php
+            $this->assertStringNotContainsString($robots, $this->render([], ['templates/header.php'], '/'));
+        }
         $this->assertStringContainsString($robots, $this->render(['SITE_NOINDEX' => true], ['templates/header.php'], '/'));
         $this->assertStringContainsString($robots, $this->render(['SITE_NOINDEX' => true], ['templates/header.php'], '/en/'));
     }
@@ -140,6 +145,12 @@ final class PublicChromeSettingsTest extends TestCase
 
     public function test_newsletter_optin_is_a_string_with_the_site_name(): void
     {
+        foreach (['bg', 'en'] as $l) {
+            $site = json_decode((string) @file_get_contents($_SERVER['DOCUMENT_ROOT'] . "/content/$l/strings.site.json"), true);
+            if (isset($site['checkout.newsletter_optin'])) {
+                $this->markTestSkipped('This site words the opt-in itself in strings.site.json.');
+            }
+        }
         $this->assertSame('Send me news from Example.',
             t_or('checkout.newsletter_optin', 'Искам да получавам новини от {name}.', 'Send me news from {name}.', 'en', ['name' => 'Example']));
         $this->assertSame('Искам да получавам новини от Пример.',

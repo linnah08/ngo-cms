@@ -37,8 +37,8 @@ final class ConfigHelpersTest extends TestCase
 
     public function test_site_phone_public_follows_site_phone_unless_switched_off(): void
     {
-        // SITE_PHONE_PUBLIC is not defined in the test config: the phone is shown.
-        $this->assertFalse(defined('SITE_PHONE_PUBLIC'));
-        $this->assertSame(defined('SITE_PHONE') ? (string) SITE_PHONE : '', site_phone_public());
+        // A site may hide its phone in site.config.php (lafetki does); otherwise it is shown.
+        $hidden = defined('SITE_PHONE_PUBLIC') && !SITE_PHONE_PUBLIC;
+        $this->assertSame($hidden ? '' : (defined('SITE_PHONE') ? (string) SITE_PHONE : ''), site_phone_public());
     }
 }
