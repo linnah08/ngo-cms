@@ -105,6 +105,11 @@ function org_legal_name(string $lang = 'bg'): string
  *
  *     feature_enabled('campaign')  →  bool, from FEATURE_CAMPAIGN
  */
+// Guarded: up to v0.16 this function lived in config.php, and the updater keeps a
+// site's own customised config.php — declaring it again here took such a site
+// down with "Cannot redeclare". The old copy reads the same constants, so either
+// one answers the same.
+if (!function_exists('feature_enabled')) {
 function feature_enabled(string $name): bool {
     $const = 'FEATURE_' . strtoupper($name);
     if (!defined($const)) return true;
@@ -112,6 +117,7 @@ function feature_enabled(string $name): bool {
     // The admin switch saves '1' / '0'; a hand-edited "false" / "off" means off too.
     if (is_string($value)) return filter_var(trim($value), FILTER_VALIDATE_BOOLEAN);
     return (bool) $value;
+}
 }
 
 function org_overrides_path(): string
