@@ -4,11 +4,9 @@ if (!function_exists('email_tpl_get')) {
     require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/email-templates.php';
 }
 $_lang     = $lang ?? $pledge['lang'] ?? 'bg';
-$_show_bgn = date('Y-m') < '2026-06';
 $_vars     = ['name' => $pledge['name'], 'pledge_number' => $pledge['pledge_number']];
 $_tpl      = email_tpl_get('campaign-confirmation', $_lang, $_vars);
 
-$amount_bgn = number_format($pledge['amount_eur'] * EUR_BGN_RATE, 2, '.', ' ');
 $amount_eur = number_format($pledge['amount_eur'], 2, '.', ' ');
 $addr       = $pledge['delivery_address'] ? json_decode($pledge['delivery_address'], true) : null;
 
@@ -18,7 +16,7 @@ echo $_tpl['intro'];
 <div class="box">
   <strong><?= $_lang === 'en' ? 'Number' : 'Номер' ?>:</strong> <?= htmlspecialchars($pledge['pledge_number'], ENT_QUOTES, 'UTF-8') ?><br>
   <strong><?= $_lang === 'en' ? 'Amount' : 'Сума' ?>:</strong>
-  <?= $amount_eur ?> EUR<?php if ($_show_bgn): ?> (<?= $amount_bgn ?> лв)<?php endif; ?><br>
+  <?= $amount_eur ?> EUR<br>
   <strong><?= $_lang === 'en' ? 'Date' : 'Дата' ?>:</strong> <?= htmlspecialchars(substr($pledge['created_at'], 0, 10), ENT_QUOTES, 'UTF-8') ?>
 </div>
 

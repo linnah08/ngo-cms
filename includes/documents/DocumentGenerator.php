@@ -3,8 +3,6 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/vendor/autoload.php';
 
 abstract class DocumentGenerator {
 
-    const EUR_TO_BGN = 1.95583;
-
     /**
      * Issuer details printed on documents, in $lang. The name is the legal
      * entity's (org_legal_name(): Admin → Организация → "Юридическо име",
@@ -65,16 +63,8 @@ abstract class DocumentGenerator {
         return $mpdf->Output('', 'S');
     }
 
-    protected static function eur2bgn(float $eur): float {
-        return round($eur * self::EUR_TO_BGN, 2);
-    }
-
     protected static function fmtEur(float $v): string {
         return number_format($v, 2, '.', ' ') . ' €';
-    }
-
-    protected static function fmtBgn(float $v): string {
-        return number_format($v, 2, '.', ' ') . ' лв.';
     }
 
     protected static function fmtDate(string $date): string {
@@ -84,16 +74,6 @@ abstract class DocumentGenerator {
 
     protected static function h(string $s): string {
         return htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-    }
-
-    protected static function amountInWordsBg(float $amount): string {
-        $lv = (int) floor($amount);
-        $st = (int) round(($amount - $lv) * 100);
-        $result = ucfirst(self::intToWordsBg($lv)) . ' лв.';
-        if ($st > 0) {
-            $result .= ', ' . str_pad((string) $st, 2, '0', STR_PAD_LEFT) . ' ст.';
-        }
-        return $result;
     }
 
     protected static function amountInWordsEur(float $amount): string {

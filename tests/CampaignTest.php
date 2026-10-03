@@ -167,13 +167,6 @@ final class CampaignTest extends TestCase
         $this->assertSame(1, (int)$row['reward_shipped']);
     }
 
-    // ── EUR→BGN rate constant ─────────────────────────────────────────────────
-
-    public function test_eur_bgn_rate_constant(): void
-    {
-        $this->assertSame(1.95583, EUR_BGN_RATE);
-    }
-
     // ── progress stats query ──────────────────────────────────────────────────
 
     public function test_stats_query_counts_only_paid(): void

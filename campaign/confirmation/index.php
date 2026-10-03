@@ -20,7 +20,6 @@ if (preg_match('/^CP-\d{8}-[A-F0-9]{4}$/i', $pledge_number)) {
     $pledge = $stmt->fetch() ?: null;
 }
 
-$show_bgn = date('Y-m') < '2026-06';
 $page_title = 'Благодарим ти! — ' . SITE_NAME_BG;
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
@@ -33,7 +32,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     <?php if ($pledge && $pledge['payment_status'] === 'paid'): ?>
     <p style="font-size:1.05rem;line-height:1.75;color:#444;margin-bottom:1.5rem;">
       Твоята подкрепа от
-      <strong><?= number_format($pledge['amount_eur'], 2) ?> EUR<?php if ($show_bgn): ?> (<?= number_format($pledge['amount_eur'] * EUR_BGN_RATE, 2, '.', ' ') ?> лв)<?php endif; ?></strong>
+      <strong><?= number_format($pledge['amount_eur'], 2) ?> EUR</strong>
       беше успешно получена.<br>
       <?php if (($pledge['pledge_type'] ?? 'donation') === 'ticket'): ?>
       Изпратихме ти потвърждение и билет на <strong><?= h($pledge['email']) ?></strong>.

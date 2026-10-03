@@ -289,14 +289,12 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 <!-- Stats bar -->
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:2rem;">
   <?php
-    $raised_bgn = $stats['raised'] * EUR_BGN_RATE;
-    $target_bgn = $target_eur    * EUR_BGN_RATE;
     $pct        = $target_eur > 0 ? min(100, round($stats['raised'] / $target_eur * 100)) : 0;
   ?>
   <div style="background:#fff;border:1px solid #e8ddd5;border-radius:8px;padding:1.1rem 1.25rem;">
     <div style="font-size:.75rem;text-transform:uppercase;color:#9b9590;letter-spacing:.05em;margin-bottom:.3rem;">Набрано</div>
     <div style="font-size:1.5rem;font-weight:700;color:#1b998b;"><?= number_format($stats['raised'], 2, '.', ' ') ?> EUR</div>
-    <div style="font-size:.8rem;color:#6b6560;"><?= $pct ?>% от <?= number_format($target_eur, 2, '.', ' ') ?> EUR &nbsp;·&nbsp; <?= number_format($raised_bgn, 0, '.', ' ') ?> лв</div>
+    <div style="font-size:.8rem;color:#6b6560;"><?= $pct ?>% от <?= number_format($target_eur, 2, '.', ' ') ?> EUR</div>
   </div>
   <div style="background:#fff;border:1px solid #e8ddd5;border-radius:8px;padding:1.1rem 1.25rem;">
     <div style="font-size:.75rem;text-transform:uppercase;color:#9b9590;letter-spacing:.05em;margin-bottom:.3rem;">Поддръжници</div>

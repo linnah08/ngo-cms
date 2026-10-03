@@ -27,11 +27,8 @@ final class DocumentGeneratorTest extends TestCase
         if (!class_exists('TestableInvoiceGenerator')) {
             eval('class TestableInvoiceGenerator extends InvoiceGenerator {
                 public function html(array $o, array $i, array $d): string { return $this->buildHtml($o,$i,$d); }
-                public static function callEur2Bgn(float $v): float { return self::eur2bgn($v); }
                 public static function callFmtEur(float $v): string { return self::fmtEur($v); }
-                public static function callFmtBgn(float $v): string { return self::fmtBgn($v); }
                 public static function callFmtDate(string $s): string { return self::fmtDate($s); }
-                public static function callAmountWordsBg(float $v): string { return self::amountInWordsBg($v); }
                 public static function callAmountWordsEur(float $v): string { return self::amountInWordsEur($v); }
             }');
         }
@@ -85,13 +82,6 @@ final class DocumentGeneratorTest extends TestCase
     // DocumentGenerator base utilities
     // ═════════════════════════════════════════════════════════════════════════
 
-    public function test_eur2bgn_rounds_to_two_decimal_places(): void
-    {
-        // 1 EUR × 1.95583 = 1.95583 → rounded to 2dp = 1.96
-        $this->assertSame(1.96, TestableInvoiceGenerator::callEur2Bgn(1.00));
-        $this->assertSame(19.56, TestableInvoiceGenerator::callEur2Bgn(10.00));
-    }
-
     public function test_fmt_eur_includes_euro_symbol(): void
     {
         $this->assertStringContainsString('€', TestableInvoiceGenerator::callFmtEur(12.50));
@@ -102,11 +92,6 @@ final class DocumentGeneratorTest extends TestCase
         $this->assertStringContainsString('12.50', TestableInvoiceGenerator::callFmtEur(12.50));
     }
 
-    public function test_fmt_bgn_includes_lv_suffix(): void
-    {
-        $this->assertStringContainsString('лв.', TestableInvoiceGenerator::callFmtBgn(25.00));
-    }
-
     public function test_fmt_date_formats_dd_mm_yyyy(): void
     {
         $this->assertSame('15.01.2026', TestableInvoiceGenerator::callFmtDate('2026-01-15 10:30:00'));
@@ -115,25 +100,6 @@ final class DocumentGeneratorTest extends TestCase
     public function test_fmt_date_with_date_only_string(): void
     {
         $this->assertSame('01.06.2026', TestableInvoiceGenerator::callFmtDate('2026-06-01'));
-    }
-
-    public static function amountWordsBgProvider(): array
-    {
-        // ucfirst() is not Cyrillic-aware, so output is lowercase
-        return [
-            [1.00,  'един лв.'],
-            [2.00,  'два лв.'],
-            [10.00, 'десет лв.'],
-            [50.00, 'петдесет лв.'],
-            [1.50,  '50 ст.'],
-        ];
-    }
-
-    #[DataProvider('amountWordsBgProvider')]
-    public function test_amount_in_words_bg(float $amount, string $expected): void
-    {
-        $words = TestableInvoiceGenerator::callAmountWordsBg($amount);
-        $this->assertStringContainsString($expected, $words);
     }
 
     public function test_amount_in_words_eur_contains_evro(): void

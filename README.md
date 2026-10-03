@@ -135,7 +135,7 @@ can be left unconfigured (or removed) if they don't apply to you:
 - **Couriers** — Econt, Speedy, BoxNow (`courier.config.php`)
 - **Card payments** — DSK Bank vPOS (configured in admin → Settings)
 - **Invoicing** — ЕИК/Булстат fields for company invoices
-- **Currency** — dual BGN/EUR display during euro adoption (`DUAL_CURRENCY_UNTIL` in `site.config.php`)
+- **Currency** — EUR only (the dual BGN/EUR period ended on 1 July 2026)
 
 ## Running tests
 

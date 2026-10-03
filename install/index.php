@@ -206,8 +206,6 @@ if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
             'SOCIAL_INSTAGRAM' => '',
             'SOCIAL_LINKEDIN'  => '',
             'GTM_ID' => '', 'GA4_ID' => '', 'GOOGLE_ADS_ID' => '', 'GOOGLE_ADS_PURCHASE_LABEL' => '',
-            'EUR_BGN_RATE' => 1.95583,
-            'DUAL_CURRENCY_UNTIL' => '2026-07-01',
             // Initial module state; Admin → Организация → Модули overrides it.
             'FEATURE_DONATIONS' => true,
             'FEATURE_CAMPAIGN' => true,

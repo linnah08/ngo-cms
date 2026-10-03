@@ -163,8 +163,6 @@ if (PHP_SAPI !== 'cli'
     exit;
 }
 
-// Derived display logic (not configuration).
-define('SHOW_DUAL_CURRENCY', date('Y-m-d') < DUAL_CURRENCY_UNTIL);
 
 // Version of the Условия / Политика за поверителност a customer accepts at
 // checkout. Stored on every order, so that months later it is possible to show
@@ -482,18 +480,10 @@ function format_eur(float $amount): string {
     return number_format($amount, 2, '.', ' ') . ' €';
 }
 
-function format_bgn(float $amount): string {
-    return number_format($amount * EUR_BGN_RATE, 2, '.', ' ') . ' лв';
-}
-
+// Prices are EUR only: Bulgaria adopted the euro on 1 Jan 2026 and the
+// dual-currency display period ended on 1 July 2026.
 function price_html(float $eur): string {
-    $eur_str = format_eur($eur);
-    if (SHOW_DUAL_CURRENCY) {
-        $bgn_str = format_bgn($eur);
-        return '<span class="price">' . $eur_str . 
-               '<span class="price__bgn">/ ' . $bgn_str . '</span></span>';
-    }
-    return '<span class="price">' . $eur_str . '</span>';
+    return '<span class="price">' . format_eur($eur) . '</span>';
 }
 
 // ============================================

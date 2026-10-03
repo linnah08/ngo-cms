@@ -92,16 +92,11 @@ final class HelperTest extends TestCase
         $this->assertStringContainsString('class="price"', $html);
     }
 
-    public function testPriceHtmlShowsBgnOnlyDuringDualCurrencyPeriod(): void
+    public function testPriceHtmlIsEuroOnly(): void
     {
         $html = price_html(10.0);
-        if (SHOW_DUAL_CURRENCY) {
-            $this->assertStringContainsString('price__bgn', $html);
-            $this->assertStringContainsString('лв', $html);
-        } else {
-            $this->assertStringNotContainsString('price__bgn', $html);
-            $this->assertStringNotContainsString('лв', $html);
-        }
+        $this->assertStringNotContainsString('лв', $html);
+        $this->assertStringNotContainsString('price__bgn', $html);
     }
 
     public function testPriceHtmlIsValidHtml(): void
@@ -202,16 +197,6 @@ final class HelperTest extends TestCase
         );
         $this->assertSame('&quot;', h('"'));
         $this->assertSame('&#039;', h("'"));
-    }
-
-    // ── format_bgn ───────────────────────────────────────────────────────────
-
-    public function testFormatBgn(): void
-    {
-        // 10 EUR × 1.95583 (EUR_BGN_RATE) = 19.5583 → rounded to 19.56
-        $result = format_bgn(10.00);
-        $this->assertStringContainsString('19.56', $result);
-        $this->assertStringContainsString('лв', $result);
     }
 
     // ── csrf_verify round-trip ───────────────────────────────────────────────

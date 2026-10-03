@@ -1,6 +1,5 @@
 <?php
 // Variables: $pledge (array from campaign_pledges table)
-$amount_bgn = number_format($pledge['amount_eur'] * EUR_BGN_RATE, 2, '.', ' ');
 $amount_eur = number_format($pledge['amount_eur'], 2, '.', ' ');
 $addr       = $pledge['delivery_address'] ? json_decode($pledge['delivery_address'], true) : null;
 ?>
@@ -9,7 +8,7 @@ $addr       = $pledge['delivery_address'] ? json_decode($pledge['delivery_addres
   <strong>Номер:</strong> <?= htmlspecialchars($pledge['pledge_number'], ENT_QUOTES, 'UTF-8') ?><br>
   <strong>Поддръжник:</strong> <?= htmlspecialchars($pledge['name'], ENT_QUOTES, 'UTF-8') ?><br>
   <strong>Email:</strong> <?= htmlspecialchars($pledge['email'], ENT_QUOTES, 'UTF-8') ?><br>
-  <strong>Сума:</strong> <?= $amount_bgn ?> лв (<?= $amount_eur ?> EUR)<br>
+  <strong>Сума:</strong> <?= $amount_eur ?> EUR<br>
   <strong>Дата:</strong> <?= htmlspecialchars(substr($pledge['created_at'], 0, 16), ENT_QUOTES, 'UTF-8') ?>
 </div>
 

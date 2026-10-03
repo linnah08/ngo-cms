@@ -249,7 +249,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <div style="background:#fff;border:1px solid #e8ddd5;border-radius:8px;padding:.85rem 1.1rem;min-width:160px;">
     <div style="font-size:.72rem;text-transform:uppercase;color:#9b9590;margin-bottom:.2rem;">Платени</div>
     <div style="font-size:1.25rem;font-weight:700;color:#1b998b;"><?= $paid_n ?> бр.</div>
-    <div style="font-size:.82rem;color:#6b6560;"><?= number_format($paid_total, 2, '.', ' ') ?> EUR &nbsp;·&nbsp; <?= number_format($paid_total * EUR_BGN_RATE, 0, '.', ' ') ?> лв</div>
+    <div style="font-size:.82rem;color:#6b6560;"><?= number_format($paid_total, 2, '.', ' ') ?> EUR</div>
   </div>
   <?php foreach (['pending'=>'Чакащи','failed'=>'Неуспешни'] as $st => $lbl): ?>
   <div style="background:#fff;border:1px solid #e8ddd5;border-radius:8px;padding:.85rem 1.1rem;min-width:120px;">
@@ -351,7 +351,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         </td>
         <td style="padding:.65rem 1rem;text-align:right;font-weight:600;">
           <?= number_format($b['amount_eur'], 2) ?> EUR
-          <div style="font-size:.75rem;color:#9b9590;"><?= number_format($b['amount_eur'] * EUR_BGN_RATE, 2, '.', ' ') ?> лв</div>
         </td>
         <?php if ($tab === 'donations'): ?>
         <td style="padding:.65rem 1rem;font-size:.85rem;"><?= $b['reward_title'] ? h($b['reward_title']) : '—' ?></td>

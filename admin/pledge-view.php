@@ -263,7 +263,6 @@ $pledge_phone = $pledge['phone'] ?? null;
     <div>
       <div style="font-size:.72rem;text-transform:uppercase;color:#9b9590;margin-bottom:.25rem;">Сума</div>
       <div style="font-weight:600;font-size:1.1rem;"><?= number_format((float)$pledge['amount_eur'], 2, '.', ' ') ?> EUR</div>
-      <div style="font-size:.82rem;color:#6b6560;"><?= number_format((float)$pledge['amount_eur'] * EUR_BGN_RATE, 2, '.', ' ') ?> лв</div>
     </div>
     <div>
       <div style="font-size:.72rem;text-transform:uppercase;color:#9b9590;margin-bottom:.25rem;">Дата</div>

@@ -32,7 +32,6 @@ if ($ev_date) {
 }
 $ev_when = $ev_date_fmt . ($ev_time ? ', ' . $ev_time . ($is_en ? '' : ' ч.') : '');
 $price_eur     = number_format($ev_price, 2, '.', ' ') . ' EUR';
-$price_bgn_val = number_format($ev_price * EUR_BGN_RATE, 2, '.', ' ');
 
 $error = $_SESSION['campaign_error'] ?? null;
 unset($_SESSION['campaign_error']);
@@ -265,9 +264,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
           <span class="tk-price-label"><?= $is_en ? 'Total' : 'Общо' ?></span>
           <span class="tk-price-amount" id="tkTotal">
             <?= $price_eur ?>
-            <?php if (!$is_en): ?>
-            <span id="tkTotalBgn" style="font-size:.75em;font-weight:500;color:#4a5568;margin-left:.35em;"><?= $price_bgn_val ?> лв</span>
-            <?php endif; ?>
           </span>
         </div>
 
@@ -277,8 +273,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
       </form>
       <script>
       var _tkUnitPrice = <?= (float)$ev_price ?>;
-      var _tkShowBgn   = <?= !$is_en ? 'true' : 'false' ?>;
-      var _tkRate      = <?= EUR_BGN_RATE ?>;
       function tkQtyChange(delta) {
         var inp = document.getElementById('tkQty');
         inp.value = Math.min(10, Math.max(1, (parseInt(inp.value) || 1) + delta));
@@ -288,12 +282,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
         var qty   = Math.min(10, Math.max(1, parseInt(document.getElementById('tkQty').value) || 1));
         document.getElementById('tkQty').value = qty;
         var total = (_tkUnitPrice * qty).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
-        document.getElementById('tkTotal').firstChild.textContent = total + ' EUR';
-        if (_tkShowBgn) {
-          var bgn = (_tkUnitPrice * qty * _tkRate).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
-          var bgnEl = document.getElementById('tkTotalBgn');
-          if (bgnEl) bgnEl.textContent = bgn + ' лв';
-        }
+        document.getElementById('tkTotal').textContent = total + ' EUR';
       }
       </script>
 

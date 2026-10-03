@@ -48,7 +48,6 @@ class DonationCertGenerator extends DocumentGenerator {
         if ($don_amount <= 0) {
             $don_amount = (float) $order['total_eur'];
         }
-        $don_bgn = self::eur2bgn($don_amount);
 
         // Donor info
         $donor_type  = $inv['donor_type'] ?? 'individual';
@@ -137,9 +136,7 @@ class DonationCertGenerator extends DocumentGenerator {
         if (!empty($f['phone'])) $header_meta .= ' &nbsp;|&nbsp; ' . $tel_label . ': ' . self::h($f['phone']);
         if (!empty($f['email'])) $header_meta .= ' &nbsp;|&nbsp; Email: ' . self::h($f['email']);
 
-        $amount_row   = $en
-            ? self::fmtEur($don_amount)
-            : self::fmtEur($don_amount) . ' / ' . self::fmtBgn($don_bgn);
+        $amount_row   = self::fmtEur($don_amount);
         $reg_note_html = $reg_note !== ''
             ? '<div style="font-size:7pt;color:' . $mu . ';margin-top:2px;">' . $reg_note . '</div>'
             : '';

@@ -62,12 +62,6 @@ define('GA4_ID',                    '');  // GA4 measurement ID
 define('GOOGLE_ADS_ID',             '');  // Google Ads conversion ID
 define('GOOGLE_ADS_PURCHASE_LABEL', '');  // add-to-cart conversion label
 
-// ── Currency ──────────────────────────────────────────────────────────────────
-// Bulgaria adopted the Euro on 1 Jan 2026; dual BGN/EUR display is required
-// until 1 July 2026. Set DUAL_CURRENCY_UNTIL to a past date for single currency.
-define('EUR_BGN_RATE',        1.95583);
-define('DUAL_CURRENCY_UNTIL', '2026-07-01');
-
 // Hide the phone number from the header, footer and contact pages while keeping
 // it on invoices and the legal pages (a card acquirer requires one published).
 // define('SITE_PHONE_PUBLIC', false);

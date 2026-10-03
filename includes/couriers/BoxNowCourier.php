@@ -203,7 +203,7 @@ class BoxNowCourier
      * @param  array  $parcel        ['weight' => float (kg)]
      * @param  string $toCity        Ignored (BoxNow is flat-rate nationwide)
      * @param  string $deliveryType  Ignored (always APM locker)
-     * @return float  Price in BGN
+     * @return float  Price in EUR
      */
     public function calculateShipping(array $parcel, string $toCity, string $deliveryType): float
     {

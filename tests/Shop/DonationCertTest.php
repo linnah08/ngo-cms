@@ -161,15 +161,16 @@ final class DonationCertTest extends TestCase
         $this->assertStringContainsString('Bank card', $html);
     }
 
-    public function testEnglishCertDoesNotShowBgnAmount(): void
+    public function testCertsShowEuroOnly(): void
     {
-        $order = array_merge(self::$baseOrder, [
-            'invoice_data' => json_encode(['donor_type' => 'individual', 'lang' => 'en']),
-        ]);
-        $gen  = new TestableDonationCertGenerator();
-        $html = $gen->buildHtmlPublic($order, self::$baseItems, self::$baseDoc);
-        // English cert shows only EUR, not BGN
-        $this->assertStringNotContainsString('лв', $html);
+        foreach (['bg', 'en'] as $lang) {
+            $order = array_merge(self::$baseOrder, [
+                'invoice_data' => json_encode(['donor_type' => 'individual', 'lang' => $lang]),
+            ]);
+            $html = (new TestableDonationCertGenerator())->buildHtmlPublic($order, self::$baseItems, self::$baseDoc);
+            $this->assertStringContainsString('€', $html, $lang);
+            $this->assertStringNotContainsString('лв', $html, "$lang cert must not show a BGN amount");
+        }
     }
 
     public function testDefaultLangIsBulgarian(): void

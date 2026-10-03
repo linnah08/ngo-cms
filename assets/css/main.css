@@ -854,12 +854,6 @@ textarea { min-height: 140px; resize: vertical; }
   color: var(--teal);
 }
 
-.price__bgn {
-  font-size: 0.85em;
-  color: var(--text-muted);
-  margin-left: var(--space-sm);
-}
-
 /* ============================================
    UTILITIES
    ============================================ */

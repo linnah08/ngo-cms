@@ -94,15 +94,8 @@ if ($end_date) {
     $days_left = max(0, $diff);
 }
 
-// Until end of June 2026 show BGN equivalent alongside EUR
-$show_bgn = date('Y-m') < '2026-06';
-function fmt_campaign_amount(float $eur, bool $show_bgn): string {
-    $eur_str = number_format($eur, 0, '.', ' ') . ' EUR';
-    if ($show_bgn) {
-        $bgn_str = number_format($eur * EUR_BGN_RATE, 0, '.', ' ') . ' лв';
-        return $eur_str . ' <small style="opacity:.75;font-weight:400;">(' . $bgn_str . ')</small>';
-    }
-    return $eur_str;
+function fmt_campaign_amount(float $eur): string {
+    return number_format($eur, 0, '.', ' ') . ' EUR';
 }
 
 $page_title = h($title) . ' — ' . SITE_NAME_BG;
@@ -189,8 +182,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
     <div class="stat-row">
       <div class="stat">
-        <span class="stat__value"><?= fmt_campaign_amount($raised_eur, $show_bgn) ?></span>
-        <span class="stat__label"><?= $is_en ? 'raised of ' : 'набрано от ' ?><?= fmt_campaign_amount($target_eur, $show_bgn) ?></span>
+        <span class="stat__value"><?= fmt_campaign_amount($raised_eur) ?></span>
+        <span class="stat__label"><?= $is_en ? 'raised of ' : 'набрано от ' ?><?= fmt_campaign_amount($target_eur) ?></span>
       </div>
       <div class="stat">
         <span class="stat__value"><?= $funders ?></span>
@@ -262,14 +255,14 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
           <?php foreach ($budget as $row): ?>
           <tr>
             <td><?= h($row['label']) ?></td>
-            <td><?= fmt_campaign_amount((float)$row['amount_eur'], $show_bgn) ?></td>
+            <td><?= fmt_campaign_amount((float)$row['amount_eur']) ?></td>
           </tr>
           <?php endforeach; ?>
         </tbody>
         <tfoot>
           <tr>
             <td><?= $is_en ? 'Total' : 'Общо' ?></td>
-            <td><?= fmt_campaign_amount(array_sum(array_column($budget, 'amount_eur')), $show_bgn) ?></td>
+            <td><?= fmt_campaign_amount(array_sum(array_column($budget, 'amount_eur'))) ?></td>
           </tr>
         </tfoot>
       </table>
@@ -361,7 +354,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
         <div class="reward-grid" id="rewardGrid">
           <?php foreach ($rewards as $r): ?>
           <div class="reward-card" data-reward-id="<?= $r['id'] ?>" data-amount="<?= $r['amount_eur'] ?>">
-            <div class="reward-card__amount"><?= fmt_campaign_amount((float)$r['amount_eur'], $show_bgn) ?></div>
+            <div class="reward-card__amount"><?= fmt_campaign_amount((float)$r['amount_eur']) ?></div>
             <div class="reward-card__title"><?= h($r['title']) ?></div>
             <div class="reward-card__desc"><?= $r['description'] ?></div>
           </div>
@@ -379,9 +372,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
             <label><?= $is_en ? 'Amount (EUR)' : 'Сума (EUR)' ?></label>
             <input type="number" name="amount_eur" id="amountEurInput"
                    min="1" step="0.01" placeholder="<?= $is_en ? 'e.g. 25.00' : 'напр. 25.00' ?>" required>
-            <?php if ($show_bgn): ?>
-            <div style="font-size:.78rem;color:#9b9590;margin-top:.3rem;" id="bgnHint"></div>
-            <?php endif; ?>
           </div>
 
           <div class="form-field">
@@ -422,7 +412,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 <?php
   $ev_when = $ev_date_fmt . ($ev_time ? ($is_en ? ', ' : ', ') . $ev_time . ($is_en ? '' : ' ч.') : '');
   $ev_price_fmt = number_format($ev_price, 2, '.', ' ') . ' EUR';
-  $ev_price_bgn = $show_bgn ? ' <small style="opacity:.7;font-weight:400;">(≈ ' . number_format($ev_price * EUR_BGN_RATE, 0, '.', ' ') . ' лв)</small>' : '';
 ?>
 <section style="background:linear-gradient(135deg,#e4f0f5 0%,#f0f9f8 100%);border-top:1px solid #c8e0e8;border-bottom:1px solid #c8e0e8;padding:3.5rem 0;">
   <div class="container">
@@ -470,7 +459,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
       <div>
         <div class="form-card" style="border-color:#b2dbd7;">
           <div style="text-align:center;margin-bottom:1.25rem;">
-            <span style="font-size:2rem;font-weight:800;color:var(--teal,#0387A5);"><?= $ev_price_fmt ?><?= $ev_price_bgn ?></span>
+            <span style="font-size:2rem;font-weight:800;color:var(--teal,#0387A5);"><?= $ev_price_fmt ?></span>
             <div style="font-size:.82rem;color:#6b6560;margin-top:.2rem;"><?= $is_en ? 'per ticket · digital delivery' : 'на билет · изпращане по имейл' ?></div>
           </div>
 
@@ -546,20 +535,10 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
 <script>
 (function () {
-  var showBgn     = <?= $show_bgn ? 'true' : 'false' ?>;
-  var rate        = <?= EUR_BGN_RATE ?>;
   var cards       = document.querySelectorAll('.reward-card');
   var rewardInput = document.getElementById('rewardIdInput');
   var amtEur      = document.getElementById('amountEurInput');
-  var bgnHint     = document.getElementById('bgnHint');
   var delivery    = document.getElementById('deliverySection');
-
-  function updateBgnHint() {
-    if (!bgnHint) return;
-    var eur = parseFloat(amtEur.value) || 0;
-    var bgnLabel = <?= $is_en ? "'BGN'" : "'лв'" ?>;
-    bgnHint.textContent = eur > 0 ? '≈ ' + (eur * rate).toFixed(2) + ' ' + bgnLabel : '';
-  }
 
   function selectReward(card) {
     cards.forEach(function (c) { c.classList.remove('selected'); });
@@ -567,7 +546,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
       card.classList.add('selected');
       rewardInput.value = card.dataset.rewardId;
       amtEur.value = parseFloat(card.dataset.amount).toFixed(2);
-      updateBgnHint();
       delivery.style.display = 'block';
     } else {
       rewardInput.value = '0';
@@ -581,8 +559,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     });
   });
 
-  if (amtEur) amtEur.addEventListener('input', updateBgnHint);
-  if (showBgn) updateBgnHint();
 
   // ── Carousel + Lightbox ───────────────────────────────────────────────────
   var photos = <?= json_encode($photos) ?>;
