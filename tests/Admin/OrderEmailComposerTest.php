@@ -66,6 +66,11 @@ final class OrderEmailComposerTest extends TestCase
     public function testPresetWordingIsGeneric(): void
     {
         $all = json_encode([_email_tpl_defaults(), admin_message_presets()], JSON_UNESCAPED_UNICODE);
+        // The defaults fill in this site's own name and email on purpose — on a
+        // fork like lafetki that IS a brand. Only hard-coded brands are wrong.
+        foreach (['SITE_NAME_BG', 'SITE_NAME_EN', 'SITE_EMAIL'] as $const) {
+            if (defined($const) && constant($const) !== '') $all = str_ireplace((string) constant($const), '', $all);
+        }
         foreach (['Odd Minds', 'oddminds', 'Лафетки', 'lafetki'] as $brand) {
             $this->assertStringNotContainsStringIgnoringCase($brand, $all);
         }
