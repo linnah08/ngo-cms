@@ -20,7 +20,10 @@ php -r '
 $root        = getcwd();
 $dirPrefixes = [".git", ".github", "tests", "node_modules", ".githooks", "relay", "docs"];
 $exactFiles  = ["phpunit.xml", "playwright.config.js", "package.json", "package-lock.json", "deploy.php",
-                "CLAUDE.md", ".gitignore"];
+                "CLAUDE.md", ".gitignore",
+                // Site-owned: a site keeps its own theme and wording here, and a
+                // release must never carry (and so overwrite) one.
+                "includes/themes-site.php", "content/bg/strings.site.json", "content/en/strings.site.json"];
 $exclude = function (string $rel) use ($dirPrefixes, $exactFiles): bool {
     if (in_array($rel, $exactFiles, true)) return true;
     if (str_ends_with($rel, ".zip")) return true;
@@ -51,5 +54,6 @@ zip -rq "$OUT" . \
   -x ".git/*" ".github/*" "tests/*" "node_modules/*" \
      "*.zip" ".phpunit*" "phpunit.xml" "playwright.config.js" \
      "package.json" "package-lock.json" ".githooks/*" "deploy.php" \
-     "relay/*" "docs/*" "CLAUDE.md" ".gitignore"
+     "relay/*" "docs/*" "CLAUDE.md" ".gitignore" \
+     "includes/themes-site.php" "content/bg/strings.site.json" "content/en/strings.site.json"
 echo "Built $OUT"
