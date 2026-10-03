@@ -157,9 +157,11 @@ p:last-child { margin-bottom: 0; }
   gap: var(--space-lg);
 }
 
-.grid--2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
-.grid--3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
-.grid--4 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+/* auto-fill, not auto-fit: auto-fit collapses the empty tracks, so a shop with
+   a single product in stock stretched that one card across the entire row. */
+.grid--2 { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.grid--3 { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.grid--4 { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 
 /* ============================================
    HEADER & NAVIGATION
@@ -339,6 +341,14 @@ p:last-child { margin-bottom: 0; }
   filter: none;
   border-color: var(--teal);
   box-shadow: 0 0 0 1px var(--teal);
+}
+
+/* On a touch screen the flags are a 34x24 target, which clears WCAG 2.2 AA but
+   is a fiddly tap. Padding grows the target to 44x44 without changing the flag
+   itself, and the gap keeps the two from being mis-tapped for each other. */
+@media (pointer: coarse) {
+  .lang-switcher { gap: var(--space-sm); }
+  .lang-switcher__flag { padding: 13px 8px; }
 }
 
 /* Mobile nav toggle */

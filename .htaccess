@@ -1,5 +1,9 @@
 Options +FollowSymLinks -Indexes
 
+# Prefer the application over any index.html left in the document root — a
+# holding page put there before launch would otherwise shadow the whole site.
+DirectoryIndex index.php index.html
+
 # Custom error pages
 ErrorDocument 404 /errors/404.php
 ErrorDocument 403 /errors/403.php

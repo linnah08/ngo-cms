@@ -84,6 +84,19 @@ require_once $root . '/includes/payment/process_payment.php';
 // ── Print helpers ─────────────────────────────────────────────────────────────
 require_once $root . '/includes/print_helpers.php';
 
+/**
+ * Admin-editable content files (content/pages.json, menus.json, organisation.json)
+ * are gitignored because the server is their source of truth, so a fresh clone
+ * does not have them and any test that reads one has nothing to read. Call this
+ * first in such a test to skip rather than fail on a missing file.
+ */
+function test_content_files_available(string ...$paths): bool {
+    foreach ($paths as $path) {
+        if (!is_file($path) || !is_readable($path)) return false;
+    }
+    return true;
+}
+
 // ── Donation flow helpers (donation_path(), donation_validate()) ──────────────
 require_once $root . '/includes/donation.php';
 
