@@ -194,11 +194,12 @@ const ARTICLE_PHOTO_CAPTION_MAX = 300;
 /**
  * Rebuild a post's photos from the editor's grid. Paths are re-checked here — the
  * browser only ever sends paths, never trusted ones. A dropped path drops its captions
- * with it, so captions never slide onto the wrong photo.
+ * with it, so captions never slide onto the wrong photo. $keep lists the post's stored
+ * photos: those survive a missing file, new ones must exist on disk.
  *
  * @return array{bg: array, en: array, image: string}
  */
-function article_photos_from_post(array $post, ?callable $exists = null): array {
+function article_photos_from_post(array $post, ?callable $exists = null, array $keep = []): array {
     $src  = is_array($post['photo_src'] ?? null) ? array_values($post['photo_src']) : [];
     $capB = is_array($post['photo_caption_bg'] ?? null) ? array_values($post['photo_caption_bg']) : [];
     $capE = is_array($post['photo_caption_en'] ?? null) ? array_values($post['photo_caption_en']) : [];
@@ -208,7 +209,11 @@ function article_photos_from_post(array $post, ?callable $exists = null): array 
     $bg = $en = [];
     $image = '';
     foreach ($src as $i => $s) {
-        if (!is_string($s) || !article_photo_path_ok($s, $exists)) continue;
+        if (!is_string($s)) continue;
+        // A photo already on the post stays even if its file is missing here (a restore,
+        // a local checkout without uploads) — dropping it is the author's call, not ours.
+        $kept = in_array($s, $keep, true) && article_photo_path_ok($s, static fn(): bool => true);
+        if (!$kept && !article_photo_path_ok($s, $exists)) continue;
         if (count($bg) === ARTICLE_PHOTOS_MAX) break;
         $bg[] = ['src' => $s, 'caption' => $clean($capB[$i] ?? '')];
         $en[] = ['src' => $s, 'caption' => $clean($capE[$i] ?? '')];
@@ -249,4 +254,32 @@ function article_with_main_photo(array $article, string $new_src, ?callable $exi
     $article['photos'] = $photos;
     $article['image']  = $new_src !== '' ? $new_src : ($photos[0]['src'] ?? '');
     return $article;
+}
+
+/** The editor's list: every stored photo with a valid path, whether or not its file exists here. */
+function article_photos_for_editor(array $article): array {
+    return article_photos($article, static fn(): bool => true);
+}
+
+/**
+ * Save the public page's inline edits (title, excerpt, content, image) into one post file.
+ * An image goes through article_with_main_photo(), so "📷 Replace" swaps the main photo
+ * inside `photos` too; an invalid image path is ignored. False when the file can't be
+ * read or written.
+ */
+function article_inline_save(string $full, string $lang, array $fields, ?callable $exists = null): bool {
+    if (!is_file($full)) return false;
+    $article = load_json($full);
+    foreach (['title', 'excerpt', 'content', 'image'] as $f) {
+        if (!isset($fields[$f])) continue;
+        $val = $fields[$f][$lang] ?? '';
+        if (!is_string($val)) continue;
+        if ($f === 'image') {
+            $val = trim(strip_tags($val));
+            if ($val === '' || article_photo_path_ok($val, $exists)) $article = article_with_main_photo($article, $val, $exists);
+            continue;
+        }
+        $article[$f] = ($f === 'content') ? $val : trim(strip_tags($val));
+    }
+    return save_json($full, $article) !== false;
 }

@@ -112,4 +112,14 @@ final class SocialImagesTest extends TestCase
         $this->assertSame('facebook: { type: post }', $r['metadata']);
         $this->assertStringEndsWith('b.jpg', $r['urls'][0]);
     }
+
+    /** Review I3: an upper-case extension must never make the crop overwrite the original. */
+    public function testUppercaseExtensionNeverOverwritesTheOriginal(): void
+    {
+        $p = $this->jpeg('IMG_1.JPG', 1200, 800);
+        $out = social_prepare_image($p, 'square');
+        $this->assertNotSame($p, $out);
+        $this->assertSame([1200, 800], array_slice(getimagesize($_SERVER['DOCUMENT_ROOT'] . $p), 0, 2), 'original untouched');
+        $this->assertSame([800, 800], array_slice(getimagesize($_SERVER['DOCUMENT_ROOT'] . $out), 0, 2));
+    }
 }

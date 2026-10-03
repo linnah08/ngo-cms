@@ -76,7 +76,10 @@ function social_prepare_image(string $path, string $mode): ?string {
     if ($ext === 'png') { imagealphablending($dst, false); imagesavealpha($dst, true); }
     imagecopyresampled($dst, $src, 0, 0, $cx, $cy, $dw, $dh, $cw, $ch);
     $suffix  = $mode === 'square' ? '-sq' : '-ig';
-    $outPath = preg_replace('/\.' . preg_quote($ext, '/') . '$/', $suffix . '.' . $ext, $path);
+    // Case-insensitive, and never the original's own name — an upper-case .JPG once made
+    // the crop overwrite the photo on the website too.
+    $outPath = preg_replace('/\.' . preg_quote($ext, '/') . '$/i', $suffix . '.' . $ext, $path);
+    if ($outPath === null || $outPath === $path) { imagedestroy($src); imagedestroy($dst); return $path; }
     $ok = _social_gd_save($dst, $_SERVER['DOCUMENT_ROOT'] . $outPath, $ext);
     imagedestroy($src); imagedestroy($dst);
     return $ok ? $outPath : $path;

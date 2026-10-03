@@ -11,14 +11,16 @@ const PNG = Buffer.from(
   'base64'
 );
 
+// Post photos no longer crop on upload (they crop on demand — see article-photos.spec.js),
+// so the shared cropper is exercised through the partners logo field, which still does.
 test('selecting a featured image opens the crop modal', async ({ page }) => {
-  await page.goto('/admin/article-edit.php');
+  await page.goto('/admin/partners.php');
   await page.waitForLoadState('networkidle');
 
   // Shared cropper must be loaded on the page.
   await page.waitForFunction(() => !!window.OMCrop);
 
-  await page.setInputFiles('#imageFile', { name: 'test.png', mimeType: 'image/png', buffer: PNG });
+  await page.locator('input[type="file"][data-om-crop]').first().setInputFiles({ name: 'test.png', mimeType: 'image/png', buffer: PNG });
 
   const dialog = page.locator('div[role="dialog"][aria-label="Изрязване на снимка"]');
   await expect(dialog).toBeVisible();

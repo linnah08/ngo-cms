@@ -201,4 +201,54 @@ final class ArticlePhotosTest extends TestCase
         $r = article_with_main_photo(['image' => '/assets/images/articles/old.jpg'], '/assets/images/articles/new.jpg', self::all());
         $this->assertSame([['src' => '/assets/images/articles/new.jpg', 'caption' => '']], $r['photos']);
     }
+
+    /** Review I2: a photo already on the post stays when its file is missing on this machine. */
+    public function testStoredPhotoWhoseFileIsMissingIsKeptOnSave(): void
+    {
+        $none = static fn(string $p): bool => false;
+        $r = article_photos_from_post([
+            'photos_present' => '1',
+            'photo_src'      => ['/assets/images/articles/old.jpg', '/assets/images/articles/new-but-missing.jpg'],
+            'photo_main'     => '0',
+        ], $none, ['/assets/images/articles/old.jpg']);
+        $this->assertSame(['/assets/images/articles/old.jpg'], array_column($r['bg'], 'src'));
+        $this->assertSame('/assets/images/articles/old.jpg', $r['image']);
+    }
+
+    /** Review I2: the editor lists stored photos even when the file is missing, so nothing drops silently. */
+    public function testEditorListIncludesMissingFilesButNotBadPaths(): void
+    {
+        $a = ['image' => '/assets/images/articles/gone.jpg', 'photos' => [
+            ['src' => '/assets/images/articles/gone.jpg', 'caption' => 'x'],
+            ['src' => '/etc/passwd', 'caption' => ''],
+        ]];
+        $this->assertSame(['/assets/images/articles/gone.jpg'], array_column(article_photos_for_editor($a), 'src'));
+    }
+
+    /** Review I4: "📷 Replace" must actually write the post file and swap the main photo. */
+    public function testInlineSaveWritesTheFileAndSwapsTheMainPhoto(): void
+    {
+        $file = tempnam(sys_get_temp_dir(), 'art') . '.json';
+        file_put_contents($file, json_encode(['title' => 'T', 'image' => '/assets/images/articles/a.jpg', 'photos' => [
+            ['src' => '/assets/images/articles/a.jpg', 'caption' => 'A'], ['src' => '/assets/images/articles/b.jpg', 'caption' => 'B']]]));
+        $ok = article_inline_save($file, 'bg', ['title' => ['bg' => ' Ново '], 'image' => ['bg' => '/assets/images/articles/n.jpg']], self::all());
+        $saved = json_decode((string) file_get_contents($file), true);
+        unlink($file);
+        $this->assertTrue($ok);
+        $this->assertSame('Ново', $saved['title']);
+        $this->assertSame('/assets/images/articles/n.jpg', $saved['image']);
+        $this->assertSame(['/assets/images/articles/n.jpg', '/assets/images/articles/b.jpg'], array_column($saved['photos'], 'src'));
+        $this->assertSame('A', $saved['photos'][0]['caption']);
+    }
+
+    public function testInlineSaveRefusesABadImagePathAndReportsAMissingFile(): void
+    {
+        $file = tempnam(sys_get_temp_dir(), 'art') . '.json';
+        file_put_contents($file, json_encode(['image' => '/assets/images/articles/a.jpg']));
+        article_inline_save($file, 'bg', ['image' => ['bg' => '/assets/images/../../config.php']], self::all());
+        $saved = json_decode((string) file_get_contents($file), true);
+        unlink($file);
+        $this->assertSame('/assets/images/articles/a.jpg', $saved['image']);
+        $this->assertFalse(article_inline_save('/nonexistent/dir/x.json', 'bg', ['title' => ['bg' => 'x']], self::all()));
+    }
 }

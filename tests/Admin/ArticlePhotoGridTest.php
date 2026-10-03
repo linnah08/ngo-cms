@@ -60,4 +60,28 @@ final class ArticlePhotoGridTest extends TestCase
         $this->assertStringContainsString('Може да добавите до 10 снимки. Премахнете снимка, за да добавите нова.', $src);
         $this->assertStringNotContainsString('window.confirm', $src);
     }
+
+    /** Review I2: a stored photo whose file is missing shows as such and is still posted. */
+    public function testMissingFileCardSaysSoAndKeepsThePath(): void
+    {
+        $missing = true;
+        ob_start();
+        (static function (array $photo, int $i, int $total, bool $main, bool $missing): void {
+            require dirname(__DIR__, 2) . '/templates/admin/article-photo-row.php';
+        })(['src' => '/assets/images/articles/gone.jpg', 'caption' => ''], 0, 1, true, $missing);
+        $html = (string) ob_get_clean();
+        $this->assertStringContainsString('Файлът липсва', $html);
+        $this->assertStringContainsString('name="photo_src[]" value="/assets/images/articles/gone.jpg"', $html);
+    }
+
+    /** Review I1: the main photo is visibly different, not only in aria-pressed. */
+    public function testMainPhotoIsVisiblyMarked(): void
+    {
+        $main  = $this->row(['src' => '/assets/images/articles/a.jpg', 'caption' => ''], 0, 2, true);
+        $other = $this->row(['src' => '/assets/images/articles/b.jpg', 'caption' => ''], 1, 2, false);
+        $this->assertStringContainsString('Основна снимка', $main);
+        $this->assertStringContainsString('Направи основна', $other);
+        $this->assertStringNotContainsString('Направи основна', $main);
+        $this->assertStringContainsString('border:3px solid', $main);
+    }
 }

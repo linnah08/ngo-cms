@@ -98,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // The photo grid (Task 4) posts paths only — each file was already uploaded
         // through /admin/inline-upload.php. Without the grid, keep what is stored.
         if (($_POST['photos_present'] ?? '') === '1') {
-            $grid      = article_photos_from_post($_POST);
+            $grid      = article_photos_from_post($_POST, null, array_column(article_photos_for_editor($article), 'src'));
             $photos_bg = $grid['bg'];
             $photos_en = $grid['en'];
             $image     = $grid['image'];
@@ -181,8 +181,8 @@ $has_en_version = !empty($article_en);
 $deepl_ready    = deepl_is_configured();
 $claude_ready   = claude_is_configured();
 
-$grid_bg   = article_photos($article);
-$grid_en   = $article_en ? article_photos(array_merge($article_en, ['image' => $article['image'] ?? ''])) : [];
+$grid_bg   = article_photos_for_editor($article);   // missing files included — they show as such, never drop silently
+$grid_en   = $article_en ? article_photos_for_editor(array_merge($article_en, ['image' => $article['image'] ?? ''])) : [];
 $grid_main = article_main_photo_index($article, $grid_bg);
 $en_caps   = array_column($grid_en, 'caption', 'src');
 ?>
@@ -283,7 +283,7 @@ $en_caps   = array_column($grid_en, 'caption', 'src');
       <input type="hidden" name="photo_main" id="apMain" value="<?= (int) $grid_main ?>">
       <ul id="apGrid" aria-labelledby="apTitle"
           style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.75rem;padding:0;margin:0 0 .75rem;">
-        <?php foreach ($grid_bg as $i => $photo): $total = count($grid_bg); $main = $i === $grid_main; ?>
+        <?php foreach ($grid_bg as $i => $photo): $total = count($grid_bg); $main = $i === $grid_main; $missing = !is_file($_SERVER['DOCUMENT_ROOT'] . $photo['src']); ?>
           <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/admin/article-photo-row.php'; ?>
         <?php endforeach; ?>
       </ul>
@@ -347,7 +347,7 @@ $en_caps   = array_column($grid_en, 'caption', 'src');
       <h3 style="font-size:1rem;margin:0 0 .5rem;">Photo captions (EN)</h3>
       <ol id="apEnCaps" style="padding-left:1.25rem;margin:0;">
         <?php foreach ($grid_bg as $i => $photo): $n = $i + 1; ?>
-        <li style="margin-bottom:.5rem;">
+        <li data-key="k<?= $i ?>" style="margin-bottom:.5rem;">
           <label for="photoCapEn<?= $n ?>">Caption under photo <?= $n ?></label>
           <input type="text" id="photoCapEn<?= $n ?>" name="photo_caption_en[<?= $i ?>]" maxlength="300"
                  data-translate-from="photo_caption_bg[<?= $i ?>]"
@@ -631,24 +631,43 @@ document.getElementById('tagsInput').addEventListener('input', function () {
 });
 
 // ── Photo grid ───────────────────────────────────────────────────────────────
+// Each card carries a data-key that never changes, and its English caption is matched
+// to the card by that key — not by the photo's path, which changes when a photo is
+// cropped and can repeat when the same library picture is added twice.
 (function () {
   var MAX = 10;
+  var OK_PATH = /^\/assets\/images\/[a-zA-Z0-9_\-][a-zA-Z0-9\/_.\-]*$/;   // same rule as article_photo_path_ok()
   var grid = document.getElementById('apGrid'), tpl = document.getElementById('apRowTpl');
   var enList = document.getElementById('apEnCaps'), mainInput = document.getElementById('apMain');
   var live = document.getElementById('apLive'), limit = document.getElementById('apLimit'), err = document.getElementById('apError');
-  var csrf = document.querySelector('input[name="csrf_token"]').value;
+  var form = document.getElementById('articleForm');
+  var csrf = form.querySelector('input[name="csrf_token"]').value;
+  var nextKey = 1000, uploading = 0;
 
   function rows() { return Array.prototype.slice.call(grid.querySelectorAll('.ap-photo')); }
+  function isMain(r) { return r.querySelector('.ap-main').getAttribute('aria-pressed') === 'true'; }
   function say(msg) { live.textContent = ''; setTimeout(function () { live.textContent = msg; }, 50); }
   function showError(msg) { err.textContent = msg; err.hidden = !msg; }
 
-  // Renumber labels, keep EN captions in the same order, and record the main photo's index.
+  function setMain(row) {
+    rows().forEach(function (r) {
+      var on = r === row, b = r.querySelector('.ap-main');
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      b.className = 'btn ' + (on ? 'btn--primary' : 'btn--outline') + ' ap-main';
+      b.innerHTML = on ? '<span aria-hidden="true">★</span> Основна снимка' : 'Направи основна';
+      r.style.border = on ? '3px solid var(--teal)' : '1px solid var(--border)';
+    });
+  }
+
+  // Renumber labels, rebuild the EN captions in card order, record the main photo's index.
   function sync() {
-    var rs = rows(), mainIdx = 0, oldEn = {};
-    enList.querySelectorAll('li').forEach(function (li) { oldEn[li.dataset.src] = li.querySelector('input').value; });
+    var rs = rows(), oldEn = {};
+    enList.querySelectorAll('li').forEach(function (li) { oldEn[li.dataset.key] = li.querySelector('input').value; });
     enList.innerHTML = '';
+    if (rs.length && !rs.some(isMain)) setMain(rs[0]);
+    var mainIdx = 0;
     rs.forEach(function (r, i) {
-      var n = i + 1, id = 'photo_caption_bg' + n + '_' + Math.random().toString(16).slice(2, 8);
+      var n = i + 1, id = 'photo_caption_bg' + n + '_' + r.dataset.key;
       var cap = r.querySelector('input[name^="photo_caption_bg"]'), lab = r.querySelector('label');
       cap.id = id; cap.name = 'photo_caption_bg[' + i + ']'; lab.htmlFor = id; lab.textContent = 'Надпис под снимка ' + n;
       r.querySelector('.ap-main').setAttribute('aria-label', 'Направи снимка ' + n + ' основна');
@@ -656,19 +675,15 @@ document.getElementById('tagsInput').addEventListener('input', function () {
       r.querySelector('.ap-down').setAttribute('aria-label', 'Премести снимка ' + n + ' надолу');
       r.querySelector('.ap-crop').setAttribute('aria-label', 'Изрежи снимка ' + n);
       r.querySelector('.ap-remove').setAttribute('aria-label', 'Премахни снимка ' + n);
-      if (r.querySelector('.ap-main').getAttribute('aria-pressed') === 'true') mainIdx = i;
+      if (isMain(r)) mainIdx = i;
       var li = document.createElement('li');
-      li.dataset.src = r.dataset.src; li.style.marginBottom = '.5rem';
+      li.dataset.key = r.dataset.key; li.style.marginBottom = '.5rem';
       li.innerHTML = '<label for="photoCapEn' + n + '">Caption under photo ' + n + '</label>'
         + '<input type="text" id="photoCapEn' + n + '" name="photo_caption_en[' + i + ']" maxlength="300"'
         + ' data-translate-from="photo_caption_bg[' + i + ']" style="width:100%;box-sizing:border-box;min-height:44px;">';
-      li.querySelector('input').value = oldEn[r.dataset.src] || '';
+      li.querySelector('input').value = oldEn[r.dataset.key] || '';
       enList.appendChild(li);
     });
-    if (rs.length && !rs.some(function (r) { return r.querySelector('.ap-main').getAttribute('aria-pressed') === 'true'; })) {
-      rs[0].querySelector('.ap-main').setAttribute('aria-pressed', 'true');
-      mainIdx = 0;
-    }
     mainInput.value = mainIdx;
     limit.hidden = rs.length < MAX;
   }
@@ -678,7 +693,10 @@ document.getElementById('tagsInput').addEventListener('input', function () {
     var holder = document.createElement('div');
     holder.innerHTML = tpl.innerHTML.split('__SRC__').join(path);
     var row = holder.querySelector('.ap-photo');
+    row.dataset.key = 'n' + (nextKey++);
     row.querySelector('.ap-main').setAttribute('aria-pressed', 'false');
+    row.style.border = '1px solid var(--border)';
+    row.draggable = true;
     grid.appendChild(row);
     return true;
   }
@@ -691,64 +709,93 @@ document.getElementById('tagsInput').addEventListener('input', function () {
       .then(function (d) { if (!d.ok) throw new Error(d.error || 'upload'); return d.path; });
   }
 
+  // Saving while photos are still uploading would silently leave them out.
+  form.addEventListener('submit', function (e) {
+    if (uploading > 0) {
+      e.preventDefault();
+      showError('Изчакайте снимките да се качат, после запазете.');
+    }
+  });
+
   document.getElementById('apFiles').addEventListener('change', function () {
     var files = Array.prototype.slice.call(this.files), room = MAX - rows().length;
     this.value = '';
     if (files.length > room) limit.hidden = false;
     files = files.slice(0, Math.max(0, room));
+    if (!files.length) return;
     showError('');
-    var failed = 0;
+    var failed = 0, done = 0;
+    uploading += files.length;
+    say('Качване на ' + files.length + (files.length === 1 ? ' снимка…' : ' снимки…'));
     files.reduce(function (p, f) {
       return p.then(function () {
-        return upload(f).then(function (path) { addRow(path); }, function () { failed++; });
+        return upload(f).then(function (path) { addRow(path); }, function () { failed++; })
+          .then(function () { uploading--; done++; if (done < files.length) say('Качване: ' + done + ' от ' + files.length); });
       });
     }, Promise.resolve()).then(function () {
       sync();
-      say(files.length - failed + ' снимки са добавени');
-      if (failed) showError(failed + ' снимки не можаха да се качат. Позволени са JPEG, PNG и WebP.');
+      var ok = files.length - failed;
+      say(ok === 1 ? 'Добавена е 1 снимка' : 'Добавени са ' + ok + ' снимки');
+      if (failed) showError(failed + (failed === 1 ? ' снимка не можа' : ' снимки не можаха') + ' да се качи. Позволени са JPEG, PNG и WebP.');
+      else if (err.textContent.indexOf('Изчакайте') === 0) showError('');
     });
   });
 
   document.getElementById('apLibrary').addEventListener('click', function () {
     if (rows().length >= MAX) { limit.hidden = false; return; }
-    openMediaPicker(function (p) { if (addRow(p)) { sync(); say('Снимката е добавена'); } });
+    openMediaPicker(function (p) {
+      if (!OK_PATH.test(p) || p.indexOf('..') >= 0) {
+        showError('Тази снимка не може да се използва — името на файла съдържа кирилица или интервали. Качете я отново с „Добави снимки“.');
+        return;
+      }
+      showError('');
+      if (addRow(p)) { sync(); say('Снимката е добавена'); }
+    });
   });
 
   grid.addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
     var row = b.closest('.ap-photo'), rs = rows(), i = rs.indexOf(row);
     if (b.classList.contains('ap-main')) {
-      rs.forEach(function (r) { r.querySelector('.ap-main').setAttribute('aria-pressed', r === row ? 'true' : 'false'); });
-      sync(); say('Снимка ' + (i + 1) + ' е основна');
+      setMain(row); sync(); say('Снимка ' + (i + 1) + ' е основна');
     } else if (b.classList.contains('ap-up') && i > 0) {
       grid.insertBefore(row, rs[i - 1]); sync(); b.focus(); say('Снимка е преместена на място ' + i);
     } else if (b.classList.contains('ap-down') && i < rs.length - 1) {
       grid.insertBefore(rs[i + 1], row); sync(); b.focus(); say('Снимка е преместена на място ' + (i + 2));
     } else if (b.classList.contains('ap-remove')) {
-      var next = rs[i + 1] || rs[i - 1];
-      row.remove(); sync(); say('Снимка ' + (i + 1) + ' е премахната');
+      var next = rs[i + 1] || rs[i - 1], wasMain = isMain(row);
+      row.remove();
+      if (wasMain && next) setMain(next);   // the next photo becomes main, as the author would expect
+      sync();
+      say('Снимка ' + (i + 1) + ' е премахната' + (wasMain && next ? '. Основна е снимка ' + (rows().indexOf(next) + 1) : ''));
       (next ? next.querySelector('.ap-remove') : document.getElementById('apLibrary')).focus();
     } else if (b.classList.contains('ap-crop')) {
       fetch(row.dataset.src).then(function (r) { return r.blob(); })
         .then(function (blob) { return OMCrop.open(new File([blob], 'photo.' + (blob.type.split('/')[1] || 'jpg'), { type: blob.type })); })
         .then(function (cropped) {
           if (!cropped) return;
+          uploading++;
           return upload(cropped).then(function (path) {
             row.dataset.src = path;
             row.querySelector('input[name="photo_src[]"]').value = path;
             row.querySelector('img').src = path;
             sync(); say('Снимка ' + (i + 1) + ' е изрязана');
-          });
+          }).finally(function () { uploading--; });
         })
         .catch(function () { showError('Снимката не можа да се изреже. Опитайте отново.'); });
     }
   });
 
-  // Drag to reorder (mouse); ↑/↓ above are the keyboard way.
+  // Drag to reorder (mouse); ↑/↓ above are the keyboard way. preventDefault on drop
+  // stops Firefox from opening the dragged image and leaving the editor.
   var dragged = null;
-  grid.addEventListener('dragstart', function (e) { dragged = e.target.closest('.ap-photo'); });
-  grid.addEventListener('dragover', function (e) { if (dragged) e.preventDefault(); });
+  grid.addEventListener('dragstart', function (e) {
+    dragged = e.target.closest('.ap-photo');
+    if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', ''); }
+  });
+  grid.addEventListener('dragover', function (e) { e.preventDefault(); });
   grid.addEventListener('drop', function (e) {
+    e.preventDefault();
     var over = e.target.closest('.ap-photo');
     if (dragged && over && over !== dragged) {
       var rs = rows();
@@ -758,7 +805,6 @@ document.getElementById('tagsInput').addEventListener('input', function () {
     dragged = null;
   });
   rows().forEach(function (r) { r.draggable = true; });
-  new MutationObserver(function () { rows().forEach(function (r) { r.draggable = true; }); }).observe(grid, { childList: true });
 })();
 
 // ── TinyMCE rich text editors ─────────────────────────────────────────────────

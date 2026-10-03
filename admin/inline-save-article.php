@@ -28,18 +28,11 @@ foreach (['bg' => $slug_bg, 'en' => $slug_en] as $lang => $slug) {
     $full = $_SERVER['DOCUMENT_ROOT'] . $path;
     if (!file_exists($full)) continue;
 
-    $article = load_json($path);
-    foreach ($allowed as $f) {
-        if (!isset($fields[$f])) continue;
-        $val = $fields[$f][$lang] ?? '';
-        if ($f === 'image') {
-            $val = trim(strip_tags($val));
-            if ($val === '' || article_photo_path_ok($val)) $article = article_with_main_photo($article, $val);
-            continue;
-        }
-        $article[$f] = ($f === 'content') ? $val : trim(strip_tags($val));
+    // $full, not $path: load_json/save_json take a filesystem path (the old code read and
+    // wrote "/content/…" at the filesystem root, so nothing was ever saved).
+    if (!article_inline_save($full, $lang, $fields)) {
+        art_json(['ok' => false, 'error' => 'save']);
     }
-    save_json($path, $article);
 }
 
 art_json(['ok' => true]);
