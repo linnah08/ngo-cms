@@ -19,6 +19,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/social_images.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/buffer.php';
 admin_require_login();
 
 header('Content-Type: application/json; charset=UTF-8');
@@ -242,16 +243,12 @@ if ($action === 'schedule') {
         exit;
     }
 
-    // If there's an existing scheduled post, update it
+    // Already in Buffer: edit that post in place (text, time and current photos).
+    // Only a post deleted in Buffer gets a fresh one — anything else is reported, so a
+    // failed edit never leaves two posts queued.
     if ($old_buffer_post_id !== '') {
-        $update_query = 'mutation { updatePost(input: {
-            id: ' . json_encode($old_buffer_post_id) . ',
-            text: ' . json_encode($social_text) . ',
-            dueAt: ' . json_encode($due_at) . '
-        }) {
-            ... on PostActionSuccess { post { id } }
-            ... on MutationError { message }
-        } }';
+        $update_query = buffer_edit_post_query($old_buffer_post_id, $social_text, $due_at,
+            social_buffer_assets_gql($req['urls']), $req['metadata']);
 
         $uch = curl_init('https://api.buffer.com');
         curl_setopt_array($uch, [
@@ -266,16 +263,14 @@ if ($action === 'schedule') {
         curl_close($uch);
 
         if ($uerr) {
-            _om_log('ERROR', "social-ajax schedule/{$channel}: cURL update: " . $uerr);
+            _om_log('ERROR', "social-ajax schedule/{$channel}: cURL edit: " . $uerr);
             echo json_encode(['ok' => false, 'error' => 'Грешка при свързване с Buffer: ' . $uerr]);
             exit;
         }
 
-        $uresp        = json_decode((string)$uraw, true);
-        $update_error = $uresp['data']['updatePost']['message'] ?? ($uresp['errors'][0]['message'] ?? '');
+        $edit = buffer_edit_outcome(json_decode((string)$uraw, true));
 
-        if ($update_error === '') {
-            // Updated successfully
+        if ($edit['status'] === 'ok') {
             $data['social_text'] = $social_text;
             if ($channel === 'fb') {
                 $data['fb_text'] = $social_text;
@@ -285,7 +280,7 @@ if ($action === 'schedule') {
             $data[$sched_key]    = $scheduled_at;
             $data[$due_key]      = $due_at;
             if (!save_json($file, $data)) {
-                _om_log('ERROR', "social-ajax schedule/{$channel}: failed to save after update");
+                _om_log('ERROR', "social-ajax schedule/{$channel}: failed to save after edit");
                 echo json_encode(['ok' => false, 'error' => 'Планирано в Buffer, но грешка при запис на файла.']);
                 exit;
             }
@@ -293,8 +288,14 @@ if ($action === 'schedule') {
             exit;
         }
 
-        // Stale ID — clear it and fall through to create
-        _om_log('ERROR', "social-ajax schedule/{$channel}: stale post ID, falling through to create: " . $update_error);
+        if ($edit['status'] === 'error') {
+            _om_log('ERROR', "social-ajax schedule/{$channel}: edit failed: " . $edit['message']);
+            echo json_encode(['ok' => false, 'error' => 'Публикацията в Buffer не можа да се промени (' . $edit['message'] . '). Нищо не е публикувано два пъти — опитайте отново след малко.']);
+            exit;
+        }
+
+        // Deleted in Buffer — forget the old id and create a fresh post below.
+        _om_log('INFO', "social-ajax schedule/{$channel}: post gone in Buffer, creating a new one");
         $data[$post_id_key] = '';
         save_json($file, $data);
         $old_buffer_post_id = '';

@@ -18,6 +18,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/social_images.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/buffer.php';
 admin_require_login();
 
 header('Content-Type: application/json; charset=UTF-8');
@@ -253,22 +254,18 @@ if ($action === 'schedule') {
 
     $due_at = gmdate('Y-m-d\TH:i:s\Z', $ts);
 
-    // If there's an existing scheduled Buffer post, delete it first.
-    // We must confirm deletion before creating — otherwise we get duplicates.
+    // The photos this post sends now (one image, or the PDF carousel for several).
     $existing_data      = load_json($file);
+    $en_data            = load_json(ARTICLES_PATH . '/en/' . basename((string) ($existing_data['slug_en'] ?? $slug)) . '.json') ?: [];
+    $assets_gql         = social_linkedin_assets_gql($existing_data, $en_data);
+    _om_log('INFO', 'linkedin-ajax schedule: ' . (str_contains($assets_gql, 'document:') ? 'PDF carousel' : ($assets_gql ? 'one image' : 'no image')));
+
+    // Already in Buffer: edit that post in place. Delete-and-recreate is not an option —
+    // Buffer's duplicate check rejects the same text for a while even after deletion.
+    // Only a post deleted in Buffer gets a fresh one; anything else is reported.
     $old_buffer_post_id = $existing_data['buffer_post_id'] ?? '';
     if ($old_buffer_post_id !== '') {
-        // Reschedule: update the existing post's time instead of delete+create.
-        // Buffer's dedup rejects the same text even after deletion for a period,
-        // so updating is the only safe way to change the schedule.
-        $update_query = 'mutation { updatePost(input: {
-            id: ' . json_encode($old_buffer_post_id) . ',
-            text: ' . json_encode($linkedin_text) . ',
-            dueAt: ' . json_encode($due_at) . '
-        }) {
-            ... on PostActionSuccess { post { id } }
-            ... on MutationError { message }
-        } }';
+        $update_query = buffer_edit_post_query($old_buffer_post_id, $linkedin_text, $due_at, $assets_gql, '');
 
         $uch = curl_init('https://api.buffer.com');
         curl_setopt_array($uch, [
@@ -287,17 +284,9 @@ if ($action === 'schedule') {
             exit;
         }
 
-        $uresp        = json_decode((string)$uraw, true);
-        $update_error = $uresp['data']['updatePost']['message'] ?? ($uresp['errors'][0]['message'] ?? '');
+        $edit = buffer_edit_outcome(json_decode((string)$uraw, true));
 
-        if ($update_error !== '') {
-            // Stale ID (post was deleted in Buffer) — clear it and fall through to create
-            _om_log('ERROR', "linkedin-ajax schedule: stale post ID, falling through to create: " . $update_error);
-            $existing_data['buffer_post_id'] = '';
-            save_json($file, $existing_data);
-            $old_buffer_post_id = ''; // fall through to createPost below
-        } else {
-            // Updated successfully — save and return
+        if ($edit['status'] === 'ok') {
             $existing_data['linkedin_scheduled_at'] = $scheduled_at;
             $existing_data['linkedin_due_at']        = $due_at;
             $existing_data['linkedin_text']          = $linkedin_text;
@@ -311,13 +300,20 @@ if ($action === 'schedule') {
             ]);
             exit;
         }
+
+        if ($edit['status'] === 'error') {
+            _om_log('ERROR', 'linkedin-ajax schedule: edit failed: ' . $edit['message']);
+            echo json_encode(['ok' => false, 'error' => 'Публикацията в Buffer не можа да се промени (' . $edit['message'] . '). Нищо не е публикувано два пъти — опитайте отново след малко.']);
+            exit;
+        }
+
+        // Deleted in Buffer — forget the old id and create a fresh post below.
+        _om_log('INFO', 'linkedin-ajax schedule: post gone in Buffer, creating a new one');
+        $existing_data['buffer_post_id'] = '';
+        save_json($file, $existing_data);
     }
 
     // No existing post — create fresh
-    $article_data = load_json($file);
-    $en_data      = load_json(ARTICLES_PATH . '/en/' . basename((string) ($article_data['slug_en'] ?? $slug)) . '.json') ?: [];
-    $assets_gql   = social_linkedin_assets_gql($article_data, $en_data);
-    _om_log('INFO', 'linkedin-ajax schedule: ' . (str_contains($assets_gql, 'document:') ? 'PDF carousel' : ($assets_gql ? 'one image' : 'no image')));
     $query = 'mutation CreatePost {
   createPost(input: {
     ' . $assets_gql . '
