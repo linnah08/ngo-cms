@@ -114,18 +114,23 @@ function seo_org_jsonld(): array {
         // Machine-readable, and the easiest thing on the page for a scraper to
         // harvest — so it follows the same setting as the visible number.
         'telephone'     => site_phone_public(),
-        'sameAs'        => [SOCIAL_FACEBOOK, SOCIAL_INSTAGRAM, SOCIAL_LINKEDIN],
+        // Only the profiles this site actually has — an empty URL is invalid here.
+        'sameAs'        => array_values(array_filter([SOCIAL_FACEBOOK, SOCIAL_INSTAGRAM, SOCIAL_LINKEDIN])),
     ];
     if ($org['telephone'] === '') unset($org['telephone']);
     return $org;
 }
 
-/** Render an array of JSON-LD blocks (skips falsy entries). */
+/**
+ * Render an array of JSON-LD blocks (skips falsy entries). JSON_HEX_TAG turns
+ * < and > into \u003C/\u003E so text from reviews or product copy can never
+ * close the <script> element early.
+ */
 function seo_render_jsonld(array $blocks): void {
     foreach ($blocks as $b) {
         if (!$b) continue;
         echo '  <script type="application/ld+json">'
-           . json_encode($b, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+           . json_encode($b, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP)
            . "</script>\n";
     }
 }
