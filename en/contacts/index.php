@@ -66,6 +66,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!$name || !$email || !$topic || !$message) {
             $error = 'Please fill in all fields.';
+        } elseif (mb_strlen($name) > 200) {
+            $error = 'Your name is too long (max 200 characters).';
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $error = 'Invalid email address.';
         } elseif (!in_array($topic, $_topics, true)) {

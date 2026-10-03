@@ -68,6 +68,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!$name || !$email || !$topic || !$message) {
             $error = 'Моля попълнете всички полета.';
+        } elseif (mb_strlen($name) > 200) {
+            $error = 'Името е твърде дълго (макс. 200 знака).';
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $error = 'Невалиден имейл адрес.';
         } elseif (!in_array($topic, $_topics, true)) {

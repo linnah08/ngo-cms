@@ -41,6 +41,8 @@ $content = trim($_POST['content']      ?? '');
 $errors = [];
 if (!$slug)   $errors[] = $lang === 'bg' ? 'Невалидна статия.' : 'Invalid article.';
 if (!$name)   $errors[] = $lang === 'bg' ? 'Името е задължително.' : 'Name is required.';
+if (mb_strlen($name) > 100)
+              $errors[] = $lang === 'bg' ? 'Името е твърде дълго (макс. 100 знака).' : 'Name is too long (max 100 characters).';
 if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL))
               $errors[] = $lang === 'bg' ? 'Въведете валиден имейл.' : 'A valid email is required.';
 if (!$content || mb_strlen($content) < 5)
