@@ -151,4 +151,54 @@ final class ArticlePhotosTest extends TestCase
         ], self::all());
         $this->assertSame(300, mb_strlen($r['bg'][0]['caption']));
     }
+
+    public function testTranslatedCopyKeepsPhotosAndTranslatesCaptions(): void
+    {
+        $bg = [['src' => '/assets/images/articles/a.jpg', 'caption' => 'Лагер'],
+               ['src' => '/assets/images/articles/b.jpg', 'caption' => '']];
+        $calls = 0;
+        $en = article_photos_translated($bg, function (string $t) use (&$calls): ?string {
+            $calls++;
+            return $t === 'Лагер' ? 'Camp' : null;
+        });
+        $this->assertSame([['src' => '/assets/images/articles/a.jpg', 'caption' => 'Camp'],
+                           ['src' => '/assets/images/articles/b.jpg', 'caption' => '']], $en);
+        $this->assertSame(1, $calls, 'empty captions are not sent to DeepL');
+    }
+
+    public function testFailedCaptionTranslationKeepsTheBulgarian(): void
+    {
+        $en = article_photos_translated([['src' => '/assets/images/articles/a.jpg', 'caption' => 'Лагер']],
+                                        static fn(string $t): ?string => null);
+        $this->assertSame('Лагер', $en[0]['caption']);
+    }
+
+    public function testReplacingTheMainPhotoInPlaceKeepsTheRest(): void
+    {
+        $a = ['image' => '/assets/images/articles/b.jpg', 'photos' => [
+            ['src' => '/assets/images/articles/a.jpg', 'caption' => 'A'],
+            ['src' => '/assets/images/articles/b.jpg', 'caption' => 'Б'],
+        ]];
+        $r = article_with_main_photo($a, '/assets/images/articles/new.jpg', self::all());
+        $this->assertSame('/assets/images/articles/new.jpg', $r['image']);
+        $this->assertSame(['/assets/images/articles/a.jpg', '/assets/images/articles/new.jpg'], array_column($r['photos'], 'src'));
+        $this->assertSame('Б', $r['photos'][1]['caption']);
+    }
+
+    public function testClearingTheMainPhotoPromotesTheNext(): void
+    {
+        $a = ['image' => '/assets/images/articles/a.jpg', 'photos' => [
+            ['src' => '/assets/images/articles/a.jpg', 'caption' => ''],
+            ['src' => '/assets/images/articles/b.jpg', 'caption' => ''],
+        ]];
+        $r = article_with_main_photo($a, '', self::all());
+        $this->assertSame('/assets/images/articles/b.jpg', $r['image']);
+        $this->assertCount(1, $r['photos']);
+    }
+
+    public function testReplacingOnAnOldPostCreatesTheList(): void
+    {
+        $r = article_with_main_photo(['image' => '/assets/images/articles/old.jpg'], '/assets/images/articles/new.jpg', self::all());
+        $this->assertSame([['src' => '/assets/images/articles/new.jpg', 'caption' => '']], $r['photos']);
+    }
 }

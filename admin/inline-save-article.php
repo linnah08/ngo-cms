@@ -1,6 +1,7 @@
 <?php
 // admin/inline-save-article.php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/articles.php';
 header('Content-Type: application/json');
 
 function art_json(array $d): never { echo json_encode($d); exit; }
@@ -31,6 +32,11 @@ foreach (['bg' => $slug_bg, 'en' => $slug_en] as $lang => $slug) {
     foreach ($allowed as $f) {
         if (!isset($fields[$f])) continue;
         $val = $fields[$f][$lang] ?? '';
+        if ($f === 'image') {
+            $val = trim(strip_tags($val));
+            if ($val === '' || article_photo_path_ok($val)) $article = article_with_main_photo($article, $val);
+            continue;
+        }
         $article[$f] = ($f === 'content') ? $val : trim(strip_tags($val));
     }
     save_json($path, $article);

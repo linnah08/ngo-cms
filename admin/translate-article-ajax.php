@@ -54,6 +54,12 @@ if ($err) { echo json_encode(['ok' => false, 'error' => $err]); exit; }
 $content = deepl_translate($article['content'] ?? '', 'EN-GB', true,  $err);
 if ($err) { echo json_encode(['ok' => false, 'error' => $err]); exit; }
 
+$photos_en = article_photos_translated(article_photos($article), static function (string $t): ?string {
+    $e = null;
+    $r = deepl_translate($t, 'EN-GB', false, $e);
+    return $e ? null : $r;   // a failed caption keeps its Bulgarian text; the post still translates
+});
+
 $en_data = [
     'title'   => $title   ?: $article['title'],
     'slug'    => $slug,
@@ -62,6 +68,7 @@ $en_data = [
     'status'  => $article['status'] ?? 'draft',
     'excerpt' => $excerpt ?: '',
     'image'   => $article['image']  ?? '',
+    'photos'  => $photos_en,
     'tags'    => $article['tags']   ?? [],
     'content' => $content ?: '',
     'scheduled' => article_is_scheduled($article, @filemtime($bg_file) ?: null),

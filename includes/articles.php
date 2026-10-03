@@ -217,3 +217,36 @@ function article_photos_from_post(array $post, ?callable $exists = null): array 
     if ($image === '' && $bg) $image = $bg[0]['src'];
     return ['bg' => $bg, 'en' => $en, 'image' => $image];
 }
+
+/** The EN copy of a photo list: same photos, captions run through $translate (BG kept on failure). */
+function article_photos_translated(array $photos, callable $translate): array {
+    $out = [];
+    foreach ($photos as $p) {
+        $cap = $p['caption'];
+        if ($cap !== '') {
+            $t = $translate($cap);
+            if (is_string($t) && $t !== '') $cap = $t;
+        }
+        $out[] = ['src' => $p['src'], 'caption' => $cap];
+    }
+    return $out;
+}
+
+/**
+ * $article with its main photo swapped for $new_src (the public page's "📷 Replace").
+ * The replaced photo keeps its place and caption; '' removes it and promotes the next.
+ */
+function article_with_main_photo(array $article, string $new_src, ?callable $exists = null): array {
+    $photos = article_photos($article, $exists);
+    $i = article_main_photo_index($article, $photos);
+    if ($new_src === '') {
+        if ($photos) array_splice($photos, $i, 1);
+    } elseif ($photos) {
+        $photos[$i]['src'] = $new_src;
+    } else {
+        $photos = [['src' => $new_src, 'caption' => '']];
+    }
+    $article['photos'] = $photos;
+    $article['image']  = $new_src !== '' ? $new_src : ($photos[0]['src'] ?? '');
+    return $article;
+}

@@ -505,7 +505,6 @@ Two other places write post files: the ✦ translate-to-English button on the ar
                                         static fn(string $t): ?string => null);
         $this->assertSame('Лагер', $en[0]['caption']);
     }
-```
 
     public function testReplacingTheMainPhotoInPlaceKeepsTheRest(): void
     {
@@ -535,6 +534,7 @@ Two other places write post files: the ✦ translate-to-English button on the ar
         $r = article_with_main_photo(['image' => '/assets/images/articles/old.jpg'], '/assets/images/articles/new.jpg', self::all());
         $this->assertSame([['src' => '/assets/images/articles/new.jpg', 'caption' => '']], $r['photos']);
     }
+```
 
 - [ ] **Step 2: Run to see them fail** — `php vendor/bin/phpunit tests/Admin/ArticlePhotosTest.php` → undefined functions.
 
