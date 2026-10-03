@@ -13,13 +13,47 @@ use PHPUnit\Framework\Attributes\Group;
 #[Group('shop')]
 final class AddedToCartNoticeTest extends TestCase
 {
-    private function render(array $flash): string
+    private function render(array $flash, bool $just_added = true): string
     {
         ob_start();
-        (static function (array $flash): void {
+        (static function (array $flash, bool $just_added): void {
             require $_SERVER['DOCUMENT_ROOT'] . '/templates/product-flash.php';
-        })($flash);
+        })($flash, $just_added);
         return (string) ob_get_clean();
+    }
+
+    public function testOtherSuccessMessagesGetNoCartButtons(): void
+    {
+        // The footer newsletter form redirects back to the product page with its own success flash.
+        $html = $this->render([['type' => 'success', 'message' => 'Записахте се успешно за бюлетина!']], false);
+
+        $this->assertStringContainsString('Записахте се успешно за бюлетина!', $html);
+        $this->assertStringContainsString('role="status"', $html);
+        $this->assertStringNotContainsString('/checkout/', $html);
+        $this->assertStringNotContainsString('Виж количката', $html);
+        $this->assertStringNotContainsString('<script', $html, 'no focus grab for a notice the buyer did not just cause');
+    }
+
+    public function testAddIsRecognisedFromTheRedirect(): void
+    {
+        // cart/add.php appends ?gads=atc only after a successful add.
+        $_GET['gads'] = 'atc';
+        try {
+            ob_start();
+            (static function (): void {
+                $flash = [['type' => 'success', 'message' => 'Добавено в количката!']];
+                require $_SERVER['DOCUMENT_ROOT'] . '/templates/product-flash.php';
+            })();
+            $html = (string) ob_get_clean();
+        } finally {
+            unset($_GET['gads']);
+        }
+        $this->assertStringContainsString('/checkout/', $html);
+        $this->assertStringContainsString(
+            "?gads=atc",
+            (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/cart/add.php'),
+            'the notice relies on cart/add.php marking a successful add this way'
+        );
     }
 
     public function testSuccessOffersCartAndCheckout(): void

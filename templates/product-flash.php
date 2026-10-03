@@ -21,20 +21,28 @@
  *
  * Inline styles only (see CLAUDE.md — main.css may be stale-cached).
  *
- * Expects: $flash (array of ['type' => ..., 'message' => ...]).
+ * Only a real add gets the cart buttons. Other success messages can land here
+ * too — the newsletter sign-up in the footer redirects back to the page it was
+ * sent from — and "Завърши поръчката" under "Записахте се за бюлетина" makes no
+ * sense. cart/add.php marks a successful add with ?gads=atc on the redirect.
+ *
+ * Expects: $flash (array of ['type' => ..., 'message' => ...]);
+ *          optional $just_added (bool, defaults to reading ?gads=atc).
  */
 $flash = $flash ?? [];
 if (!$flash) return;
+$_pf_added       = $just_added ?? (($_GET['gads'] ?? '') === 'atc');
 $_pf_has_success = false;
 
 ?>
 <?php foreach ($flash as $f):
-    $_pf_success = ($f['type'] ?? '') === 'success';
+    $_pf_ok      = ($f['type'] ?? '') === 'success';
+    $_pf_success = $_pf_ok && $_pf_added;   // the "added to cart" notice, with its next steps
     if ($_pf_success) $_pf_has_success = true;
 ?>
-  <div <?= $_pf_success ? 'role="status" aria-live="polite" tabindex="-1" data-cart-notice' : 'role="alert"' ?>
+  <div <?= $_pf_success ? 'role="status" aria-live="polite" tabindex="-1" data-cart-notice' : ($_pf_ok ? 'role="status"' : 'role="alert"') ?>
        style="position:relative;padding:.9rem 1.25rem;border-radius:6px;margin-bottom:1.5rem;outline-offset:3px;
-       <?= $_pf_success ? 'background:#e6f4ea;border:1px solid #a8d5b0;color:#2d6a35;padding-right:3.25rem;' : 'background:#fdf0ef;border:1px solid #f0c4c0;color:#c0392b;' ?>">
+       <?= $_pf_success ? 'background:#e6f4ea;border:1px solid #a8d5b0;color:#2d6a35;padding-right:3.25rem;' : ($_pf_ok ? 'background:#e6f4ea;border:1px solid #a8d5b0;color:#2d6a35;' : 'background:#fdf0ef;border:1px solid #f0c4c0;color:#c0392b;') ?>">
     <?php if ($_pf_success): ?>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
         <span style="font-weight:600;"><span aria-hidden="true">✓ </span><?= h($f['message']) ?></span>
@@ -53,6 +61,8 @@ $_pf_has_success = false;
               style="position:absolute;top:.25rem;right:.25rem;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:transparent;border:0;border-radius:6px;color:inherit;font-size:1.4rem;line-height:1;cursor:pointer;">
         <span aria-hidden="true">×</span>
       </button>
+    <?php elseif ($_pf_ok): ?>
+      <span aria-hidden="true">✓ </span><?= h($f['message']) ?>
     <?php else: ?>
       <?= h($f['message']) ?>
     <?php endif; ?>
