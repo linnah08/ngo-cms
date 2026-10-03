@@ -81,3 +81,22 @@ function social_prepare_image(string $path, string $mode): ?string {
     imagedestroy($src); imagedestroy($dst);
     return $ok ? $outPath : $path;
 }
+
+/**
+ * What social-ajax.php sends Buffer for Facebook or Instagram: the photo URLs (main
+ * first) and the metadata. Instagram with several photos is a carousel of square slides.
+ */
+function social_fb_insta_request(array $article, string $channel): array {
+    $paths    = social_photo_paths($article);
+    $carousel = $channel === 'insta' && count($paths) > 1;
+    $mode     = $channel === 'insta' ? ($carousel ? 'square' : 'insta') : 'fit';
+    $urls = [];
+    foreach ($paths as $p) {
+        $ready = social_prepare_image($p, $mode);
+        if ($ready !== null) $urls[] = social_image_url($ready);
+    }
+    $metadata = $channel === 'fb'
+        ? 'facebook: { type: post }'
+        : 'instagram: { type: post, shouldShareToFeed: true }';   // several assets make the carousel; Buffer refuses type: carousel
+    return ['urls' => $urls, 'metadata' => $metadata];
+}

@@ -18,6 +18,7 @@
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/social_images.php';
 admin_require_login();
 
 header('Content-Type: application/json; charset=UTF-8');
@@ -232,108 +233,13 @@ if ($action === 'schedule') {
     $data               = load_json($file);
     $old_buffer_post_id = $data[$post_id_key] ?? '';
 
-    // Build absolute image URL — only if the file actually exists on disk
-    $image_path = $data['image'] ?? '';
-    $image_url  = '';
-    if ($image_path !== '' && is_file($_SERVER['DOCUMENT_ROOT'] . $image_path)) {
-        $encoded   = implode('/', array_map('rawurlencode', explode('/', ltrim($image_path, '/'))));
-        $image_url = SITE_URL . '/' . $encoded;
-    }
-    _om_log('INFO', "social-ajax schedule/{$channel}: image_path={$image_path} image_url={$image_url}");
+    $req = social_fb_insta_request($data, $channel);
+    _om_log('INFO', "social-ajax schedule/{$channel}: " . count($req['urls']) . ' photo(s)');
 
     // Instagram requires an image
-    if ($channel === 'insta' && $image_url === '') {
+    if ($channel === 'insta' && !$req['urls']) {
         echo json_encode(['ok' => false, 'error' => 'Instagram изисква снимка. Добавете снимка към статията преди да планирате.']);
         exit;
-    }
-
-    // Resize/crop image for Buffer/Instagram constraints
-    if ($image_url !== '') {
-        $abs_path  = $_SERVER['DOCUMENT_ROOT'] . $image_path;
-        $ext       = strtolower(pathinfo($abs_path, PATHINFO_EXTENSION));
-        $ig_path   = preg_replace('/\.' . preg_quote($ext, '/') . '$/', '-ig.' . $ext, $image_path);
-        $ig_abs    = $_SERVER['DOCUMENT_ROOT'] . $ig_path;
-        $work_abs  = $abs_path;
-        $size      = @getimagesize($abs_path);
-
-        // Step 1: resize if wider than 4800px (Buffer max is 5000px)
-        if ($size && $size[0] > 4800) {
-            $src = match($ext) {
-                'jpg', 'jpeg' => @imagecreatefromjpeg($abs_path),
-                'png'         => @imagecreatefrompng($abs_path),
-                'webp'        => @imagecreatefromwebp($abs_path),
-                default       => false,
-            };
-            if ($src) {
-                $new_w = 4800;
-                $new_h = (int)round($size[1] * $new_w / $size[0]);
-                $dst   = imagecreatetruecolor($new_w, $new_h);
-                if ($ext === 'png') { imagealphablending($dst, false); imagesavealpha($dst, true); }
-                imagecopyresampled($dst, $src, 0, 0, 0, 0, $new_w, $new_h, $size[0], $size[1]);
-                $resized = match($ext) {
-                    'jpg', 'jpeg' => imagejpeg($dst, $ig_abs, 90),
-                    'png'         => imagepng($dst, $ig_abs),
-                    'webp'        => imagewebp($dst, $ig_abs, 90),
-                    default       => false,
-                };
-                imagedestroy($src);
-                imagedestroy($dst);
-                if ($resized) {
-                    $encoded   = implode('/', array_map('rawurlencode', explode('/', ltrim($ig_path, '/'))));
-                    $image_url = SITE_URL . '/' . $encoded;
-                    $work_abs  = $ig_abs;
-                    _om_log('INFO', "social-ajax schedule/{$channel}: resized to {$ig_path}");
-                }
-            }
-        }
-
-        // Step 2: for Instagram, enforce aspect ratio between 4:5 (0.8) and 1.91:1
-        if ($channel === 'insta') {
-            $check_size = @getimagesize($work_abs);
-            if ($check_size) {
-                $w     = $check_size[0];
-                $h     = $check_size[1];
-                $ratio = $w / $h;
-                $crop_w = $w; $crop_h = $h; $crop_x = 0; $crop_y = 0;
-
-                if ($ratio < 0.8) {
-                    // Too tall — center-crop height to 4:5
-                    $crop_h = (int)round($w * 5 / 4);
-                    $crop_y = (int)(($h - $crop_h) / 2);
-                } elseif ($ratio > 1.91) {
-                    // Too wide — center-crop width to 1.91:1
-                    $crop_w = (int)round($h * 1.91);
-                    $crop_x = (int)(($w - $crop_w) / 2);
-                }
-
-                if ($crop_w !== $w || $crop_h !== $h) {
-                    $src = match($ext) {
-                        'jpg', 'jpeg' => @imagecreatefromjpeg($work_abs),
-                        'png'         => @imagecreatefrompng($work_abs),
-                        'webp'        => @imagecreatefromwebp($work_abs),
-                        default       => false,
-                    };
-                    if ($src) {
-                        $dst = imagecreatetruecolor($crop_w, $crop_h);
-                        if ($ext === 'png') { imagealphablending($dst, false); imagesavealpha($dst, true); }
-                        imagecopy($dst, $src, 0, 0, $crop_x, $crop_y, $crop_w, $crop_h);
-                        $cropped = match($ext) {
-                            'jpg', 'jpeg' => imagejpeg($dst, $ig_abs, 90),
-                            'png'         => imagepng($dst, $ig_abs),
-                            'webp'        => imagewebp($dst, $ig_abs, 90),
-                            default       => false,
-                        };
-                        imagedestroy($src);
-                        imagedestroy($dst);
-                        if ($cropped) {
-                            $encoded   = implode('/', array_map('rawurlencode', explode('/', ltrim($ig_path, '/'))));
-                            $image_url = SITE_URL . '/' . $encoded;
-                            _om_log('INFO', "social-ajax schedule/{$channel}: cropped aspect {$ratio} → {$crop_w}x{$crop_h}");
-                        }
-                    }
-                }
-            }
-        }
     }
 
     // If there's an existing scheduled post, update it
@@ -395,12 +301,8 @@ if ($action === 'schedule') {
     }
 
     // Create fresh post
-    $metadata = $channel === 'fb'
-        ? 'facebook: { type: post }'
-        : 'instagram: { type: post, shouldShareToFeed: true }';
-    $assets_gql = $image_url !== ''
-        ? 'assets: [{ image: { url: ' . json_encode($image_url) . ' } }],'
-        : '';
+    $metadata   = $req['metadata'];
+    $assets_gql = social_buffer_assets_gql($req['urls']);
     $query = 'mutation {
   createPost(input: {
     ' . $assets_gql . '

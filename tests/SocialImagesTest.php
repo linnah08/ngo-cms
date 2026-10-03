@@ -84,4 +84,32 @@ final class SocialImagesTest extends TestCase
             $gql
         );
     }
+
+    public function testInstagramCarouselForSeveralPhotos(): void
+    {
+        $a = $this->jpeg('a.jpg', 1200, 800);
+        $b = $this->jpeg('b.jpg', 800, 800);
+        $r = social_fb_insta_request(['image' => $a, 'photos' => [['src' => $a, 'caption' => ''], ['src' => $b, 'caption' => '']]], 'insta');
+        $this->assertCount(2, $r['urls']);
+        $this->assertStringEndsWith('a-sq.jpg', $r['urls'][0]);
+        // Buffer refuses type: carousel (verified 03.10.2026) — several assets on a post make the carousel.
+        $this->assertSame('instagram: { type: post, shouldShareToFeed: true }', $r['metadata']);
+    }
+
+    public function testInstagramSinglePhotoStaysAPost(): void
+    {
+        $a = $this->jpeg('a.jpg', 1000, 800);
+        $r = social_fb_insta_request(['image' => $a], 'insta');
+        $this->assertSame('instagram: { type: post, shouldShareToFeed: true }', $r['metadata']);
+        $this->assertCount(1, $r['urls']);
+    }
+
+    public function testFacebookSendsEveryPhotoAsAPost(): void
+    {
+        $a = $this->jpeg('a.jpg', 100, 100);
+        $b = $this->jpeg('b.jpg', 100, 100);
+        $r = social_fb_insta_request(['image' => $b, 'photos' => [['src' => $a, 'caption' => ''], ['src' => $b, 'caption' => '']]], 'fb');
+        $this->assertSame('facebook: { type: post }', $r['metadata']);
+        $this->assertStringEndsWith('b.jpg', $r['urls'][0]);
+    }
 }
