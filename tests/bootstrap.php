@@ -160,3 +160,58 @@ function with_setting(string $key, string $value, callable $fn): mixed {
         setting_set($key, $original);
     }
 }
+
+/**
+ * Run an admin page in its own PHP process, the way a browser POST would hit
+ * it: a logged-in session with the given role, a valid CSRF token (unless
+ * $opts['csrf'] says otherwise), and $post as the form body. Pages exit() and
+ * send headers, so they can't be included in-process. Returns the HTTP status
+ * the page set (200 if none), its output, the flash messages it queued and
+ * the final session.
+ *
+ * $opts: role ('admin' | 'author' | 'shop_admin' | null = logged out),
+ *        csrf (true = valid token, false = none, string = that token),
+ *        get (query params), method ('POST'), ip (REMOTE_ADDR).
+ */
+function run_admin_page(string $rel, array $post = [], array $opts = []): array {
+    $spec = [
+        'root'   => dirname(__DIR__),
+        'rel'    => $rel,
+        'post'   => $post,
+        'get'    => $opts['get'] ?? [],
+        'method' => $opts['method'] ?? 'POST',
+        'role'   => array_key_exists('role', $opts) ? $opts['role'] : 'admin',
+        'csrf'   => $opts['csrf'] ?? true,
+        'ip'     => $opts['ip'] ?? '127.0.0.1',
+    ];
+    $code = <<<'PHP'
+$s = json_decode($argv[1], true);
+$_SERVER['DOCUMENT_ROOT']  = $s['root'];
+$_SERVER['REQUEST_METHOD'] = $s['method'];
+$_SERVER['REQUEST_URI']    = '/' . $s['rel'];
+$_SERVER['HTTP_HOST']      = 'localhost';
+$_SERVER['REMOTE_ADDR']    = $s['ip'];
+$_GET  = $s['get'];
+$_POST = $s['post'];
+session_id('phpunit' . bin2hex(random_bytes(8)));
+require $s['root'] . '/config.php';
+start_session();
+if ($s['role'] !== null) {
+    $_SESSION[ADMIN_SESSION_NAME] = ['logged_in' => true, 'id' => 0, 'name' => 'PHPUnit',
+        'email' => 'phpunit@test.local', 'role' => $s['role'], 'time' => time()];
+}
+$token = csrf_token();
+if ($s['csrf'] === true) $_POST['csrf_token'] = $token;
+elseif (is_string($s['csrf'])) $_POST['csrf_token'] = $s['csrf'];
+register_shutdown_function(function () {
+    echo "\n@@RESULT@@" . json_encode(['status' => http_response_code() ?: 200, 'flash' => $_SESSION['flash'] ?? [], 'session' => $_SESSION ?? []]);
+    session_destroy();
+});
+include $s['root'] . '/' . $s['rel'];
+PHP;
+    $out = (string) shell_exec(escapeshellarg(PHP_BINARY) . ' -r ' . escapeshellarg($code) . ' ' . escapeshellarg(json_encode($spec)) . ' 2>&1');
+    $pos = strrpos($out, "\n@@RESULT@@");
+    if ($pos === false) return ['status' => 500, 'body' => $out, 'flash' => [], 'session' => []];
+    $meta = json_decode(substr($out, $pos + 11), true) ?: [];
+    return ['status' => (int) ($meta['status'] ?? 500), 'body' => substr($out, 0, $pos), 'flash' => $meta['flash'] ?? [], 'session' => $meta['session'] ?? []];
+}
