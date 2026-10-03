@@ -63,7 +63,9 @@ final class ImageCropperTest extends TestCase
     public function testFileInputsAreTagged(): void
     {
         $expected = [
-            'admin/article-edit.php'  => 1,
+            // 0: posts take many photos at once (multiple input, no crop on upload); each
+            // photo is cropped on demand with its own "Изрежи" button — see testPostPhotosCropOnDemand.
+            'admin/article-edit.php'  => 0,
             'admin/partners.php'      => 1,
             'admin/product-edit.php'  => 3,
             // 4, not 5: the mission-image input left with the old home form (front page is built in admin/home-sections.php now)
@@ -79,5 +81,12 @@ final class ImageCropperTest extends TestCase
                 "Expected {$count} data-om-crop input(s) in {$file}"
             );
         }
+    }
+
+    public function testPostPhotosCropOnDemand(): void
+    {
+        $src = $this->read('admin/article-edit.php');
+        $this->assertStringContainsString('OMCrop.open(', $src, 'each post photo can still be cropped');
+        $this->assertStringContainsString('class="btn btn--outline ap-crop"', $this->read('templates/admin/article-photo-row.php'));
     }
 }

@@ -56,7 +56,7 @@ final class TranslateButtonCoverageTest extends TestCase
                 $target = preg_replace('/\[.*$/s', '', $from[1]);
                 $this->assertMatchesRegularExpression(
                     '/\b(?:name|id)="' . preg_quote($target, '/') . '(?:\[[^"]*)?"/',
-                    $src,
+                    $src . self::includedAdminTemplates($src),
                     "$file: $name translates from \"{$from[1]}\", but no field with that name or id exists."
                 );
                 continue;
@@ -78,5 +78,16 @@ final class TranslateButtonCoverageTest extends TestCase
             array_values(array_unique($missing)),
             "$file: these English fields have no translate button — add data-translate-from=\"<bg field name>\"."
         );
+    }
+
+    /** Fields a page renders from its admin row templates (templates/admin/*.php) are part of the page. */
+    private static function includedAdminTemplates(string $src): string
+    {
+        preg_match_all("#/templates/admin/([a-z0-9_-]+\\.php)#", $src, $m);
+        $out = '';
+        foreach (array_unique($m[1]) as $tpl) {
+            $out .= (string) @file_get_contents(dirname(__DIR__, 2) . '/templates/admin/' . $tpl);
+        }
+        return $out;
     }
 }

@@ -83,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $image = '';
         } elseif (!empty($_POST['image_from_library'])) {
             $lib = $_POST['image_from_library'];
-            if (preg_match('#^/assets/images/[a-zA-Z0-9/_.\-]+$#', $lib)) {
+            if (is_string($lib) && article_photo_path_ok($lib)) {
                 $image = $lib;
             }
         } elseif (isset($_FILES['image']['error']) && $_FILES['image']['error'] !== UPLOAD_ERR_NO_FILE) {
@@ -180,6 +180,11 @@ $edit_tags    = implode(', ', $article['tags'] ?? []);
 $has_en_version = !empty($article_en);
 $deepl_ready    = deepl_is_configured();
 $claude_ready   = claude_is_configured();
+
+$grid_bg   = article_photos($article);
+$grid_en   = $article_en ? article_photos(array_merge($article_en, ['image' => $article['image'] ?? ''])) : [];
+$grid_main = article_main_photo_index($article, $grid_bg);
+$en_caps   = array_column($grid_en, 'caption', 'src');
 ?>
 
 <div class="admin-page-header">
@@ -272,23 +277,31 @@ $claude_ready   = claude_is_configured();
     </div>
 
     <div class="form-group">
-      <label>Изображение</label>
-      <input type="hidden" name="remove_image" id="removeImageFlag" value="">
-      <?php if (!empty($article['image'])): ?>
-        <div id="currentImage" style="margin-bottom:.75rem;display:flex;align-items:flex-start;gap:.75rem;">
-          <img src="<?= h($article['image']) ?>" alt="" style="max-height:150px;border-radius:4px;">
-          <button type="button" class="btn btn--outline" style="font-size:.78rem;padding:.25rem .6rem;color:#dc2626;border-color:#dc2626;"
-                  onclick="document.getElementById('removeImageFlag').value='1';document.getElementById('currentImage').style.display='none';">
-            ✕ Премахни
-          </button>
-        </div>
-      <?php endif; ?>
-      <input type="file" id="imageFile" name="image" accept="image/jpeg,image/png,image/webp" data-om-crop>
-      <input type="hidden" name="image_from_library" id="imageFromLibrary">
-      <button type="button" class="btn btn--outline"
-              style="margin-top:.5rem;font-size:.82rem;"
-              onclick="_pickArticleImage()">Избери от библиотека</button>
-      <div id="imagePreview" style="margin-top:.75rem;"></div>
+      <h3 id="apTitle" style="font-size:1rem;margin:0 0 .25rem;">Снимки</h3>
+      <p style="margin:0 0 .75rem;color:var(--text-muted);">До 10 снимки. Основната се показва в списъка с новини и при споделяне.</p>
+      <input type="hidden" name="photos_present" value="1">
+      <input type="hidden" name="photo_main" id="apMain" value="<?= (int) $grid_main ?>">
+      <ul id="apGrid" aria-labelledby="apTitle"
+          style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.75rem;padding:0;margin:0 0 .75rem;">
+        <?php foreach ($grid_bg as $i => $photo): $total = count($grid_bg); $main = $i === $grid_main; ?>
+          <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/admin/article-photo-row.php'; ?>
+        <?php endforeach; ?>
+      </ul>
+      <template id="apRowTpl"><?php
+        $photo = ['src' => '__SRC__', 'caption' => '']; $i = 0; $total = 1; $main = false;
+        require $_SERVER['DOCUMENT_ROOT'] . '/templates/admin/article-photo-row.php'; ?></template>
+      <p id="apLimit" role="alert" hidden
+         style="border:2px solid #b91c1c;background:#fef2f2;color:#7f1d1d;border-radius:8px;padding:.75rem 1rem;font-weight:600;">
+        Може да добавите до 10 снимки. Премахнете снимка, за да добавите нова.</p>
+      <p id="apError" role="alert" hidden
+         style="border:2px solid #b91c1c;background:#fef2f2;color:#7f1d1d;border-radius:8px;padding:.75rem 1rem;font-weight:600;"></p>
+      <div style="display:flex;flex-wrap:wrap;gap:.5rem;">
+        <label class="btn btn--primary" for="apFiles" style="min-height:44px;cursor:pointer;">+ Добави снимки</label>
+        <input type="file" id="apFiles" accept="image/jpeg,image/png,image/webp" multiple
+               style="position:absolute;width:1px;height:1px;opacity:0;">
+        <button type="button" class="btn btn--outline" id="apLibrary" style="min-height:44px;">Избери от библиотека</button>
+      </div>
+      <div id="apLive" role="status" aria-live="polite" style="position:absolute;left:-9999px;"></div>
     </div>
   </div>
 
@@ -328,6 +341,20 @@ $claude_ready   = claude_is_configured();
     <div class="form-group">
       <label>Content (EN)</label>
       <textarea id="content_en" name="content_en" class="rich-editor"><?= $article_en['content'] ?? '' ?></textarea>
+    </div>
+
+    <div class="form-group">
+      <h3 style="font-size:1rem;margin:0 0 .5rem;">Photo captions (EN)</h3>
+      <ol id="apEnCaps" style="padding-left:1.25rem;margin:0;">
+        <?php foreach ($grid_bg as $i => $photo): $n = $i + 1; ?>
+        <li style="margin-bottom:.5rem;">
+          <label for="photoCapEn<?= $n ?>">Caption under photo <?= $n ?></label>
+          <input type="text" id="photoCapEn<?= $n ?>" name="photo_caption_en[<?= $i ?>]" maxlength="300"
+                 data-translate-from="photo_caption_bg[<?= $i ?>]"
+                 value="<?= h($en_caps[$photo['src']] ?? '') ?>" style="width:100%;box-sizing:border-box;min-height:44px;">
+        </li>
+        <?php endforeach; ?>
+      </ol>
     </div>
 
     <p style="margin:.5rem 0 0;font-size:.8rem;color:var(--text-muted);">
@@ -599,27 +626,140 @@ $default_social_at = date('Y-m-d\TH:i', strtotime('+1 day 11:00'));
 
 <script>
 
-function _pickArticleImage() {
-  openMediaPicker(function (p) {
-    document.getElementById('imageFromLibrary').value = p;
-    document.getElementById('imageFile').value = '';
-    document.getElementById('imagePreview').innerHTML =
-      '<img src="' + p + '" style="max-height:150px;border-radius:4px;">';
-  });
-}
-
 document.getElementById('tagsInput').addEventListener('input', function () {
   document.getElementById('tagsHidden').value = this.value;
 });
 
-document.getElementById('imageFile').addEventListener('change', function () {
-  var preview = document.getElementById('imagePreview');
-  if (this.files && this.files[0]) {
-    var r = new FileReader();
-    r.onload = e => preview.innerHTML = '<img src="' + e.target.result + '" style="max-height:150px;border-radius:4px;">';
-    r.readAsDataURL(this.files[0]);
+// ── Photo grid ───────────────────────────────────────────────────────────────
+(function () {
+  var MAX = 10;
+  var grid = document.getElementById('apGrid'), tpl = document.getElementById('apRowTpl');
+  var enList = document.getElementById('apEnCaps'), mainInput = document.getElementById('apMain');
+  var live = document.getElementById('apLive'), limit = document.getElementById('apLimit'), err = document.getElementById('apError');
+  var csrf = document.querySelector('input[name="csrf_token"]').value;
+
+  function rows() { return Array.prototype.slice.call(grid.querySelectorAll('.ap-photo')); }
+  function say(msg) { live.textContent = ''; setTimeout(function () { live.textContent = msg; }, 50); }
+  function showError(msg) { err.textContent = msg; err.hidden = !msg; }
+
+  // Renumber labels, keep EN captions in the same order, and record the main photo's index.
+  function sync() {
+    var rs = rows(), mainIdx = 0, oldEn = {};
+    enList.querySelectorAll('li').forEach(function (li) { oldEn[li.dataset.src] = li.querySelector('input').value; });
+    enList.innerHTML = '';
+    rs.forEach(function (r, i) {
+      var n = i + 1, id = 'photo_caption_bg' + n + '_' + Math.random().toString(16).slice(2, 8);
+      var cap = r.querySelector('input[name^="photo_caption_bg"]'), lab = r.querySelector('label');
+      cap.id = id; cap.name = 'photo_caption_bg[' + i + ']'; lab.htmlFor = id; lab.textContent = 'Надпис под снимка ' + n;
+      r.querySelector('.ap-main').setAttribute('aria-label', 'Направи снимка ' + n + ' основна');
+      r.querySelector('.ap-up').setAttribute('aria-label', 'Премести снимка ' + n + ' нагоре');
+      r.querySelector('.ap-down').setAttribute('aria-label', 'Премести снимка ' + n + ' надолу');
+      r.querySelector('.ap-crop').setAttribute('aria-label', 'Изрежи снимка ' + n);
+      r.querySelector('.ap-remove').setAttribute('aria-label', 'Премахни снимка ' + n);
+      if (r.querySelector('.ap-main').getAttribute('aria-pressed') === 'true') mainIdx = i;
+      var li = document.createElement('li');
+      li.dataset.src = r.dataset.src; li.style.marginBottom = '.5rem';
+      li.innerHTML = '<label for="photoCapEn' + n + '">Caption under photo ' + n + '</label>'
+        + '<input type="text" id="photoCapEn' + n + '" name="photo_caption_en[' + i + ']" maxlength="300"'
+        + ' data-translate-from="photo_caption_bg[' + i + ']" style="width:100%;box-sizing:border-box;min-height:44px;">';
+      li.querySelector('input').value = oldEn[r.dataset.src] || '';
+      enList.appendChild(li);
+    });
+    if (rs.length && !rs.some(function (r) { return r.querySelector('.ap-main').getAttribute('aria-pressed') === 'true'; })) {
+      rs[0].querySelector('.ap-main').setAttribute('aria-pressed', 'true');
+      mainIdx = 0;
+    }
+    mainInput.value = mainIdx;
+    limit.hidden = rs.length < MAX;
   }
-});
+
+  function addRow(path) {
+    if (rows().length >= MAX) { limit.hidden = false; return false; }
+    var holder = document.createElement('div');
+    holder.innerHTML = tpl.innerHTML.split('__SRC__').join(path);
+    var row = holder.querySelector('.ap-photo');
+    row.querySelector('.ap-main').setAttribute('aria-pressed', 'false');
+    grid.appendChild(row);
+    return true;
+  }
+
+  function upload(file) {
+    var fd = new FormData();
+    fd.append('image', file); fd.append('section', 'article'); fd.append('csrf_token', csrf);
+    return fetch('/admin/inline-upload.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (!d.ok) throw new Error(d.error || 'upload'); return d.path; });
+  }
+
+  document.getElementById('apFiles').addEventListener('change', function () {
+    var files = Array.prototype.slice.call(this.files), room = MAX - rows().length;
+    this.value = '';
+    if (files.length > room) limit.hidden = false;
+    files = files.slice(0, Math.max(0, room));
+    showError('');
+    var failed = 0;
+    files.reduce(function (p, f) {
+      return p.then(function () {
+        return upload(f).then(function (path) { addRow(path); }, function () { failed++; });
+      });
+    }, Promise.resolve()).then(function () {
+      sync();
+      say(files.length - failed + ' снимки са добавени');
+      if (failed) showError(failed + ' снимки не можаха да се качат. Позволени са JPEG, PNG и WebP.');
+    });
+  });
+
+  document.getElementById('apLibrary').addEventListener('click', function () {
+    if (rows().length >= MAX) { limit.hidden = false; return; }
+    openMediaPicker(function (p) { if (addRow(p)) { sync(); say('Снимката е добавена'); } });
+  });
+
+  grid.addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    var row = b.closest('.ap-photo'), rs = rows(), i = rs.indexOf(row);
+    if (b.classList.contains('ap-main')) {
+      rs.forEach(function (r) { r.querySelector('.ap-main').setAttribute('aria-pressed', r === row ? 'true' : 'false'); });
+      sync(); say('Снимка ' + (i + 1) + ' е основна');
+    } else if (b.classList.contains('ap-up') && i > 0) {
+      grid.insertBefore(row, rs[i - 1]); sync(); b.focus(); say('Снимка е преместена на място ' + i);
+    } else if (b.classList.contains('ap-down') && i < rs.length - 1) {
+      grid.insertBefore(rs[i + 1], row); sync(); b.focus(); say('Снимка е преместена на място ' + (i + 2));
+    } else if (b.classList.contains('ap-remove')) {
+      var next = rs[i + 1] || rs[i - 1];
+      row.remove(); sync(); say('Снимка ' + (i + 1) + ' е премахната');
+      (next ? next.querySelector('.ap-remove') : document.getElementById('apLibrary')).focus();
+    } else if (b.classList.contains('ap-crop')) {
+      fetch(row.dataset.src).then(function (r) { return r.blob(); })
+        .then(function (blob) { return OMCrop.open(new File([blob], 'photo.' + (blob.type.split('/')[1] || 'jpg'), { type: blob.type })); })
+        .then(function (cropped) {
+          if (!cropped) return;
+          return upload(cropped).then(function (path) {
+            row.dataset.src = path;
+            row.querySelector('input[name="photo_src[]"]').value = path;
+            row.querySelector('img').src = path;
+            sync(); say('Снимка ' + (i + 1) + ' е изрязана');
+          });
+        })
+        .catch(function () { showError('Снимката не можа да се изреже. Опитайте отново.'); });
+    }
+  });
+
+  // Drag to reorder (mouse); ↑/↓ above are the keyboard way.
+  var dragged = null;
+  grid.addEventListener('dragstart', function (e) { dragged = e.target.closest('.ap-photo'); });
+  grid.addEventListener('dragover', function (e) { if (dragged) e.preventDefault(); });
+  grid.addEventListener('drop', function (e) {
+    var over = e.target.closest('.ap-photo');
+    if (dragged && over && over !== dragged) {
+      var rs = rows();
+      grid.insertBefore(dragged, rs.indexOf(dragged) < rs.indexOf(over) ? over.nextSibling : over);
+      sync(); say('Редът на снимките е променен');
+    }
+    dragged = null;
+  });
+  rows().forEach(function (r) { r.draggable = true; });
+  new MutationObserver(function () { rows().forEach(function (r) { r.draggable = true; }); }).observe(grid, { childList: true });
+})();
 
 // ── TinyMCE rich text editors ─────────────────────────────────────────────────
 tinymce.init(Object.assign({}, window._tinyBase, { selector: 'textarea.rich-editor', min_height: 300 }));
