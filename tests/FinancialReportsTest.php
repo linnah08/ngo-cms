@@ -177,4 +177,24 @@ final class FinancialReportsTest extends TestCase
         $this->assertStringContainsString('/content/financial-reports.json', $gi);
         $this->assertStringContainsString('/assets/files/reports/*.pdf', $gi);
     }
+
+    public function testAdminScreenIsGuardedAndEveryPostIsCsrfChecked(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__) . '/admin/financial-reports.php');
+        $this->assertStringContainsString('admin_require_editorial()', $src);
+        $this->assertStringContainsString('csrf_verify()', $src);
+        $this->assertSame(substr_count($src, '<form'), substr_count($src, 'csrf_field()'), 'every form posts a token');
+        $this->assertStringNotContainsString('window.confirm', $src);
+        $this->assertStringContainsString('data-confirm=', $src);
+        $this->assertStringContainsString('data-translate-from="title_bg"', $src);
+        $this->assertStringContainsString('data-translate-from="description_bg"', $src);
+        $this->assertStringContainsString('Сканираният PDF не може да се чете от екранни четци', $src);
+    }
+
+    public function testContentPageListsTheReports(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__) . '/admin/pages.php');
+        $this->assertStringContainsString('/admin/financial-reports.php', $src);
+        $this->assertStringContainsString("'Финансови отчети'", $src);
+    }
 }

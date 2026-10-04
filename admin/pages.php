@@ -408,6 +408,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
           ['legal_privacy', 'Политика за поверителност',       '/politika-za-poveritelnost/'],
           ['legal_info',    'Правна информация',               '/pravna-informaciya/'],
           ['legal_terms',   'Условия за ползване',             '/usloviya/'],
+          ['reports',       'Финансови отчети',                '/finansovi-otcheti/'],
       ];
       foreach ($rows as [$key, $label, $url]):
       ?>
@@ -420,7 +421,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
           <?php endif; ?>
         </td>
         <td style="text-align:right;">
-          <a href="<?= $key === 'home' ? '/admin/home-sections.php' : '/admin/pages.php?page=' . h($key) ?>" class="btn btn--outline" style="font-size:0.85rem;padding:0.4rem 0.9rem;">
+          <a href="<?= $key === 'home' ? '/admin/home-sections.php' : ($key === 'reports' ? '/admin/financial-reports.php' : '/admin/pages.php?page=' . h($key)) ?>" class="btn btn--outline" style="font-size:0.85rem;padding:0.4rem 0.9rem;">
             Редактиране
           </a>
         </td>
