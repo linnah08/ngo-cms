@@ -5,12 +5,39 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/vendor/pdfjs/pdf.worker.min.js
 
 const EN = window.OM_REPORT_LANG === 'en';
 const T = EN
-  ? { prev: 'Previous page', next: 'Next page', zin: 'Zoom in', zout: 'Zoom out', close: 'Close', fail: 'The document cannot be shown here. Use the download link above.', page: 'Page' }
-  : { prev: 'Предишна страница', next: 'Следваща страница', zin: 'Увеличи', zout: 'Намали', close: 'Затвори', fail: 'Документът не може да се покаже тук. Използвайте връзката „Изтегли“ по-горе.', page: 'Страница' };
+  ? { prev: 'Previous page', next: 'Next page', zin: 'Zoom in', zout: 'Zoom out', close: 'Close', fail: 'The document cannot be shown here. Use the download link above.', page: 'Page', area: 'Document page — drag, scroll or use the arrow keys to move around' }
+  : { prev: 'Предишна страница', next: 'Следваща страница', zin: 'Увеличи', zout: 'Намали', close: 'Затвори', fail: 'Документът не може да се покаже тук. Използвайте връзката „Изтегли“ по-горе.', page: 'Страница', area: 'Страница от документа — плъзнете, превъртете или използвайте стрелките, за да я разгледате' };
 const BTN = 'min-width:44px;min-height:44px;';
 // Browsers refuse canvases much over ~16.7 million pixels (iOS Safari); past that the
 // page is drawn at this size and shown larger, slightly softer, instead of failing.
 const MAX_PIXELS = 16_000_000;
+// Grab-and-drag for mouse and pen: moves the zoomed page inside the viewer. Touch is left
+// to the browser, which already pans a scroll area with a finger.
+function panWithMouse(el) {
+  let start = null;
+  el.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch' || e.button !== 0) return;
+    if (el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight) return;
+    start = { x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop };
+    el.setPointerCapture(e.pointerId);
+    el.style.cursor = 'grabbing';
+    e.preventDefault();
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!start) return;
+    el.scrollLeft = start.left - (e.clientX - start.x);
+    el.scrollTop  = start.top  - (e.clientY - start.y);
+  });
+  const end = (e) => {
+    if (!start) return;
+    start = null;
+    if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+    el.style.cursor = 'grab';
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+}
+
 let current = null;   // { button, box, task }
 
 // restoreFocus is off when another document is being opened, so focus stays with that one.
@@ -44,9 +71,13 @@ async function open(button) {
     + '<button type="button" class="btn btn--outline" data-act="zout" style="' + BTN + '" aria-label="' + T.zout + '">−</button>'
     + '<button type="button" class="btn btn--outline" data-act="zin" style="' + BTN + '" aria-label="' + T.zin + '">+</button>'
     + '<button type="button" class="btn btn--outline" data-act="close" style="' + BTN + '">' + T.close + '</button>'
-    + '</div><div style="overflow:auto;border:1px solid var(--border);border-radius:8px;background:#f5f5f5;"><canvas style="display:block;margin:0 auto;max-width:none;"></canvas></div>';
+    + '</div><div data-report-scroll tabindex="0" role="region" aria-label="' + T.area + '"'
+    + ' style="overflow:auto;max-height:80vh;border:1px solid var(--border);border-radius:8px;background:#f5f5f5;outline-offset:2px;">'
+    + '<canvas style="display:block;margin:0 auto;max-width:none;"></canvas></div>';
 
   const canvas = box.querySelector('canvas');
+  const scroller = box.querySelector('[data-report-scroll]');
+  panWithMouse(scroller);
   const label = box.querySelector('[data-report-page]');
   let pdf, num = 1, zoom = 1, busy = false, again = false;
 
@@ -66,6 +97,7 @@ async function open(button) {
       canvas.setAttribute('aria-label', T.page + ' ' + num + ' / ' + pdf.numPages);
       await page.render({ canvas, canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
       label.textContent = num + ' / ' + pdf.numPages;
+      scroller.style.cursor = scroller.scrollWidth > scroller.clientWidth || scroller.scrollHeight > scroller.clientHeight ? 'grab' : '';
     } catch (err) {
       again = false;
       fail(box, err);   // say so in words instead of freezing on a page that will not draw

@@ -131,3 +131,45 @@ test('editing a document that no longer exists says so and stores nothing', asyn
   await expect(page.getByRole('alert').filter({ hasText: 'Документът вече не съществува' })).toBeVisible();
   expect(fs.readdirSync(DIR).filter((f) => !before.has(f))).toEqual([]);
 });
+
+/** Zoomed in on a computer: the whole page can be reached by dragging, and the scrollbars stay in view. */
+test.describe('zoomed in on a computer', () => {
+  test.use({ viewport: { width: 1024, height: 700 } });
+
+  test('dragging moves around the page, and the viewer fits the screen', async ({ page }) => {
+    await page.goto('/finansovi-otcheti/');
+    await page.getByRole('button', { name: 'Отвори' }).first().click();
+    await expect(page.locator('[data-report-page]')).toHaveText('1 / 3');
+    for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Увеличи' }).click();
+    const scroller = page.locator('[data-report-scroll]');
+    await expect.poll(() => scroller.evaluate((b) => b.scrollWidth > b.clientWidth)).toBe(true);
+
+    // The viewer is no taller than the window, so its scrollbars are on screen.
+    const [h, vh] = await scroller.evaluate((b) => [b.getBoundingClientRect().height, innerHeight]);
+    expect(h).toBeLessThanOrEqual(vh);
+    expect(await scroller.evaluate((b) => getComputedStyle(b).cursor)).toBe('grab');
+
+    // Grab the page and pull it left and up: we see more of its right side and lower part.
+    await scroller.scrollIntoViewIfNeeded();
+    const box = await scroller.boundingBox();
+    await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.7);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.2, { steps: 8 });
+    await page.mouse.up();
+    const [left, top] = await scroller.evaluate((b) => [b.scrollLeft, b.scrollTop]);
+    expect(left).toBeGreaterThan(100);
+    expect(top).toBeGreaterThan(100);
+  });
+
+  test('arrow keys move around the page once the viewer has focus', async ({ page }) => {
+    await page.goto('/finansovi-otcheti/');
+    await page.getByRole('button', { name: 'Отвори' }).first().click();
+    await expect(page.locator('[data-report-page]')).toHaveText('1 / 3');
+    for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Увеличи' }).click();
+    const scroller = page.locator('[data-report-scroll]');
+    await expect.poll(() => scroller.evaluate((b) => b.scrollWidth > b.clientWidth)).toBe(true);
+    await scroller.focus();
+    for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowRight');
+    await expect.poll(() => scroller.evaluate((b) => b.scrollLeft)).toBeGreaterThan(0);   // smooth scrolling finishes a moment later
+  });
+});
