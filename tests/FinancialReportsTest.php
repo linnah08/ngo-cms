@@ -115,4 +115,66 @@ final class FinancialReportsTest extends TestCase
         unlink($file);
         $this->assertSame(['years' => []], reports_load($file));
     }
+
+    private function upload(string $bytes, int $err = UPLOAD_ERR_OK): array
+    {
+        $tmp = tempnam(sys_get_temp_dir(), 'up');
+        file_put_contents($tmp, $bytes);
+        return ['name' => 'отчет.pdf', 'tmp_name' => $tmp, 'error' => $err, 'size' => strlen($bytes)];
+    }
+
+    private const PDF = "%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n";
+
+    public function testARealPdfPasses(): void
+    {
+        $this->assertNull(reports_check_upload($this->upload(self::PDF)));
+    }
+
+    /** Review Focus 2 */
+    public function testAnythingElseNamedPdfIsRefused(): void
+    {
+        foreach (["\xFF\xD8\xFF\xE0JFIF", '<html><script>x</script></html>', ''] as $bytes) {
+            $this->assertSame('Позволени са само PDF файлове.', reports_check_upload($this->upload($bytes)));
+        }
+    }
+
+    public function testPhpUploadErrorsBecomePlainWords(): void
+    {
+        $this->assertSame('Файлът е твърде голям за сървъра.', reports_check_upload($this->upload('', UPLOAD_ERR_INI_SIZE)));
+        $this->assertSame('Изберете PDF файл.', reports_check_upload($this->upload('', UPLOAD_ERR_NO_FILE)));
+        $this->assertNotNull(reports_check_upload($this->upload('', UPLOAD_ERR_PARTIAL)));
+        $this->assertNotNull(reports_check_upload([]));
+    }
+
+    /** Review Focus 4: a failed upload stores nothing. */
+    public function testStoringNamesTheFileAndRefusesWithoutLeavingAnything(): void
+    {
+        $dir = sys_get_temp_dir() . '/fr-' . bin2hex(random_bytes(4));
+        $move = static fn(string $from, string $to): bool => rename($from, $to);
+
+        $r = reports_store_upload($this->upload(self::PDF), 2025, $dir, $move);
+        $this->assertNull($r['error']);
+        $this->assertTrue(reports_file_name_ok($r['file']));
+        $this->assertStringStartsWith('2025-', $r['file']);
+        $this->assertFileExists($dir . '/' . $r['file']);
+
+        $bad = reports_store_upload($this->upload('<html>'), 2025, $dir, $move);
+        $this->assertNull($bad['file']);
+        $this->assertSame('Позволени са само PDF файлове.', $bad['error']);
+        $this->assertCount(1, glob($dir . '/*.pdf'));
+
+        array_map('unlink', glob($dir . '/*'));
+        rmdir($dir);
+    }
+
+    public function testTheReportsFolderServesOnlyPdfs(): void
+    {
+        $ht = (string) @file_get_contents(dirname(__DIR__) . '/assets/files/reports/.htaccess');
+        $this->assertMatchesRegularExpression('#<IfModule mod_php\.c>\s*php_flag engine off#', $ht, 'a bare php_flag is a 500 on PHP-FPM hosts');
+        $this->assertMatchesRegularExpression('#<IfModule mod_headers\.c>\s*Header set#', $ht);
+        $this->assertMatchesRegularExpression('/FilesMatch/', $ht);
+        $gi = (string) file_get_contents(dirname(__DIR__) . '/.gitignore');
+        $this->assertStringContainsString('/content/financial-reports.json', $gi);
+        $this->assertStringContainsString('/assets/files/reports/*.pdf', $gi);
+    }
 }

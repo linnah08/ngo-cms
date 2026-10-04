@@ -1,0 +1,20 @@
+# Yearly report PDFs: public on purpose. Serve only PDFs; never run anything here.
+# Module-specific lines sit in IfModule blocks: on PHP-FPM hosts a bare php_flag
+# is a 500 error. Refusing every non-PDF file is what keeps scripts from running.
+<IfModule mod_php.c>
+  php_flag engine off
+</IfModule>
+<FilesMatch "\.(?!pdf$)[^.]+$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Deny from all
+  </IfModule>
+</FilesMatch>
+<FilesMatch "\.pdf$">
+  ForceType application/pdf
+  <IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+  </IfModule>
+</FilesMatch>

@@ -143,3 +143,29 @@ function reports_any_published(?array $d = null): bool {
     }
     return false;
 }
+
+/** null when $entry is a real PDF upload; otherwise a plain Bulgarian message. */
+function reports_check_upload(array $entry): ?string {
+    $err = $entry['error'] ?? UPLOAD_ERR_NO_FILE;
+    if ($err === UPLOAD_ERR_NO_FILE) return 'Изберете PDF файл.';
+    if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE) return 'Файлът е твърде голям за сървъра.';
+    if ($err !== UPLOAD_ERR_OK) return 'Файлът не се качи докрай. Опитайте отново.';
+    $tmp = (string) ($entry['tmp_name'] ?? '');
+    if ($tmp === '' || !is_file($tmp)) return 'Файлът не се качи докрай. Опитайте отново.';
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($tmp);
+    $head = (string) file_get_contents($tmp, false, null, 0, 5);
+    if ($mime !== 'application/pdf' || $head !== '%PDF-') return 'Позволени са само PDF файлове.';
+    return null;
+}
+
+/** @return array{file: ?string, error: ?string} */
+function reports_store_upload(array $entry, int $year, ?string $dir = null, ?callable $move = null): array {
+    $error = reports_check_upload($entry);
+    if ($error !== null) return ['file' => null, 'error' => $error];
+    $dir  ??= REPORTS_DIR;
+    $move ??= 'move_uploaded_file';
+    if (!is_dir($dir) && !mkdir($dir, 0755, true)) return ['file' => null, 'error' => 'Папката за отчети не може да се създаде.'];
+    $file = sprintf('%04d-%s.pdf', $year, bin2hex(random_bytes(4)));
+    if (!$move($entry['tmp_name'], $dir . '/' . $file)) return ['file' => null, 'error' => 'Файлът не можа да се запише на сървъра.'];
+    return ['file' => $file, 'error' => null];
+}
