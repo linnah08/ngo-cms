@@ -24,9 +24,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $year   = filter_var($_POST['year'] ?? null, FILTER_VALIDATE_INT) ?: 0;
     $done   = null;
 
+    // Every save is checked: a failed write says so, keeps the files that were there, and
+    // removes a just-uploaded file nothing points to.
+    $save_failed = 'Промените не можаха да се запазят. Опитайте отново; ако се повтаря, обърнете се към човека, който поддържа сайта.';
+    $drop = static function (?string $f): void { if ($f && reports_file_name_ok($f)) @unlink(REPORTS_DIR . '/' . $f); };
+
     if ($action === 'add_year') {
         $r = reports_add_year($d, $year);
-        if (is_string($r)) $error = $r; else { reports_save($r); $done = 'year_added'; }
+        if (is_string($r)) $error = $r;
+        elseif (!reports_save($r)) $error = $save_failed;
+        else $done = 'year_added';
     } elseif ($action === 'add_doc' || $action === 'edit_doc') {
         $form = ['mode' => $action, 'year' => $year, 'id' => $id, 'fields' => $fields];
         $has_file = ($_FILES['pdf']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
@@ -37,28 +44,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($up['error'] !== null) {
                 $error = $up['error'];
             } elseif ($action === 'add_doc') {
-                reports_save(reports_add_document($d, $year, $fields, $up['file'])); $done = 'doc_added';
+                if (reports_save(reports_add_document($d, $year, $fields, $up['file']))) $done = 'doc_added';
+                else { $drop($up['file']); $error = $save_failed; }
             } else {
                 $old = reports_delete_document($d, $id)['file'];
-                reports_save(reports_update_document($d, $id, $fields, $up['file']));
-                if ($old && reports_file_name_ok($old)) @unlink(REPORTS_DIR . '/' . $old);   // only after the new file and JSON are in place
-                $done = 'doc_saved';
+                if (reports_save(reports_update_document($d, $id, $fields, $up['file']))) {
+                    $drop($old);   // only after the new file and the JSON are in place
+                    $done = 'doc_saved';
+                } else { $drop($up['file']); $error = $save_failed; }
             }
+        } elseif (reports_save(reports_update_document($d, $id, $fields))) {
+            $done = 'doc_saved';
         } else {
-            reports_save(reports_update_document($d, $id, $fields)); $done = 'doc_saved';
+            $error = $save_failed;
         }
     } elseif ($action === 'move_doc') {
-        reports_save(reports_move_document($d, $id, ($_POST['dir'] ?? '') === 'up' ? -1 : 1)); $done = 'doc_moved';
+        if (reports_save(reports_move_document($d, $id, ($_POST['dir'] ?? '') === 'up' ? -1 : 1))) $done = 'doc_moved';
+        else $error = $save_failed;
     } elseif ($action === 'delete_doc') {
         $r = reports_delete_document($d, $id);
-        reports_save($r['data']);
-        if ($r['file'] && reports_file_name_ok($r['file'])) @unlink(REPORTS_DIR . '/' . $r['file']);
-        $done = 'doc_deleted';
+        if (reports_save($r['data'])) { $drop($r['file']); $done = 'doc_deleted'; }
+        else $error = $save_failed;
     } elseif ($action === 'delete_year') {
         $r = reports_delete_year($d, $year);
-        reports_save($r['data']);
-        foreach ($r['files'] as $f) if (reports_file_name_ok($f)) @unlink(REPORTS_DIR . '/' . $f);
-        $done = 'year_deleted';
+        if (reports_save($r['data'])) { array_map($drop, $r['files']); $done = 'year_deleted'; }
+        else $error = $save_failed;
     }
 
     if ($done !== null) { header('Location: /admin/financial-reports.php?msg=' . $done); exit; }

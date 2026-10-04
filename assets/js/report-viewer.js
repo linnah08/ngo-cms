@@ -8,22 +8,32 @@ const T = EN
   ? { prev: 'Previous page', next: 'Next page', zin: 'Zoom in', zout: 'Zoom out', close: 'Close', fail: 'The document cannot be shown here. Use the download link above.', page: 'Page' }
   : { prev: 'Предишна страница', next: 'Следваща страница', zin: 'Увеличи', zout: 'Намали', close: 'Затвори', fail: 'Документът не може да се покаже тук. Използвайте връзката „Изтегли“ по-горе.', page: 'Страница' };
 const BTN = 'min-width:44px;min-height:44px;';
-let current = null;   // { button, box }
+// Browsers refuse canvases much over ~16.7 million pixels (iOS Safari); past that the
+// page is drawn at this size and shown larger, slightly softer, instead of failing.
+const MAX_PIXELS = 16_000_000;
+let current = null;   // { button, box, task }
 
-function close() {
+// restoreFocus is off when another document is being opened, so focus stays with that one.
+function close({ restoreFocus = true } = {}) {
   if (!current) return;
+  if (current.task) current.task.destroy();   // ends this document's PDF worker
   current.box.hidden = true;
   current.box.innerHTML = '';
   current.button.setAttribute('aria-expanded', 'false');
-  current.button.focus();
+  if (restoreFocus) current.button.focus();
   current = null;
+}
+
+function fail(box, err) {
+  box.innerHTML = '<p role="alert" style="margin:0;color:#7f1d1d;font-weight:600;">' + T.fail + '</p>';
+  console.error('report viewer:', err);
 }
 
 async function open(button) {
   if (current && current.button === button) { close(); return; }
-  close();
+  close({ restoreFocus: false });
   const box = document.getElementById(button.getAttribute('aria-controls'));
-  current = { button, box };
+  current = { button, box, task: null };
   button.setAttribute('aria-expanded', 'true');
   box.hidden = false;
   box.innerHTML =
@@ -44,16 +54,25 @@ async function open(button) {
   async function render() {
     if (busy) { again = true; return; }
     busy = true;
-    const page = await pdf.getPage(num);
-    const fit = (box.clientWidth - 2) / page.getViewport({ scale: 1 }).width;
-    const dpr = window.devicePixelRatio || 1;
-    const vp = page.getViewport({ scale: fit * zoom * dpr });
-    canvas.width = vp.width; canvas.height = vp.height;
-    canvas.style.width = (vp.width / dpr) + 'px';
-    canvas.setAttribute('aria-label', T.page + ' ' + num + ' / ' + pdf.numPages);
-    await page.render({ canvas, canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
-    label.textContent = num + ' / ' + pdf.numPages;
-    busy = false;
+    try {
+      const page = await pdf.getPage(num);
+      const fit = (box.clientWidth - 2) / page.getViewport({ scale: 1 }).width;
+      const dpr = window.devicePixelRatio || 1;
+      const want = page.getViewport({ scale: fit * zoom * dpr });
+      const shrink = Math.min(1, Math.sqrt(MAX_PIXELS / (want.width * want.height)));
+      const vp = page.getViewport({ scale: fit * zoom * dpr * shrink });
+      canvas.width = Math.floor(vp.width); canvas.height = Math.floor(vp.height);
+      canvas.style.width = (want.width / dpr) + 'px';   // shown at the asked size even when drawn smaller
+      canvas.setAttribute('aria-label', T.page + ' ' + num + ' / ' + pdf.numPages);
+      await page.render({ canvas, canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+      label.textContent = num + ' / ' + pdf.numPages;
+    } catch (err) {
+      again = false;
+      fail(box, err);   // say so in words instead of freezing on a page that will not draw
+      return;
+    } finally {
+      busy = false;
+    }
     if (again) { again = false; render(); }
   }
 
@@ -71,11 +90,11 @@ async function open(button) {
   box.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
 
   try {
-    pdf = await pdfjsLib.getDocument({ url: button.dataset.reportOpen }).promise;   // PDF.js 6 takes an options object only
+    current.task = pdfjsLib.getDocument({ url: button.dataset.reportOpen });   // PDF.js 6 takes an options object only
+    pdf = await current.task.promise;
     await render();
   } catch (err) {
-    box.innerHTML = '<p role="alert" style="margin:0;color:#7f1d1d;font-weight:600;">' + T.fail + '</p>';
-    console.error('report viewer:', err);
+    fail(box, err);
   }
 }
 

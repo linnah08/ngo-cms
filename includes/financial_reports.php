@@ -17,7 +17,7 @@ function reports_save(array $d, ?string $file = null): bool {
     $file ??= REPORTS_FILE;
     if (!is_dir(dirname($file))) mkdir(dirname($file), 0755, true);
     $json = json_encode(reports_sorted($d), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-    return file_put_contents($file, $json, LOCK_EX) !== false;
+    return @file_put_contents($file, $json, LOCK_EX) !== false;   // the caller shows a plain message on false
 }
 
 function reports_sorted(array $d): array {
