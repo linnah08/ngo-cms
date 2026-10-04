@@ -219,6 +219,9 @@ final class BulkActionsTest extends TestCase
 
     public function testBackerShippedToggleIsSmartAndSkipsPledgesWithoutAReward(): void
     {
+        if (function_exists('feature_enabled') && !feature_enabled('campaign')) {
+            $this->markTestSkipped('The campaign module is switched off on this site.');
+        }
         $rid = (int) $this->db()->query('SELECT id FROM campaign_rewards ORDER BY id LIMIT 1')->fetchColumn();
         if (!$rid) $this->markTestSkipped('No campaign reward in the DB.');
 

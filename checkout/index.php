@@ -1035,7 +1035,7 @@ $subtotal  = $cart_info['subtotal'];
         </label>
       </fieldset>
 
-      <div style="display:flex;gap:1rem;align-items:center;">
+      <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:center;">
         <button type="submit" class="btn btn--primary" style="padding:.9rem 2rem;font-size:1rem;">
           <?= h(t_or('checkout.btn.confirm', 'Потвърди поръчката', 'Confirm order')) ?> <span aria-hidden="true">→</span>
         </button>
