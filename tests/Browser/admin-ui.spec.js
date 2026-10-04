@@ -1,10 +1,33 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
+const fs   = require('fs');
 const path = require('path');
 
-const AUTH_FILE = path.join(__dirname, '../../.playwright-auth.json');
+const ROOT      = path.join(__dirname, '../..');
+const AUTH_FILE = path.join(ROOT, '.playwright-auth.json');
 
 test.use({ storageState: AUTH_FILE });
+
+// Its own published BG/EN article, so the article and news checks don't depend on
+// whatever content this site happens to have (a fresh checkout has none).
+const SLUG    = 'pw-admin-ui';
+const BG_FILE = path.join(ROOT, 'content/articles/bg', SLUG + '.json');
+const EN_FILE = path.join(ROOT, 'content/articles/en', SLUG + '.json');
+
+test.beforeAll(() => {
+  const post = (title) => ({
+    title, slug: SLUG, slug_en: SLUG, date: '2026-10-04', author: 'PW', status: 'published',
+    excerpt: '', image: '', tags: [], content: '<p>x</p>', scheduled: false,
+  });
+  for (const [file, title] of [[BG_FILE, 'PW админ'], [EN_FILE, 'PW admin']]) {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify(post(title)));
+  }
+});
+
+test.afterAll(() => {
+  for (const f of [BG_FILE, EN_FILE]) if (fs.existsSync(f)) fs.unlinkSync(f);
+});
 
 // ── Articles ──────────────────────────────────────────────────────────────────
 
@@ -16,9 +39,7 @@ test('articles list loads and has table', async ({ page }) => {
 test('article edit page has save button above and below form', async ({ page }) => {
   await page.goto('/admin/articles.php');
 
-  // Click the first article's edit link
-  const firstEditLink = page.locator('a[href*="article-edit.php?slug"]').first();
-  await firstEditLink.click();
+  await page.locator(`a[href*="article-edit.php?slug=${SLUG}"]`).first().click();
   await page.waitForLoadState('networkidle');
 
   // Save button in page header (top)
@@ -33,8 +54,7 @@ test('article edit page has save button above and below form', async ({ page }) 
 
 test('article edit has TinyMCE toolbar with link button', async ({ page }) => {
   await page.goto('/admin/articles.php');
-  const firstEditLink = page.locator('a[href*="article-edit.php?slug"]').first();
-  await firstEditLink.click();
+  await page.locator(`a[href*="article-edit.php?slug=${SLUG}"]`).first().click();
 
   // Wait for TinyMCE to initialise
   await page.waitForFunction(() => typeof window.tinymce !== 'undefined' && !!tinymce.activeEditor);
@@ -77,8 +97,11 @@ test('product edit has save button and TinyMCE', async ({ page }) => {
 // ── Orders ────────────────────────────────────────────────────────────────────
 
 test('orders list loads', async ({ page }) => {
-  await page.goto('/admin/orders.php');
-  await expect(page.locator('table.admin-table')).toBeVisible();
+  const res = await page.goto('/admin/orders.php');
+  expect(res?.status()).toBe(200);
+  // Orders live in the database, which a test doesn't write to: a site with none
+  // shows its empty-state line instead of the table.
+  await expect(page.locator('table.admin-table').or(page.getByText('Няма поръчки.'))).toBeVisible();
 });
 
 // ── Public pages ──────────────────────────────────────────────────────────────
@@ -96,6 +119,12 @@ test('shop page loads with product cards', async ({ page }) => {
 test('news page loads with article cards', async ({ page }) => {
   await page.goto('/novini/');
   await expect(page.locator('.article-grid')).toBeVisible();
+  await expect(page.locator(`.article-grid a[href="/novini/${SLUG}/"]`).first()).toBeVisible();
+});
+
+test('English news page loads with article cards', async ({ page }) => {
+  await page.goto('/en/news/');
+  await expect(page.locator(`.article-grid a[href="/en/news/${SLUG}/"]`).first()).toBeVisible();
 });
 
 // ── Navigation ────────────────────────────────────────────────────────────────
