@@ -23,6 +23,10 @@ $static = [
 if (feature_enabled('donations')) {
     array_push($static, '/donation/', '/en/donation/');
 }
+require_once __DIR__ . '/includes/financial_reports.php';
+if (reports_any_published()) {
+    array_push($static, '/finansovi-otcheti/', '/en/financial-reports/');
+}
 foreach ($static as $p) {
     $urls[] = [$base . $p, null];
 }

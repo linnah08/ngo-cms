@@ -24,6 +24,7 @@ $_path_map_bg_to_en = [
     '/politika-za-biskvitki'     => '/en/cookie-policy',
     '/pravna-informaciya'        => '/en/legal',
     '/usloviya'                  => '/en/terms',
+    '/finansovi-otcheti'         => '/en/financial-reports',
     '/'                          => '/en',
 ];
 
