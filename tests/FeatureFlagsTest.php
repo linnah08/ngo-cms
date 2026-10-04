@@ -80,7 +80,7 @@ final class FeatureFlagsTest extends TestCase
             ['admin/home-sections.php'],
             ['kak-da-pomogna/index.php'],
             ['en/how-to-help/index.php'],
-            ['templates/header.php'],
+            ['includes/menus.php'], // the BG↔EN address map the header's language switch uses
             ['admin/includes/admin-header.php'],
             ['admin/dashboard.php'],
             ['admin/pages.php'],

@@ -8,67 +8,11 @@ $other = other_lang();
 $other_label = $other === 'en' ? 'EN' : 'БГ';
 $current_path = url_request_path($_SERVER['REQUEST_URI'] ?? '/');
 
-// BG path prefix → EN path prefix (longest match wins)
-$_path_map_bg_to_en = [
-    '/novini'                    => '/en/news',
-    '/za-nas'                    => '/en/about',
-    '/proekti'                   => '/en/projects',
-    '/kak-da-pomogna'            => '/en/how-to-help',
-    '/kontakti'                  => '/en/contacts',
-    '/magazin'                   => '/en/shop',
-    '/cart'                      => '/en/cart',
-    '/checkout'                  => '/en/checkout',
-    '/donation'                  => '/en/donation',
-    '/campaign'                  => '/en/campaign',
-    '/politika-za-poveritelnost' => '/en/privacy-policy',
-    '/politika-za-biskvitki'     => '/en/cookie-policy',
-    '/pravna-informaciya'        => '/en/legal',
-    '/usloviya'                  => '/en/terms',
-    '/finansovi-otcheti'         => '/en/financial-reports',
-    '/'                          => '/en',
-];
-
-// Campaign module off: the /campaign pair does not exist, so it must not take
-// part in longest-match path switching either.
-if (!feature_enabled('campaign')) {
-    unset($_path_map_bg_to_en['/campaign']);
-}
+// BG ↔ EN page addresses — one map, shared with the menu editor.
+require_once __DIR__ . '/../includes/menus.php';
 
 function _switch_lang(string $path, string $current_lang): string {
-    global $_path_map_bg_to_en;
-
-    $trailing = str_ends_with($path, '/') ? '/' : '';
-    $p = rtrim($path, '/');
-
-    if ($current_lang === 'bg') {
-        // BG → EN: match longest prefix first
-        arsort($_path_map_bg_to_en); // sort by value length, but key length matters
-        $sorted = $_path_map_bg_to_en;
-        uksort($sorted, fn($a, $b) => strlen($b) - strlen($a));
-        foreach ($sorted as $bg => $en) {
-            $bg_clean = rtrim($bg, '/');
-            if ($p === $bg_clean || str_starts_with($p, $bg_clean . '/')) {
-                return $en . substr($p, strlen($bg_clean)) . $trailing;
-            }
-        }
-        return '/en' . $path;
-    } else {
-        // EN → BG: strip /en prefix, reverse-map
-        $without_en = substr($p, 3); // remove leading /en
-        $sorted = $_path_map_bg_to_en;
-        uksort($sorted, fn($a, $b) => strlen($b) - strlen($a));
-        foreach ($sorted as $bg => $en) {
-            $en_clean = rtrim($en, '/');
-            $en_part  = substr($en_clean, 3); // remove /en from map value
-            if ($without_en === $en_part || str_starts_with($without_en, $en_part . '/')) {
-                $bg_clean = rtrim($bg, '/');
-                $result = $bg_clean . substr($without_en, strlen($en_part));
-                $final  = $result . $trailing;
-                return $final !== '' ? $final : '/';
-            }
-        }
-        return $without_en . $trailing ?: '/';
-    }
+    return $current_lang === 'bg' ? path_bg_to_en($path) : path_en_to_bg($path);
 }
 
 $_menus    = load_json(CONTENT_PATH . '/menus.json');

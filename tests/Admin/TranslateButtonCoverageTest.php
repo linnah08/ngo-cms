@@ -16,8 +16,8 @@ final class TranslateButtonCoverageTest extends TestCase
 {
     /** Fields with no Bulgarian counterpart to translate from, and why. */
     private const EXEMPT = [
-        // BG and EN menus are separate lists with their own rows and URLs.
-        'menus.php'        => ['label_en', 'url_en'],
+        // An address, filled from the BG address by the page map — not text to translate.
+        'menus.php'        => ['url_en'],
         // URL slug, built from the English title — not text to translate.
         'article-edit.php' => ['slug_en'],
     ];
