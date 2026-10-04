@@ -118,3 +118,15 @@ test('cropping a photo keeps its English caption', async ({ page }) => {
   await expect.poll(() => page.locator('#apGrid .ap-photo').nth(1).getAttribute('data-src')).not.toBe('/assets/images/articles/_pw-grid/p2.jpg');
   expect(await enCaps(page)).toEqual(['One', 'Two', 'Three']);
 });
+
+/** Trello #24: every photo-card button keeps its label inside it, also at phone width. */
+for (const [name, viewport] of [['computer', { width: 1280, height: 900 }], ['phone', { width: 375, height: 812 }]]) {
+  test(`photo card buttons keep their labels inside (${name})`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.goto('/admin/article-edit.php?slug=' + SLUG);
+    const spill = await page.$$eval('#apGrid .ap-photo button', (els) => els
+      .filter((b) => b.scrollWidth > b.clientWidth + 1 || b.getBoundingClientRect().right > b.closest('.ap-photo').getBoundingClientRect().right + 1)
+      .map((b) => b.textContent.trim() + ' ' + b.scrollWidth + '>' + b.clientWidth));
+    expect(spill).toEqual([]);
+  });
+}

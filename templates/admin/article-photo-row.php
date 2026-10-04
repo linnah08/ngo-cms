@@ -8,7 +8,8 @@
  */
 $n   = $i + 1;
 $uid = 'photo_caption_bg' . $n . '_' . substr(md5($photo['src']), 0, 6);  // id prefix = the BG field's name, so the translate coverage test can resolve it
-$b   = 'min-height:44px;min-width:44px;';
+// Cards can be ~180px wide: buttons may wrap and use tight padding, so no label spills out.
+$b   = 'min-height:44px;min-width:44px;white-space:normal;padding:.4rem .6rem;justify-content:center;text-align:center;line-height:1.2;';
 $missing = $missing ?? false;
 ?>
 <li class="ap-photo" data-src="<?= h($photo['src']) ?>" data-key="k<?= $i ?>"
@@ -22,7 +23,7 @@ $missing = $missing ?? false;
   <?php endif; ?>
   <div style="display:flex;flex-wrap:wrap;gap:.35rem;">
     <button type="button" class="btn <?= $main ? 'btn--primary' : 'btn--outline' ?> ap-main" aria-pressed="<?= $main ? 'true' : 'false' ?>"
-            aria-label="Направи снимка <?= $n ?> основна" style="<?= $b ?>"><?= $main ? '<span aria-hidden="true">★</span> Основна снимка' : 'Направи основна' ?></button>
+            aria-label="Направи снимка <?= $n ?> основна" style="<?= $b ?>flex:1 1 100%;"><?= $main ? '<span aria-hidden="true">★</span> Основна снимка' : 'Направи основна' ?></button>
     <button type="button" class="btn btn--outline ap-up" aria-label="Премести снимка <?= $n ?> нагоре" style="<?= $b ?>">↑</button>
     <button type="button" class="btn btn--outline ap-down" aria-label="Премести снимка <?= $n ?> надолу" style="<?= $b ?>">↓</button>
     <button type="button" class="btn btn--outline ap-crop" aria-label="Изрежи снимка <?= $n ?>" style="<?= $b ?>">Изрежи</button>
