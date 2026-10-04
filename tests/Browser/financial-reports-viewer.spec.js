@@ -106,3 +106,28 @@ test('a save that cannot be written says so and keeps the old file', async ({ pa
   // The just-uploaded file was removed again: nothing new is left behind.
   expect(fs.readdirSync(DIR).filter((f) => !before.has(f))).toEqual([]);
 });
+
+/** A year deleted meanwhile (another tab, or a deploy that wiped the data): say so, keep nothing. */
+test('adding a document to a year that no longer exists says so and stores nothing', async ({ page }) => {
+  const before = new Set(fs.readdirSync(DIR));
+  await page.goto('/admin/financial-reports.php?add=2025');
+  // The year disappears after the form was opened.
+  fs.writeFileSync(DATA, JSON.stringify({ years: [] }));
+  await page.fill('#title_bg', 'Изгубен');
+  await page.setInputFiles('#pdf', { name: 'n.pdf', mimeType: 'application/pdf', buffer: pdf(1) });
+  await page.getByRole('button', { name: 'Запази' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Годината 2025 вече не съществува' })).toBeVisible();
+  await expect(page.getByRole('status')).toHaveCount(0);
+  expect(fs.readdirSync(DIR).filter((f) => !before.has(f))).toEqual([]);
+});
+
+test('editing a document that no longer exists says so and stores nothing', async ({ page }) => {
+  const before = new Set(fs.readdirSync(DIR));
+  await page.goto('/admin/financial-reports.php?edit=aaaa0001');
+  fs.writeFileSync(DATA, JSON.stringify({ years: [{ year: 2025, documents: [] }] }));
+  await page.fill('#title_bg', 'Изгубен');
+  await page.setInputFiles('#pdf', { name: 'n.pdf', mimeType: 'application/pdf', buffer: pdf(1) });
+  await page.getByRole('button', { name: 'Запази' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Документът вече не съществува' })).toBeVisible();
+  expect(fs.readdirSync(DIR).filter((f) => !before.has(f))).toEqual([]);
+});

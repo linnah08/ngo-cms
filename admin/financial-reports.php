@@ -37,8 +37,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'add_doc' || $action === 'edit_doc') {
         $form = ['mode' => $action, 'year' => $year, 'id' => $id, 'fields' => $fields];
         $has_file = ($_FILES['pdf']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+        $year_there = in_array($year, array_map('intval', array_column($d['years'], 'year')), true);
+        $doc_there  = false;
+        foreach ($d['years'] as $y) foreach ($y['documents'] ?? [] as $doc) if (($doc['id'] ?? '') === $id) $doc_there = true;
         if ($fields['title_bg'] === '') {
             $error = 'Заглавието е задължително.';
+        } elseif ($action === 'add_doc' && !$year_there) {
+            // Checked before the upload is stored, so nothing is left behind.
+            $error = "Годината {$year} вече не съществува — може да е изтрита междувременно. Добавете я отново и опитайте пак.";
+        } elseif ($action === 'edit_doc' && !$doc_there) {
+            $error = 'Документът вече не съществува — може да е изтрит междувременно.';
         } elseif ($action === 'add_doc' || $has_file) {
             $up = reports_store_upload($_FILES['pdf'] ?? [], $year ?: (int) date('Y'));
             if ($up['error'] !== null) {
