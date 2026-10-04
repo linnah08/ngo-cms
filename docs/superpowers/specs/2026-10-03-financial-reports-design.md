@@ -64,7 +64,7 @@ content pages. It is for admins and authors (`admin_require_editorial()`), like 
   be deleted. A year with documents asks first, then deletes the year and its files.
 - Every form posts with `csrf_field()`; every handler starts with `csrf_verify()`.
 - Messages are persistent and visible (no auto-dismiss): "Документът е добавен",
-  "Файлът е по-голям от позволеното (32 MB)", "Позволени са само PDF файлове".
+  "Файлът е твърде голям за сървъра", "Позволени са само PDF файлове".
 
 ## Files and storage
 
@@ -82,22 +82,13 @@ content pages. It is for admins and authors (`admin_require_editorial()`), like 
   `<year>-<id>.pdf` by the server, and the uploaded name is never used. They are public
   on purpose. A `.htaccess` in that folder serves only `.pdf` and turns off script
   execution, as defence in depth.
-- **Upload checks** (server side):
-  - `UPLOAD_ERR_OK`;
-  - `finfo` MIME type `application/pdf`, and the file starts with `%PDF-`;
-  - size at most `REPORTS_MAX_BYTES` (32 MB);
-  - the move into the folder succeeds.
+- **Upload checks** (server side): `UPLOAD_ERR_OK`, `finfo` MIME `application/pdf` and the
+  file starting with `%PDF-`, and a successful move into the folder. PHP's own upload
+  errors (including "file too big" from the server's existing limits) become plain
+  Bulgarian messages; there is no limit of our own and no change to the server's limits.
   Any failure keeps the rest of the form's input and shows the message.
-- **Upload limits.** `admin/.user.ini` goes from 8M / 10M to `upload_max_filesize = 32M`
-  and `post_max_size = 34M`. The `.htaccess` `php_value` pair gets the same values, for
-  hosts running mod_php. **To verify on the test site before relying on it:** that the
-  host honours the new value (cPanel's MultiPHP may cap it). If it doesn't, the form's
-  limit message names the real limit, read from `ini_get('upload_max_filesize')`.
-- **The release never ships a site's reports.** `assets/files/reports/` and
-  `content/financial-reports.json` are added to both exclusion lists in
-  `tests/release-gate/build-zip.sh` (the checksums `$dirPrefixes` / `$exactFiles` and the
-  `zip -x` list). Being gitignored already keeps them out; this guards against a build
-  from a dirty tree.
+- `assets/files/reports/` and `content/financial-reports.json` are gitignored, so a
+  release (built from git) never carries a site's reports.
 
 ## Code
 
@@ -153,8 +144,8 @@ content pages. It is for admins and authors (`admin_require_editorial()`), like 
   - delete year returns its files;
   - the public list orders newest first, falls back to BG, flags missing files, and
     rejects bad file names;
-  - `reports_check_upload` refuses non-PDF content with a `.pdf` name, files that are
-    too big, and upload errors.
+  - `reports_check_upload` refuses non-PDF content with a `.pdf` name and turns PHP
+    upload errors into plain messages.
 - **Template:**
   - empty state;
   - escaping of titles and descriptions;
@@ -167,8 +158,6 @@ content pages. It is for admins and authors (`admin_require_editorial()`), like 
   - every POST without a valid CSRF token is refused;
   - `TranslateButtonCoverageTest` passes for the EN fields;
   - the webroot guard test covers the new public pages.
-- **Release:** `build-zip.sh` excludes `assets/files/reports/` and
-  `content/financial-reports.json`.
 - **Browser (Playwright):**
   - add a year and a document with a small PDF, see it on `/finansovi-otcheti/` and
     `/en/financial-reports/`;
