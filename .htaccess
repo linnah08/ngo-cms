@@ -108,6 +108,17 @@ ErrorDocument 503 /errors/503.php
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^en/shop/([^/]+)/?$ /magazin/index.php [L,QSA]
+
+  # Pages created in Admin → Страници: /<name>/ and /en/<name>/. Only when no
+  # real file or folder has that name, so a built-in page always wins. page.php
+  # shows the page, or the 404 page when there is no such (published) page.
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^en/([a-z0-9-]+)/?$ /page.php [L,QSA]
+
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^([a-z0-9-]+)/?$ /page.php [L,QSA]
 </IfModule>
 
 # Security headers

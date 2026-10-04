@@ -18,7 +18,9 @@ OUT="${1:?usage: build-zip.sh <output.zip>}"
 # checksums must describe exactly what's in the zip.
 php -r '
 $root        = getcwd();
-$dirPrefixes = [".git", ".github", "tests", "node_modules", ".githooks", "relay", "docs"];
+$dirPrefixes = [".git", ".github", "tests", "node_modules", ".githooks", "relay", "docs",
+                // Site-owned: the pages an admin created (Admin → Страници).
+                "content/pages", "assets/images/pages/created"];
 $exactFiles  = ["phpunit.xml", "playwright.config.js", "package.json", "package-lock.json", "deploy.php",
                 "CLAUDE.md", ".gitignore",
                 // Site-owned: a site keeps its own theme and wording here, and a
@@ -55,5 +57,6 @@ zip -rq "$OUT" . \
      "*.zip" ".phpunit*" "phpunit.xml" "playwright.config.js" \
      "package.json" "package-lock.json" ".githooks/*" "deploy.php" \
      "relay/*" "docs/*" "CLAUDE.md" ".gitignore" \
-     "includes/themes-site.php" "content/bg/strings.site.json" "content/en/strings.site.json"
+     "includes/themes-site.php" "content/bg/strings.site.json" "content/en/strings.site.json" \
+     "content/pages/*" "assets/images/pages/created/*"
 echo "Built $OUT"

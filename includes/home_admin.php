@@ -6,6 +6,21 @@ require_once __DIR__ . '/home.php';
 
 const HS_SR = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;';
 
+/**
+ * Address of the section editor for the document being edited, with $q as its query:
+ * /admin/home-sections.php for the front page, /admin/page-edit.php?id=… for a created page.
+ */
+function hs_url(array $q = []): string {
+    $t = home_target();
+    if ($t['kind'] === 'page') {
+        $q = ['id' => $t['id']] + $q;
+        $base = '/admin/page-edit.php';
+    } else {
+        $base = '/admin/home-sections.php';
+    }
+    return $base . ($q ? '?' . http_build_query($q, '', '&', PHP_QUERY_RFC3986) : '');
+}
+
 function hs_badge(string $lang): string {
     return $lang === 'bg'
         ? '<span style="font-size:.68rem;font-weight:700;background:#dcfce7;color:#166534;border-radius:3px;padding:.05rem .35rem;margin-left:.4rem;vertical-align:middle;">BG</span>'
@@ -175,7 +190,7 @@ function hs_action_form(string $action, array $s, int $rev, string $label, strin
     $confirm = $action === 'delete'
         ? ' data-confirm="' . h('Да изтрия ли „' . home_section_name($s) . '“? Това не може да се върне.') . '" data-confirm-ok="Да, изтрий"'
         : '';
-    return '<form method="POST" action="/admin/home-sections.php" style="display:inline;margin:0;"' . $confirm . '>'
+    return '<form method="POST" action="' . h(hs_url()) . '" style="display:inline;margin:0;"' . $confirm . '>'
          . csrf_field()
          . '<input type="hidden" name="action" value="' . h($action) . '">'
          . '<input type="hidden" name="id" value="' . h($id) . '">'

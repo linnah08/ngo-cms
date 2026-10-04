@@ -12,8 +12,10 @@
  * templates/header.php and the EN address the menu editor fills in.
  */
 
-/** BG path prefix → EN path prefix (longest match wins). */
-function path_map_bg_to_en(): array
+require_once __DIR__ . '/created_pages.php';
+
+/** The built-in pages: BG path prefix → EN path prefix (longest match wins). */
+function path_map_builtin(): array
 {
     $map = [
         '/novini'                    => '/en/news',
@@ -40,6 +42,92 @@ function path_map_bg_to_en(): array
     }
     uksort($map, fn($a, $b) => strlen($b) - strlen($a));
     return $map;
+}
+
+/**
+ * BG path prefix → EN path prefix for every page of the site: the built-in ones
+ * and the pages created in Admin → Страници (drafts too — the menu editor and
+ * the language switcher both need a draft's pair). Longest match wins; a built-in
+ * page always wins over a created one.
+ */
+function path_map_bg_to_en(): array
+{
+    $map = path_map_builtin();
+    foreach (cpage_all() as $p) {
+        if ($p['slug_bg'] === '' || $p['slug_en'] === '') continue;
+        $map += ['/' . $p['slug_bg'] => '/en/' . $p['slug_en']];
+    }
+    uksort($map, fn($a, $b) => strlen($b) - strlen($a));
+    return $map;
+}
+
+/** Readable names of the built-in pages, by BG path — for the menu editor's page picker. */
+function path_builtin_names(): array
+{
+    $names = [
+        '/'                          => 'Начална страница',
+        '/za-nas'                    => 'За нас',
+        '/proekti'                   => 'Проекти',
+        '/novini'                    => 'Новини',
+        '/kak-da-pomogna'            => 'Как да помогна',
+        '/kontakti'                  => 'Контакти',
+        '/magazin'                   => 'Магазин',
+        '/donation'                  => 'Дарение',
+        '/campaign'                  => 'Кампания',
+        '/finansovi-otcheti'         => 'Финансови отчети',
+        '/cart'                      => 'Количка',
+        '/checkout'                  => 'Поръчка (плащане)',
+        '/politika-za-poveritelnost' => 'Политика за поверителност',
+        '/politika-za-biskvitki'     => 'Политика за бисквитки',
+        '/pravna-informaciya'        => 'Правна информация',
+        '/usloviya'                  => 'Условия за ползване',
+    ];
+    $out = [];
+    foreach ($names as $bg => $name) {
+        if (!isset(path_map_builtin()[$bg])) continue;   // e.g. the campaign module is off
+        $out[$bg === '/' ? '/' : $bg . '/'] = $name;
+    }
+    return $out;
+}
+
+/**
+ * What a site address in a menu points at:
+ *   'page'    — a published created page        'draft' — a created page still in draft
+ *   'missing' — shaped like a page address (/<name>/ or /en/<name>/), but no page,
+ *               file or folder of the site has that name
+ *   'ok'      — anything else: a built-in page, a file, an external link, an anchor.
+ * Only one-segment addresses are judged, so a link to a product, an article or a
+ * file is never mistaken for a missing page.
+ * @return array{state: string, page: ?array}
+ */
+function menu_link_state(string $url): array
+{
+    $u = trim($url);
+    if ($u === '' || $u[0] !== '/' || str_starts_with($u, '//')) return ['state' => 'ok', 'page' => null];
+    $path   = substr($u, 0, strcspn($u, '?#'));
+    $parsed = cpage_parse_path($path);
+    if ($parsed === null) return ['state' => 'ok', 'page' => null];
+    [$lang, $slug] = $parsed;
+    $page = cpage_by_slug($lang, $slug);
+    if ($page !== null) return ['state' => $page['status'] === 'published' ? 'page' : 'draft', 'page' => $page];
+    $rel = ($lang === 'en' ? '/en/' : '/') . $slug;
+    if (file_exists(ROOT_PATH . $rel) || in_array($slug, cpage_reserved_slugs($lang), true)) {
+        return ['state' => 'ok', 'page' => null];
+    }
+    return ['state' => 'missing', 'page' => null];
+}
+
+/**
+ * The menu items visitors see: links to a draft or to a page that does not exist
+ * are left out. Keys are kept — the on-page editor addresses items by their
+ * position in the stored menu.
+ */
+function menu_public_items(array $items): array
+{
+    return array_filter($items, function ($it) {
+        if (!is_array($it)) return false;
+        return !in_array(menu_link_state((string) ($it['url'] ?? ''))['state'], ['draft', 'missing'], true);
+    });
 }
 
 /**
@@ -279,4 +367,48 @@ function menu_url_ok(string $url): bool
     if ($url === '') return false;
     if ($url[0] === '#' || ($url[0] === '/' && !str_starts_with($url, '//'))) return true;
     return (bool) preg_match('~^(https?://[^\s/]+|mailto:\S+|tel:[+\d][\d\s\-()]*$)~i', $url);
+}
+
+// ── The menu editor's page picker ────────────────────────────────────────────
+
+/**
+ * The pages a menu row can pick: the built-in pages [BG address => name], and
+ * the created ones [BG address => page].
+ * @return array{builtin: array<string,string>, created: array<string,array>}
+ */
+function menu_pick_options(): array
+{
+    $created = [];
+    foreach (cpage_all() as $p) {
+        if ($p['slug_bg'] === '' || $p['slug_en'] === '') continue;
+        $created[cpage_url($p, 'bg')] = $p;
+    }
+    return ['builtin' => path_builtin_names(), 'created' => $created];
+}
+
+/** Which picker option a stored BG address is: an option's address, '__custom__' (a typed address), or '' (none yet). */
+function menu_pick_value(string $url, ?array $options = null): string
+{
+    $u = trim($url);
+    if ($u === '') return '';
+    if (strcspn($u, '?#') !== strlen($u)) return '__custom__';
+    $options ??= menu_pick_options();
+    $key = menu_url_key($u);
+    foreach (array_merge(array_keys($options['builtin']), array_keys($options['created'])) as $value) {
+        if (menu_url_key((string) $value) === $key) return (string) $value;
+    }
+    return '__custom__';
+}
+
+/**
+ * The BG address a posted row means: the picked page, or — for "external link",
+ * or with nothing picked (no JavaScript) — what was typed in the address field.
+ */
+function menu_resolve_pick(mixed $pick, mixed $typed): string
+{
+    $pick  = is_string($pick) ? trim($pick) : '';
+    $typed = is_string($typed) ? $typed : '';
+    if ($pick === '' || $pick === '__custom__') return $typed;
+    // Only a site path can be picked; anything else falls back to the typed address.
+    return ($pick[0] === '/' && !str_starts_with($pick, '//') && !preg_match('/[\s<>"\'\\\\]/', $pick)) ? $pick : $typed;
 }

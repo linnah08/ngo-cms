@@ -16,7 +16,8 @@ function _switch_lang(string $path, string $current_lang): string {
 }
 
 $_menus    = load_json(CONTENT_PATH . '/menus.json');
-$nav       = $_menus['header'][$lang] ?? [];
+// Links to a draft or a missing page are left out (keys kept for the on-page editor).
+$nav       = menu_public_items(is_array($_menus['header'][$lang] ?? null) ? $_menus['header'][$lang] : []);
 $_nav_bg   = $_menus['header']['bg'] ?? [];
 $_nav_en   = $_menus['header']['en'] ?? [];
 $shop_url  = shop_path('shop', $lang);

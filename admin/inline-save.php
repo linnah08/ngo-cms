@@ -166,6 +166,17 @@ if (str_starts_with($section, 'home:')) {
     save_json_response(home_inline_save(substr($section, 5), $fields));
 }
 
+// Sections of a page created in Admin → Страници: "page:<page id>:<section id>".
+if (is_string($section) && str_starts_with($section, 'page:')) {
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/home.php';
+    $parts = explode(':', $section);
+    if (count($parts) !== 3 || !cpage_valid_id($parts[1]) || cpage_get($parts[1]) === null) {
+        save_json_response(['ok' => false, 'error' => 'unknown page']);
+    }
+    home_target_page($parts[1]);
+    save_json_response(home_inline_save($parts[2], $fields));
+}
+
 // Allowed field map: section → [field_name => [bg_key, en_key]]
 $allowed = [
     'home' => [

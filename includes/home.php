@@ -1,8 +1,13 @@
 <?php
 // includes/home.php — configurable front-page sections: the model.
 // Storage is content/home.json. Spec: docs/superpowers/specs/2026-09-21-home-sections-design.md
+//
+// The same sections also build the pages admins create (includes/created_pages.php):
+// home_target_page() points the model, the renderer and the admin editor at one
+// such page's file instead of home.json. Nothing changes for the front page.
 
 require_once __DIR__ . '/url.php';
+require_once __DIR__ . '/created_pages.php';
 
 const HOME_IMAGE_RE  = '#^/assets/images/[a-zA-Z0-9/_.\-]+$#';
 const HOME_HTML_TAGS = ['p', 'br', 'b', 'strong', 'em', 'i', 'u', 's', 'a', 'ul', 'ol', 'li',
@@ -360,9 +365,48 @@ function home_button_errors(array $fields): array {
     return $errors;
 }
 
+// ── Which document ───────────────────────────────────────────────────────────
+
+/** The document the section functions work on: ['kind' => 'home'|'page', 'id' => page id]. */
+function home_target(): array {
+    return $GLOBALS['_om_home_target'] ?? ['kind' => 'home', 'id' => ''];
+}
+
+/** Work on a created page (content/pages/<id>.json) instead of the front page. */
+function home_target_page(string $id): void {
+    if (!cpage_valid_id($id)) throw new InvalidArgumentException('not a page id');
+    $GLOBALS['_om_home_target'] = ['kind' => 'page', 'id' => $id];
+}
+
+/** Back to the front page. */
+function home_target_reset(): void {
+    unset($GLOBALS['_om_home_target']);
+}
+
+function home_is_page(): bool {
+    return home_target()['kind'] === 'page';
+}
+
+/**
+ * The section types this document offers. A created page gets the free blocks
+ * (and a site's own); the built-in front-page blocks — banner, shop products,
+ * numbers, campaign, centres, mission, news, partners — exist once, on the front page.
+ */
+function home_doc_types(): array {
+    $types = home_types();
+    return home_is_page() ? array_filter($types, fn($t) => !$t['builtin']) : $types;
+}
+
+/** Where uploaded images and video thumbnails of this document go (a site path). */
+function home_upload_dir(): string {
+    $t = home_target();
+    return $t['kind'] === 'page' ? '/assets/images/pages/created/' . $t['id'] : '/assets/images/pages/home';
+}
+
 // ── Storage ──────────────────────────────────────────────────────────────────
 
 function home_file(): string {
+    if (home_is_page()) return (string) cpage_file(home_target()['id']);
     return $GLOBALS['_om_home_file'] ?? CONTENT_PATH . '/home.json';
 }
 
@@ -472,12 +516,16 @@ function home_ensure_builtins(array $doc, ?callable $seed = null): array {
 /** @return array{doc: array, corrupt: bool, exists: bool} */
 function home_load(): array {
     $path = home_file();
-    if (!file_exists($path)) return ['doc' => home_seed_from_site(), 'corrupt' => false, 'exists' => false];
+    $page = home_is_page();
+    // A created page has no default content: missing or damaged, it is simply empty.
+    $empty = fn(): array => $page ? ['version' => 1, 'rev' => 0, 'sections' => []] : home_seed_from_site();
+    clearstatcache(true, $path);
+    if (!file_exists($path)) return ['doc' => $empty(), 'corrupt' => false, 'exists' => false];
     $raw = @file_get_contents($path);
     $doc = is_string($raw) ? json_decode($raw, true) : null;
     if (!is_array($doc) || !is_array($doc['sections'] ?? null)) {
-        error_log('home.json is unreadable or invalid — showing the default front page');
-        return ['doc' => home_seed_from_site(), 'corrupt' => true, 'exists' => true];
+        error_log(basename($path) . ' is unreadable or invalid — showing ' . ($page ? 'an empty page' : 'the default front page'));
+        return ['doc' => $empty(), 'corrupt' => true, 'exists' => true];
     }
     $doc['version']  = 1;
     $doc['rev']      = (int) ($doc['rev'] ?? 0);
@@ -488,7 +536,7 @@ function home_load(): array {
         $s['fields']  = is_array($s['fields'] ?? null) ? $s['fields'] : [];
     }
     unset($s);
-    return ['doc' => home_ensure_builtins($doc), 'corrupt' => false, 'exists' => true];
+    return ['doc' => $page ? $doc : home_ensure_builtins($doc), 'corrupt' => false, 'exists' => true];
 }
 
 /**
@@ -511,6 +559,8 @@ function home_section_on(string $type): bool {
  */
 function home_save(array $doc, int $expected_rev): array {
     $path = home_file();
+    // A created page is created by cpage_create() only — never brought back by a late save.
+    if (home_is_page() && !is_file($path)) return ['ok' => false, 'error' => 'gone'];
     $dir  = dirname($path);
     if (!is_dir($dir) && !mkdir($dir, 0755, true)) return ['ok' => false, 'error' => 'write'];
     $lock = @fopen($path . '.lock', 'c');
@@ -524,6 +574,11 @@ function home_save(array $doc, int $expected_rev): array {
             $damaged = !is_array($cur) || !is_array($cur['sections'] ?? null);
         }
         if ($current !== $expected_rev) return ['ok' => false, 'error' => 'conflict'];
+        // A created page's file also holds its title, address and status: a damaged one
+        // is never replaced by bare sections, and a document is only written to its own page.
+        if (home_is_page() && ($damaged || ($doc['id'] ?? null) !== home_target()['id'])) {
+            return ['ok' => false, 'error' => 'write'];
+        }
         // Never overwrite a damaged file without keeping a copy — it may be fixable by hand.
         if ($damaged) {
             $backup = $path . '.corrupt-' . date('YmdHis');
@@ -535,12 +590,14 @@ function home_save(array $doc, int $expected_rev): array {
         $doc['version']  = 1;
         $doc['rev']      = $current + 1;
         $doc['sections'] = array_values($doc['sections']);
+        if (home_is_page()) $doc['updated'] = date('c');
         $json = json_encode($doc, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $tmp  = $path . '.tmp-' . bin2hex(random_bytes(4));
         if ($json === false || file_put_contents($tmp, $json) === false || !rename($tmp, $path)) {
             @unlink($tmp);
             return ['ok' => false, 'error' => 'write'];
         }
+        if (home_is_page()) cpage_cache_reset();
         return ['ok' => true, 'error' => null, 'doc' => $doc];
     } finally {
         flock($lock, LOCK_UN);
@@ -549,10 +606,12 @@ function home_save(array $doc, int $expected_rev): array {
 }
 
 const HOME_CONFLICT_FORM_MESSAGE = 'Междувременно някой друг е променил началната страница. Вашият текст е запазен тук — проверете го и натиснете „Запази“ отново.';
+const HOME_CONFLICT_FORM_MESSAGE_PAGE = 'Междувременно някой друг е променил тази страница. Вашият текст е запазен тук — проверете го и натиснете „Запази“ отново.';
 
 function home_save_error_message(?string $error): string {
+    if ($error === 'gone') return 'Страницата е изтрита междувременно — промените не са запазени.';
     return $error === 'conflict'
-        ? 'Междувременно някой друг е променил началната страница. Презаредете страницата и направете промяната отново.'
+        ? 'Междувременно някой друг е променил ' . (home_is_page() ? 'тази страница' : 'началната страница') . '. Презаредете страницата и направете промяната отново.'
         : 'Промените не можаха да се запазят. Опитайте отново след малко.';
 }
 
@@ -704,7 +763,7 @@ function home_fetch_video_thumb(array $v, string $sid, ?callable $get = null, ?s
     if (!is_string($bytes) || $bytes === '' || strlen($bytes) > HOME_THUMB_MAX_BYTES) return '';
     $ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][(new finfo(FILEINFO_MIME_TYPE))->buffer($bytes)] ?? null;
     if ($ext === null) return '';
-    $rel = '/assets/images/pages/home/' . $sid . '-video-' . $v['id'] . '.' . $ext;
+    $rel = home_upload_dir() . '/' . $sid . '-video-' . $v['id'] . '.' . $ext;
     $abs = $root . $rel;
     $d   = dirname($abs);
     if (!is_dir($d) && !@mkdir($d, 0755, true) && !is_dir($d)) return '';
@@ -719,6 +778,7 @@ function home_inline_save(string $id, array $fields): array {
     if ($loaded['corrupt']) {
         return ['ok' => false, 'error' => 'Файлът на началната страница е повреден — отворете Админ → Съдържание → Начална страница.'];
     }
+    if (home_is_page() && !$loaded['exists']) return ['ok' => false, 'error' => 'unknown page'];
     $doc = $loaded['doc'];
     $i   = home_find($doc, $id);
     if ($i === null) return ['ok' => false, 'error' => 'unknown section'];
@@ -776,7 +836,7 @@ function home_store_upload(array $file, string $sid, string $key): array {
     $ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][(string) mime_content_type($file['tmp_name'])] ?? null;
     if ($ext === null) return ['path' => null, 'error' => 'Снимката трябва да е JPEG, PNG или WebP.'];
     if (!preg_match('/^s_[a-z0-9_]{1,24}$/', $sid)) return ['path' => null, 'error' => 'Снимката не можа да се запази.'];
-    $rel = '/assets/images/pages/home/' . $sid . '-' . preg_replace('/[^a-z0-9_]/', '', $key) . '-' . time() . '.' . $ext;
+    $rel = home_upload_dir() . '/' . $sid . '-' . preg_replace('/[^a-z0-9_]/', '', $key) . '-' . time() . '.' . $ext;
     $abs = ROOT_PATH . $rel;
     if (!is_dir(dirname($abs))) mkdir(dirname($abs), 0755, true);
     if (!move_uploaded_file($file['tmp_name'], $abs)) return ['path' => null, 'error' => 'Снимката не можа да се запази. Опитайте отново.'];
@@ -838,7 +898,7 @@ function home_admin_save(array $doc, array $post, array $files, ?callable $fetch
                 'message' => 'Секцията не е намерена — може би е изтрита междувременно.', 'errors' => [], 'form' => null];
     }
     $type = $idx !== null ? (string) $doc['sections'][$idx]['type'] : (string) ($post['type'] ?? '');
-    if (!isset($types[$type]) || ($idx === null && home_is_builtin($type))) {
+    if (!isset($types[$type]) || ($idx === null && home_is_builtin($type)) || !isset(home_doc_types()[$type])) {
         return ['status' => 'bad_type', 'doc' => null, 'sid' => '', 'message' => '', 'errors' => [], 'form' => null];
     }
 
@@ -859,13 +919,14 @@ function home_admin_save(array $doc, array $post, array $files, ?callable $fetch
         $saved   = home_save(home_upsert($doc, $section), $post_rev);
         if ($saved['ok']) {
             $name = home_section_name($section);
-            $message = $idx !== null ? "„{$name}“ е запазена." : "„{$name}“ е добавена най-долу на страницата и вече се вижда.";
+            $message = $idx !== null ? "„{$name}“ е запазена."
+                : (home_is_page() ? "„{$name}“ е добавена най-долу на страницата." : "„{$name}“ е добавена най-долу на страницата и вече се вижда.");
             return ['status' => 'saved', 'doc' => $saved['doc'], 'sid' => $sid, 'message' => $message, 'errors' => [], 'form' => null];
         }
         if ($saved['error'] === 'conflict') {
             // Only this section is written (upserted into the file as it is now), so the
             // typed values can simply be saved again — against the current revision.
-            $errors['_form'] = HOME_CONFLICT_FORM_MESSAGE;
+            $errors['_form'] = home_is_page() ? HOME_CONFLICT_FORM_MESSAGE_PAGE : HOME_CONFLICT_FORM_MESSAGE;
             $rev_out = (int) home_load()['doc']['rev'];
         } else {
             $errors['_form'] = home_save_error_message($saved['error']);

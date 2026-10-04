@@ -1,6 +1,10 @@
 <?php
 // admin/home-sections.php — build and edit the front page (content/home.json).
 // Spec: docs/superpowers/specs/2026-09-21-home-sections-design.md
+//
+// admin/page-edit.php runs this same editor for a page created in Admin → Страници
+// (home_target_page()): every address below comes from hs_url(), and the page's own
+// title, addresses and status are shown above its sections.
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
@@ -10,12 +14,15 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/home_admin.php';
 admin_require_login();
 admin_require_admin();
 
-$types  = home_types();
+$cpage  = home_is_page() ? cpage_get(home_target()['id']) : null;   // set by admin/page-edit.php
+$types  = home_doc_types();
 $loaded = home_load();
 $doc    = $loaded['doc'];
 $rev    = (int) $doc['rev'];
 $errors = [];
 $form   = null;   // section shown in the edit form: ['id' => '' for new, 'type', 'fields']
+$cp_errors = [];  // created page: errors and typed values of its title/address form
+$cp_values = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) { http_response_code(400); exit('Невалидна заявка — презаредете страницата и опитайте отново.'); }
@@ -25,7 +32,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $post_rev = is_string($_POST['rev'] ?? null) && preg_match('/^\d{1,9}$/', $_POST['rev']) ? (int) $_POST['rev'] : -1;
     $post_id  = $post_str('id');
 
-    if ($action === 'reorder') {   // sent by the drag handles, answers in JSON
+    if ($action === 'page_settings' && $cpage !== null) {   // a created page's title and addresses
+        $r = cpage_save_settings($cpage['id'], $_POST);
+        if ($r['ok']) {
+            $moved = cpage_menus_follow($cpage, $r['page']);
+            flash_set('success', 'Заглавието и адресът са запазени.'
+                . ($moved ? ' Връзките към страницата в менютата са насочени към новия адрес.' : ''));
+            header('Location: ' . hs_url(['focus' => 'settings:'])); exit;
+        }
+        // Shown again below, with the typed values and what to fix.
+        $cp_errors = $r['errors'];
+        $cp_values = $r['values'];
+    } elseif ($action === 'reorder') {   // sent by the drag handles, answers in JSON
         header('Content-Type: application/json; charset=UTF-8');
         $order = is_array($_POST['order'] ?? null) ? $_POST['order'] : [];
         $r = home_apply_reorder($doc, $order, $post_id);
@@ -37,53 +55,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         echo json_encode(['ok' => $r['ok'], 'message' => $r['message'], 'rev' => $new_rev], JSON_UNESCAPED_UNICODE);
         exit;
-    }
-    if (in_array($action, HOME_ACTIONS, true)) {
+    } elseif (in_array($action, HOME_ACTIONS, true)) {
         $r = home_apply_action($doc, $action, $post_id);
         if ($r['ok']) {
             $saved = home_save($r['doc'], $post_rev);
             if (!$saved['ok']) $r = ['ok' => false, 'message' => home_save_error_message($saved['error']), 'focus' => $post_id];
         }
         flash_set($r['ok'] ? 'success' : 'error', $r['message']);
-        header('Location: /admin/home-sections.php?focus=' . rawurlencode($action . ':' . ($r['focus'] ?? ''))); exit;
-    }
-    if ($action !== 'save') { http_response_code(400); exit('Непознато действие.'); }
-
-    $post = ['id' => $post_id, 'type' => $post_str('type'), 'rev' => $post_rev, 'f' => is_array($_POST['f'] ?? null) ? $_POST['f'] : []];
-    $r = home_admin_save($doc, $post, $_FILES);
-    switch ($r['status']) {
-        case 'bad_type':
-            http_response_code(400); exit('Непознат вид секция.');
-        case 'not_found':
-            flash_set('error', $r['message']);
-            header('Location: /admin/home-sections.php'); exit;
-        case 'saved':
-            flash_set('success', $r['message']);
-            header('Location: /admin/home-sections.php?focus=' . rawurlencode('edit:' . $r['sid'])); exit;
-        default:   // 'invalid'
-            $errors = $r['errors'];
-            $form   = $r['form'];
-            // The revision the admin started from — or, after a conflict, the current one,
-            // so the typed values (kept in the form) can be saved with one more click.
-            $rev    = (int) ($r['rev'] ?? $post_rev);
+        header('Location: ' . hs_url(['focus' => $action . ':' . ($r['focus'] ?? '')])); exit;
+    } elseif ($action !== 'save') {
+        http_response_code(400); exit('Непознато действие.');
+    } else {
+        $post = ['id' => $post_id, 'type' => $post_str('type'), 'rev' => $post_rev, 'f' => is_array($_POST['f'] ?? null) ? $_POST['f'] : []];
+        $r = home_admin_save($doc, $post, $_FILES);
+        switch ($r['status']) {
+            case 'bad_type':
+                http_response_code(400); exit('Непознат вид секция.');
+            case 'not_found':
+                flash_set('error', $r['message']);
+                header('Location: ' . hs_url()); exit;
+            case 'saved':
+                flash_set('success', $r['message']);
+                header('Location: ' . hs_url(['focus' => 'edit:' . $r['sid']])); exit;
+            default:   // 'invalid'
+                $errors = $r['errors'];
+                $form   = $r['form'];
+                // The revision the admin started from — or, after a conflict, the current one,
+                // so the typed values (kept in the form) can be saved with one more click.
+                $rev    = (int) ($r['rev'] ?? $post_rev);
+        }
     }
 } elseif (isset($_GET['edit'])) {
     $idx = is_string($_GET['edit']) ? home_find($doc, $_GET['edit']) : null;
     if ($idx === null || !isset($types[$doc['sections'][$idx]['type']])) {
         flash_set('error', 'Секцията не е намерена.');
-        header('Location: /admin/home-sections.php'); exit;
+        header('Location: ' . hs_url()); exit;
     }
     $form = $doc['sections'][$idx];
 } elseif (isset($_GET['add']) && $_GET['add'] !== '') {
     $type = is_string($_GET['add']) ? $_GET['add'] : '';
-    if (!isset($types[$type]) || home_is_builtin($type)) { header('Location: /admin/home-sections.php?add='); exit; }
+    if (!isset($types[$type]) || home_is_builtin($type)) { header('Location: ' . hs_url(['add' => ''])); exit; }
     $form = ['id' => '', 'type' => $type, 'fields' => home_validate_section($type, [])[0]];
 }
 $picker = $form === null && isset($_GET['add']);
 $flash  = flash_get();
 
 $active_nav       = 'pages';
-$page_title_admin = 'Начална страница';
+$page_title_admin = $cpage !== null ? 'Страница — ' . $cpage['title_bg'] : 'Начална страница';
 if ($form !== null) {
     $_tinymce_key    = setting_get('tinymce_api_key', 'no-api-key');
     $page_head_extra = '<script src="https://cdn.tiny.cloud/1/' . h($_tinymce_key) . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>';
@@ -99,7 +117,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
 <?php if ($form !== null): $t = $types[$form['type']]; $is_new = $form['id'] === ''; ?>
   <!-- ══ EDIT / NEW ══ -->
-  <a href="/admin/home-sections.php" style="display:inline-block;margin-bottom:.5rem;">← Назад към всички секции</a>
+  <a href="<?= h(hs_url()) ?>" style="display:inline-block;margin-bottom:.5rem;">← Назад към всички секции</a>
   <h1 style="margin:0 0 1rem;"><span aria-hidden="true"><?= $t['icon'] ?></span> <?= h(($is_new ? 'Нова секция: ' : 'Редактиране: ') . $t['label']) ?></h1>
   <?= hs_error_summary($form['type'], $errors) ?>
   <?php if (!empty($t['note'])): ?><p style="background:#f8fafc;border-left:4px solid var(--border);padding:.75rem 1rem;"><?= h($t['note']) ?></p><?php endif; ?>
@@ -112,7 +130,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       <p><strong>Модулът „Кампания“ е изключен</strong>, затова тази секция не се показва на сайта, дори да е видима тук.</p>
     <?php endif; ?>
   <?php else: ?>
-  <form id="hsForm" method="POST" action="/admin/home-sections.php" enctype="multipart/form-data" class="admin-form" novalidate>
+  <form id="hsForm" method="POST" action="<?= h(hs_url()) ?>" enctype="multipart/form-data" class="admin-form" novalidate>
     <?= csrf_field() ?>
     <input type="hidden" name="action" value="save">
     <input type="hidden" name="rev" value="<?= (int) $rev ?>">
@@ -120,7 +138,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <?php else: ?><input type="hidden" name="id" value="<?= h($form['id']) ?>"><?php endif; ?>
     <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1.5rem;">
       <button type="submit" class="btn btn--primary" style="min-height:44px;">Запази</button>
-      <a href="/admin/home-sections.php" class="btn btn--outline" style="min-height:44px;">Отказ</a>
+      <a href="<?= h(hs_url()) ?>" class="btn btn--outline" style="min-height:44px;">Отказ</a>
     </div>
     <?php if ($form['type'] === 'video' && !empty($form['fields']['thumb'])): ?>
       <p style="margin:0 0 .5rem;font-weight:600;">Картинка на видеото сега:</p>
@@ -131,19 +149,22 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <?php endforeach; ?>
     <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--border);">
       <button type="submit" class="btn btn--primary" style="min-height:44px;">Запази</button>
-      <a href="/admin/home-sections.php" class="btn btn--outline" style="min-height:44px;">Отказ</a>
+      <a href="<?= h(hs_url()) ?>" class="btn btn--outline" style="min-height:44px;">Отказ</a>
     </div>
   </form>
   <?php endif; ?>
 
 <?php elseif ($picker): ?>
   <!-- ══ TYPE PICKER ══ -->
-  <a href="/admin/home-sections.php" style="display:inline-block;margin-bottom:.5rem;">← Назад към всички секции</a>
+  <a href="<?= h(hs_url()) ?>" style="display:inline-block;margin-bottom:.5rem;">← Назад към всички секции</a>
   <h1 style="margin:0 0 .5rem;">Добави секция</h1>
   <p style="margin:0 0 1.5rem;">Изберете вид. Новата секция ще се появи най-долу на страницата — после можете да я преместите.</p>
+  <?php if ($cpage !== null): ?>
+    <p style="margin:-1rem 0 1.5rem;color:var(--text-muted);">Банерът, продуктите, числата, новините и другите блокове на началната страница са само там — тук са свободните блокове.</p>
+  <?php endif; ?>
   <ul style="list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;">
     <?php foreach ($types as $key => $t): if ($t['builtin']) continue; ?>
-      <li><a href="/admin/home-sections.php?add=<?= h($key) ?>" style="display:block;min-height:44px;padding:1rem 1.25rem;border:2px solid var(--border);border-radius:8px;text-decoration:none;color:inherit;">
+      <li><a href="<?= h(hs_url(['add' => $key])) ?>" style="display:block;min-height:44px;padding:1rem 1.25rem;border:2px solid var(--border);border-radius:8px;text-decoration:none;color:inherit;">
         <span aria-hidden="true" style="font-size:1.5rem;"><?= $t['icon'] ?></span>
         <strong style="display:block;font-size:1.05rem;margin:.25rem 0;"><?= h($t['label']) ?></strong>
         <span style="color:var(--text-muted);"><?= h($t['desc']) ?></span>
@@ -153,13 +174,107 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
 <?php else: ?>
   <!-- ══ LIST ══ -->
+  <?php if ($cpage !== null): ?>
+    <a href="/admin/pages.php" style="display:inline-block;margin-bottom:.5rem;">← Всички страници</a>
+  <?php endif; ?>
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1rem;">
-    <h1 id="hsListTitle" tabindex="-1" style="margin:0;">Начална страница</h1>
+    <h1 id="hsListTitle" tabindex="-1" style="margin:0;"><?= $cpage !== null ? h($cpage['title_bg']) : 'Начална страница' ?></h1>
     <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+      <?php if ($cpage !== null): ?>
+      <a href="<?= h(cpage_url($cpage, 'bg')) ?>" target="_blank" rel="noopener" class="btn btn--outline" style="min-height:44px;">Виж страницата<span style="<?= HS_SR ?>"> (отваря се в нов раздел)</span></a>
+      <?php else: ?>
       <a href="/" target="_blank" rel="noopener" class="btn btn--outline" style="min-height:44px;">Виж началната страница<span style="<?= HS_SR ?>"> (отваря се в нов раздел)</span></a>
-      <a href="/admin/home-sections.php?add=" class="btn btn--primary" style="min-height:44px;">+ Добави секция</a>
+      <?php endif; ?>
+      <a href="<?= h(hs_url(['add' => ''])) ?>" class="btn btn--primary" style="min-height:44px;">+ Добави секция</a>
     </div>
   </div>
+  <?php if ($cpage !== null):
+    $cpv   = $cp_values ?? $cpage;
+    $cpe   = $cp_errors;
+    $draft = $cpage['status'] !== 'published';
+    $site  = rtrim(SITE_URL, '/');
+    $cp_untranslated = trim($cpv['title_en']) === trim($cpv['title_bg']) && preg_match('/\p{Cyrillic}/u', $cpv['title_en']) === 1;
+    $cp_field = function (string $name, string $label, string $badge, array $extra = []) use ($cpv, $cpe): string {
+        $id   = 'cp_' . $name;
+        $err  = $cpe[$name] ?? null;
+        $desc = trim(($extra['hint_id'] ?? '') . ($err ? " {$id}_err" : ''));
+        return '<label for="' . $id . '">' . h($label) . $badge . '</label>'
+             . ($extra['prefix'] ?? '')
+             . '<input type="text" id="' . $id . '" name="' . $name . '" value="' . h((string) $cpv[$name]) . '"'
+             . ' maxlength="' . (str_starts_with($name, 'slug') ? CPAGE_SLUG_MAX : CPAGE_TITLE_MAX) . '"'
+             . ($extra['attrs'] ?? '')
+             . ($desc !== '' ? ' aria-describedby="' . h($desc) . '"' : '') . ($err ? ' aria-invalid="true"' : '')
+             . ' style="width:100%;box-sizing:border-box;min-height:44px;' . ($err ? 'border:2px solid #b91c1c;' : '') . '">'
+             . ($extra['suffix'] ?? '')
+             . ($err ? '<p id="' . $id . '_err" style="color:#b91c1c;font-weight:600;margin:.35rem 0 0;"><span aria-hidden="true">⚠ </span>' . h($err) . '</p>' : '');
+    };
+  ?>
+  <section id="cpSettings" aria-labelledby="cpSettingsTitle" style="border:1px solid var(--border);border-radius:8px;padding:1.25rem;margin:0 0 2rem;background:#fff;">
+    <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+      <p style="margin:0;font-weight:700;padding:.5rem .85rem;border-radius:6px;<?= $draft ? 'background:#fef3c7;color:#78350f;border:1px solid #b45309;' : 'background:#f0fdf4;color:#14532d;border:1px solid #15803d;' ?>">
+        <?= $draft ? '<span aria-hidden="true">✎ </span>Чернова — не се вижда от посетителите' : '<span aria-hidden="true">● </span>Публикувана — вижда се на сайта' ?>
+      </p>
+      <form method="POST" action="/admin/created-pages.php" style="margin:0;">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="<?= $draft ? 'publish' : 'unpublish' ?>">
+        <input type="hidden" name="id" value="<?= h($cpage['id']) ?>">
+        <input type="hidden" name="back" value="edit">
+        <button type="submit" id="btn-publish-page" class="btn <?= $draft ? 'btn--primary' : 'btn--outline' ?>" style="min-height:44px;"><?= $draft ? 'Публикувай' : 'Скрий от сайта' ?></button>
+      </form>
+    </div>
+    <h2 id="cpSettingsTitle" tabindex="-1" style="font-size:1.15rem;margin:0 0 .75rem;">Заглавие и адрес</h2>
+    <?php if ($cpe): ?>
+      <div id="cpErrSummary" role="alert" tabindex="-1" style="border:2px solid #b91c1c;background:#fef2f2;color:#7f1d1d;border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem;">
+        <p style="margin:0 0 .4rem;font-weight:700;"><span aria-hidden="true">⚠ </span>Не е запазено. Поправете следното:</p>
+        <ul style="margin:0;padding-left:1.25rem;">
+          <?php foreach ($cpe as $k => $msg): ?>
+            <li><?= $k === '_form' ? h($msg) : '<a href="#cp_' . h($k) . '">' . h($msg) . '</a>' ?></li>
+          <?php endforeach; ?>
+        </ul>
+      </div>
+    <?php endif; ?>
+    <form method="POST" action="<?= h(hs_url()) ?>" class="admin-form" novalidate>
+      <?= csrf_field() ?>
+      <input type="hidden" name="action" value="page_settings">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem 1.5rem;">
+        <div class="form-group" style="margin:0;">
+          <?= $cp_field('title_bg', 'Заглавие', hs_badge('bg'), ['attrs' => ' aria-required="true"']) ?>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <?= $cp_field('title_en', 'Заглавие', hs_badge('en'), ['attrs' => ' data-translate-from="title_bg"', 'hint_id' => 'cp_title_en_note']) ?>
+          <p id="cp_title_en_note" style="margin:.35rem 0 0;font-size:.85rem;color:#92400e;<?= $cp_untranslated ? '' : 'display:none;' ?>"><?= $cp_untranslated ? '⚠ Не е преведено — на английски засега стои българското заглавие. Натиснете „✦ Translate“ или го напишете.' : '' ?></p>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <?= $cp_field('slug_bg', 'Адрес', hs_badge('bg'), [
+                'hint_id' => 'cp_slug_hint', 'attrs' => ' autocomplete="off" spellcheck="false" aria-required="true"',
+                'prefix'  => '<span style="display:block;font-size:.82rem;color:var(--text-muted);margin-bottom:.2rem;">' . h($site) . '/</span>']) ?>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <?= $cp_field('slug_en', 'Адрес', hs_badge('en'), [
+                'hint_id' => 'cp_slug_hint', 'attrs' => ' autocomplete="off" spellcheck="false" aria-required="true"',
+                'prefix'  => '<span style="display:block;font-size:.82rem;color:var(--text-muted);margin-bottom:.2rem;">' . h($site) . '/en/</span>']) ?>
+        </div>
+      </div>
+      <p id="cp_slug_hint" style="font-size:.85rem;color:var(--text-muted);margin:.75rem 0 0;">
+        Адресът е частта след името на сайта: само малки латински букви, цифри и тирета (например <code>nashata-istoriya</code>).
+        Ако го смените, връзките в менютата се пренасочват сами.
+      </p>
+      <button type="submit" class="btn btn--primary" style="min-height:44px;margin-top:1rem;">Запази заглавието и адреса</button>
+    </form>
+    <p style="margin:1rem 0 0;font-size:.9rem;">
+      На сайта:
+      <a href="<?= h(cpage_url($cpage, 'bg')) ?>" target="_blank" rel="noopener"><?= h($site . cpage_url($cpage, 'bg')) ?><span style="<?= HS_SR ?>"> (отваря се в нов раздел)</span></a>
+      ·
+      <a href="<?= h(cpage_url($cpage, 'en')) ?>" target="_blank" rel="noopener"><?= h($site . cpage_url($cpage, 'en')) ?><span style="<?= HS_SR ?>"> (отваря се в нов раздел)</span></a>
+    </p>
+  </section>
+  <?php endif; ?>
+  <?php if ($cpage !== null): ?>
+  <h2 style="font-size:1.15rem;margin:0 0 .5rem;">Съдържание на страницата</h2>
+  <?php if (!$doc['sections']): ?>
+  <p style="margin:0 0 1rem;padding:1rem;border:2px dashed var(--border);border-radius:8px;">Страницата още няма съдържание. Натиснете „+ Добави секция“ — например „Свободен текст“ или „Текст и снимка“.</p>
+  <?php endif; ?>
+  <?php endif; ?>
   <p style="margin:0 0 .5rem;">Секциите се показват на сайта в този ред, отгоре надолу, на български и на английски.</p>
   <?= hs_sort_help('hsSortHelp', 'секциите') ?>
   <div id="hsSortMsg" hidden style="border:2px solid #15803d;background:#f0fdf4;color:#14532d;border-radius:8px;padding:.85rem 1.1rem;margin-bottom:1.25rem;font-weight:600;"></div>
@@ -170,7 +285,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       (повреденият файл се пази като резервно копие на сървъра).
     </div>
   <?php endif; ?>
-  <ol id="list" data-rev="<?= (int) $rev ?>" data-csrf="<?= h(csrf_token()) ?>" style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.75rem;">
+  <ol id="list" data-rev="<?= (int) $rev ?>" data-action="<?= h(hs_url()) ?>" data-csrf="<?= h(csrf_token()) ?>" style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.75rem;">
     <?php $n = count($doc['sections']); foreach ($doc['sections'] as $i => $s):
       $t = $types[$s['type']] ?? null; if ($t === null) continue;
       $name = home_section_name($s); $vis = !empty($s['visible']); ?>
@@ -185,7 +300,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <?php endif; ?>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:.5rem;">
-        <a id="btn-edit-<?= h($s['id']) ?>" href="/admin/home-sections.php?edit=<?= h(rawurlencode($s['id'])) ?>" class="btn btn--outline" style="min-height:44px;" aria-label="<?= h("Редактирай „{$name}“") ?>">Редактирай</a>
+        <a id="btn-edit-<?= h($s['id']) ?>" href="<?= h(hs_url(['edit' => $s['id']])) ?>" class="btn btn--outline" style="min-height:44px;" aria-label="<?= h("Редактирай „{$name}“") ?>">Редактирай</a>
         <?= hs_action_form('toggle', $s, $rev, $vis ? 'Скрий' : 'Покажи', ($vis ? 'Скрий' : 'Покажи') . " „{$name}“") ?>
         <?php if (!$t['builtin']): ?>
           <?= hs_action_form('duplicate', $s, $rev, 'Дублирай', "Дублирай „{$name}“") ?>
@@ -211,7 +326,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     if (!el || el.disabled) el = document.getElementById('h-' + p[1]) || document.getElementById('hsListTitle');
     if (el) el.focus();
   }
-  var summary = document.getElementById('hsErrSummary');
+  var summary = document.getElementById('hsErrSummary') || document.getElementById('cpErrSummary');
   if (summary) summary.focus();
 
   // Images: library picker and "remove".
@@ -384,7 +499,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         Array.prototype.forEach.call(sections.querySelectorAll('li[data-id]'), function (li) { body.append('order[]', li.dataset.id); });
         var fail = 'Новият ред не можа да се запази. Презаредете страницата и опитайте отново.';
         function failed(text) { list_.restore(before); showMsg(text || fail, false); }
-        fetch('/admin/home-sections.php', { method: 'POST', body: body, credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+        fetch(sections.dataset.action, { method: 'POST', body: body, credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
           .then(function (r) { return r.json().catch(function () { return null; }); })   // e.g. a login page after the session ran out
           .then(function (d) {
             if (!d || !d.ok) { failed(d && d.message); return; }

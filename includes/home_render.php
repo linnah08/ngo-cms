@@ -21,8 +21,14 @@ function hf(array $f, string $key, string $lang): string {
  * so they are omitted for everyone else: no reason to leak the other
  * language's copy into a logged-out visitor's DOM.
  */
+/** The on-page editor's name for a section: "home:<sid>", or "page:<page id>:<sid>" on a created page. */
+function home_cms_section(string $sid): string {
+    $t = home_target();
+    return ($t['kind'] === 'page' ? 'page:' . $t['id'] . ':' : 'home:') . $sid;
+}
+
 function home_cms_attrs(string $sid, string $key, array $f, string $type = 'text'): string {
-    $out = ' data-cms-section="home:' . h($sid) . '" data-cms-field="' . h($key) . '" data-cms-type="' . h($type) . '"';
+    $out = ' data-cms-section="' . h(home_cms_section($sid)) . '" data-cms-field="' . h($key) . '" data-cms-type="' . h($type) . '"';
     if ($GLOBALS['_show_admin_bar'] ?? false) {
         $v = home_pair($f[$key] ?? null);
         $out .= ' data-cms-bg="' . h($v['bg']) . '" data-cms-en="' . h($v['en']) . '"';
@@ -31,7 +37,7 @@ function home_cms_attrs(string $sid, string $key, array $f, string $type = 'text
 }
 
 function home_img_attrs(string $sid, string $key): string {
-    return ' data-cms-section="home:' . h($sid) . '" data-cms-field="' . h($key) . '"';
+    return ' data-cms-section="' . h(home_cms_section($sid)) . '" data-cms-field="' . h($key) . '"';
 }
 
 /** The stored background if this block offers it, else $default (a stored teal outside the CTA block → $default). */
@@ -155,12 +161,13 @@ HTML;
 }
 
 function home_render(array $doc, string $lang): void {
-    $types      = home_types();
+    $types      = home_doc_types();
     $ctx        = home_context($doc, $lang);
     $show_admin = (bool) ($GLOBALS['_show_admin_bar'] ?? false);
     echo home_shared_head();
-    // The hero carries the page's only <h1>. Hidden, the page still needs one for screen readers.
-    $hero_shown = false;
+    // A created page prints its title as the <h1> itself (page.php).
+    // On the front page the hero carries the only <h1>. Hidden, the page still needs one for screen readers.
+    $hero_shown = home_is_page();
     foreach ($doc['sections'] as $s) {
         if (!empty($s['visible']) && ($s['type'] ?? '') === 'hero') $hero_shown = true;
     }

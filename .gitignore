@@ -47,6 +47,9 @@ package-lock.json
 /content/home.json.corrupt-*
 /assets/images/pages/home/
 /content/menus.json
+# Pages created in Admin → Страници, and their images
+/content/pages/
+/assets/images/pages/created/
 /content/organisation.json
 
 # MCP server configuration with credentials

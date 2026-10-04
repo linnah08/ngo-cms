@@ -349,11 +349,10 @@ define('BUFFER_INSTAGRAM_CHANNEL_ID', '');
 
 function get_lang(): string {
     // URL segment takes priority: /en/... = English, everything else = Bulgarian
+    // Only /en and /en/… — a Bulgarian address that merely starts with "en"
+    // (a created page such as /energiya/) stays Bulgarian.
     $uri = $_SERVER['REQUEST_URI'] ?? '/';
-    if (str_starts_with($uri, '/en') || str_starts_with($uri, '/en/')) {
-        return 'en';
-    }
-    return 'bg';
+    return preg_match('#^/en(?:[/?\#]|$)#', $uri) ? 'en' : 'bg';
 }
 
 function lang_url(string $path, string $lang = ''): string {

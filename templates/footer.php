@@ -4,10 +4,12 @@ if (!defined('SITE_NAME_BG')) require_once $_SERVER['DOCUMENT_ROOT'] . '/config.
 $lang      = get_lang();
 $site_name = $lang === 'bg' ? SITE_NAME_BG : SITE_NAME_EN;
 $_fmenus    = load_json(CONTENT_PATH . '/menus.json');
-$_fnav      = $_fmenus['footer_nav'][$lang]   ?? [];
+// Links to a draft or a missing page are left out (keys kept for the on-page editor).
+require_once __DIR__ . '/../includes/menus.php';
+$_fnav      = menu_public_items(is_array($_fmenus['footer_nav'][$lang] ?? null) ? $_fmenus['footer_nav'][$lang] : []);
 $_fnav_bg   = $_fmenus['footer_nav']['bg']    ?? [];
 $_fnav_en   = $_fmenus['footer_nav']['en']    ?? [];
-$_fhelp     = $_fmenus['footer_help'][$lang]  ?? [];
+$_fhelp     = menu_public_items(is_array($_fmenus['footer_help'][$lang] ?? null) ? $_fmenus['footer_help'][$lang] : []);
 $_fhelp_bg  = $_fmenus['footer_help']['bg']   ?? [];
 $_fhelp_en  = $_fmenus['footer_help']['en']   ?? [];
 $pages      = $pages ?? load_json(CONTENT_PATH . '/pages.json');

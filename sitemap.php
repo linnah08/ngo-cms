@@ -1,7 +1,8 @@
 <?php
 /**
  * Dynamic XML sitemap — served at /sitemap.xml (rewritten in .htaccess).
- * Lists static pages plus active products and published articles (BG + EN),
+ * Lists static pages plus active products, published articles and published
+ * created pages (BG + EN),
  * so it stays current without a build step.
  */
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
@@ -51,6 +52,15 @@ foreach (['bg' => '/novini/', 'en' => '/en/news/'] as $lang => $prefix) {
         $lastmod = !empty($article['date']) ? date('Y-m-d', strtotime($article['date'])) : null;
         $urls[]  = [$base . $prefix . $enc . '/', $lastmod];
     }
+}
+
+// ── Pages created in Admin → Страници: published ones only ────────────────
+require_once __DIR__ . '/includes/created_pages.php';
+foreach (cpage_all() as $cp) {
+    if ($cp['status'] !== 'published' || $cp['slug_bg'] === '' || $cp['slug_en'] === '') continue;
+    $lastmod = $cp['updated'] !== '' && strtotime($cp['updated']) ? date('Y-m-d', strtotime($cp['updated'])) : null;
+    $urls[]  = [$base . cpage_url($cp, 'bg'), $lastmod];
+    $urls[]  = [$base . cpage_url($cp, 'en'), $lastmod];
 }
 
 // ── Render ───────────────────────────────────────────────────────────────

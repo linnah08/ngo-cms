@@ -386,6 +386,102 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
      INDEX — list of all editable pages
      ══════════════════════════════════════════════════════════════════════════ -->
 <h1 style="margin-bottom:1.5rem;">Съдържание</h1>
+
+<!-- ── Pages the admin created (content/pages/, admin/created-pages.php) ──── -->
+<?php
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/menus.php';
+$cp_list  = cpage_all();
+$cp_flash = flash_get();
+$cp_site  = rtrim(SITE_URL, '/');
+?>
+<div id="cpLive" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;"><?php foreach ($cp_flash as $f) if ($f['type'] === 'success') echo h($f['message']) . ' '; ?></div>
+<?php foreach ($cp_flash as $f): $ok = $f['type'] === 'success'; ?>
+  <div <?= $ok ? '' : 'role="alert" ' ?>style="border:2px solid <?= $ok ? '#15803d' : '#b91c1c' ?>;background:<?= $ok ? '#f0fdf4' : '#fef2f2' ?>;color:<?= $ok ? '#14532d' : '#7f1d1d' ?>;border-radius:8px;padding:.85rem 1.1rem;margin-bottom:1.25rem;font-weight:600;">
+    <span aria-hidden="true"><?= $ok ? '✓' : '⚠' ?> </span><?= h($f['message']) ?>
+  </div>
+<?php endforeach; ?>
+
+<section aria-labelledby="cpListTitle" style="margin-bottom:2.5rem;">
+  <h2 id="cpListTitle" style="margin:0 0 .5rem;font-size:1.15rem;">Вашите страници</h2>
+  <p style="margin:0 0 1rem;color:var(--text-muted);">
+    Страници, които създавате сами — например „Нашата история“. Новата страница започва като чернова:
+    посетителите не я виждат, докато не натиснете „Публикувай“.
+  </p>
+
+  <form method="POST" action="/admin/created-pages.php" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin:0 0 1.5rem;padding:1rem;border:1px solid var(--border);border-radius:8px;background:#f8fafc;">
+    <?= csrf_field() ?>
+    <input type="hidden" name="action" value="create">
+    <div style="flex:1 1 18rem;">
+      <label for="cpNewTitle" style="display:block;font-weight:600;margin-bottom:.3rem;">Заглавие на новата страница (на български)</label>
+      <input type="text" id="cpNewTitle" name="title_bg" maxlength="<?= CPAGE_TITLE_MAX ?>" required aria-describedby="cpNewHint"
+             style="width:100%;box-sizing:border-box;min-height:44px;">
+    </div>
+    <button type="submit" class="btn btn--primary" style="min-height:44px;">+ Нова страница</button>
+    <p id="cpNewHint" style="flex-basis:100%;margin:0;font-size:.85rem;color:var(--text-muted);">
+      Английското заглавие и адресите се попълват сами — после можете да ги промените.
+    </p>
+  </form>
+
+  <?php if (!$cp_list): ?>
+    <p style="margin:0;padding:1rem;border:2px dashed var(--border);border-radius:8px;">Още нямате свои страници.</p>
+  <?php else: ?>
+  <div class="admin-table-wrap">
+    <table class="admin-table">
+      <thead>
+        <tr><th scope="col">Страница</th><th scope="col">Адрес</th><th scope="col">Състояние</th><th scope="col"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;">Действия</span></th></tr>
+      </thead>
+      <tbody>
+      <?php foreach ($cp_list as $cp):
+        $cp_draft = $cp['status'] !== 'published';
+        $cp_menus = cpage_menus_using($cp);
+        $cp_confirm = "Да изтрия ли страницата \u{201E}{$cp['title_bg']}\u{201C}? Това не може да се върне."
+            . ($cp_menus ? ' Тя е в менюто: ' . implode(', ', $cp_menus) . ' — връзката към нея ще изчезне от сайта.' : '');
+      ?>
+        <tr id="cp-<?= h($cp['id']) ?>">
+          <td>
+            <strong><?= h($cp['title_bg']) ?></strong>
+            <?php if ($cp['title_en'] !== '' && $cp['title_en'] !== $cp['title_bg']): ?>
+              <br><span lang="en" style="color:var(--text-muted);font-size:.85rem;"><?= h($cp['title_en']) ?></span>
+            <?php endif; ?>
+            <?php if ($cp_menus): ?>
+              <br><span style="color:var(--text-muted);font-size:.8rem;">В менюто: <?= h(implode(', ', $cp_menus)) ?></span>
+            <?php endif; ?>
+          </td>
+          <td style="font-size:.85rem;">
+            <a href="<?= h(cpage_url($cp, 'bg')) ?>" target="_blank" rel="noopener"><?= h(cpage_url($cp, 'bg')) ?></a><br>
+            <a href="<?= h(cpage_url($cp, 'en')) ?>" target="_blank" rel="noopener"><?= h(cpage_url($cp, 'en')) ?></a>
+          </td>
+          <td>
+            <span style="display:inline-block;font-weight:600;padding:.2rem .55rem;border-radius:4px;white-space:nowrap;<?= $cp_draft ? 'background:#fef3c7;color:#78350f;' : 'background:#dcfce7;color:#14532d;' ?>">
+              <?= $cp_draft ? '<span aria-hidden="true">✎ </span>Чернова' : '<span aria-hidden="true">● </span>Публикувана' ?>
+            </span>
+          </td>
+          <td style="text-align:right;">
+            <div style="display:flex;flex-wrap:wrap;gap:.4rem;justify-content:flex-end;">
+              <a href="/admin/page-edit.php?id=<?= h($cp['id']) ?>" class="btn btn--outline" style="min-height:44px;" aria-label="<?= h("Редактирай \u{201E}{$cp['title_bg']}\u{201C}") ?>">Редактирай</a>
+              <form method="POST" action="/admin/created-pages.php" style="margin:0;">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="<?= $cp_draft ? 'publish' : 'unpublish' ?>">
+                <input type="hidden" name="id" value="<?= h($cp['id']) ?>">
+                <button type="submit" class="btn btn--outline" style="min-height:44px;" aria-label="<?= h(($cp_draft ? 'Публикувай' : 'Скрий от сайта') . " \u{201E}{$cp['title_bg']}\u{201C}") ?>"><?= $cp_draft ? 'Публикувай' : 'Скрий от сайта' ?></button>
+              </form>
+              <form method="POST" action="/admin/created-pages.php" style="margin:0;" data-confirm="<?= h($cp_confirm) ?>" data-confirm-ok="Да, изтрий">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="id" value="<?= h($cp['id']) ?>">
+                <button type="submit" class="btn btn--outline" style="min-height:44px;color:#b91c1c;border-color:#b91c1c;" aria-label="<?= h("Изтрий \u{201E}{$cp['title_bg']}\u{201C}") ?>">Изтрий</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+  <?php endif; ?>
+</section>
+
+<h2 style="margin:0 0 1rem;font-size:1.15rem;">Страници на сайта</h2>
 <div class="admin-table-wrap">
   <table class="admin-table">
     <thead>
