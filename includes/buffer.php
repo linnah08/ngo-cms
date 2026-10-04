@@ -40,3 +40,32 @@ function buffer_edit_outcome(?array $resp): array {
     $msg = $edit['message'] ?? ($resp['errors'][0]['message'] ?? '');
     return ['status' => 'error', 'message' => $msg !== '' ? (string) $msg : 'Buffer не отговори.'];
 }
+
+/**
+ * Connecting Buffer: the organisations a key can see. Buffer refuses `account.currentOrganization`
+ * for API keys ("Not authorized to access this resource", verified 04.10.2026) — `organizations` works.
+ */
+function buffer_organizations_query(): string {
+    return '{ account { organizations { id name } } }';
+}
+
+/**
+ * Which organisation to connect: the first one with a LinkedIn, Facebook or Instagram
+ * channel, else the first one (so the caller can list what it does have).
+ * $channels_of(org id) returns that organisation's channels ({id, name, service}).
+ *
+ * @return array{org: array, channels: array}|null  null when the key sees no organisation
+ */
+function buffer_pick_organization(array $orgs, callable $channels_of): ?array {
+    $first = null;
+    foreach ($orgs as $org) {
+        $channels = $channels_of((string) ($org['id'] ?? ''));
+        $first ??= ['org' => $org, 'channels' => $channels];
+        foreach ($channels as $ch) {
+            if (in_array(strtolower($ch['service'] ?? ''), ['linkedin', 'facebook', 'instagram'], true)) {
+                return ['org' => $org, 'channels' => $channels];
+            }
+        }
+    }
+    return $first;
+}

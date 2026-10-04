@@ -10,6 +10,7 @@
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/buffer.php';
 admin_require_admin();
 
 header('Content-Type: application/json; charset=UTF-8');
@@ -61,19 +62,21 @@ function buffer_gql(string $api_key, string $query): array
 }
 
 try {
-    // Step 1: get org ID
-    $org_data = buffer_gql($api_key, '{ account { currentOrganization { id name } } }');
-    $org_id   = $org_data['data']['account']['currentOrganization']['id'] ?? '';
-    $org_name = $org_data['data']['account']['currentOrganization']['name'] ?? '';
-    if ($org_id === '') {
+    // Step 1: the organisation with social channels, and its channels
+    $org_data = buffer_gql($api_key, buffer_organizations_query());
+    $pick = buffer_pick_organization(
+        $org_data['data']['account']['organizations'] ?? [],
+        fn(string $id) => buffer_gql($api_key, 'query { channels(input: { organizationId: ' . json_encode($id) . ' }) { id name service } }')['data']['channels'] ?? []
+    );
+    if ($pick === null || ($pick['org']['id'] ?? '') === '') {
         echo json_encode(['ok' => false, 'error' => 'Не беше намерена организация. Проверете API ключа.']);
         exit;
     }
+    $org_id   = $pick['org']['id'];
+    $org_name = $pick['org']['name'] ?? '';
+    $channels = $pick['channels'];
 
-    // Step 2: get channels, find LinkedIn / Facebook / Instagram
-    $ch_data  = buffer_gql($api_key, 'query { channels(input: { organizationId: ' . json_encode($org_id) . ' }) { id name service } }');
-    $channels = $ch_data['data']['channels'] ?? [];
-
+    // Step 2: find LinkedIn / Facebook / Instagram
     $li_channel    = null;
     $fb_channel    = null;
     $insta_channel = null;
