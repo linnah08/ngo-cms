@@ -191,7 +191,7 @@ foreach ($sections as $key => $title):
       if (b === '') continue;
       if (p === b || p.indexOf(b + '/') === 0) return MAP[bg] + p.slice(b.length) + trailing + tail;
     }
-    return url;
+    return '/en' + path + tail;
   }
   function untranslated(bg, en) { return en !== '' && en.trim() === bg.trim() && /[Ѐ-ӿ]/.test(en); }
 

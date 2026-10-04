@@ -75,9 +75,10 @@ function path_en_to_bg(string $path): string
 }
 
 /**
- * The EN address for a BG menu address. Site paths the map knows are mapped
- * (with any ?query or #anchor kept); external links, mailto:/tel:, anchors and
- * paths the map does not know stay exactly as they are.
+ * The EN address for a BG menu address — the same rule as the language switcher
+ * (path_bg_to_en): site paths the map knows are mapped, any other site path gets
+ * /en in front, with any ?query or #anchor kept. External links, mailto:/tel:
+ * and anchors stay exactly as they are.
  */
 function menu_en_url(string $bg_url): string
 {
@@ -99,7 +100,19 @@ function menu_en_url(string $bg_url): string
             return path_bg_to_en($path) . $tail;
         }
     }
-    return $url;
+    return '/en' . $path . $tail;
+}
+
+/**
+ * True when a saved EN address is what v0.22's editor wrote for a page its map
+ * did not know: the BG site path copied unchanged. Such an address is replaced
+ * by menu_en_url() when the menu is opened, since the admin never typed it.
+ */
+function menu_en_url_is_stale_copy(string $bg_url, string $en_url): bool
+{
+    $u = trim($bg_url);
+    return $u !== '' && $u[0] === '/' && !str_starts_with($u, '//')
+        && trim($en_url) === $u && menu_en_url($u) !== $u;
 }
 
 /** Comparable form of a menu address: no trailing slash, "/" for home. */
@@ -179,7 +192,9 @@ function menu_rows_from_section(array $section): array
         $want = menu_url_key(menu_en_url($b['url']));
         foreach ($en as $j => $e) {
             if (isset($used[$j])) continue;
-            if (menu_url_key($e['url']) === $want) { $pair[$i] = $j; $used[$j] = true; break; }
+            if (menu_url_key($e['url']) === $want || menu_en_url_is_stale_copy($b['url'], $e['url'])) {
+                $pair[$i] = $j; $used[$j] = true; break;
+            }
         }
     }
     // 2. by position among what is left
@@ -197,7 +212,8 @@ function menu_rows_from_section(array $section): array
         if ($pair[$i] !== null) {
             $e = $en[$pair[$i]];
             $row_of[$pair[$i]] = count($rows);
-            $rows[] = ['label_bg' => $b['label'], 'url_bg' => $b['url'], 'label_en' => $e['label'], 'url_en' => $e['url']];
+            $url_en = menu_en_url_is_stale_copy($b['url'], $e['url']) ? menu_en_url($b['url']) : $e['url'];
+            $rows[] = ['label_bg' => $b['label'], 'url_bg' => $b['url'], 'label_en' => $e['label'], 'url_en' => $url_en];
         } else {
             $rows[] = [
                 'label_bg' => $b['label'],

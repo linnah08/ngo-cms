@@ -24,7 +24,8 @@ final class MenuPairsTest extends TestCase
             'home'                 => ['/',                       '/en/'],
             'anchor kept'          => ['/kak-da-pomogna/#dari',   '/en/how-to-help/#dari'],
             'query kept'           => ['/novini/?page=2',         '/en/news/?page=2'],
-            'unknown site page'    => ['/nyakakva-stranitsa/',    '/nyakakva-stranitsa/'],
+            'unknown site page'    => ['/nyakakva-stranitsa/',    '/en/nyakakva-stranitsa/'],
+            'unknown, no slash'    => ['/story',                  '/en/story'],
             'already english'      => ['/en/about/',              '/en/about/'],
             'external link'        => ['https://example.org/x',   'https://example.org/x'],
             'protocol-relative'    => ['//example.org/x',         '//example.org/x'],
@@ -37,6 +38,27 @@ final class MenuPairsTest extends TestCase
     public function testEnAddressComesFromTheSharedMap(string $bg, string $en): void
     {
         $this->assertSame($en, menu_en_url($bg));
+    }
+
+    public function testUnknownPagesFollowTheLanguageSwitcher(): void
+    {
+        foreach (['/story', '/principles/', '/some/deep/page'] as $p) {
+            $this->assertSame(path_bg_to_en($p), menu_en_url($p), $p);
+        }
+    }
+
+    public function testAnEnAddressCopiedUnchangedByV022IsCorrectedOnOpen(): void
+    {
+        $rows = menu_rows_from_section([
+            'bg' => [['url' => '/story', 'label' => 'История'], ['url' => '/donation', 'label' => 'Дари'],
+                     ['url' => 'https://example.org', 'label' => 'Външен']],
+            'en' => [['url' => '/story', 'label' => 'Our story'], ['url' => '/en/donation', 'label' => 'Donate'],
+                     ['url' => 'https://example.org', 'label' => 'External']],
+        ]);
+        $this->assertSame('/en/story', $rows[0]['url_en'], 'the stale copy is replaced');
+        $this->assertSame('Our story', $rows[0]['label_en'], 'the EN text is kept');
+        $this->assertSame('/en/donation', $rows[1]['url_en']);
+        $this->assertSame('https://example.org', $rows[2]['url_en'], 'external links are untouched');
     }
 
     public function testLanguageSwitcherUsesTheSameMap(): void
@@ -135,7 +157,7 @@ final class MenuPairsTest extends TestCase
             ],
             'en' => [
                 ['url' => '/en/news/', 'label' => 'News'],
-                ['url' => '/blog/', 'label' => 'Блог'],
+                ['url' => '/en/blog/', 'label' => 'Блог'],
                 ['url' => 'https://example.org', 'label' => 'Partner x'],
             ],
         ], $r['section']);
