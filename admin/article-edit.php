@@ -451,6 +451,10 @@ $default_social_at = date('Y-m-d\TH:i', strtotime('+1 day 11:00'));
 // Which Instagram tab (Post/Story) should be shown on load. A scheduled post/story
 // always wins (it's the thing most likely to need attention).
 $ig_default_story = !$insta_sched && $insta_story_sched;
+
+// Previews of exactly what Instagram gets: each photo cut to the shape it is sent at.
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/social_images.php';
+$ig_preview = social_insta_preview($article);
 ?>
 <!-- ── FB / Insta panel ───────────────────────────────────────────────────── -->
 <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;" id="socialPanel">
@@ -561,6 +565,47 @@ $ig_default_story = !$insta_sched && $insta_story_sched;
     <button type="button" id="igModePostBtn" class="btn <?= $ig_default_story ? 'btn--outline' : 'btn--primary' ?>" aria-pressed="<?= $ig_default_story ? 'false' : 'true' ?>" style="font-size:.82rem;min-height:44px;">📷 Публикация</button>
     <button type="button" id="igModeStoryBtn" class="btn <?= $ig_default_story ? 'btn--primary' : 'btn--outline' ?>" aria-pressed="<?= $ig_default_story ? 'true' : 'false' ?>" style="font-size:.82rem;min-height:44px;">🎬 Story</button>
   </div>
+
+  <!-- What Instagram will receive: click a photo to choose which part is shown. -->
+  <style>.ig-crop-thumb:focus-visible{outline:3px solid #0387A5;outline-offset:2px;}.ig-crop-thumb:hover{border-color:#0387A5 !important;}</style>
+  <?php foreach (['post' => 'igCropPost', 'story' => 'igCropStory'] as $_kind => $_id):
+      $_shown = $_kind === 'story' ? $ig_default_story : !$ig_default_story;
+      $_items = $ig_preview[$_kind];
+      $_sched = $_kind === 'story' ? $insta_story_sched : $insta_sched; ?>
+  <div id="<?= $_id ?>" data-kind="<?= $_kind ?>" style="<?= $_shown ? '' : 'display:none;' ?>margin-bottom:1rem;">
+    <?php if (!$_items): ?>
+      <p style="margin:0;font-size:.82rem;color:var(--text-muted);">Добавете снимка към статията, за да видите как ще изглежда в Instagram.</p>
+    <?php else: ?>
+      <div role="list" aria-label="<?= $_kind === 'story' ? 'Снимка за Instagram Story' : 'Снимки за публикацията в Instagram' ?>" style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:flex-end;margin-bottom:.4rem;">
+        <?php foreach ($_items as $_i => $_p):
+            $_h  = $_kind === 'story' ? 128 : 104;
+            $_w  = (int) round($_h * $_p['ar']);
+            $_r  = $_p['rect'];
+            $_lbl = $_kind === 'story'
+                ? 'Главната снимка в Story. Натиснете, за да изберете коя част да се вижда.'
+                : 'Снимка ' . ($_i + 1) . ' от ' . count($_items) . ($_i === 0 ? ' (главна)' : '') . '. Натиснете, за да изберете коя част да се вижда.'; ?>
+        <div role="listitem" style="display:flex;flex-direction:column;align-items:center;gap:.2rem;">
+          <button type="button" class="ig-crop-thumb" aria-label="<?= h($_lbl) ?>"
+                  data-src="<?= h($_p['src']) ?>" data-w="<?= (int) $_p['w'] ?>" data-h="<?= (int) $_p['h'] ?>" data-ar="<?= h((string) $_p['ar']) ?>" data-rect="<?= h(json_encode($_r)) ?>"
+                  style="display:block;padding:0;margin:0;border:2px solid var(--border,#e8ddd5);border-radius:6px;background:#f3efe9;cursor:pointer;width:<?= $_w + 4 ?>px;height:<?= $_h + 4 ?>px;overflow:hidden;">
+            <span style="display:block;position:relative;width:<?= $_w ?>px;height:<?= $_h ?>px;overflow:hidden;">
+              <img src="<?= h($_p['src']) ?>" alt="" loading="lazy" draggable="false"
+                   style="position:absolute;display:block;max-width:none;margin:0;width:<?= round(100 / $_r['w'], 4) ?>%;height:<?= round(100 / $_r['h'], 4) ?>%;left:<?= round(-100 * $_r['x'] / $_r['w'], 4) ?>%;top:<?= round(-100 * $_r['y'] / $_r['h'], 4) ?>%;">
+            </span>
+          </button>
+          <span aria-hidden="true" style="font-size:.72rem;color:var(--text-muted);"><?= $_kind === 'story' ? '9:16' : ($_i === 0 ? 'Главна' : (string) ($_i + 1)) ?></span>
+        </div>
+        <?php endforeach; ?>
+      </div>
+      <p style="margin:0;font-size:.8rem;color:var(--text-muted);">Натиснете снимка, за да изберете коя част да се вижда в Instagram.</p>
+      <p class="ig-crop-sched-note" style="<?= $_sched ? '' : 'display:none;' ?>margin:.25rem 0 0;font-size:.8rem;color:#92400e;">
+        <?= $_kind === 'story' ? 'Story-то вече е планирано.' : 'Публикацията вече е планирана.' ?> Ако промените изрязването, натиснете отново „Планирай в Instagram“, за да стигне промяната до Instagram.
+      </p>
+    <?php endif; ?>
+  </div>
+  <?php endforeach; ?>
+  <p id="igCropStatus" role="status" aria-live="polite" style="margin:0 0 .75rem;font-size:.82rem;color:#2e7d32;min-height:0;"></p>
+  <p id="igCropError" role="alert" style="display:none;margin:0 0 .75rem;font-size:.82rem;color:#c0392b;"></p>
 
   <div class="form-group" id="igPostTextGroup" style="<?= $ig_default_story ? 'display:none;' : '' ?>margin-bottom:1rem;">
     <label style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;">
@@ -1307,8 +1352,58 @@ if (translateBtn) {
     storyBtn.className = 'btn ' + (mode === 'story' ? 'btn--primary' : 'btn--outline');
     postBtn.setAttribute('aria-pressed',  mode === 'post'  ? 'true' : 'false');
     storyBtn.setAttribute('aria-pressed', mode === 'story' ? 'true' : 'false');
+    document.getElementById('igCropPost').style.display  = mode === 'post'  ? '' : 'none';
+    document.getElementById('igCropStory').style.display = mode === 'story' ? '' : 'none';
+    document.getElementById('igCropStatus').textContent = '';
+    document.getElementById('igCropError').style.display = 'none';
     document.getElementById('socInstaError').style.display = 'none';
   }
+
+  // ── Instagram crop previews ──────────────────────────────────────────────
+  // Each thumbnail shows the exact part Instagram gets (the original photo, shifted
+  // and scaled inside a box of the final shape). Clicking opens the shared cropper
+  // locked to that shape; "Готово" saves the choice and the thumbnail follows.
+  var cropStatus = document.getElementById('igCropStatus');
+  var cropError  = document.getElementById('igCropError');
+  function _igPlace(btn, r) {
+    var img = btn.querySelector('img');
+    img.style.width  = (100 / r.w) + '%';
+    img.style.height = (100 / r.h) + '%';
+    img.style.left   = (-100 * r.x / r.w) + '%';
+    img.style.top    = (-100 * r.y / r.h) + '%';
+    btn.dataset.rect = JSON.stringify({ x: r.x, y: r.y, w: r.w, h: r.h });
+  }
+  document.querySelectorAll('.ig-crop-thumb').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (!window.OMCrop || !OMCrop.pick) return;
+      var kind = btn.closest('[data-kind]').dataset.kind;
+      var w = +btn.dataset.w, h = +btn.dataset.h, ar = +btn.dataset.ar;
+      var cur = JSON.parse(btn.dataset.rect);   // what Instagram gets now, as fractions
+      cropError.style.display = 'none';
+      OMCrop.pick(btn.dataset.src, {
+        aspectRatio: ar,
+        data: { x: cur.x * w, y: cur.y * h, width: cur.w * w, height: cur.h * h }
+      }).then(function (d) {
+        if (!d) return;
+        var nw = d.naturalWidth || w, nh = d.naturalHeight || h;
+        var rect = { x: d.x / nw, y: d.y / nh, w: d.width / nw, h: d.height / nh, ar: ar };
+        _igPlace(btn, rect);   // the thumbnail follows at once
+        cropStatus.textContent = 'Запазва се…';
+        return socPost({ action: 'save_crop', kind: kind, src: btn.dataset.src, rect: rect }).then(function (res) {
+          if (!res.ok) { var err = new Error(res.error || ''); err.fromServer = true; throw err; }
+          _igPlace(btn, res.rect);
+          cropStatus.textContent = 'Запазено. Instagram ще покаже тази част от снимката.';
+        }).catch(function (e) {
+          _igPlace(btn, cur);   // not saved — show what Instagram will really get
+          throw e;
+        });
+      }).catch(function (e) {
+        cropStatus.textContent = '';
+        cropError.textContent = (e && e.fromServer && e.message) || 'Изрязването не можа да се запази. Проверете връзката и опитайте отново.';
+        cropError.style.display = '';
+      });
+    });
+  });
 
   document.getElementById('igModePostBtn').addEventListener('click', function() { _igSetMode('post'); });
   document.getElementById('igModeStoryBtn').addEventListener('click', function() { _igSetMode('story'); });
@@ -1468,6 +1563,11 @@ if (translateBtn) {
         errEl.textContent   = data.error;
         errEl.style.display = '';
       } else {
+        if (channel === 'insta') {
+          var noteBox = document.getElementById(extra && extra.post_type === 'story' ? 'igCropStory' : 'igCropPost');
+          var note = noteBox && noteBox.querySelector('.ig-crop-sched-note');
+          if (note && data.due_at) note.style.display = '';
+        }
         label = label || (channel === 'fb' ? 'FB' : 'IG');
         if (data.due_at) {
           document.getElementById(badgeId).innerHTML =

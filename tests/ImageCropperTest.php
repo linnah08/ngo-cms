@@ -49,6 +49,8 @@ final class ImageCropperTest extends TestCase
         $js = $this->read('assets/js/image-cropper.js');
         $this->assertStringContainsString('window.OMCrop', $js);
         $this->assertStringContainsString('data-om-crop', $js);
+        // pick(): choose part of an existing photo (Instagram crop previews) without uploading.
+        $this->assertStringContainsString('pick: pick', $js);
         $this->assertStringContainsString('DataTransfer', $js);
         // GIF bypass and transparency handling must remain.
         $this->assertStringContainsString("image/gif", $js);

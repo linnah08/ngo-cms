@@ -95,6 +95,30 @@ final class ArticleSaveLogicTest extends TestCase
         $this->assertSame('published', $data['status']);
     }
 
+    public function testBgDataKeepsInstagramCropsForPhotosStillOnThePost(): void
+    {
+        $rect = ['x' => 0, 'y' => 0.1, 'w' => 1, 'h' => 0.5, 'ar' => 0.8];
+        $existing = ['insta_crops' => [
+            'post'  => ['/assets/images/a.jpg' => $rect, '/assets/images/gone.jpg' => $rect],
+            'story' => ['/assets/images/a.jpg' => $rect],
+        ]];
+        $data = article_build_bg_data([
+            'title' => 'T', 'slug' => 's', 'slug_en' => 'se', 'date' => '2026-10-06', 'author' => 'A',
+            'status' => 'published', 'excerpt' => '', 'image' => '/assets/images/a.jpg', 'tags' => [], 'content' => '',
+            'photos' => [['src' => '/assets/images/a.jpg', 'caption' => ''], ['src' => '/assets/images/b.jpg', 'caption' => '']],
+        ], $existing);
+        $this->assertSame([
+            'post'  => ['/assets/images/a.jpg' => $rect],
+            'story' => ['/assets/images/a.jpg' => $rect],
+        ], $data['insta_crops'], 'a removed photo loses its crop; the others are kept');
+
+        $none = article_build_bg_data([
+            'title' => 'T', 'slug' => 's', 'slug_en' => 'se', 'date' => '2026-10-06', 'author' => 'A',
+            'status' => 'published', 'excerpt' => '', 'image' => '', 'tags' => [], 'content' => '',
+        ], []);
+        $this->assertArrayNotHasKey('insta_crops', $none);
+    }
+
     public function testBgDataDefaultsMissingMetadataToEmptyStringForNewArticle(): void
     {
         $data = article_build_bg_data([

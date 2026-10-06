@@ -3,7 +3,7 @@
  * Facebook / Instagram post AJAX handler.
  *
  * POST body (JSON):
- *   action      'generate' | 'schedule'
+ *   action      'generate' | 'schedule' | 'save_crop'
  *   csrf_token  string
  *   slug        string   — BG article slug
  *
@@ -14,6 +14,11 @@
  *   social_text   string   — text to post
  *   scheduled_at  string   — datetime-local (Europe/Sofia)
  *   channel       string   — 'fb' or 'insta'
+ *
+ * For 'save_crop':
+ *   kind  string — 'post' or 'story'
+ *   src   string — one of the article's own photos
+ *   rect  object — {x, y, w, h} fractions of the photo, ar = the shape it was made for
  */
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
@@ -51,6 +56,29 @@ if (!$slug) {
 $file = ARTICLES_PATH . '/bg/' . $slug . '.json';
 if (!file_exists($file)) {
     echo json_encode(['ok' => false, 'error' => 'Article not found']);
+    exit;
+}
+
+// ── Save an Instagram crop ────────────────────────────────────────────────────
+// Which part of a photo Instagram shows. Stored on the BG article as fractions of the
+// photo, with the shape it was made for: insta_crops.{post|story}.{src} = {x,y,w,h,ar}.
+if ($action === 'save_crop') {
+    $data  = load_json($file);
+    $clean = social_crop_clean($data, $body);
+    if (!$clean['ok']) {
+        echo json_encode(['ok' => false, 'error' => $clean['error']]);
+        exit;
+    }
+    $crops = is_array($data['insta_crops'] ?? null) ? $data['insta_crops'] : [];
+    if (!is_array($crops[$clean['kind']] ?? null)) $crops[$clean['kind']] = [];
+    $crops[$clean['kind']][$clean['src']] = $clean['rect'];
+    $data['insta_crops'] = $crops;
+    if (!save_json($file, $data)) {
+        _om_log('ERROR', "social-ajax save_crop: failed to save {$file}");
+        echo json_encode(['ok' => false, 'error' => 'Изрязването не можа да се запази. Опитайте отново.']);
+        exit;
+    }
+    echo json_encode(['ok' => true, 'rect' => $clean['rect']]);
     exit;
 }
 

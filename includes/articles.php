@@ -98,6 +98,18 @@ function article_build_bg_data(array $f, array $existing = []): array {
     foreach ($carry as $k) {
         $data[$k] = $existing[$k] ?? '';
     }
+    // The author's Instagram crops (admin/social-ajax.php save_crop), kept for the photos
+    // the post still has — a removed or replaced photo simply loses its crop.
+    $srcs  = array_merge(array_column($data['photos'], 'src'), [$data['image']]);
+    $crops = [];
+    foreach (['post', 'story'] as $kind) {
+        $set = $existing['insta_crops'][$kind] ?? null;
+        if (!is_array($set)) continue;
+        foreach ($set as $src => $rect) {
+            if (is_array($rect) && in_array((string) $src, $srcs, true)) $crops[$kind][(string) $src] = $rect;
+        }
+    }
+    if ($crops) $data['insta_crops'] = $crops;
     return $data;
 }
 

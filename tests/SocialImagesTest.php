@@ -36,12 +36,99 @@ final class SocialImagesTest extends TestCase
         return $this->rel . '/' . $name;
     }
 
-    public function testSquareModeCropsToTheCentre(): void
+    /** LinkedIn's document pages stay square. */
+    public function testSquareModeCropsWideToTheCentre(): void
     {
         $out = social_prepare_image($this->jpeg('wide.jpg', 1200, 800), 'square');
         [$w, $h] = getimagesize($_SERVER['DOCUMENT_ROOT'] . $out);
         $this->assertSame([800, 800], [$w, $h]);
-        $this->assertStringEndsWith('-sq.jpg', $out);
+        $this->assertMatchesRegularExpression('/-sq-[0-9a-f]{8}\.jpg$/', $out);
+        $this->assertSame([200, 0, 800, 800], social_crop_box(1200, 800, 'square'));
+    }
+
+    public function testCarouselSlidesAre4x5Portrait(): void
+    {
+        foreach ([[1200, 800, 640, 800], [900, 2000, 900, 1125], [800, 1000, 800, 1000]] as [$w, $h, $ew, $eh]) {
+            $p   = $this->jpeg("c{$w}x{$h}.jpg", $w, $h);
+            $out = social_prepare_image($p, 'carousel');
+            $this->assertSame([$ew, $eh], array_slice(getimagesize($_SERVER['DOCUMENT_ROOT'] . $out), 0, 2), "{$w}×{$h}");
+        }
+    }
+
+    /** The bug: a 900×2000 phone photo lost the head (rows 370–540) to a centred square. */
+    public function testAutomaticCropOfATallPhotoKeepsTheTop(): void
+    {
+        $this->assertSame([0, 175, 900, 1125], social_crop_box(900, 2000, 'carousel'));   // (2000 − 1125) × 0.2
+        $this->assertSame([0, 80, 900, 1600], social_crop_box(900, 2000, 'story'));        // 400 spare → 80
+        $this->assertSame([0, 120, 800, 1000], social_crop_box(800, 1600, 'insta'));
+        // Horizontal cuts stay centred.
+        $this->assertSame([547, 0, 506, 900], social_crop_box(1600, 900, 'story'));
+    }
+
+    public function testASavedCropIsUsed(): void
+    {
+        $rect = ['x' => 0.0, 'y' => 0.5, 'w' => 0.5, 'h' => 0.28125, 'ar' => 0.8];   // 450×562.5 on 900×2000
+        $this->assertSame([0, 1000, 450, 563], social_crop_box(900, 2000, 'carousel', $rect));
+
+        $p   = $this->jpeg('tall.jpg', 900, 2000);
+        $out = social_prepare_image($p, 'carousel', $rect);
+        $this->assertSame([450, 563], array_slice(getimagesize($_SERVER['DOCUMENT_ROOT'] . $out), 0, 2));
+        $this->assertNotSame(social_prepare_image($p, 'carousel'), $out, 'a different crop is a different file');
+    }
+
+    public function testACropMadeForAnotherShapeIsIgnored(): void
+    {
+        $square = ['x' => 0.0, 'y' => 0.5, 'w' => 1.0, 'h' => 0.45, 'ar' => 1.0];
+        $this->assertSame(social_crop_box(900, 2000, 'carousel'), social_crop_box(900, 2000, 'carousel', $square));
+        // Right label, wrong rectangle (e.g. the file was swapped for another size).
+        $bad = ['x' => 0.0, 'y' => 0.0, 'w' => 1.0, 'h' => 1.0, 'ar' => 0.8];
+        $this->assertSame([0, 175, 900, 1125], social_crop_box(900, 2000, 'carousel', $bad));
+        $this->assertSame([0, 175, 900, 1125], social_crop_box(900, 2000, 'carousel', ['x' => 'a']));
+    }
+
+    public function testCarouselUsesTheSavedPostCropAndStoryItsOwn(): void
+    {
+        $a = $this->jpeg('a.jpg', 900, 2000);
+        $b = $this->jpeg('b.jpg', 800, 800);
+        $article = ['image' => $a, 'photos' => [['src' => $a, 'caption' => ''], ['src' => $b, 'caption' => '']],
+            'insta_crops' => ['post' => [$a => ['x' => 0, 'y' => 0, 'w' => 1, 'h' => 0.5625, 'ar' => 0.8]]]];
+        $r = social_fb_insta_request($article, 'insta');
+        $path = substr($r['urls'][0], strlen(SITE_URL));
+        $this->assertSame([900, 1125], array_slice(getimagesize($_SERVER['DOCUMENT_ROOT'] . rawurldecode($path)), 0, 2));
+        $this->assertSame(social_prepare_image($a, 'carousel', $article['insta_crops']['post'][$a]), rawurldecode($path));
+        // The story has no saved crop → automatic.
+        $s = social_fb_insta_request($article, 'insta', true);
+        $this->assertSame(social_prepare_image($a, 'story'), rawurldecode(substr($s['urls'][0], strlen(SITE_URL))));
+    }
+
+    public function testCropValidation(): void
+    {
+        $a = $this->jpeg('a.jpg', 900, 2000);
+        $article = ['image' => $a, 'photos' => [['src' => $a, 'caption' => '']]];
+        $ok = social_crop_clean($article, ['kind' => 'post', 'src' => $a, 'rect' => ['x' => -0.2, 'y' => '0.1', 'w' => 1.5, 'h' => 0.5, 'ar' => 0.8]]);
+        $this->assertTrue($ok['ok']);
+        $this->assertSame(['x' => 0.0, 'y' => 0.1, 'w' => 1.0, 'h' => 0.5, 'ar' => 0.8], $ok['rect']);
+
+        $this->assertFalse(social_crop_clean($article, ['kind' => 'reel', 'src' => $a, 'rect' => $ok['rect']])['ok']);
+        $this->assertFalse(social_crop_clean($article, ['kind' => 'post', 'src' => '/assets/images/other.jpg', 'rect' => $ok['rect']])['ok']);
+        $this->assertFalse(social_crop_clean($article, ['kind' => 'post', 'src' => $a, 'rect' => ['x' => 0, 'y' => 0, 'w' => 'all', 'h' => 1, 'ar' => 0.8]])['ok']);
+        $this->assertFalse(social_crop_clean($article, ['kind' => 'post', 'src' => $a, 'rect' => ['x' => 0, 'y' => 0, 'w' => 0, 'h' => 1, 'ar' => 0.8]])['ok']);
+        $this->assertFalse(social_crop_clean($article, ['kind' => 'post', 'src' => $a])['ok']);
+    }
+
+    public function testPreviewMatchesWhatIsSent(): void
+    {
+        $a = $this->jpeg('a.jpg', 900, 2000);
+        $b = $this->jpeg('b.jpg', 1200, 800);
+        $pv = social_insta_preview(['image' => $b, 'photos' => [['src' => $a, 'caption' => ''], ['src' => $b, 'caption' => '']]]);
+        $this->assertSame([$b, $a], array_column($pv['post'], 'src'));
+        $this->assertSame([0.8, 0.8], array_column($pv['post'], 'ar'));
+        $this->assertEqualsWithDelta(['x' => 0.0, 'y' => 0.0875, 'w' => 1.0, 'h' => 0.5625], $pv['post'][1]['rect'], 1e-9);
+        $this->assertCount(1, $pv['story']);
+        $this->assertSame($b, $pv['story'][0]['src']);
+        // One photo: its own shape, clamped.
+        $one = social_insta_preview(['image' => $b]);
+        $this->assertSame(1.5, $one['post'][0]['ar']);
     }
 
     public function testAlreadySquareIsSentAsIs(): void
@@ -91,7 +178,7 @@ final class SocialImagesTest extends TestCase
         $b = $this->jpeg('b.jpg', 800, 800);
         $r = social_fb_insta_request(['image' => $a, 'photos' => [['src' => $a, 'caption' => ''], ['src' => $b, 'caption' => '']]], 'insta');
         $this->assertCount(2, $r['urls']);
-        $this->assertStringEndsWith('a-sq.jpg', $r['urls'][0]);
+        $this->assertMatchesRegularExpression('/a-4x5-[0-9a-f]{8}\.jpg$/', $r['urls'][0]);
         // Buffer refuses type: carousel (verified 03.10.2026) — several assets on a post make the carousel.
         $this->assertSame('instagram: { type: post, shouldShareToFeed: true }', $r['metadata']);
     }
@@ -109,7 +196,7 @@ final class SocialImagesTest extends TestCase
         $out = social_prepare_image($this->jpeg('wide.jpg', 1600, 900), 'story');
         [$w, $h] = getimagesize($_SERVER['DOCUMENT_ROOT'] . $out);
         $this->assertSame([506, 900], [$w, $h]);   // 900 × 9/16
-        $this->assertStringEndsWith('-story.jpg', $out);
+        $this->assertMatchesRegularExpression('/-story-[0-9a-f]{8}\.jpg$/', $out);
     }
 
     public function testInstagramStoryIsTheMainPhotoAloneAsAStory(): void
@@ -118,7 +205,7 @@ final class SocialImagesTest extends TestCase
         $b = $this->jpeg('b.jpg', 800, 800);
         $r = social_fb_insta_request(['image' => $b, 'photos' => [['src' => $a, 'caption' => ''], ['src' => $b, 'caption' => '']]], 'insta', true);
         $this->assertCount(1, $r['urls']);
-        $this->assertStringEndsWith('b-story.jpg', $r['urls'][0]);
+        $this->assertMatchesRegularExpression('/b-story-[0-9a-f]{8}\.jpg$/', $r['urls'][0]);
         $this->assertSame('instagram: { type: story, shouldShareToFeed: false }', $r['metadata']);
     }
 
