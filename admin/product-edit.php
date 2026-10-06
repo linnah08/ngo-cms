@@ -4,6 +4,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/distribution.php';
 
 admin_require_shop();
 
@@ -126,7 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         "SELECT COUNT(*) FROM orders WHERE JSON_SEARCH(items, 'one', ?, NULL, '\$[*].variant_id') IS NOT NULL"
                     );
                     $ord->execute([(string)$eid]);
-                    if ((int)$ord->fetchColumn() > 0) {
+                    if ((int)$ord->fetchColumn() > 0 || distribution_variant_has_records($pdo, $eid)) {
                         $pdo->prepare('UPDATE product_variants SET active = 0 WHERE id = ?')->execute([$eid]);
                     } else {
                         $pdo->prepare('DELETE FROM product_variants WHERE id = ?')->execute([$eid]);

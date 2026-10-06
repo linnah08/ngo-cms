@@ -119,6 +119,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        // Products with distribution records keep their history too.
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/distribution.php';
+        $hasOrders = array_values(array_unique(array_merge($hasOrders, distribution_products_with_records($pdo, $ids))));
+
         $safe    = array_values(array_diff($ids, $hasOrders));
         $skipped = array_values(array_intersect($ids, $hasOrders));
 
@@ -132,9 +136,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($nSkipped === 0) {
             $msg = $nSafe . ($nSafe === 1 ? ' продукт изтрит' : ' продукта изтрити') . ' завинаги.';
         } elseif ($nSafe === 0) {
-            $msg = 'Нито един продукт не може да бъде изтрит — всички имат поръчки.';
+            $msg = 'Нито един продукт не може да бъде изтрит — всички имат поръчки или записи в „Разпространение“.';
         } else {
-            $msg = $nSafe . ' изтрити, ' . $nSkipped . ' пропуснати — имат поръчки.';
+            $msg = $nSafe . ' изтрити, ' . $nSkipped . ' пропуснати — имат поръчки или записи в „Разпространение“.';
         }
         flash_set('success', $msg);
         header('Location: /admin/products.php');
@@ -168,7 +172,12 @@ try {
 
 <div class="admin-page-header">
   <h1>Продукти</h1>
-  <a href="/admin/product-edit.php" class="btn btn--primary">+ Нов продукт</a>
+  <div style="display:flex;flex-wrap:wrap;gap:.5rem;">
+    <?php if (feature_enabled('distribution')): ?>
+    <a href="/admin/distribution.php" class="btn btn--outline">Разпространение</a>
+    <?php endif; ?>
+    <a href="/admin/product-edit.php" class="btn btn--primary">+ Нов продукт</a>
+  </div>
 </div>
 
 <?php foreach (flash_get() as $_flash): ?>
