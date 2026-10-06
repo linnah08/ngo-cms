@@ -661,4 +661,28 @@ final class NewsletterTest extends TestCase
             $this->assertStringContainsString('newsletter_remember_order($order_number)', $src, $rel);
         }
     }
+
+    // ── Sign-ups from English pages ───────────────────────────────────────────
+
+    public function test_form_lang_comes_from_the_page_not_the_endpoint_address(): void
+    {
+        $this->loadNewsletter();
+        $this->assertSame('en', newsletter_form_lang(['lang' => 'en']));
+        $this->assertSame('bg', newsletter_form_lang(['lang' => 'bg']));
+        $this->assertSame(get_lang(), newsletter_form_lang(['lang' => 'fr']));
+        $this->assertSame(get_lang(), newsletter_form_lang(['lang' => ['en']]));
+        $this->assertSame(get_lang(), newsletter_form_lang([]));
+    }
+
+    public function test_every_signup_form_posts_its_page_language(): void
+    {
+        foreach (['templates/footer.php', 'templates/newsletter-confirm-card.php'] as $rel) {
+            $src = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/' . $rel);
+            $this->assertMatchesRegularExpression('/<input type="hidden" name="lang" value="<\?= h\(\$\w+\) \?>">/', $src, $rel);
+        }
+        foreach (['newsletter/subscribe.php', 'newsletter/subscribe-order.php'] as $rel) {
+            $src = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/' . $rel);
+            $this->assertStringContainsString('newsletter_form_lang($_POST)', $src, $rel);
+        }
+    }
 }

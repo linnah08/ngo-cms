@@ -40,6 +40,7 @@ $_show_nl_banner = empty($_COOKIE['om_nl_sub']) && !$_is_admin_page;
     <form method="POST" action="/newsletter/subscribe.php"
           style="display:flex;gap:.5rem 1.5rem;justify-content:center;align-items:center;flex-wrap:wrap;text-align:left;">
       <?= csrf_field() ?>
+      <input type="hidden" name="lang" value="<?= h($lang) ?>">
       <?php $nl_on_dark = true; require $_SERVER['DOCUMENT_ROOT'] . '/templates/newsletter-topics.php'; ?>
       <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;">
         <label for="nlBannerEmail" class="sr-only"><?= h(t('newsletter.banner.placeholder')) ?></label>

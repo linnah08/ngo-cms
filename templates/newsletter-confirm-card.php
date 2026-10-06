@@ -45,6 +45,7 @@ if (newsletter_session_owns_order((string) ($order['order_number'] ?? ''))):
       <form method="POST" action="/newsletter/subscribe-order.php" style="margin:0;">
         <?= csrf_field() ?>
         <input type="hidden" name="order" value="<?= h((string) $order['order_number']) ?>">
+        <input type="hidden" name="lang" value="<?= h($_nlc_lang) ?>">
         <input type="hidden" name="flow" value="<?= $nl_flow === 'donation' ? 'donation' : 'order' ?>">
         <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/newsletter-topics.php'; ?>
         <div style="text-align:center;">

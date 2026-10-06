@@ -147,6 +147,18 @@ function newsletter_clean_topic(mixed $topic): string
     return is_string($topic) && isset(newsletter_topics()[$topic]) ? $topic : 'all';
 }
 
+/**
+ * Language of the page a sign-up form was on. The forms post to
+ * /newsletter/…, which has no /en/ in its address, so get_lang() alone would
+ * make every English sign-up Bulgarian — Bulgarian messages, and Bulgarian
+ * newsletters afterwards. The forms send it in a hidden `lang` field.
+ */
+function newsletter_form_lang(array $post): string
+{
+    $lang = $post['lang'] ?? null;
+    return in_array($lang, ['bg', 'en'], true) ? $lang : get_lang();
+}
+
 /** Mark this browser as subscribed, so the footer sign-up band stops showing. */
 function newsletter_set_subscribed_cookie(): void
 {

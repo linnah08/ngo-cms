@@ -22,7 +22,7 @@ if (!csrf_verify()) {
     exit('Invalid token');
 }
 
-$lang         = get_lang();
+$lang         = newsletter_form_lang($_POST);
 $order_number = trim((string) ($_POST['order'] ?? ''));
 if (!preg_match('/^OM-\d{8}-[A-F0-9]{4}$/i', $order_number)) {
     header('Location: /');

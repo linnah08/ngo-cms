@@ -14,12 +14,13 @@ if (!csrf_verify()) {
 
 $email = trim((string)($_POST['email'] ?? ''));
 $name  = trim((string)($_POST['name']  ?? ''));
-$lang  = get_lang();
+$lang  = newsletter_form_lang($_POST);
 // Back to the page the form was on (same site only, no query string).
-$back  = strtok($_SERVER['HTTP_REFERER'] ?? '/', '?') ?: '/';
-if (parse_url($back, PHP_URL_HOST) && parse_url($back, PHP_URL_HOST) !== parse_url(SITE_URL, PHP_URL_HOST)
-    && parse_url($back, PHP_URL_HOST) !== ($_SERVER['HTTP_HOST'] ?? '')) {
-    $back = '/';
+$back      = strtok($_SERVER['HTTP_REFERER'] ?? '/', '?') ?: '/';
+$back_host = parse_url($back, PHP_URL_HOST);
+$own_hosts = [parse_url(SITE_URL, PHP_URL_HOST), parse_url('http://' . ($_SERVER['HTTP_HOST'] ?? ''), PHP_URL_HOST)];
+if ($back_host && !in_array($back_host, $own_hosts, true)) {
+    $back = $lang === 'en' ? '/en/' : '/';
 }
 
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
