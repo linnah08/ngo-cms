@@ -59,6 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'forma
     $campaign = array_merge($campaign ?? [], [
         'subject_bg' => $_POST['subject_bg'] ?? ($campaign['subject_bg'] ?? ''),
         'subject_en' => $_POST['subject_en'] ?? ($campaign['subject_en'] ?? ''),
+        'topic'      => newsletter_clean_topic($_POST['topic'] ?? ($campaign['topic'] ?? 'all')),
         'body_bg'    => $articles_bg ? newsletter_format_articles(array_values($articles_bg), 'bg') : ($campaign['body_bg'] ?? ''),
         'body_en'    => $articles_en ? newsletter_format_articles(array_values($articles_en), 'en') : ($campaign['body_en'] ?? ''),
     ]);
@@ -72,6 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
     $subject_en = trim($_POST['subject_en'] ?? '');
     $body_bg    = $_POST['body_bg'] ?? '';
     $body_en    = $_POST['body_en'] ?? '';
+    $topic      = newsletter_clean_topic($_POST['topic'] ?? 'all');
     $send_date  = trim($_POST['send_date'] ?? '');
     $send_date  = ($send_date && preg_match('/^\d{4}-\d{2}-\d{2}$/', $send_date)) ? $send_date : null;
 
@@ -80,11 +82,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
     if (!$errors) {
         $as_id = $id;  // autosave key was based on the page-load id (0 for new)
         if ($id && $campaign) {
-            $pdo->prepare("UPDATE newsletter_campaigns SET subject_bg=?,subject_en=?,body_bg=?,body_en=?,send_date=?,status='draft' WHERE id=?")
-                ->execute([$subject_bg, $subject_en, $body_bg, $body_en, $send_date, $id]);
+            $pdo->prepare("UPDATE newsletter_campaigns SET subject_bg=?,subject_en=?,body_bg=?,body_en=?,topic=?,send_date=?,status='draft' WHERE id=?")
+                ->execute([$subject_bg, $subject_en, $body_bg, $body_en, $topic, $send_date, $id]);
         } else {
-            $pdo->prepare("INSERT INTO newsletter_campaigns (subject_bg,subject_en,body_bg,body_en,send_date) VALUES (?,?,?,?,?)")
-                ->execute([$subject_bg, $subject_en, $body_bg, $body_en, $send_date]);
+            $pdo->prepare("INSERT INTO newsletter_campaigns (subject_bg,subject_en,body_bg,body_en,topic,send_date) VALUES (?,?,?,?,?,?)")
+                ->execute([$subject_bg, $subject_en, $body_bg, $body_en, $topic, $send_date]);
             $id = (int)$pdo->lastInsertId();
         }
         flash_set('success', 'Кампанията е записана.');
@@ -93,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
     }
 
     // Re-populate for error display
-    $campaign = array_merge($campaign ?? [], compact('subject_bg','subject_en','body_bg','body_en','send_date'));
+    $campaign = array_merge($campaign ?? [], compact('subject_bg','subject_en','body_bg','body_en','topic','send_date'));
 }
 
 // Load published articles for picker (both langs)
@@ -216,10 +218,22 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <input type="hidden" name="subject_bg" id="save_subject_bg">
     <input type="hidden" name="subject_en" id="save_subject_en">
 
-    <label style="display:block;margin:0 0 1.5rem;">
-      <span style="font-weight:600;">Насрочи за дата:</span>
-      <input type="date" name="send_date" value="<?= h($campaign['send_date'] ?? '') ?>" style="margin-left:.5rem;padding:.35rem .5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;">
-    </label>
+    <?php $cur_topic = newsletter_clean_topic($campaign['topic'] ?? 'all'); ?>
+    <div style="display:flex;gap:1rem 2rem;flex-wrap:wrap;margin:0 0 1.5rem;">
+      <label>
+        <span style="font-weight:600;">Получатели:</span>
+        <select name="topic" style="margin-left:.5rem;padding:.35rem .5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;max-width:100%;">
+          <option value="all"<?= $cur_topic === 'all' ? ' selected' : '' ?>>Всички абонати</option>
+          <?php foreach (array_keys(newsletter_topics()) as $tk): ?>
+          <option value="<?= h($tk) ?>"<?= $cur_topic === $tk ? ' selected' : '' ?>>Само „<?= h(newsletter_topic_label($tk, 'bg')) ?>“</option>
+          <?php endforeach; ?>
+        </select>
+      </label>
+      <label>
+        <span style="font-weight:600;">Насрочи за дата:</span>
+        <input type="date" name="send_date" value="<?= h($campaign['send_date'] ?? '') ?>" style="margin-left:.5rem;padding:.35rem .5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;">
+      </label>
+    </div>
     <?php if (!empty($campaign['send_date'])): ?>
     <p style="font-size:.85rem;color:#8b6b1a;margin:-1rem 0 1.5rem;">⏱ Ще бъде изпратена автоматично на <?= h(date('d.m.Y', strtotime($campaign['send_date']))) ?>. Изтрийте датата, за да отмените, или я променете по всяко време, докато е чернова.</p>
     <?php endif; ?>

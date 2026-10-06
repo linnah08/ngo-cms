@@ -88,8 +88,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // ── List ──────────────────────────────────────────────────────────────────────
-$filter_status = $_GET['status'] ?? 'all';
-$filter_source = $_GET['source'] ?? 'all';
+$filter_status = in_array($_GET['status'] ?? 'all', ['all', 'active', 'unsubscribed'], true) ? $_GET['status'] : 'all';
+$filter_source = in_array($_GET['source'] ?? 'all', NEWSLETTER_SOURCES, true) ? $_GET['source'] : 'all';
+$filter_topic  = newsletter_clean_topic($_GET['topic'] ?? 'all');
 $page          = max(1, (int)($_GET['p'] ?? 1));
 $per_page      = 50;
 $offset        = ($page - 1) * $per_page;
@@ -97,6 +98,8 @@ $offset        = ($page - 1) * $per_page;
 $where = ['1=1']; $params = [];
 if ($filter_status !== 'all') { $where[] = 'status = ?'; $params[] = $filter_status; }
 if ($filter_source !== 'all') { $where[] = 'source = ?'; $params[] = $filter_source; }
+// Constant column name from newsletter_topics(), never user input.
+if ($filter_topic !== 'all')  { $where[] = newsletter_topics()[$filter_topic] . ' = 1'; }
 $where_sql = implode(' AND ', $where);
 
 $total = (int)$pdo->prepare("SELECT COUNT(*) FROM newsletter_subscribers WHERE $where_sql")
@@ -113,7 +116,8 @@ $subscribers = $stmt->fetchAll();
 $counts = newsletter_active_count();
 $flash  = flash_get();
 
-$source_labels = ['web_banner'=>'Банер','customer_import'=>'Клиент','manual'=>'Ръчно'];
+$source_labels = ['web_banner'=>'Банер','customer_import'=>'Клиент','manual'=>'Ръчно',
+                  'checkout'=>'Поръчка','donation'=>'Дарение','confirmation'=>'След поръчка'];
 $status_labels = ['active'=>['Активен','badge--published'],'unsubscribed'=>['Отписан','badge--draft']];
 
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
@@ -149,11 +153,21 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     ['source','web_banner','Банер','web_banner'],
     ['source','customer_import','Клиенти','customer_import'],
     ['source','manual','Ръчно','manual'],
+    ['source','checkout','Поръчка','checkout'],
+    ['source','donation','Дарение','donation'],
+    ['source','confirmation','След поръчка','confirmation'],
   ];
+  foreach (newsletter_topics() as $tk => $_col) {
+    $f_pairs[] = ['topic', $tk, 'Тема: ' . h(newsletter_topic_label($tk, 'bg')), $tk];
+  }
+  $f_current = ['status' => $filter_status, 'source' => $filter_source, 'topic' => $filter_topic];
   foreach ($f_pairs as [$key, $val, $label, $cmp]):
-    $active = ($key === 'status' ? $filter_status : $filter_source) === $cmp;
+    $active = $f_current[$key] === $cmp;
+    // Clicking an active source/topic chip switches that filter off again.
+    $next   = ($active && $key !== 'status') ? 'all' : $val;
   ?>
-  <a href="?<?= http_build_query(array_merge(['status'=>$filter_status,'source'=>$filter_source], [$key=>$val])) ?>"
+  <a href="?<?= h(http_build_query(array_merge($f_current, [$key=>$next]))) ?>"
+     aria-pressed="<?= $active ? 'true' : 'false' ?>"
      style="padding:.3rem .9rem;border-radius:20px;font-size:.8rem;text-decoration:none;
      <?= $active ? 'background:var(--teal);color:#fff;' : 'background:var(--off-white);color:var(--text-muted);border:1px solid var(--border);' ?>">
     <?= $label ?>
@@ -166,13 +180,14 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <table class="admin-table" style="width:100%;border-collapse:collapse;table-layout:fixed;">
     <colgroup>
       <col style="width:4%;">
-      <col style="width:24%;">
-      <col style="width:18%;">
+      <col style="width:22%;">
+      <col style="width:15%;">
       <col style="width:6%;">
       <col style="width:10%;">
-      <col style="width:10%;">
-      <col style="width:10%;">
-      <col style="width:18%;">
+      <col style="width:12%;">
+      <col style="width:9%;">
+      <col style="width:9%;">
+      <col style="width:13%;">
     </colgroup>
     <thead>
       <tr style="background:var(--off-white);">
@@ -181,6 +196,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <th data-sort style="padding:.65rem 1rem;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);overflow:hidden;">Имена</th>
         <th data-sort style="padding:.65rem 1rem;text-align:center;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);overflow:hidden;">Език</th>
         <th data-sort style="padding:.65rem 1rem;text-align:center;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);overflow:hidden;">Източник</th>
+        <th data-sort style="padding:.65rem 1rem;text-align:center;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);overflow:hidden;">Теми</th>
         <th data-sort style="padding:.65rem 1rem;text-align:center;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);overflow:hidden;">Статус</th>
         <th data-sort style="padding:.65rem 1rem;text-align:right;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);overflow:hidden;">Записан</th>
         <th style="padding:.65rem 1rem;text-align:center;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);overflow:hidden;">Действия</th>
@@ -188,7 +204,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </thead>
     <tbody>
       <?php if (empty($subscribers)): ?>
-      <tr><td colspan="8" style="padding:2rem;text-align:center;color:var(--text-muted);">Няма абонати.</td></tr>
+      <tr><td colspan="9" style="padding:2rem;text-align:center;color:var(--text-muted);">Няма абонати.</td></tr>
       <?php else: foreach ($subscribers as $s): ?>
       <tr style="border-top:1px solid var(--border);">
         <td style="padding:.75rem 1rem;text-align:center;">
@@ -199,7 +215,16 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <td style="padding:.75rem 1rem;font-size:.9rem;"><?= h($s['email']) ?></td>
         <td style="padding:.75rem 1rem;font-size:.9rem;color:var(--text-muted);"><?= h($s['name'] ?? '—') ?></td>
         <td style="padding:.75rem 1rem;text-align:center;font-size:.85rem;text-transform:uppercase;"><?= h($s['lang']) ?></td>
-        <td style="padding:.75rem 1rem;text-align:center;font-size:.8rem;color:var(--text-muted);"><?= $source_labels[$s['source']] ?? $s['source'] ?></td>
+        <td style="padding:.75rem 1rem;text-align:center;font-size:.8rem;color:var(--text-muted);"><?= h($source_labels[$s['source']] ?? $s['source']) ?></td>
+        <td style="padding:.75rem 1rem;text-align:center;font-size:.8rem;">
+          <?php
+            $tags = [];
+            foreach (newsletter_topics() as $tk => $col) {
+                if (!empty($s[$col])) $tags[] = newsletter_topic_label($tk, 'bg');
+            }
+            echo h($tags ? implode(', ', $tags) : '—');
+          ?>
+        </td>
         <td style="padding:.75rem 1rem;text-align:center;">
           <?php [$lbl,$cls] = $status_labels[$s['status']] ?? [$s['status'],'badge--draft']; ?>
           <span class="badge <?= $cls ?>"><?= $lbl ?></span>
@@ -343,7 +368,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 <?php if ($pages > 1): ?>
 <div style="display:flex;gap:.4rem;margin-bottom:2rem;">
   <?php for ($i = 1; $i <= $pages; $i++): ?>
-  <a href="?<?= http_build_query(['status'=>$filter_status,'source'=>$filter_source,'p'=>$i]) ?>"
+  <a href="?<?= h(http_build_query(['status'=>$filter_status,'source'=>$filter_source,'topic'=>$filter_topic,'p'=>$i])) ?>"
      style="padding:.35rem .75rem;border-radius:4px;font-size:.85rem;text-decoration:none;
      <?= $i===$page ? 'background:var(--teal);color:#fff;' : 'background:var(--off-white);color:var(--text-muted);border:1px solid var(--border);' ?>">
     <?= $i ?>

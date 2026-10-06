@@ -406,4 +406,259 @@ final class NewsletterTest extends TestCase
         $this->assertStringNotContainsString('array_slice($articles_bg, 0, 10)', $src);
         $this->assertStringNotContainsString('array_slice($articles_en, 0, 10)', $src);
     }
+
+    // ── Topics: merge-safe subscribe ──────────────────────────────────────────
+
+    /** Read topic flags (and status/source) for an email. */
+    private function topicsOf(string $email): array
+    {
+        $stmt = self::$pdo->prepare(
+            "SELECT wants_news, wants_education, status, source FROM newsletter_subscribers WHERE email=?"
+        );
+        $stmt->execute([strtolower(trim($email))]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function test_subscribe_stores_selected_topics(): void
+    {
+        $this->skipWithoutDb();
+        $email = 'test_topics_' . uniqid() . '@example-test.invalid';
+        try {
+            $result = newsletter_subscribe($email, 'T', 'bg', 'checkout', true, false);
+            $this->assertSame('subscribed', $result['status']);
+            $row = $this->topicsOf($email);
+            $this->assertSame('1', (string)$row['wants_news']);
+            $this->assertSame('0', (string)$row['wants_education']);
+            $this->assertSame('checkout', $row['source'], 'checkout is a real source now, not folded into web_banner');
+        } finally {
+            $this->deleteSubscriber($email);
+        }
+    }
+
+    public function test_subscribe_merges_topics_without_clearing(): void
+    {
+        $this->skipWithoutDb();
+        $email = 'test_merge_' . uniqid() . '@example-test.invalid';
+        try {
+            newsletter_subscribe($email, 'T', 'bg', 'checkout', true, false);            // news only
+            $result = newsletter_subscribe($email, 'T', 'bg', 'checkout', false, true);  // add the other
+            $this->assertSame('merged', $result['status']);
+            $this->assertTrue($result['duplicate']);
+            $row = $this->topicsOf($email);
+            $this->assertSame('1', (string)$row['wants_news'], 'a later sign-up must never clear a topic');
+            $this->assertSame('1', (string)$row['wants_education']);
+        } finally {
+            $this->deleteSubscriber($email);
+        }
+    }
+
+    public function test_subscribe_does_not_resurrect_unsubscribed(): void
+    {
+        $this->skipWithoutDb();
+        $email = 'test_noresurrect_' . uniqid() . '@example-test.invalid';
+        $this->insertSubscriber($email, 'unsubscribed');
+        try {
+            $result = newsletter_subscribe($email, 'T', 'bg', 'checkout', true, true);
+            $this->assertSame('resurrect_blocked', $result['status']);
+            $this->assertSame('unsubscribed', $this->topicsOf($email)['status']);
+        } finally {
+            $this->deleteSubscriber($email);
+        }
+    }
+
+    public function test_subscribe_with_no_topics_writes_nothing(): void
+    {
+        $this->skipWithoutDb();
+        $email = 'test_notopic_' . uniqid() . '@example-test.invalid';
+        try {
+            $result = newsletter_subscribe($email, 'T', 'bg', 'checkout', false, false);
+            $this->assertFalse($result['ok']);
+            $this->assertSame('no_topics', $result['status']);
+            $this->assertSame([], $this->topicsOf($email));
+        } finally {
+            $this->deleteSubscriber($email);
+        }
+    }
+
+    public function test_subscribe_uses_atomic_insert_and_greatest_merge(): void
+    {
+        // Concurrency safety lives in the SQL: INSERT IGNORE decides who created
+        // the row, GREATEST() merges in one statement — no read-modify-write.
+        $src = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php');
+        $this->assertStringContainsString('INSERT IGNORE INTO newsletter_subscribers', $src);
+        $this->assertStringContainsString('wants_news = GREATEST(wants_news, ?)', $src);
+        $this->assertStringContainsString('wants_education = GREATEST(wants_education, ?)', $src);
+    }
+
+    // ── Topics: helpers ───────────────────────────────────────────────────────
+
+    public function test_topic_where_filters_by_topic(): void
+    {
+        $this->loadNewsletter();
+        $this->assertSame("status='active' AND wants_news=1",      newsletter_topic_where('news'));
+        $this->assertSame("status='active' AND wants_education=1", newsletter_topic_where('education'));
+        $this->assertSame("status='active'", newsletter_topic_where('all'));
+        $this->assertSame("status='active'", newsletter_topic_where("news' OR 1=1 --"));
+    }
+
+    public function test_clean_topic_whitelists(): void
+    {
+        $this->loadNewsletter();
+        $this->assertSame('news', newsletter_clean_topic('news'));
+        $this->assertSame('education', newsletter_clean_topic('education'));
+        $this->assertSame('all', newsletter_clean_topic('all'));
+        $this->assertSame('all', newsletter_clean_topic('evil'));
+        $this->assertSame('all', newsletter_clean_topic(['news']));
+        $this->assertSame('all', newsletter_clean_topic(null));
+    }
+
+    public function test_topics_from_post(): void
+    {
+        $this->loadNewsletter();
+        $this->assertSame([true, false], newsletter_topics_from_post(['wants_news' => '1']));
+        $this->assertSame([false, true], newsletter_topics_from_post(['wants_education' => '1']));
+        $this->assertSame([false, false], newsletter_topics_from_post([]));
+    }
+
+    public function test_topic_labels_have_generic_defaults_in_both_languages(): void
+    {
+        $this->loadNewsletter();
+        foreach (['heading', 'news', 'education'] as $topic) {
+            foreach (['bg', 'en'] as $lang) {
+                $label = newsletter_topic_label($topic, $lang);
+                $this->assertNotSame('', trim($label));
+                $this->assertStringNotContainsString('newsletter.', $label, 'never a raw string key');
+            }
+            $this->assertNotSame(newsletter_topic_label($topic, 'bg'), newsletter_topic_label($topic, 'en'));
+        }
+    }
+
+    public function test_topic_labels_are_inline_editable(): void
+    {
+        $partial = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/templates/newsletter-topics.php');
+        $save    = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/admin/inline-save.php');
+        $this->assertStringContainsString('data-cms-section="newsletter"', $partial);
+        $this->assertStringContainsString("'newsletter' => [", $save);
+        foreach (['topics_heading', 'topic_news_label', 'topic_education_label'] as $f) {
+            $this->assertStringContainsString("'$f'", $save, "$f must be saveable from the page");
+        }
+        $this->loadNewsletter();
+        $this->assertSame('topic_news_label', newsletter_topic_field('news'));
+        $this->assertSame('topics_heading', newsletter_topic_field('heading'));
+    }
+
+    public function test_topics_partial_renders_unticked_checkboxes_for_each_topic(): void
+    {
+        $this->loadNewsletter();
+        ob_start();
+        require $_SERVER['DOCUMENT_ROOT'] . '/templates/newsletter-topics.php';
+        $html = (string) ob_get_clean();
+        $this->assertStringContainsString('name="wants_news"', $html);
+        $this->assertStringContainsString('name="wants_education"', $html);
+        $this->assertStringNotContainsString(' checked', $html, 'consent is never pre-ticked');
+        $this->assertStringContainsString('<legend', $html);
+    }
+
+    public function test_every_send_path_filters_by_campaign_topic(): void
+    {
+        foreach (['admin/newsletter-send.php', 'cron/newsletter-send-scheduled-cron.php'] as $rel) {
+            $src = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/' . $rel);
+            $this->assertStringContainsString('newsletter_topic_where(', $src, "$rel must send only to the campaign's topic");
+            $this->assertStringNotContainsString(
+                "FROM newsletter_subscribers WHERE status='active' ORDER BY",
+                $src,
+                "$rel still selects every active subscriber"
+            );
+        }
+    }
+
+    public function test_topic_send_selects_only_matching_subscribers(): void
+    {
+        $this->skipWithoutDb();
+        $a = 'test_tw_a_' . uniqid() . '@example-test.invalid';
+        $b = 'test_tw_b_' . uniqid() . '@example-test.invalid';
+        try {
+            newsletter_subscribe($a, '', 'bg', 'manual', true, false);
+            newsletter_subscribe($b, '', 'bg', 'manual', false, true);
+            $emails = self::$pdo->query("SELECT email FROM newsletter_subscribers WHERE " . newsletter_topic_where('news'))
+                ->fetchAll(\PDO::FETCH_COLUMN);
+            $this->assertContains($a, $emails);
+            $this->assertNotContains($b, $emails);
+        } finally {
+            $this->deleteSubscriber($a);
+            $this->deleteSubscriber($b);
+        }
+    }
+
+    // ── Confirmation-page sign-up ─────────────────────────────────────────────
+
+    private function insertOrder(string $email): string
+    {
+        $num = 'OM-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(2)));
+        self::$pdo->prepare(
+            "INSERT INTO orders (order_number,type,status,lang,customer_name,customer_email,items,subtotal_eur,total_eur,
+                                 payment_method,payment_status)
+             VALUES (?, 'donation', 'new', 'en', 'Test Buyer', ?, '[]', 10, 10, 'card', 'pending')"
+        )->execute([$num, $email]);
+        return $num;
+    }
+
+    public function test_order_signup_requires_the_session_that_placed_the_order(): void
+    {
+        $this->skipWithoutDb();
+        if (session_status() === PHP_SESSION_NONE) @session_start();
+        $email = 'test_order_' . uniqid() . '@example-test.invalid';
+        $num   = $this->insertOrder($email);
+        $saved = $_SESSION['nl_orders'] ?? null;
+        try {
+            unset($_SESSION['nl_orders']);
+            $this->assertSame('not_found', newsletter_subscribe_order(self::$pdo, $num, true, true),
+                'knowing an order number must not be enough');
+            $this->assertSame([], $this->topicsOf($email));
+
+            newsletter_remember_order($num);
+            $this->assertSame('no_topics', newsletter_subscribe_order(self::$pdo, $num, false, false));
+            $this->assertSame('subscribed', newsletter_subscribe_order(self::$pdo, $num, false, true));
+            $row = $this->topicsOf($email);
+            $this->assertSame('confirmation', $row['source']);
+            $this->assertSame('0', (string)$row['wants_news']);
+            $this->assertSame('1', (string)$row['wants_education']);
+        } finally {
+            $_SESSION['nl_orders'] = $saved;
+            self::$pdo->prepare("DELETE FROM orders WHERE order_number=?")->execute([$num]);
+            $this->deleteSubscriber($email);
+        }
+    }
+
+    public function test_remembered_orders_are_capped(): void
+    {
+        $this->loadNewsletter();
+        if (session_status() === PHP_SESSION_NONE) @session_start();
+        $saved = $_SESSION['nl_orders'] ?? null;
+        try {
+            unset($_SESSION['nl_orders']);
+            for ($i = 0; $i < 15; $i++) newsletter_remember_order(sprintf('OM-20260101-%04X', $i));
+            $this->assertCount(10, $_SESSION['nl_orders']);
+            $this->assertFalse(newsletter_session_owns_order('OM-20260101-0000'));
+            $this->assertTrue(newsletter_session_owns_order('om-20260101-000e'), 'case-insensitive');
+        } finally {
+            $_SESSION['nl_orders'] = $saved;
+        }
+    }
+
+    public function test_order_signup_endpoint_checks_csrf_and_reads_email_from_the_order(): void
+    {
+        $src = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/newsletter/subscribe-order.php');
+        $this->assertStringContainsString('csrf_verify()', $src);
+        $this->assertStringContainsString('newsletter_subscribe_order(', $src);
+        $this->assertStringNotContainsString("\$_POST['email']", $src, 'the email must come from the order, not the request');
+    }
+
+    public function test_checkout_and_donation_remember_the_order_for_this_session(): void
+    {
+        foreach (['checkout/index.php', 'donation/checkout.php'] as $rel) {
+            $src = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/' . $rel);
+            $this->assertStringContainsString('newsletter_remember_order($order_number)', $src, $rel);
+        }
+    }
 }

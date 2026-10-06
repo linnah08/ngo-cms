@@ -209,6 +209,12 @@ $allowed = [
         'social_fb'    => ['social_fb',    'social_fb'],
         'social_ig'    => ['social_ig',    'social_ig'],
     ],
+    // Newsletter topic opt-in (templates/newsletter-topics.php).
+    'newsletter' => [
+        'topics_heading'        => ['topics_heading',        'topics_heading_en'],
+        'topic_news_label'      => ['topic_news_label',      'topic_news_label_en'],
+        'topic_education_label' => ['topic_education_label', 'topic_education_label_en'],
+    ],
 ];
 
 if (!isset($allowed[$section])) {

@@ -297,7 +297,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'terms_version' => LEGAL_VERSION,
             'accepted_at'   => date('c'),
             'documents'     => ['terms', 'privacy', 'withdrawal'],
-            'newsletter'    => !empty($_POST['accept_newsletter']),
+            // Ticking any newsletter topic is the opt-in.
+            'newsletter'    => !empty($_POST['wants_news']) || !empty($_POST['wants_education']),
         ];
 
         // Online payment only — COD is not offered. Resolve to an enabled provider.
@@ -415,14 +416,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $order_id = $pdo->lastInsertId();
             $pdo->commit();
 
+            // Lets this session's confirmation page offer a one-click sign-up.
+            require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
+            newsletter_remember_order($order_number);
+
             // Newsletter opt-in, after the order is safely committed: a failure
             // to subscribe must never cost the customer their order.
             if (!empty($consents['newsletter'])) {
                 try {
                     require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
+                    [$nl_news, $nl_edu] = newsletter_topics_from_post($_POST);
                     newsletter_subscribe(
-                        $d['customer_email'], $d['customer_name'], $order_lang, 'checkout'
+                        $d['customer_email'], $d['customer_name'], $order_lang, 'checkout',
+                        $nl_news, $nl_edu
                     );
+                    newsletter_set_subscribed_cookie();
                 } catch (Throwable $e) {
                     error_log('Checkout newsletter opt-in failed: ' . $e->getMessage());
                 }
@@ -1024,15 +1032,14 @@ $subtotal  = $cart_info['subtotal'];
           </span>
         </label>
 
-        <label style="display:flex;align-items:flex-start;gap:.75rem;padding:1rem 1.25rem;border:2px solid var(--border);border-radius:var(--radius-lg);cursor:pointer;">
-          <input type="checkbox" name="accept_newsletter" value="1"
-                 <?= !empty($_POST['accept_newsletter']) ? 'checked' : '' ?>
-                 style="width:1.1rem;height:1.1rem;margin-top:.15rem;flex-shrink:0;accent-color:var(--teal);">
-          <span style="font-size:.9rem;line-height:1.6;text-transform:none;letter-spacing:normal;">
-            <?= h(t_or('checkout.newsletter_optin', 'Искам да получавам новини от {name}.', 'Send me news from {name}.',
-                       null, ['name' => $lang === 'en' ? SITE_NAME_EN : SITE_NAME_BG])) ?>
-          </span>
-        </label>
+        <div style="padding:.25rem 1.25rem;border:2px solid var(--border);border-radius:var(--radius-lg);">
+          <?php
+            $nl_heading = t_or('checkout.newsletter_optin', 'Искам да получавам новини от {name}.', 'Send me news from {name}.',
+                               null, ['name' => $lang === 'en' ? SITE_NAME_EN : SITE_NAME_BG]);
+            $nl_checked = ['news' => !empty($_POST['wants_news']), 'education' => !empty($_POST['wants_education'])];
+            require $_SERVER['DOCUMENT_ROOT'] . '/templates/newsletter-topics.php';
+          ?>
+        </div>
       </fieldset>
 
       <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:center;">

@@ -8,29 +8,205 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 
 // ── Subscriber management ──────────────────────────────────────────────────────
 
+/** Sources a subscriber can come from — mirrors the `source` column's ENUM. */
+const NEWSLETTER_SOURCES = ['web_banner', 'customer_import', 'manual', 'checkout', 'donation', 'confirmation'];
+
 /**
- * Subscribe an email address.
- * Uses INSERT IGNORE so concurrent requests cannot create duplicates.
+ * Subscribe an email to one or both newsletter topics.
  *
- * @return array ['ok' => bool, 'duplicate' => bool]
+ * Merge-aware and consent-safe:
+ *  - no topic selected            → no write
+ *  - new email                    → insert with the chosen topics
+ *  - existing & active            → OR-merge topics (never clears one)
+ *  - existing & unsubscribed      → left untouched (no resurrection: the
+ *                                   person said stop, a later form tick on
+ *                                   some other page must not undo that)
+ *
+ * Concurrency-safe: INSERT IGNORE on the unique email decides atomically
+ * whether this call created the row, and the merge uses GREATEST() in a single
+ * UPDATE, so two simultaneous sign-ups can neither duplicate a row nor clear
+ * each other's topic.
+ *
+ * @return array ['ok' => bool, 'duplicate' => bool, 'status' => string]
+ *   status ∈ subscribed | merged | resurrect_blocked | no_topics
  */
-function newsletter_subscribe(string $email, string $name, string $lang, string $source): array
-{
+function newsletter_subscribe(
+    string $email,
+    string $name,
+    string $lang,
+    string $source,
+    bool $wantsNews = true,
+    bool $wantsEducation = true
+): array {
+    if (!$wantsNews && !$wantsEducation) {
+        return ['ok' => false, 'duplicate' => false, 'status' => 'no_topics'];
+    }
+
+    $email  = strtolower(trim($email));
+    $lang   = in_array($lang, ['bg', 'en'], true) ? $lang : 'bg';
+    $source = in_array($source, NEWSLETTER_SOURCES, true) ? $source : 'web_banner';
+
     $pdo   = get_pdo();
     $token = bin2hex(random_bytes(32));
-    $stmt  = $pdo->prepare("
-        INSERT IGNORE INTO newsletter_subscribers (email, name, lang, source, token)
-        VALUES (?, ?, ?, ?, ?)
-    ");
-    $stmt->execute([
-        strtolower(trim($email)),
-        trim($name) ?: null,
-        in_array($lang, ['bg','en']) ? $lang : 'bg',
-        in_array($source, ['web_banner','customer_import','manual']) ? $source : 'web_banner',
-        $token,
+
+    $ins = $pdo->prepare(
+        "INSERT IGNORE INTO newsletter_subscribers
+           (email, name, lang, source, token, wants_news, wants_education)
+         VALUES (?, ?, ?, ?, ?, ?, ?)"
+    );
+    $ins->execute([
+        $email, trim($name) ?: null, $lang, $source, $token,
+        $wantsNews ? 1 : 0, $wantsEducation ? 1 : 0,
     ]);
-    $duplicate = $stmt->rowCount() === 0;
-    return ['ok' => true, 'duplicate' => $duplicate];
+    if ($ins->rowCount() === 1) {
+        return ['ok' => true, 'duplicate' => false, 'status' => 'subscribed'];
+    }
+
+    // The email is already on the list.
+    $sel = $pdo->prepare("SELECT id, status FROM newsletter_subscribers WHERE email = ?");
+    $sel->execute([$email]);
+    $row = $sel->fetch(\PDO::FETCH_ASSOC);
+    if (!$row || $row['status'] === 'unsubscribed') {
+        // (No row: deleted between the INSERT and this SELECT — treat as a no-op.)
+        return ['ok' => false, 'duplicate' => true, 'status' => 'resurrect_blocked'];
+    }
+
+    $pdo->prepare(
+        "UPDATE newsletter_subscribers
+         SET wants_news = GREATEST(wants_news, ?), wants_education = GREATEST(wants_education, ?)
+         WHERE id = ?"
+    )->execute([$wantsNews ? 1 : 0, $wantsEducation ? 1 : 0, $row['id']]);
+    return ['ok' => true, 'duplicate' => true, 'status' => 'merged'];
+}
+
+// ── Topics ─────────────────────────────────────────────────────────────────────
+
+/**
+ * The topics a subscriber can pick, as campaign topic key => subscriber column.
+ * The keys are internal; what people read comes from newsletter_topic_label().
+ */
+function newsletter_topics(): array
+{
+    return ['news' => 'wants_news', 'education' => 'wants_education'];
+}
+
+/**
+ * The visible name of a topic (or of the "topics" heading, $topic = 'heading').
+ *
+ * Wording is the site's own: an admin edits it in place on the page (inline
+ * editing, saved to the `newsletter` section of content/pages.json). Until
+ * then the strings.json default is used — generic text a site can also reword
+ * in content/{bg,en}/strings.site.json.
+ */
+function newsletter_topic_label(string $topic, ?string $lang = null): string
+{
+    $lang = ($lang ?? get_lang()) === 'en' ? 'en' : 'bg';
+    if (!in_array($topic, ['heading', 'news', 'education'], true)) return $topic;
+    $field = newsletter_topic_field($topic);
+    $saved = newsletter_pages_section()[$lang === 'en' ? $field . '_en' : $field] ?? '';
+    if (is_string($saved) && trim($saved) !== '') return $saved;
+    return match ($topic) {
+        'heading'   => t_or('newsletter.topics.heading', 'Какво искате да получавате?', 'What would you like to receive?', $lang),
+        'news'      => t_or('newsletter.topic.news', 'Новини за нашата дейност', 'News about our work', $lang),
+        'education' => t_or('newsletter.topic.education', 'Полезни материали и съвети', 'Useful resources and tips', $lang),
+    };
+}
+
+/** The pages.json field (BG; EN adds _en) holding a topic's label. */
+function newsletter_topic_field(string $topic): string
+{
+    return $topic === 'heading' ? 'topics_heading' : 'topic_' . $topic . '_label';
+}
+
+/** The `newsletter` section of content/pages.json (inline-edited copy). */
+function newsletter_pages_section(): array
+{
+    $pages = load_json(CONTENT_PATH . '/pages.json');
+    return is_array($pages['newsletter'] ?? null) ? $pages['newsletter'] : [];
+}
+
+/** Topic flags ticked in a submitted form (the topics partial's checkboxes). */
+function newsletter_topics_from_post(array $post): array
+{
+    return [!empty($post['wants_news']), !empty($post['wants_education'])];
+}
+
+/**
+ * WHERE fragment selecting the active subscribers a campaign of $topic goes to.
+ * A constant string with no user input in it — safe to embed in SQL.
+ */
+function newsletter_topic_where(string $topic): string
+{
+    $col = newsletter_topics()[$topic] ?? null;
+    return $col ? "status='active' AND $col=1" : "status='active'";
+}
+
+/** A campaign topic from untrusted input: one of 'all' / the topic keys. */
+function newsletter_clean_topic(mixed $topic): string
+{
+    return is_string($topic) && isset(newsletter_topics()[$topic]) ? $topic : 'all';
+}
+
+/** Mark this browser as subscribed, so the footer sign-up band stops showing. */
+function newsletter_set_subscribed_cookie(): void
+{
+    if (headers_sent()) return;
+    setcookie('om_nl_sub', '1', [
+        'expires'  => time() + 365 * 24 * 3600,
+        'path'     => '/',
+        'samesite' => 'Lax',
+        'httponly' => true,
+        'secure'   => isset($_SERVER['HTTPS']),
+    ]);
+}
+
+// ── "Subscribe me" on the order / donation confirmation page ─────────────────
+
+/**
+ * Remember that this browser session placed $order_number, so its confirmation
+ * page may offer a one-click newsletter sign-up for the order's email.
+ * Called by the shop checkout and the donation form when they create an order.
+ */
+function newsletter_remember_order(string $order_number): void
+{
+    if (session_status() !== PHP_SESSION_ACTIVE) return;
+    $list   = is_array($_SESSION['nl_orders'] ?? null) ? $_SESSION['nl_orders'] : [];
+    $list[] = strtoupper($order_number);
+    $_SESSION['nl_orders'] = array_slice(array_values(array_unique($list)), -10);
+}
+
+/**
+ * Did this browser session place $order_number? Order numbers are short and
+ * appear in URLs, so knowing one must never be enough to sign its buyer up —
+ * only the session that placed the order may.
+ */
+function newsletter_session_owns_order(string $order_number): bool
+{
+    if (session_status() !== PHP_SESSION_ACTIVE) return false;
+    $list = $_SESSION['nl_orders'] ?? [];
+    return is_array($list) && in_array(strtoupper($order_number), $list, true);
+}
+
+/**
+ * Subscribe the buyer of an order this session placed. The email comes from
+ * the order row, never from the request.
+ *
+ * @return string  subscribed | merged | resurrect_blocked | no_topics | not_found
+ */
+function newsletter_subscribe_order(\PDO $pdo, string $order_number, bool $wantsNews, bool $wantsEducation): string
+{
+    if (!$wantsNews && !$wantsEducation) return 'no_topics';
+    if (!newsletter_session_owns_order($order_number)) return 'not_found';
+
+    $stmt = $pdo->prepare('SELECT customer_email, customer_name, lang FROM orders WHERE order_number = ?');
+    $stmt->execute([$order_number]);
+    $order = $stmt->fetch(\PDO::FETCH_ASSOC);
+    if (!$order || !filter_var($order['customer_email'] ?? '', FILTER_VALIDATE_EMAIL)) return 'not_found';
+
+    return newsletter_subscribe(
+        (string) $order['customer_email'], (string) ($order['customer_name'] ?? ''),
+        (string) ($order['lang'] ?? 'bg'), 'confirmation', $wantsNews, $wantsEducation
+    )['status'];
 }
 
 /**

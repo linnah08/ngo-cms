@@ -40,7 +40,9 @@ foreach (newsletter_due_campaigns($pdo) as $campaign) {
 
     log_line("Sending campaign #$id (send_date={$campaign['send_date']})");
 
-    $stmt = $pdo->prepare("SELECT id, email, name, lang, token FROM newsletter_subscribers WHERE status='active' ORDER BY id ASC");
+    // Only the subscribers who chose this campaign's topic get it.
+    $topic_where = newsletter_topic_where(newsletter_clean_topic($campaign['topic'] ?? 'all'));
+    $stmt = $pdo->prepare("SELECT id, email, name, lang, token FROM newsletter_subscribers WHERE $topic_where ORDER BY id ASC");
     $stmt->execute();
     $subscribers = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 

@@ -18,6 +18,10 @@ if (!$campaign || $campaign['status'] === 'sent') {
 }
 
 $counts = newsletter_active_count();
+// Only the subscribers who chose this campaign's topic get it.
+$topic           = newsletter_clean_topic($campaign['topic'] ?? 'all');
+$topic_where     = newsletter_topic_where($topic);
+$recipient_total = (int)$pdo->query("SELECT COUNT(*) FROM newsletter_subscribers WHERE $topic_where")->fetchColumn();
 
 // ── Phase 1: confirm screen ────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -46,9 +50,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
       <div style="background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.5rem;">
         <div style="font-size:.875rem;margin-bottom:.5rem;">Активни абонати, които ще получат имейл:</div>
-        <div style="font-size:1.5rem;font-weight:700;color:var(--teal);"><?= $counts['total'] ?></div>
+        <div style="font-size:1.5rem;font-weight:700;color:var(--teal);"><?= $recipient_total ?></div>
         <div style="font-size:.8rem;color:var(--text-muted);margin-top:.25rem;">
-          БГ: <?= $counts['bg'] ?> &nbsp;·&nbsp; EN: <?= $counts['en'] ?>
+          <?php if ($topic === 'all'): ?>
+          Всички абонати — БГ: <?= $counts['bg'] ?> &nbsp;·&nbsp; EN: <?= $counts['en'] ?>
+          <?php else: ?>
+          Само абонатите, избрали „<?= h(newsletter_topic_label($topic, 'bg')) ?>“ (от <?= $counts['total'] ?> активни общо)
+          <?php endif; ?>
         </div>
       </div>
 
@@ -62,9 +70,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
       <div style="background:#fdf0ef;border:1px solid #f0c4c0;border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.5rem;color:#c0392b;font-size:.9rem;">
         ⚠ Кампанията няма тема. Добавете тема преди изпращане.
       </div>
-      <?php elseif ($counts['total'] === 0): ?>
+      <?php elseif ($recipient_total === 0): ?>
       <div style="background:#fdf0ef;border:1px solid #f0c4c0;border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.5rem;color:#c0392b;font-size:.9rem;">
-        ⚠ Няма активни абонати.
+        ⚠ <?= $topic === 'all' ? 'Няма активни абонати.' : 'Няма активни абонати, избрали тази тема.' ?>
       </div>
       <?php else: ?>
       <div style="background:#fdf0ef;border:1px solid #f0c4c0;border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.5rem;color:#8b4513;font-size:.9rem;">
@@ -73,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
       <form method="POST">
         <?= csrf_field() ?>
         <button type="submit" class="btn btn--primary" style="padding:.9rem 2rem;font-size:1rem;"
-                <?= (!$campaign['subject_bg'] && !$campaign['subject_en']) || $counts['total'] === 0 ? 'disabled' : '' ?>>
+                <?= (!$campaign['subject_bg'] && !$campaign['subject_en']) || $recipient_total === 0 ? 'disabled' : '' ?>>
           Изпрати сега →
         </button>
       </form>
@@ -100,8 +108,8 @@ if (!newsletter_claim_for_sending($pdo, $id)) {
     exit;
 }
 
-// Fetch all active subscribers
-$stmt = $pdo->prepare("SELECT id, email, name, lang, token FROM newsletter_subscribers WHERE status='active' ORDER BY id ASC");
+// Fetch the active subscribers who chose this campaign's topic
+$stmt = $pdo->prepare("SELECT id, email, name, lang, token FROM newsletter_subscribers WHERE $topic_where ORDER BY id ASC");
 $stmt->execute();
 $subscribers = $stmt->fetchAll();
 $total = count($subscribers);

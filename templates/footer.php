@@ -14,16 +14,21 @@ $pages      = $pages ?? load_json(CONTENT_PATH . '/pages.json');
 ?>
 <?php
 // Show newsletter banner unless visitor already subscribed (cookie) or is in admin
-$_show_nl_banner = empty($_COOKIE['om_nl_sub']) && !str_starts_with($_SERVER['REQUEST_URI'], '/admin');
+$_is_admin_page  = str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/admin');
+$_show_nl_banner = empty($_COOKIE['om_nl_sub']) && !$_is_admin_page;
 ?>
-<?php if ($_show_nl_banner): ?>
-<?php foreach (flash_get() as $_f): ?>
-<?php if ($_f['type'] === 'success' && str_contains($_f['message'], 'бюлетин') || str_contains($_f['message'], 'subscribed')): ?>
-<div style="background:#e6f4ea;border-top:1px solid #a8d5b0;padding:1rem 0;text-align:center;font-size:.9rem;color:#2d6a35;">
-  <?= h($_f['message']) ?>
+<?php // Messages nothing on the page has shown yet — above all the sign-up
+      // band's own result. Shown whether or not the band is: a successful
+      // sign-up sets the cookie that hides the band on the very next page.
+      // Never auto-dismissed, and an error is announced as one. ?>
+<?php if (!$_is_admin_page): foreach (flash_get() as $_f): $_f_err = ($_f['type'] ?? '') === 'error'; ?>
+<div role="<?= $_f_err ? 'alert' : 'status' ?>" style="<?= $_f_err
+      ? 'background:#fdf0ef;border-top:1px solid #f0c4c0;color:#a4243d;'
+      : 'background:#e6f4ea;border-top:1px solid #a8d5b0;color:#2d6a35;' ?>padding:1rem 16px;text-align:center;font-size:.95rem;">
+  <?= h($_f['message'] ?? '') ?>
 </div>
-<?php endif; ?>
-<?php endforeach; ?>
+<?php endforeach; endif; ?>
+<?php if ($_show_nl_banner): ?>
 <?php // The band colour is chosen in Admin → Организация → Визия (text colour follows
       // for contrast); else a theme's palette sets --newsletter-bg / --newsletter-fg;
       // else the original teal and white. Full-strength text, never faded: a faded
@@ -33,15 +38,19 @@ $_show_nl_banner = empty($_COOKIE['om_nl_sub']) && !str_starts_with($_SERVER['RE
     <h3 style="color:var(--newsletter-fg,#fff);margin:0 0 .5rem;font-size:1.3rem;"><?= t('newsletter.banner.title') ?></h3>
     <p style="color:var(--newsletter-fg,#fff);margin:0 0 1.5rem;font-size:.95rem;"><?= t('newsletter.banner.text') ?></p>
     <form method="POST" action="/newsletter/subscribe.php"
-          style="display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap;">
+          style="display:flex;gap:.5rem 1.5rem;justify-content:center;align-items:center;flex-wrap:wrap;text-align:left;">
       <?= csrf_field() ?>
-      <input type="email" name="email" required
-             placeholder="<?= h(t('newsletter.banner.placeholder')) ?>"
-             style="padding:.6rem 1rem;border:none;border-radius:4px;font-size:1rem;font-family:inherit;width:280px;max-width:100%;">
-      <button type="submit" class="btn btn--primary"
-              style="background:var(--newsletter-fg,#fff);color:var(--newsletter-bg,#037F9B);border:none;font-weight:700;padding:.6rem 1.5rem;">
-        <?= t('newsletter.banner.submit') ?>
-      </button>
+      <?php $nl_on_dark = true; require $_SERVER['DOCUMENT_ROOT'] . '/templates/newsletter-topics.php'; ?>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;">
+        <label for="nlBannerEmail" class="sr-only"><?= h(t('newsletter.banner.placeholder')) ?></label>
+        <input type="email" name="email" id="nlBannerEmail" required autocomplete="email"
+               placeholder="<?= h(t('newsletter.banner.placeholder')) ?>"
+               style="padding:.6rem 1rem;border:none;border-radius:4px;font-size:1rem;font-family:inherit;width:280px;max-width:100%;box-sizing:border-box;">
+        <button type="submit" class="btn btn--primary"
+                style="background:var(--newsletter-fg,#fff);color:var(--newsletter-bg,#037F9B);border:none;font-weight:700;padding:.6rem 1.5rem;">
+          <?= t('newsletter.banner.submit') ?>
+        </button>
+      </div>
     </form>
   </div>
 </section>
