@@ -49,37 +49,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // Redirect back preserving filters
-    $qs = http_build_query(array_filter([
+    // Redirect back preserving filters and search
+    $back = orders_list_filter([
         'type'   => $_POST['filter_type']   ?? '',
         'status' => $_POST['filter_status'] ?? '',
-    ]));
-    header('Location: /admin/orders.php' . ($qs ? "?$qs" : ''));
+        'q'      => $_POST['filter_q']      ?? '',
+    ]);
+    header('Location: ' . orders_list_url($back));
     exit;
 }
 
-$filter_type   = $_GET['type']   ?? 'all';
-$filter_status = $_GET['status'] ?? 'all';
+// Type / status filters and the search box (order number, name, email, phone).
+$filter        = orders_list_filter($_GET);
+$filter_type   = $filter['type'];
+$filter_status = $filter['status'];
+$search        = $filter['q'];
 
-$where  = ['1=1'];
-$params = [];
-if ($filter_type === 'donation') {
-    // Dedicated donation orders AND product orders with a donation add-on line.
-    $where[] = order_has_donation_sql();
-} elseif ($filter_type !== 'all') {
-    $where[]  = 'type = ?';
-    $params[] = $filter_type;
-}
-if ($filter_status === 'unpaid') {
-    $where[] = unpaid_orders_sql_condition();
-} elseif ($filter_status !== 'all') {
-    $where[]  = 'status = ?';
-    $params[] = $filter_status;
-}
-
-$sql    = 'SELECT *, TIMESTAMPDIFF(MINUTE, created_at, NOW()) AS age_minutes FROM orders WHERE ' . implode(' AND ', $where) . ' ORDER BY created_at DESC LIMIT 200';
+$sql    = 'SELECT *, TIMESTAMPDIFF(MINUTE, created_at, NOW()) AS age_minutes FROM orders WHERE ' . $filter['where'] . ' ORDER BY created_at DESC LIMIT 200';
 $stmt   = $pdo->prepare($sql);
-$stmt->execute($params);
+$stmt->execute($filter['params']);
 $orders = $stmt->fetchAll();
 
 $status_labels = [
@@ -109,12 +97,29 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <div class="admin-alert admin-alert--<?= h($_flash['type']) ?>" style="margin-bottom:1.5rem;"><?= h($_flash['message']) ?></div>
 <?php endforeach; ?>
 
+<!-- Search -->
+<form method="GET" action="/admin/orders.php" role="search" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem;max-width:640px;margin-bottom:1rem;">
+  <?php if ($filter_type !== 'all'): ?><input type="hidden" name="type" value="<?= h($filter_type) ?>"><?php endif; ?>
+  <?php if ($filter_status !== 'all'): ?><input type="hidden" name="status" value="<?= h($filter_status) ?>"><?php endif; ?>
+  <div style="flex:1 1 16rem;min-width:0;">
+    <label for="ordersSearch" style="display:block;font-size:.85rem;font-weight:600;margin-bottom:.3rem;">Търсене</label>
+    <input type="search" id="ordersSearch" name="q" value="<?= h($search) ?>" maxlength="100"
+           aria-describedby="ordersSearchHelp"
+           style="width:100%;box-sizing:border-box;min-height:44px;padding:.5rem .75rem;border:1px solid #6b7280;border-radius:8px;font-size:1rem;font-family:inherit;">
+  </div>
+  <button type="submit" class="btn btn--primary" style="min-height:44px;padding:.5rem 1.1rem;">Търси</button>
+  <?php if ($search !== ''): ?>
+    <a href="<?= h(orders_list_url($filter, ['q' => ''])) ?>" class="btn btn--outline" style="min-height:44px;padding:.5rem 1.1rem;box-sizing:border-box;display:inline-flex;align-items:center;">Изчисти търсенето</a>
+  <?php endif; ?>
+  <p id="ordersSearchHelp" style="flex-basis:100%;font-size:.8rem;color:var(--text-muted);margin:0;">По номер на поръчката, име, имейл или телефон на клиента. Търси в избраните отдолу тип и статус.</p>
+</form>
+
 <!-- Filters -->
 <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.5rem;">
   <?php
   $type_filters = ['all'=>'Всички','physical'=>'Продукти','donation'=>'Дарения','ticket'=>'Билети'];
   foreach ($type_filters as $val => $label): ?>
-    <a href="?type=<?= $val ?>&status=<?= h($filter_status) ?>"
+    <a href="<?= h(orders_list_url($filter, ['type' => $val])) ?>"<?= $filter_type === $val ? ' aria-current="true"' : '' ?>
        style="padding:.35rem .9rem;border-radius:20px;font-size:.85rem;text-decoration:none;
          <?= $filter_type === $val ? 'background:var(--teal);color:#fff;' : 'background:var(--warm-grey);color:var(--text);' ?>">
       <?= $label ?>
@@ -124,7 +129,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <?php
   $status_filters = ['all'=>'Всички статуси','new'=>'Нови','confirmed'=>'Потвърдени','shipped'=>'Изпратени','delivered'=>'Доставени','cancelled'=>'Отменени','unpaid'=>'Неплатени'];
   foreach ($status_filters as $val => $label): ?>
-    <a href="?type=<?= h($filter_type) ?>&status=<?= $val ?>"
+    <a href="<?= h(orders_list_url($filter, ['status' => $val])) ?>"<?= $filter_status === $val ? ' aria-current="true"' : '' ?>
        style="padding:.35rem .9rem;border-radius:20px;font-size:.85rem;text-decoration:none;
          <?= $filter_status === $val ? 'background:var(--teal);color:#fff;' : 'background:var(--warm-grey);color:var(--text);' ?>">
       <?= $label ?>
@@ -133,13 +138,22 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 </div>
 
 <?php if (empty($orders)): ?>
-  <p style="color:var(--text-muted);">Няма поръчки.</p>
+  <p role="status" style="color:var(--text-muted);"><?= $search !== ''
+      ? 'Няма поръчки, които отговарят на „' . h($search) . '“' . ($filter_type !== 'all' || $filter_status !== 'all' ? ' при избраните тип и статус' : '') . '.'
+      : 'Няма поръчки.' ?></p>
 <?php else: ?>
+
+<?php if ($search !== ''): ?>
+  <p role="status" style="font-size:.875rem;margin:0 0 1rem;">
+    Намерени за „<?= h($search) ?>“: <strong><?= count($orders) ?><?= count($orders) >= 200 ? '+' : '' ?></strong><?= count($orders) >= 200 ? ' (показани са първите 200 — уточнете търсенето)' : '' ?>
+  </p>
+<?php endif; ?>
 
 <form method="POST" id="bulkForm">
   <?= csrf_field() ?>
   <input type="hidden" name="filter_type"   value="<?= h($filter_type) ?>">
   <input type="hidden" name="filter_status" value="<?= h($filter_status) ?>">
+  <input type="hidden" name="filter_q"      value="<?= h($search) ?>">
 
   <!-- Bulk action bar -->
   <div id="bulkBar" style="display:none;align-items:center;gap:.75rem;background:var(--warm-grey);border:1px solid var(--border);border-radius:8px;padding:.6rem 1rem;margin-bottom:1rem;">

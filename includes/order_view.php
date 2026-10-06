@@ -119,3 +119,74 @@ function order_print_spec(array $pos, float $ar, ?array $sdims, string $ordered_
 
     return 'Добавете размери на тениската в продукта за да изчислим cm' . $size_suffix;
 }
+
+/** Order list filters (admin/orders.php) — the values the type/status links offer. */
+const ORDERS_LIST_TYPES    = ['all', 'physical', 'donation', 'ticket', 'pledge'];
+const ORDERS_LIST_STATUSES = ['all', 'new', 'confirmed', 'shipped', 'delivered', 'cancelled', 'unpaid'];
+
+/**
+ * Read the order list's filters from the query string and build the WHERE for them.
+ *
+ *   type   — one of ORDERS_LIST_TYPES ('donation' also finds product orders with a donation line)
+ *   status — one of ORDERS_LIST_STATUSES ('unpaid' = the "Неплатени" filter)
+ *   q      — search text: part of the order number, name, email or phone. A phone
+ *            matches however it is written ("0888 12 34 56", "+359888123456").
+ *
+ * Unknown type/status values fall back to 'all'. The search text only ever goes
+ * into $params, never into the SQL itself.
+ *
+ * @param array $query $_GET (or $_POST with the same keys)
+ * @return array{type:string,status:string,q:string,where:string,params:list<string>}
+ */
+function orders_list_filter(array $query): array {
+    require_once __DIR__ . '/payment/unpaid_orders.php';
+
+    $type   = is_string($query['type'] ?? null) && in_array($query['type'], ORDERS_LIST_TYPES, true) ? $query['type'] : 'all';
+    $status = is_string($query['status'] ?? null) && in_array($query['status'], ORDERS_LIST_STATUSES, true) ? $query['status'] : 'all';
+    $q      = is_string($query['q'] ?? null) ? mb_substr(trim(preg_replace('/\s+/u', ' ', $query['q']) ?? ''), 0, 100) : '';
+
+    $where  = ['1=1'];
+    $params = [];
+    if ($type === 'donation') {
+        $where[] = order_has_donation_sql();
+    } elseif ($type !== 'all') {
+        $where[]  = 'type = ?';
+        $params[] = $type;
+    }
+    if ($status === 'unpaid') {
+        $where[] = unpaid_orders_sql_condition();
+    } elseif ($status !== 'all') {
+        $where[]  = 'status = ?';
+        $params[] = $status;
+    }
+    if ($q !== '') {
+        // '!' escapes LIKE's own wildcards, so "100%" or "a_b" are searched for literally.
+        $like  = '%' . strtr($q, ['!' => '!!', '%' => '!%', '_' => '!_']) . '%';
+        $match = ["order_number LIKE ? ESCAPE '!'", "customer_name LIKE ? ESCAPE '!'", "customer_email LIKE ? ESCAPE '!'"];
+        array_push($params, $like, $like, $like);
+
+        // Phone: compare digits only, without the leading 0 / country code, so the
+        // way it was typed at checkout and in the search box doesn't matter.
+        if (preg_match('/^[\d\s+\-().\/]+$/', $q)) {
+            $digits = ltrim(preg_replace('/\D/', '', $q) ?? '', '0');
+            if (strlen($digits) >= 3) {
+                $match[]  = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(customer_phone, ''),"
+                          . " ' ', ''), '-', ''), '+', ''), '(', ''), ')', ''), '.', ''), '/', '') LIKE ?";
+                $params[] = '%' . $digits . '%';
+            }
+        }
+        $where[] = '(' . implode(' OR ', $match) . ')';
+    }
+
+    return ['type' => $type, 'status' => $status, 'q' => $q, 'where' => implode(' AND ', $where), 'params' => $params];
+}
+
+/**
+ * Query string for an order list link: the current filters with some changed
+ * ($change), leaving out the defaults. E.g. orders_list_url($f, ['status' => 'new']).
+ */
+function orders_list_url(array $filter, array $change = []): string {
+    $f  = array_merge(['type' => $filter['type'], 'status' => $filter['status'], 'q' => $filter['q']], $change);
+    $qs = http_build_query(array_filter($f, fn($v) => $v !== '' && $v !== 'all'));
+    return '/admin/orders.php' . ($qs !== '' ? '?' . $qs : '');
+}
