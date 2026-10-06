@@ -281,6 +281,10 @@ final class EnglishDonationTest extends TestCase
                        VALUES (?, 'donation', 'confirmed', 'en', 'Test Donor', 'donor@example.com', '[]', 15, 0, 15, 'Go team', 'card', 'paid')")
             ->execute([$num]);
         $id = (int) $pdo->lastInsertId();
+        // The donor's own browser: only it is shown the amount and the message.
+        if (session_status() === PHP_SESSION_NONE) @session_start();
+        require_once self::root() . '/includes/order_session.php';
+        order_session_remember($num);
         try {
             $_SERVER['REQUEST_URI'] = '/en/donation/confirmation/?order=' . $num;
             $_GET['order'] = $num;

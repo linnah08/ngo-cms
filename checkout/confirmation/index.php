@@ -1,6 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_session.php';
 start_session();
 
 $lang         = get_lang();
@@ -31,6 +32,12 @@ if ($order_lang !== $lang) {
     exit;
 }
 
+// The order number is in the URL and easy to guess, so the buyer's details (items,
+// address) show only in the browser that placed the order. Anyone else — or the
+// buyer on another device — gets the thank-you and the number; the details are
+// in their email.
+$owner = order_session_owns($order['order_number']);
+
 $items          = json_decode($order['items'], true) ?? [];
 $courier_labels = ['speedy'=>'Speedy','boxnow'=>'BoxNow'];
 $type_labels    = checkout_delivery_type_labels($lang);
@@ -46,7 +53,8 @@ $_dl_items = array_map(fn($item) => [
     'quantity'  => (int)($item['quantity'] ?? 1),
 ], $items);
 
-$page_head_extra = '<script>
+// Counted once, by the buyer's own browser — never by someone reopening the link.
+$page_head_extra = !$owner ? '' : '<script>
 window.dataLayer = window.dataLayer || [];
 window.dataLayer.push({
     event: "purchase",
@@ -75,6 +83,11 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 <section class="section">
   <div class="container" style="max-width:640px;">
 
+    <?php if (!$owner): ?>
+    <p role="status" style="padding:1.25rem 1.5rem;background:var(--teal-light);border-radius:var(--radius-lg);margin:0 0 2rem;line-height:1.7;">
+      <?= h(t_or('confirm.details_in_email', 'Подробностите за поръчката са в имейла, който ви изпратихме.', 'The details of your order are in the email we sent you.')) ?>
+    </p>
+    <?php else: ?>
     <!-- Order summary -->
     <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:2rem;">
       <div style="padding:1rem 1.25rem;background:var(--off-white);font-size:.75rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);">
@@ -101,13 +114,16 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
       </table>
     </div>
 
+    <?php endif; ?>
+
     <!-- What happens next -->
     <div style="padding:1.5rem;background:var(--teal-light);border-radius:var(--radius-lg);margin-bottom:2rem;">
       <h3 style="margin-top:0;color:var(--teal);"><?= h(t_or('confirm.next', 'Какво следва?', 'What happens next?')) ?></h3>
       <ol style="margin:0;padding-left:1.5rem;line-height:2;">
         <li><?= h(t_or('confirm.next.email', 'Ще потвърдим поръчката ви по имейл в рамките на 24 часа.', 'We will confirm your order by email within 24 hours.')) ?></li>
         <li><?= h(t_or('confirm.next.courier', 'Изпращаме с {courier} ({type}).', 'We ship with {courier} ({type}).', vars: ['courier' => $courier_labels[$order['courier']] ?? '', 'type' => $type_labels[$order['delivery_type']] ?? ''])) ?></li>
-        <?php if ($order['delivery_type'] !== 'address'): ?>
+        <?php if (!$owner): ?>
+        <?php elseif ($order['delivery_type'] !== 'address'): ?>
           <li><?= h(t_or('confirm.next.office', 'Офис/автомат', 'Office/locker')) ?>: <?= h($order['courier_office_name'] ?? '') ?></li>
         <?php else: ?>
           <li><?= h(t_or('confirm.next.address', 'Адрес', 'Address')) ?>: <?= h($order['delivery_address'] . ', ' . $order['delivery_city']) ?></li>

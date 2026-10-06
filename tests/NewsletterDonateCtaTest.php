@@ -140,11 +140,11 @@ final class NewsletterDonateCtaTest extends TestCase
     public function test_card_only_for_the_session_that_placed_the_order(): void
     {
         if (session_status() === PHP_SESSION_NONE) @session_start();
-        $saved = $_SESSION['nl_orders'] ?? null;
+        $saved = $_SESSION[ORDER_SESSION_KEY] ?? null;
         $cookie = $_COOKIE['om_nl_sub'] ?? null;
         unset($_COOKIE['om_nl_sub']);
         try {
-            unset($_SESSION['nl_orders'], $_SESSION['flash']);
+            unset($_SESSION[ORDER_SESSION_KEY], $_SESSION['flash']);
             $order = ['order_number' => 'OM-20260101-ABCD'];
             $this->assertSame('', trim($this->renderCard($order, 'order')), 'someone else\'s order: no card');
 
@@ -165,7 +165,7 @@ final class NewsletterDonateCtaTest extends TestCase
             $this->assertStringContainsString('role="status"', $html);
             $this->assertStringNotContainsString('<form', $html);
         } finally {
-            $_SESSION['nl_orders'] = $saved;
+            $_SESSION[ORDER_SESSION_KEY] = $saved;
             if ($cookie === null) unset($_COOKIE['om_nl_sub']); else $_COOKIE['om_nl_sub'] = $cookie;
         }
     }

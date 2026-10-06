@@ -2,6 +2,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_session.php';
 start_session();
 
 // Campaign module switched off for this install — the page does not exist.
@@ -14,7 +15,10 @@ $pdo           = get_pdo();
 $pledge_number = trim($_GET['pledge'] ?? '');
 $pledge        = null;
 
-if (preg_match('/^CP-\d{8}-[A-F0-9]{4}$/i', $pledge_number)) {
+// The pledge number is in the URL and easy to guess, so the backer's email,
+// address and phone show only in the browser that made the pledge. Anyone else
+// gets the plain thank-you below — the details are in the backer's email.
+if (preg_match('/^CP-\d{8}-[A-F0-9]{4}$/i', $pledge_number) && order_session_owns($pledge_number)) {
     $stmt = $pdo->prepare('SELECT * FROM campaign_pledges WHERE pledge_number = ?');
     $stmt->execute([$pledge_number]);
     $pledge = $stmt->fetch() ?: null;

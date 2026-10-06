@@ -416,9 +416,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $order_id = $pdo->lastInsertId();
             $pdo->commit();
 
-            // Lets this session's confirmation page offer a one-click sign-up.
-            require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
-            newsletter_remember_order($order_number);
+            // Only this session may see the order's details on its confirmation
+            // page (and sign its buyer up there) — the number alone is guessable.
+            require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_session.php';
+            order_session_remember($order_number);
 
             // Newsletter opt-in, after the order is safely committed: a failure
             // to subscribe must never cost the customer their order.

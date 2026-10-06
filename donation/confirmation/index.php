@@ -2,6 +2,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/donation.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_session.php';
 start_session();
 
 if (!feature_enabled('donations')) {
@@ -36,13 +37,18 @@ if ($order_lang !== $lang) {
     exit;
 }
 
+// The number is in the URL and easy to guess, so the amount and the donor's
+// message show only in the browser that made the donation; anyone else gets the
+// thank-you and the number — the details are in the donor's email.
+$owner  = order_session_owns($order['order_number']);
 $amount = (float)$order['total_eur'];
 $paid   = $order['payment_status'] === 'paid';
 $_amt   = '<strong>' . h(number_format($amount, 2)) . ' €</strong>';
 
 $page_title = t_or('donation.confirm.title', 'Благодарим за дарението!', 'Thank you for your donation!');
 
-$page_head_extra = '<script>
+// Counted once, by the donor's own browser — never by someone reopening the link.
+$page_head_extra = !$owner ? '' : '<script>
 window.dataLayer = window.dataLayer || [];
 window.dataLayer.push({
     event: "purchase",
@@ -71,7 +77,11 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
   <div class="container" style="max-width:560px;">
 
     <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem;margin-bottom:2rem;text-align:center;">
-      <?php if ($paid): ?>
+      <?php if (!$owner): ?>
+        <p role="status" style="color:var(--text-muted);margin-top:0;">
+          <?= h(t_or('donation.confirm.details_in_email', 'Подробностите за дарението са в имейла, който ви изпратихме.', 'The details of your donation are in the email we sent you.')) ?>
+        </p>
+      <?php elseif ($paid): ?>
         <div style="font-size:2.5rem;margin-bottom:.75rem;" aria-hidden="true">✅</div>
         <h2 style="color:var(--teal);margin-top:0;">
           <?= h(t_or('donation.confirm.paid', 'Плащането е успешно!', 'Payment confirmed!')) ?>
@@ -94,7 +104,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
       </p>
     </div>
 
-    <?php if ($order['donation_message']): ?>
+    <?php if ($owner && $order['donation_message']): ?>
     <div style="padding:1rem 1.25rem;background:var(--warm-grey);border-radius:var(--radius-lg);margin-bottom:2rem;">
       <strong style="font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);">
         <?= h(t_or('donation.confirm.message', 'Вашето послание', 'Your message')) ?>

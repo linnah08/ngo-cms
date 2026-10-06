@@ -96,9 +96,10 @@ $pdo->prepare("
 ]);
 $order_id = $pdo->lastInsertId();
 
-// Lets this session's confirmation page offer a one-click newsletter sign-up.
-require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
-newsletter_remember_order($order_number);
+// Only this session may see the donation's details on its confirmation page
+// (and sign the donor up there) — the number alone is guessable.
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_session.php';
+order_session_remember($order_number);
 
 if ($payment_method === 'card') {
     // Register with DSK Bank and redirect to payment page

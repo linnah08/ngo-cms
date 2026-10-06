@@ -5,6 +5,7 @@
  */
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
+require_once __DIR__ . '/order_session.php';
 
 // ── Subscriber management ──────────────────────────────────────────────────────
 
@@ -177,26 +178,17 @@ function newsletter_set_subscribed_cookie(): void
 /**
  * Remember that this browser session placed $order_number, so its confirmation
  * page may offer a one-click newsletter sign-up for the order's email.
- * Called by the shop checkout and the donation form when they create an order.
+ * Kept for callers and tests; the rule itself lives in includes/order_session.php.
  */
 function newsletter_remember_order(string $order_number): void
 {
-    if (session_status() !== PHP_SESSION_ACTIVE) return;
-    $list   = is_array($_SESSION['nl_orders'] ?? null) ? $_SESSION['nl_orders'] : [];
-    $list[] = strtoupper($order_number);
-    $_SESSION['nl_orders'] = array_slice(array_values(array_unique($list)), -10);
+    order_session_remember($order_number);
 }
 
-/**
- * Did this browser session place $order_number? Order numbers are short and
- * appear in URLs, so knowing one must never be enough to sign its buyer up —
- * only the session that placed the order may.
- */
+/** Did this browser session place $order_number? See order_session_owns(). */
 function newsletter_session_owns_order(string $order_number): bool
 {
-    if (session_status() !== PHP_SESSION_ACTIVE) return false;
-    $list = $_SESSION['nl_orders'] ?? [];
-    return is_array($list) && in_array(strtoupper($order_number), $list, true);
+    return order_session_owns($order_number);
 }
 
 /**

@@ -126,6 +126,9 @@ try {
         $office_city_val,
     ]);
     $pledge_id = (int)$pdo->lastInsertId();
+    // Only this session may see the pledge's details on its confirmation page.
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_session.php';
+    order_session_remember($pledge_number);
 } catch (Throwable $e) {
     payment_error_report('Подкрепата за кампания не можа да бъде записана', '', $e);
     $_SESSION['campaign_error'] = 'Техническа грешка. Моля, опитайте отново.';

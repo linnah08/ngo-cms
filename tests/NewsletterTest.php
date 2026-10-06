@@ -609,9 +609,9 @@ final class NewsletterTest extends TestCase
         if (session_status() === PHP_SESSION_NONE) @session_start();
         $email = 'test_order_' . uniqid() . '@example-test.invalid';
         $num   = $this->insertOrder($email);
-        $saved = $_SESSION['nl_orders'] ?? null;
+        $saved = $_SESSION[ORDER_SESSION_KEY] ?? null;
         try {
-            unset($_SESSION['nl_orders']);
+            unset($_SESSION[ORDER_SESSION_KEY]);
             $this->assertSame('not_found', newsletter_subscribe_order(self::$pdo, $num, true, true),
                 'knowing an order number must not be enough');
             $this->assertSame([], $this->topicsOf($email));
@@ -624,7 +624,7 @@ final class NewsletterTest extends TestCase
             $this->assertSame('0', (string)$row['wants_news']);
             $this->assertSame('1', (string)$row['wants_education']);
         } finally {
-            $_SESSION['nl_orders'] = $saved;
+            $_SESSION[ORDER_SESSION_KEY] = $saved;
             self::$pdo->prepare("DELETE FROM orders WHERE order_number=?")->execute([$num]);
             $this->deleteSubscriber($email);
         }
@@ -634,15 +634,15 @@ final class NewsletterTest extends TestCase
     {
         $this->loadNewsletter();
         if (session_status() === PHP_SESSION_NONE) @session_start();
-        $saved = $_SESSION['nl_orders'] ?? null;
+        $saved = $_SESSION[ORDER_SESSION_KEY] ?? null;
         try {
-            unset($_SESSION['nl_orders']);
+            unset($_SESSION[ORDER_SESSION_KEY]);
             for ($i = 0; $i < 15; $i++) newsletter_remember_order(sprintf('OM-20260101-%04X', $i));
-            $this->assertCount(10, $_SESSION['nl_orders']);
+            $this->assertCount(10, $_SESSION[ORDER_SESSION_KEY]);
             $this->assertFalse(newsletter_session_owns_order('OM-20260101-0000'));
             $this->assertTrue(newsletter_session_owns_order('om-20260101-000e'), 'case-insensitive');
         } finally {
-            $_SESSION['nl_orders'] = $saved;
+            $_SESSION[ORDER_SESSION_KEY] = $saved;
         }
     }
 
@@ -656,9 +656,9 @@ final class NewsletterTest extends TestCase
 
     public function test_checkout_and_donation_remember_the_order_for_this_session(): void
     {
-        foreach (['checkout/index.php', 'donation/checkout.php'] as $rel) {
+        foreach (['checkout/index.php' => '$order_number', 'donation/checkout.php' => '$order_number', 'campaign/checkout.php' => '$pledge_number'] as $rel => $var) {
             $src = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/' . $rel);
-            $this->assertStringContainsString('newsletter_remember_order($order_number)', $src, $rel);
+            $this->assertStringContainsString("order_session_remember($var)", $src, $rel);
         }
     }
 
