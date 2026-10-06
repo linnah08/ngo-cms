@@ -174,7 +174,8 @@ final class OrganisationTest extends TestCase
         // An explicitly cleared phone must override a phone in site.config.php.
         $this->assertArrayHasKey('SITE_PHONE', $loaded);
         $this->assertSame('', $loaded['SITE_PHONE']);
-        $this->assertCount(count(org_fields()), $loaded);
+        // Every field of the Организация form; the module switches are saved by Admin → Модули.
+        $this->assertCount(count(org_fields()) - count(org_module_fields()), $loaded);
         $this->assertStringNotContainsString('evil', (string) file_get_contents($file));
         $this->assertSame([$file], glob($this->tmp . '/*'), 'no temp files left behind');
     }

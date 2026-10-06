@@ -9,11 +9,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
 start_session();
 
-// Campaign module switched off for this install — the page does not exist.
-if (!feature_enabled('campaign')) {
-    require $_SERVER['DOCUMENT_ROOT'] . '/errors/404.php';
-    exit;
-}
+// Module switched off in Admin → Модули — the page does not exist (site's 404).
+module_public_guard('campaign');
 
 // Must be POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

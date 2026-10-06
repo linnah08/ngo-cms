@@ -70,8 +70,10 @@ Each config below is gitignored. Copy the matching `*.example` file and fill it 
 contact details, bank account, social links, Google Analytics/Ads IDs, and
 initial feature toggles (`FEATURE_DONATIONS`, `FEATURE_CAMPAIGN`). Leave any
 analytics ID empty (`''`) to disable that tag entirely. After install, the
-modules are switched on and off in Admin → Организация → Модули, which wins over
-the constants.
+modules are switched on and off in Admin → Модули, which wins over the
+constants. The install wizard asks which modules to use and writes a
+`FEATURE_*` line for every one of them (`modules_registry()` in
+`includes/modules.php` lists them).
 
 ### 3. Create and install the database
 

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/url.php';
+require_once __DIR__ . '/modules.php';   // modules_registry(): the optional modules and their switches
 /**
  * Organisation identity that admins can change after installation
  * (admin/organisation.php): name, contacts, bank details, brand, social links.
@@ -45,37 +46,25 @@ function org_fields(): array
         'newsletter_donate_heading_en' => 'NEWSLETTER_DONATE_HEADING_EN',
         'newsletter_donate_text_bg'    => 'NEWSLETTER_DONATE_TEXT_BG',
         'newsletter_donate_text_en'    => 'NEWSLETTER_DONATE_TEXT_EN',
-        'feature_donations' => 'FEATURE_DONATIONS',
-        'feature_campaign'  => 'FEATURE_CAMPAIGN',
-    ];
+    ] + org_module_fields();
 }
 
 /**
- * Optional modules an admin can switch on and off in Admin → Организация →
- * Модули. Module name (as passed to feature_enabled()) => its org_fields() key
- * plus the copy shown next to the switch.
- *
- * The switch is saved like every other field here, so it wins over the
- * FEATURE_<NAME> constant in site.config.php; that constant is only the initial
- * value until the admin saves the page once.
+ * The module switches, feature_<name> => FEATURE_<NAME>, one per module in
+ * modules_registry() (includes/modules.php). Saved by Admin → Модули, not by
+ * the Организация form — org_validate() leaves them out and
+ * org_save_overrides() keeps whatever is saved for them.
  */
-function org_modules(): array
+function org_module_fields(): array
 {
-    return [
-        'donations' => [
-            'field' => 'feature_donations',
-            'label' => 'Дарения',
-            'hint'  => 'Ако изключите даренията, от сайта изчезват страницата за дарение, формата за дарение в магазина и бутоните „Дари сега“ под новините.',
-            'off_warning' => 'Изключвате даренията. Страницата за дарение, формата за дарение и бутоните „Дари сега“ ще изчезнат от сайта и посетителите няма да могат да даряват онлайн.',
-        ],
-        'campaign' => [
-            'field' => 'feature_campaign',
-            'label' => 'Кампании',
-            'hint'  => 'Ако изключите кампаниите, от сайта изчезват страниците на кампанията за набиране на средства и връзките към тях.',
-            'off_warning' => 'Изключвате кампаниите. Страниците на кампанията ще изчезнат от сайта и посетителите няма да могат да ги отварят.',
-        ],
-    ];
+    $out = [];
+    foreach (array_keys(modules_registry()) as $name) {
+        $out[module_field($name)] = 'FEATURE_' . strtoupper($name);
+    }
+    return $out;
 }
+
+// org_modules() — the old shape of the module list — now lives in includes/modules.php.
 
 /**
  * The registered legal name of whoever issues documents and receives the
@@ -99,11 +88,11 @@ function org_legal_name(string $lang = 'bg'): string
  *
  * Reads the FEATURE_<NAME> constant. Its value comes, in order of precedence,
  * from:
- *   1. the switch in Admin → Организация → Модули, saved to
+ *   1. the switch in Admin → Модули (admin/modules.php), saved to
  *      content/organisation.json and defined before site.config.php is loaded
  *      (see includes/organisation.php) — stored as '1' / '0';
  *   2. FEATURE_<NAME> in site.config.php — the initial value until an admin
- *      saves that page;
+ *      saves that page (a new install's wizard writes one for every module);
  *   3. nothing set at all → on, so installs that predate a flag keep working.
  *
  * Costs nothing per call: the JSON file is read once per request by
@@ -244,7 +233,8 @@ function org_url_valid(string $url): bool
 function org_validate(array $in, array $themeKeys): array
 {
     $v = [];
-    foreach (array_keys(org_fields()) as $k) {
+    // Module switches are not part of this form (Admin → Модули saves them).
+    foreach (array_keys(array_diff_key(org_fields(), org_module_fields())) as $k) {
         $v[$k] = is_string($in[$k] ?? null) ? trim($in[$k]) : '';
     }
     $e = [];
@@ -336,22 +326,6 @@ function org_validate(array $in, array $themeKeys): array
     // Same for the newsletter donate box — off unless ticked.
     $v['newsletter_donate_cta'] = ($in['newsletter_donate_cta'] ?? '') === '1' ? '1' : '0';
 
-    // Module switches: same explicit '1' / '0' as the banner, so "off" is saved
-    // and wins over FEATURE_<NAME> in site.config.php. Anything other than the
-    // checkbox's own value is refused instead of being guessed at.
-    foreach (org_modules() as $mod) {
-        $k   = $mod['field'];
-        $raw = $in[$k] ?? null;
-        if ($raw === null) {
-            $v[$k] = '0';
-        } elseif ($raw === '1') {
-            $v[$k] = '1';
-        } else {
-            $v[$k] = '0';
-            $e[$k] = 'Невалидна стойност за „' . $mod['label'] . '“. Презаредете страницата и опитайте отново.';
-        }
-    }
-
     foreach (['launch_banner_bg' => 'на български', 'launch_banner_en' => 'на английски'] as $k => $lang) {
         if (mb_strlen($v[$k]) > 200) {
             $e[$k] = "Съобщението {$lang} е твърде дълго (най-много 200 знака).";
@@ -375,13 +349,24 @@ function org_validate(array $in, array $themeKeys): array
 
 // ── Saving ─────────────────────────────────────────────────────────────────────
 
-/** Atomically write the overrides file (write temp + rename). */
+/**
+ * Atomically write the overrides file (write temp + rename).
+ *
+ * Fields missing from $values keep what is saved now, so the Организация form
+ * and Admin → Модули can each save their own part without wiping the other's.
+ */
 function org_save_overrides(array $values, ?string $file = null): bool
 {
     $file ??= org_overrides_path();
+    $saved = is_file($file) ? json_decode((string) @file_get_contents($file), true) : null;
+    if (!is_array($saved)) $saved = [];
     $out  = [];
     foreach (array_keys(org_fields()) as $k) {
-        if (isset($values[$k]) && is_string($values[$k])) $out[$k] = $values[$k];
+        if (isset($values[$k]) && is_string($values[$k])) {
+            $out[$k] = $values[$k];
+        } elseif (isset($saved[$k]) && is_string($saved[$k])) {
+            $out[$k] = $saved[$k];
+        }
     }
     $json = json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     if ($json === false) return false;

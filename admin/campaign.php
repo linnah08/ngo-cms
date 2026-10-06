@@ -9,13 +9,10 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
 admin_require_admin();
 
-// Campaign module switched off for this install — the page does not exist.
+// Campaign module switched off in Admin → Модули — says so, with a way back.
 // Deliberately after the auth call: an anonymous request still gets the normal
 // login redirect, so this never becomes an oracle for which modules a site runs.
-if (!feature_enabled('campaign')) {
-    require $_SERVER['DOCUMENT_ROOT'] . '/errors/404.php';
-    exit;
-}
+module_admin_guard('campaign');
 
 $_tinymce_key    = setting_get('tinymce_api_key', 'no-api-key');
 $deepl_ready     = deepl_is_configured();

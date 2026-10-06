@@ -67,9 +67,10 @@ define('GOOGLE_ADS_PURCHASE_LABEL', '');  // add-to-cart conversion label
 // define('SITE_PHONE_PUBLIC', false);
 
 // ── Optional feature modules ──────────────────────────────────────────────────
-// Initial values only: an admin switches these on and off in Admin →
-// Организация → Модули, and once that page is saved its choice wins over the
-// lines below. A missing line means "on".
+// Initial values only: an admin switches these on and off in Admin → Модули,
+// and once that page is saved its choice wins over the lines below. A missing
+// line means "on". The full list of modules is modules_registry() in
+// includes/modules.php; the install wizard writes a line for each one.
 // Donations (the /donation/ page, its form and the "Donate" buttons).
 define('FEATURE_DONATIONS', true);
 // Crowdfunding campaigns (the campaign/ pages + reward pledges in checkout).

@@ -37,39 +37,38 @@ final class FeatureFlagsTest extends TestCase
         $this->assertSame($expected, feature_enabled('CaMpAiGn'));
     }
 
-    /** Entry points that must become unreachable when the module is off. */
+    /** Entry points that must become unreachable when the module is off: [file, guard]. */
     public static function gatedEntryPoints(): array
     {
         return [
-            ['campaign/index.php'],
-            ['campaign/checkout.php'],
-            ['campaign/confirmation/index.php'],
-            ['campaign/payment-failed/index.php'],
-            ['tickets/index.php'],
-            ['api/campaign-payment-return.php'],
-            ['admin/campaign.php'],
-            ['admin/campaign-backers.php'],
-            ['admin/pledge-view.php'],
-            ['admin/ticket-checklist.php'],
+            ['campaign/index.php', 'public'],
+            ['campaign/checkout.php', 'public'],
+            ['campaign/confirmation/index.php', 'public'],
+            ['campaign/payment-failed/index.php', 'public'],
+            ['tickets/index.php', 'public'],
+            ['api/campaign-payment-return.php', 'public'],
+            ['admin/campaign.php', 'admin'],
+            ['admin/campaign-backers.php', 'admin'],
+            ['admin/pledge-view.php', 'admin'],
+            ['admin/ticket-checklist.php', 'admin'],
         ];
     }
 
     #[DataProvider('gatedEntryPoints')]
-    public function test_entry_point_is_gated(string $rel): void
+    public function test_entry_point_is_gated(string $rel, string $kind): void
     {
         $src = file_get_contents(self::root() . '/' . $rel);
         $this->assertIsString($src, "$rel should exist");
 
-        $this->assertMatchesRegularExpression(
-            '/if\s*\(\s*!\s*feature_enabled\(\s*[\'"]campaign[\'"]\s*\)\s*\)\s*\{/',
-            $src,
-            "$rel must refuse the request when the campaign module is off"
-        );
-        $this->assertStringContainsString(
-            "/errors/404.php",
-            $src,
-            "$rel should answer with a 404, not a redirect"
-        );
+        // module_public_guard() answers with the site's 404, module_admin_guard()
+        // with "Този модул е изключен" — see includes/modules.php.
+        $guard = $kind === 'public' ? "module_public_guard('campaign');" : "module_admin_guard('campaign');";
+        $this->assertStringContainsString($guard, $src, "$rel must refuse the request when the campaign module is off");
+        if ($kind === 'admin') {
+            $auth = preg_match('/admin_require_(admin|login|shop|editorial)\(\);/', $src, $m, PREG_OFFSET_CAPTURE) ? $m[0][1] : false;
+            $this->assertNotFalse($auth, "$rel checks who is asking");
+            $this->assertLessThan(strpos($src, $guard), $auth, "$rel: auth first, so a visitor cannot learn which modules a site runs");
+        }
     }
 
     /** Surfaces that must stop advertising the module, without being removed. */
@@ -81,7 +80,6 @@ final class FeatureFlagsTest extends TestCase
             ['kak-da-pomogna/index.php'],
             ['en/how-to-help/index.php'],
             ['includes/menus.php'], // the BG↔EN address map the header's language switch uses
-            ['admin/includes/admin-header.php'],
             ['admin/dashboard.php'],
             ['admin/pages.php'],
         ];
@@ -97,6 +95,13 @@ final class FeatureFlagsTest extends TestCase
             $src,
             "$rel links to the campaign module and must check the flag first"
         );
+    }
+
+    public function test_admin_menu_hides_module_pages_through_the_registry(): void
+    {
+        $src = (string) file_get_contents(self::root() . '/admin/includes/admin-header.php');
+        $this->assertStringContainsString("module_admin_page_visible('campaign.php')", $src);
+        $this->assertStringNotContainsString("feature_enabled('campaign')", $src, 'no hard-coded module ifs in the menu');
     }
 
     /**

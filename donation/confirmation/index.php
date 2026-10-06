@@ -5,10 +5,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/donation.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_session.php';
 start_session();
 
-if (!feature_enabled('donations')) {
-    require $_SERVER['DOCUMENT_ROOT'] . '/errors/404.php';
-    exit;
-}
+// Module switched off in Admin → Модули — the page does not exist (site's 404).
+module_public_guard('donations');
 
 $lang         = get_lang();
 $order_number = trim($_GET['order'] ?? '');
