@@ -18,6 +18,7 @@ final class ArticleSaveLogicTest extends TestCase
     public static function setUpBeforeClass(): void
     {
         require_once dirname(__DIR__, 2) . '/includes/articles.php';
+        require_once dirname(__DIR__, 2) . '/includes/ai_excerpt.php';
     }
 
     // ── article_compute_slugs ────────────────────────────────────────────────
@@ -121,6 +122,64 @@ final class ArticleSaveLogicTest extends TestCase
             array_keys($data)
         );
         $this->assertSame('EN T', $data['title']);
+    }
+
+    // ── article_excerpt_from_content ─────────────────────────────────────────
+
+    public function testExcerptFromContentStripsHtmlAndCollapsesWhitespace(): void
+    {
+        $out = article_excerpt_from_content("<p>Hello   <strong>world</strong></p>\n<p>Bye</p>");
+        $this->assertSame('Hello world Bye', $out);
+    }
+
+    public function testExcerptFromContentReturnsShortTextUnchanged(): void
+    {
+        $this->assertSame('Short text.', article_excerpt_from_content('<p>Short text.</p>'));
+    }
+
+    public function testExcerptFromContentTruncatesAtWordBoundaryWithEllipsis(): void
+    {
+        $text = str_repeat('word ', 40); // way over 160 chars
+        $out  = article_excerpt_from_content($text, 160);
+        $this->assertLessThanOrEqual(161, mb_strlen($out)); // 160 + ellipsis char
+        $this->assertStringEndsWith('…', $out);
+        $this->assertStringNotContainsString('  ', $out);
+    }
+
+    public function testExcerptFromContentReturnsEmptyForEmptyOrTagOnlyContent(): void
+    {
+        $this->assertSame('', article_excerpt_from_content(''));
+        $this->assertSame('', article_excerpt_from_content('<p><br></p>'));
+    }
+
+    // ── article_auto_excerpt ──────────────────────────────────────────────────
+    // Only the content-emptiness short-circuit is pure/deterministic; the
+    // Claude-vs-fallback branch depends on live settings (claude_api_key) and
+    // isn't unit-tested here, matching claude_suggest_keywords() in ai_keywords.php.
+
+    public function testAutoExcerptReturnsEmptyForEmptyContent(): void
+    {
+        $this->assertSame('', article_auto_excerpt('Title', '', 'bg'));
+        $this->assertSame('', article_auto_excerpt('Title', '<p></p>', 'en'));
+    }
+
+    public function testEditorKeepsTheStoredExcerptAndFillsAMissingOne(): void
+    {
+        // The editor form has no excerpt field: reading one from $_POST blanked the
+        // excerpt (set inline on the listing) on every save.
+        $src = file_get_contents(dirname(__DIR__, 2) . '/admin/article-edit.php');
+        $this->assertStringNotContainsString("\$_POST['excerpt", $src);
+        $this->assertStringContainsString("\$excerpt = trim(\$article['excerpt'] ?? '');", $src);
+        $this->assertStringContainsString("\$excerpt_en = trim(\$article_en['excerpt'] ?? '');", $src);
+        $this->assertStringContainsString("article_auto_excerpt(\$title, \$content, 'bg')", $src);
+        $this->assertStringContainsString("article_auto_excerpt(\$title_en ?: \$title, \$content_en, 'en')", $src);
+    }
+
+    public function testExcerptBackfillRunsOnlyFromTheCommandLine(): void
+    {
+        $src = file_get_contents(dirname(__DIR__, 2) . '/cron/backfill-article-excerpts.php');
+        $this->assertStringContainsString("if (PHP_SAPI !== 'cli')", $src);
+        $this->assertStringContainsString("in_array('--apply', \$argv, true)", $src, 'writes only with --apply');
     }
 
     // ── html_to_social_text ──────────────────────────────────────────────────

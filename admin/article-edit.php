@@ -3,6 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/ai_keywords.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/ai_excerpt.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/articles.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
 admin_require_editorial();
@@ -31,7 +32,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // ── BG fields ──────────────────────────────────────────────────────────────
     $title   = trim($_POST['title']   ?? '');
     $content = $_POST['content']       ?? '';
-    $excerpt = trim($_POST['excerpt']  ?? '');
+    // No excerpt field on this form — it's edited inline on the news listing
+    // (novini/index.php). Keep whatever is stored rather than wiping it on every
+    // unrelated save.
+    $excerpt = trim($article['excerpt'] ?? '');
     $author  = trim($_POST['author']   ?? $current['name'] ?? '');
     $status  = in_array($_POST['status'] ?? '', ['published','draft']) ? $_POST['status'] : 'draft';
     $date    = is_string($_POST['date'] ?? null) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['date']) ? $_POST['date'] : date('Y-m-d');
@@ -41,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // ── EN fields (optional) ───────────────────────────────────────────────────
     $title_en   = trim($_POST['title_en']   ?? '');
     $content_en = $_POST['content_en']       ?? '';
-    $excerpt_en = trim($_POST['excerpt_en']  ?? '');
+    $excerpt_en = trim($article_en['excerpt'] ?? '');
     $has_en     = $title_en !== '' || $content_en !== '';
 
     // Derive both slugs (BG keeps its language; EN prefers override/EN title).
@@ -125,6 +129,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // BG slug unchanged but EN slug changed — delete old EN file
             $old_en = ARTICLES_PATH . '/en/' . $slug_en_current . '.json';
             if (file_exists($old_en)) unlink($old_en);
+        }
+
+        // Fill in an excerpt the post doesn't have yet (Claude when configured, else
+        // the start of the text), so every post gets one for the listing and the
+        // search-engine description without the author having to know about it.
+        if ($excerpt === '') {
+            $excerpt = article_auto_excerpt($title, $content, 'bg');
+        }
+        if ($has_en && $excerpt_en === '') {
+            $excerpt_en = article_auto_excerpt($title_en ?: $title, $content_en, 'en');
         }
 
         // Save BG article (preserves social metadata from $article)

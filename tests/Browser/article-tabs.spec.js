@@ -92,4 +92,7 @@ test('saving with the English section folded keeps the English version', async (
   const en = JSON.parse(fs.readFileSync(EN_FILE, 'utf8'));
   expect(en.title).toBe('PW tabs');
   expect(en.content).toContain('x');
+  // A post saved without an excerpt gets one (Claude, or the start of the text).
+  expect(en.excerpt).not.toBe('');
+  expect(JSON.parse(fs.readFileSync(BG_FILE, 'utf8')).excerpt).not.toBe('');
 });

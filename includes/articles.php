@@ -102,6 +102,20 @@ function article_build_bg_data(array $f, array $existing = []): array {
 }
 
 /**
+ * Fallback excerpt when AI generation is unavailable or fails: strip HTML,
+ * collapse whitespace, and truncate to a word boundary. Used by both
+ * admin/article-edit.php (article_auto_excerpt) and the backfill script.
+ */
+function article_excerpt_from_content(string $html, int $max_len = 160): string {
+    $text = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = trim(preg_replace('/\s+/u', ' ', $text));
+    if ($text === '' || mb_strlen($text) <= $max_len) return $text;
+    $cut = mb_substr($text, 0, $max_len);
+    $cut = preg_replace('/\s+\S*$/u', '', $cut);
+    return rtrim($cut, " \t\n\r\0\x0B.,;:") . '…';
+}
+
+/**
  * Assemble the EN article record. Date, author, image, status and tags are shared
  * with the BG record by the caller; only the EN title/excerpt/content differ.
  */
