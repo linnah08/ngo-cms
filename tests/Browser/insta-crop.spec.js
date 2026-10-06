@@ -59,7 +59,12 @@ test('previews show the 4:5 carousel and a chosen crop is saved and kept', async
   const dialog = page.getByRole('dialog', { name: 'Изберете коя част да се вижда' });
   await expect(dialog).toBeVisible();
   await page.waitForFunction(() => !!document.querySelector('.cropper-crop-box'));
-  await dialog.getByRole('group', { name: 'Рамка за изрязване' }).focus();
+  // As a person does it: click the photo with the mouse, then use the keys — no Tab first.
+  await page.locator('.cropper-crop-box').click();
+  const before = await page.evaluate(() => document.querySelector('.cropper-crop-box').getBoundingClientRect().height);
+  await page.keyboard.press('-');
+  const after = await page.evaluate(() => document.querySelector('.cropper-crop-box').getBoundingClientRect().height);
+  expect(after).toBeLessThan(before);
   await page.keyboard.press('Shift+ArrowDown');
   await dialog.getByRole('button', { name: 'Готово' }).click();
   await expect(dialog).toHaveCount(0);

@@ -71,8 +71,9 @@
           else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
           return;
         }
-        // Keyboard way to move/resize the frame when the stage has focus (pick mode).
-        if (!o.keyboard || !cropper || document.activeElement !== stage) return;
+        // Keyboard way to move/resize the frame (pick mode). Works wherever focus is in the
+        // dialog — clicking the photo doesn't focus it, so requiring that made the keys dead.
+        if (!o.keyboard || !cropper) return;
         var d = cropper.getData(), step = (e.shiftKey ? 0.1 : 0.02) * Math.min(img.naturalWidth, img.naturalHeight);
         var moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
         if (moves[e.key]) {
@@ -145,6 +146,8 @@
         if (o.help) stage.setAttribute('aria-describedby', 'omCropHelp');
         stage.addEventListener('focus', function () { stage.style.outline = '3px solid ' + TEAL; stage.style.outlineOffset = '-3px'; });
         stage.addEventListener('blur', function () { stage.style.outline = 'none'; });
+        // Cropper.js swallows the pointer, so a click never focuses the stage on its own.
+        stage.addEventListener('pointerdown', function () { stage.focus({ preventScroll: true }); });
       }
       img.src = o.src;
       img.alt = '';
@@ -200,7 +203,8 @@
         if (o.keyboard) { opts.dragMode = 'none'; opts.zoomable = false; opts.movable = false; }
         cropper = new Cropper(img, opts);
       });
-      okBtn.focus();
+      // Pick mode opens on the photo, so the arrows and +/− work straight away.
+      (o.keyboard ? stage : okBtn).focus();
     });
   }
 
