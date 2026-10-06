@@ -61,6 +61,31 @@ final class ArticlePhotoGridTest extends TestCase
         $this->assertStringNotContainsString('window.confirm', $src);
     }
 
+    /**
+     * The new-photo template is rendered right after the loop over stored photos. When the
+     * last stored photo's file was missing, its $missing leaked in and every photo added
+     * afterwards showed "Файлът липсва" although its upload worked.
+     */
+    public function testNewPhotoTemplateIgnoresTheLastRowsMissingFile(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 2) . '/admin/article-edit.php');
+        $this->assertSame(1, preg_match('#<template id="apRowTpl"><\?php(.*?)\?></template>#s', $src, $m));
+        $prevRoot = $_SERVER['DOCUMENT_ROOT'] ?? null;
+        $_SERVER['DOCUMENT_ROOT'] = dirname(__DIR__, 2);
+        ob_start();
+        try {
+            (static function (string $code): void {
+                $missing = true; // left over from the loop's last row
+                eval($code);
+            })($m[1]);
+        } finally {
+            $html = (string) ob_get_clean();
+            $_SERVER['DOCUMENT_ROOT'] = $prevRoot;
+        }
+        $this->assertStringContainsString('__SRC__', $html);
+        $this->assertStringNotContainsString('Файлът липсва', $html);
+    }
+
     /** Review I2: a stored photo whose file is missing shows as such and is still posted. */
     public function testMissingFileCardSaysSoAndKeepsThePath(): void
     {

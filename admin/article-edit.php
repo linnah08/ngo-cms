@@ -347,7 +347,9 @@ $badge_style       = 'font-size:.75rem;font-weight:600;border-radius:3px;padding
         <?php endforeach; ?>
       </ul>
       <template id="apRowTpl"><?php
-        $photo = ['src' => '__SRC__', 'caption' => '']; $i = 0; $total = 1; $main = false;
+        // Every var is set here: $missing would otherwise leak in from the loop's
+        // last row and mark each newly added photo as a missing file.
+        $photo = ['src' => '__SRC__', 'caption' => '']; $i = 0; $total = 1; $main = false; $missing = false;
         require $_SERVER['DOCUMENT_ROOT'] . '/templates/admin/article-photo-row.php'; ?></template>
       <p id="apLimit" role="alert" hidden
          style="border:2px solid #b91c1c;background:#fef2f2;color:#7f1d1d;border-radius:8px;padding:.75rem 1rem;font-weight:600;">
