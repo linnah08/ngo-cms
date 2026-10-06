@@ -16,6 +16,25 @@ final class LinkedInCarouselTest extends TestCase
         require_once dirname(__DIR__) . '/includes/documents/LinkedInCarouselGenerator.php';
     }
 
+    /**
+     * linkedin-ajax.php / social-ajax.php never load the Composer autoloader themselves,
+     * so the generator must — in production its absence was a fatal "Class Mpdf\Mpdf not
+     * found" on every LinkedIn schedule with 2+ photos. Run in a fresh process: this
+     * class's setUpBeforeClass() loads the autoloader and would hide the bug.
+     */
+    public function testLoadsMpdfOnItsOwn(): void
+    {
+        $root = dirname(__DIR__);
+        $code = sprintf(
+            '$_SERVER["DOCUMENT_ROOT"] = %s; require %s; require %s; echo class_exists("Mpdf\\Mpdf") ? "MPDF_OK" : "MPDF_MISSING";',
+            var_export($root, true),
+            var_export($root . '/config.php', true),
+            var_export($root . '/includes/documents/LinkedInCarouselGenerator.php', true)
+        );
+        $out = (string) shell_exec(escapeshellarg(PHP_BINARY) . ' -r ' . escapeshellarg($code) . ' 2>&1');
+        $this->assertStringContainsString('MPDF_OK', $out, $out);
+    }
+
     protected function setUp(): void
     {
         $this->rel = '/assets/images/articles/_test-li-' . bin2hex(random_bytes(3));

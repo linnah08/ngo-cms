@@ -3,6 +3,7 @@
  * The PDF LinkedIn shows as a swipeable "document" carousel: one square page per photo,
  * main photo first, its English caption underneath (Bulgarian when there is no English).
  */
+require_once dirname(__DIR__, 2) . '/vendor/autoload.php';   // mPDF — this class doesn't extend DocumentGenerator, which loads it for the others
 require_once __DIR__ . '/../social_images.php';
 
 final class LinkedInCarouselGenerator
