@@ -78,6 +78,8 @@ function article_build_bg_data(array $f, array $existing = []): array {
         'linkedin_due_at', 'buffer_post_id', 'social_text', 'fb_text', 'insta_text',
         'fb_buffer_post_id', 'fb_scheduled_at', 'fb_due_at', 'insta_buffer_post_id',
         'insta_scheduled_at', 'insta_due_at',
+        'insta_story_buffer_post_id',
+        'insta_story_scheduled_at', 'insta_story_due_at',
     ];
     $data = [
         'title'   => $f['title'],

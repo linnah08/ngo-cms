@@ -178,6 +178,7 @@ if (is_dir($articles_dir)) {
         foreach ([
             'fb_scheduled_at'      => 'fb',
             'insta_scheduled_at'   => 'ig',
+            'insta_story_scheduled_at' => 'igs',
             'linkedin_scheduled_at' => 'li',
         ] as $field => $ch) {
             if (empty($a[$field]) || $a[$field] === 'now') continue;
@@ -195,6 +196,7 @@ if (is_dir($articles_dir)) {
         foreach ([
             'fb_scheduled_at'    => ['fb_due_at',    'fb'],
             'insta_scheduled_at' => ['insta_due_at', 'ig'],
+            'insta_story_scheduled_at' => ['insta_story_due_at', 'igs'],
         ] as $sched_field => [$due_field, $ch]) {
             if (($a[$sched_field] ?? '') !== 'now' || empty($a[$due_field])) continue;
             try {
@@ -225,11 +227,12 @@ if (is_dir($articles_dir)) {
 $bg_days_short   = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 $bg_months_short = ['', 'яну', 'фев', 'мар', 'апр', 'май', 'юни', 'юли', 'авг', 'сеп', 'окт', 'ное', 'дек'];
 
-$ch_labels = ['web' => 'Сайт', 'fb' => 'FB', 'ig' => 'IG', 'li' => 'LI'];
+$ch_labels = ['web' => 'Сайт', 'fb' => 'FB', 'ig' => 'IG', 'igs' => 'IGS', 'li' => 'LI'];
 $ch_colors = [
     'web' => 'background:#e4f0f5;color:#0387A5;',
     'fb'  => 'background:#e8f0fe;color:#1877f2;',
     'ig'  => 'background:#fce4ec;color:#c2185b;',
+    'igs' => 'background:#fef3c7;color:#b45309;',
     'li'  => 'background:#e3f2fd;color:#0a66c2;',
 ];
 
@@ -494,9 +497,10 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     web: 'background:#e4f0f5;color:#0387A5;',
     fb:  'background:#e8f0fe;color:#1877f2;',
     ig:  'background:#fce4ec;color:#c2185b;',
+    igs: 'background:#fef3c7;color:#b45309;',
     li:  'background:#e3f2fd;color:#0a66c2;'
   };
-  var chLabel = { web: 'Сайт', fb: 'Facebook', ig: 'Instagram', li: 'LinkedIn' };
+  var chLabel = { web: 'Сайт', fb: 'Facebook', ig: 'Instagram', igs: 'Instagram Story', li: 'LinkedIn' };
 
   window.dashPopShow = function (btn) {
     var ch    = btn.dataset.ch;

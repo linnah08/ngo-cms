@@ -377,7 +377,12 @@ $fb_ready          = setting_is_set('buffer_facebook_channel_id')  && setting_is
 $insta_ready       = setting_is_set('buffer_instagram_channel_id') && setting_is_set('buffer_api_key');
 $fb_sched          = !empty($article['fb_scheduled_at']);
 $insta_sched       = !empty($article['insta_scheduled_at']);
+$insta_story_sched = !empty($article['insta_story_scheduled_at']);
 $default_social_at = date('Y-m-d\TH:i', strtotime('+1 day 11:00'));
+
+// Which Instagram tab (Post/Story) should be shown on load. A scheduled post/story
+// always wins (it's the thing most likely to need attention).
+$ig_default_story = !$insta_sched && $insta_story_sched;
 ?>
 <!-- ── FB / Insta panel ───────────────────────────────────────────────────── -->
 <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;margin-top:2rem;" id="socialPanel">
@@ -388,9 +393,10 @@ $default_social_at = date('Y-m-d\TH:i', strtotime('+1 day 11:00'));
       <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/>
     </svg>
     <h2 style="font-size:.95rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:0;">Facebook / Instagram</h2>
-    <span style="margin-left:auto;font-size:.82rem;font-weight:600;display:flex;gap:.75rem;flex-wrap:wrap;">
+    <span role="status" style="margin-left:auto;font-size:.82rem;font-weight:600;display:flex;gap:.75rem;flex-wrap:wrap;">
       <span id="fbStatusBadge"><?php if ($fb_sched): ?><span style="color:#b45309;">⏱ FB: <?= h(date('d.m.Y H:i', strtotime($article['fb_scheduled_at']))) ?></span><?php endif; ?></span>
       <span id="instaStatusBadge"><?php if ($insta_sched): ?><span style="color:#b45309;">⏱ IG: <?= h(date('d.m.Y H:i', strtotime($article['insta_scheduled_at']))) ?></span><?php endif; ?></span>
+      <span id="instaStoryStatusBadge"><?php if ($insta_story_sched): ?><span style="color:#b45309;">⏱ IG Story: <?= h(date('d.m.Y H:i', strtotime($article['insta_story_scheduled_at']))) ?></span><?php endif; ?></span>
     </span>
   </div>
 
@@ -415,7 +421,7 @@ $default_social_at = date('Y-m-d\TH:i', strtotime('+1 day 11:00'));
     <label style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;">
       <span style="font-size:.85rem;font-weight:600;">Текст за Facebook</span>
       <span style="display:flex;gap:.4rem;">
-        <button type="button" id="socEmojiBtn" class="btn btn--outline" style="font-size:.75rem;padding:.25rem .6rem;" onclick="_toggleEmojiPicker()">😊 Емоджи</button>
+        <button type="button" id="socEmojiBtn" class="btn btn--outline" style="font-size:.75rem;padding:.25rem .6rem;" data-emoji-target="fbText" aria-controls="socEmojiPicker" aria-expanded="false" onclick="_toggleEmojiPicker(this)">😊 Емоджи</button>
         <button type="button" id="socCopyBtn" class="btn btn--outline" style="font-size:.75rem;padding:.25rem .6rem;">Копирай</button>
       </span>
     </label>
@@ -465,7 +471,7 @@ $default_social_at = date('Y-m-d\TH:i', strtotime('+1 day 11:00'));
       Публикувай сега (FB)
     </button>
     <span id="socFbSpinner" style="display:none;font-size:.85rem;color:var(--text-muted);">Изпраща се…</span>
-    <span id="socFbError"   style="display:none;font-size:.85rem;color:#c0392b;"></span>
+    <span id="socFbError" role="alert" style="display:none;font-size:.85rem;color:#c0392b;"></span>
   </div>
   <p style="margin:.25rem 0 1.25rem;font-size:.78rem;color:var(--text-muted);">
     Публикацията ще бъде планирана в Buffer. Редактирайте я в <a href="https://publish.buffer.com" target="_blank" rel="noopener">publish.buffer.com</a>.
@@ -483,10 +489,16 @@ $default_social_at = date('Y-m-d\TH:i', strtotime('+1 day 11:00'));
     <span style="font-size:.82rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">Instagram</span>
   </div>
 
-  <div class="form-group" style="margin-bottom:1rem;">
+  <div role="group" aria-label="Вид публикация в Instagram" style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+    <button type="button" id="igModePostBtn" class="btn <?= $ig_default_story ? 'btn--outline' : 'btn--primary' ?>" aria-pressed="<?= $ig_default_story ? 'false' : 'true' ?>" style="font-size:.82rem;min-height:44px;">📷 Публикация</button>
+    <button type="button" id="igModeStoryBtn" class="btn <?= $ig_default_story ? 'btn--primary' : 'btn--outline' ?>" aria-pressed="<?= $ig_default_story ? 'true' : 'false' ?>" style="font-size:.82rem;min-height:44px;">🎬 Story</button>
+  </div>
+
+  <div class="form-group" id="igPostTextGroup" style="<?= $ig_default_story ? 'display:none;' : '' ?>margin-bottom:1rem;">
     <label style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;">
       <span style="font-size:.85rem;font-weight:600;">Текст за Instagram</span>
-      <span style="display:flex;gap:.4rem;">
+      <span style="display:flex;gap:.4rem;flex-wrap:wrap;">
+        <button type="button" id="socEmojiBtnInsta" class="btn btn--outline" style="font-size:.75rem;padding:.25rem .6rem;" data-emoji-target="instaText" aria-controls="socEmojiPicker" aria-expanded="false" onclick="_toggleEmojiPicker(this)">😊 Емоджи</button>
         <button type="button" id="socCopyFromFbBtn" class="btn btn--outline" style="font-size:.75rem;padding:.25rem .6rem;">📋 Копирай от FB</button>
         <button type="button" id="instaCopyBtn" class="btn btn--outline" style="font-size:.75rem;padding:.25rem .6rem;">Копирай</button>
       </span>
@@ -500,10 +512,20 @@ $default_social_at = date('Y-m-d\TH:i', strtotime('+1 day 11:00'));
     <div id="instaCounter" style="display:flex;gap:1.25rem;margin-top:.3rem;font-size:.78rem;font-variant-numeric:tabular-nums;"></div>
   </div>
 
-  <div style="margin-bottom:.75rem;">
+  <p id="igStoryNoteGroup" style="<?= $ig_default_story ? '' : 'display:none;' ?>margin:0 0 1rem;font-size:.82rem;color:var(--text-muted);">
+    Instagram Story се публикува само с главната снимка на статията, изрязана вертикално (9:16). Instagram не позволява текст или линк върху Story, публикувано автоматично.
+  </p>
+
+  <div style="margin-bottom:.75rem;<?= $ig_default_story ? 'display:none;' : '' ?>" id="igPostScheduleGroup">
     <label for="instaScheduleAt" style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.3rem;">Планирай за</label>
     <input type="datetime-local" id="instaScheduleAt"
            value="<?= h(!empty($article['insta_scheduled_at']) ? date('Y-m-d\TH:i', strtotime($article['insta_scheduled_at'])) : $default_social_at) ?>"
+           style="font-size:.88rem;">
+  </div>
+  <div style="margin-bottom:.75rem;<?= $ig_default_story ? '' : 'display:none;' ?>" id="igStoryScheduleGroup">
+    <label for="instaStoryScheduleAt" style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.3rem;">Планирай Story за</label>
+    <input type="datetime-local" id="instaStoryScheduleAt"
+           value="<?= h(!empty($article['insta_story_scheduled_at']) ? date('Y-m-d\TH:i', strtotime($article['insta_story_scheduled_at'])) : $default_social_at) ?>"
            style="font-size:.88rem;">
   </div>
   <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.5rem;">
@@ -514,7 +536,7 @@ $default_social_at = date('Y-m-d\TH:i', strtotime('+1 day 11:00'));
       Публикувай сега (IG)
     </button>
     <span id="socInstaSpinner" style="display:none;font-size:.85rem;color:var(--text-muted);">Изпраща се…</span>
-    <span id="socInstaError"   style="display:none;font-size:.85rem;color:#c0392b;"></span>
+    <span id="socInstaError" role="alert" style="display:none;font-size:.85rem;color:#c0392b;"></span>
   </div>
   <p style="margin:.25rem 0 0;font-size:.78rem;color:var(--text-muted);">
     Публикацията ще бъде планирана в Buffer. Редактирайте я в <a href="https://publish.buffer.com" target="_blank" rel="noopener">publish.buffer.com</a>.
@@ -1149,6 +1171,31 @@ if (translateBtn) {
   var instaText = document.getElementById('instaText');
   var slug      = '<?= h($edit_slug) ?>';
 
+  // ── Instagram Feed Post / Story mode toggle ────────────────────────────────
+  // Story has no text/link — Instagram doesn't support either on an
+  // automatically-published Story — so switching modes only ever affects the
+  // Feed Post's text box and the schedule-time field.
+  var igMode = <?= $ig_default_story ? "'story'" : "'post'" ?>;
+
+  function _igSetMode(mode) {
+    if (mode === igMode) return;
+    igMode = mode;
+    document.getElementById('igPostTextGroup').style.display      = mode === 'post'  ? '' : 'none';
+    document.getElementById('igStoryNoteGroup').style.display     = mode === 'story' ? '' : 'none';
+    document.getElementById('igPostScheduleGroup').style.display  = mode === 'post'  ? '' : 'none';
+    document.getElementById('igStoryScheduleGroup').style.display = mode === 'story' ? '' : 'none';
+    var postBtn  = document.getElementById('igModePostBtn');
+    var storyBtn = document.getElementById('igModeStoryBtn');
+    postBtn.className  = 'btn ' + (mode === 'post'  ? 'btn--primary' : 'btn--outline');
+    storyBtn.className = 'btn ' + (mode === 'story' ? 'btn--primary' : 'btn--outline');
+    postBtn.setAttribute('aria-pressed',  mode === 'post'  ? 'true' : 'false');
+    storyBtn.setAttribute('aria-pressed', mode === 'story' ? 'true' : 'false');
+    document.getElementById('socInstaError').style.display = 'none';
+  }
+
+  document.getElementById('igModePostBtn').addEventListener('click', function() { _igSetMode('post'); });
+  document.getElementById('igModeStoryBtn').addEventListener('click', function() { _igSetMode('story'); });
+
   async function socPost(body) {
     var r = await fetch('/admin/social-ajax.php', {
       method: 'POST',
@@ -1176,7 +1223,9 @@ if (translateBtn) {
   }
 
   function _instaGetText() {
-    return instaText.value.trim();
+    // Story mode has no text box — Instagram doesn't support captions on
+    // automatically-published Stories — so nothing is sent for it.
+    return igMode === 'story' ? '' : instaText.value.trim();
   }
 
   // Generate — shared handler for both buttons
@@ -1256,13 +1305,26 @@ if (translateBtn) {
     });
   }
 
-  function _toggleEmojiPicker() {
-    var p = document.getElementById('socEmojiPicker');
-    p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  var _emojiTarget = 'fbText';
+
+  function _toggleEmojiPicker(btn) {
+    var p          = document.getElementById('socEmojiPicker');
+    var targetId   = btn.getAttribute('data-emoji-target');
+    var isOpenHere = p.style.display !== 'none' && _emojiTarget === targetId;
+    document.querySelectorAll('[data-emoji-target]').forEach(function(b) { b.setAttribute('aria-expanded', 'false'); });
+    if (isOpenHere) {
+      p.style.display = 'none';
+      return;
+    }
+    _emojiTarget = targetId;
+    // Move the shared picker right after whichever box's emoji button was clicked.
+    btn.closest('label').insertAdjacentElement('afterend', p);
+    p.style.display = 'block';
+    btn.setAttribute('aria-expanded', 'true');
   }
 
   function _insertEmoji(emoji) {
-    var ta    = fbText;
+    var ta    = document.getElementById(_emojiTarget) || fbText;
     var start = ta.selectionStart;
     var end   = ta.selectionEnd;
     ta.value  = ta.value.slice(0, start) + emoji + ta.value.slice(end);
@@ -1271,19 +1333,25 @@ if (translateBtn) {
     ta.dispatchEvent(new Event('input'));
   }
 
+  // Exposed on window: the emoji buttons/spans call these via inline onclick=
+  // attributes, which run in global scope and can't see IIFE-local functions.
+  window._toggleEmojiPicker = _toggleEmojiPicker;
+  window._insertEmoji       = _insertEmoji;
+
   // Schedule / publish-now helper
-  async function scheduleChannel(channel, scheduled_at, btn, spinner, errEl, badgeId) {
+  async function scheduleChannel(channel, scheduled_at, btn, spinner, errEl, badgeId, extra, label) {
     var text = channel === 'fb' ? _fbGetText() : _instaGetText();
     btn.disabled          = true;
     spinner.style.display = '';
     errEl.style.display   = 'none';
     try {
-      var data = await socPost({ action: 'schedule', social_text: text, scheduled_at: scheduled_at, channel: channel });
+      var body = Object.assign({ action: 'schedule', social_text: text, scheduled_at: scheduled_at, channel: channel }, extra || {});
+      var data = await socPost(body);
       if (!data.ok) {
         errEl.textContent   = data.error;
         errEl.style.display = '';
       } else {
-        var label = channel === 'fb' ? 'FB' : 'IG';
+        label = label || (channel === 'fb' ? 'FB' : 'IG');
         if (data.due_at) {
           document.getElementById(badgeId).innerHTML =
             '<span style="color:#b45309;">⏱ ' + label + ': ' + fmtSofia(data.due_at) + '</span>';
@@ -1321,24 +1389,34 @@ if (translateBtn) {
     });
   }
 
+  // The extra payload + target badge/label for the current IG mode.
+  function _igConfig() {
+    if (igMode === 'story') {
+      return { extra: { post_type: 'story' }, badgeId: 'instaStoryStatusBadge', label: 'IG Story' };
+    }
+    return { extra: { post_type: 'post' }, badgeId: 'instaStatusBadge', label: 'IG' };
+  }
+
   var instaBtn = document.getElementById('socInstaBtn');
   if (instaBtn) {
     instaBtn.addEventListener('click', function() {
-      var schedAt = document.getElementById('instaScheduleAt').value;
+      var schedAt = document.getElementById(igMode === 'story' ? 'instaStoryScheduleAt' : 'instaScheduleAt').value;
       var errEl   = document.getElementById('socInstaError');
       if (!schedAt) { errEl.textContent = 'Изберете дата и час.'; errEl.style.display = ''; return; }
+      var cfg = _igConfig();
       scheduleChannel('insta', schedAt, instaBtn,
-        document.getElementById('socInstaSpinner'), errEl, 'instaStatusBadge');
+        document.getElementById('socInstaSpinner'), errEl, cfg.badgeId, cfg.extra, cfg.label);
     });
   }
 
   var instaNowBtn = document.getElementById('socInstaNowBtn');
   if (instaNowBtn) {
     instaNowBtn.addEventListener('click', function() {
+      var cfg = _igConfig();
       scheduleChannel('insta', 'now', instaNowBtn,
         document.getElementById('socInstaSpinner'),
         document.getElementById('socInstaError'),
-        'instaStatusBadge');
+        cfg.badgeId, cfg.extra, cfg.label);
     });
   }
 })();

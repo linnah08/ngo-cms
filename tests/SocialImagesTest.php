@@ -104,6 +104,24 @@ final class SocialImagesTest extends TestCase
         $this->assertCount(1, $r['urls']);
     }
 
+    public function testStoryModeCropsTo9x16(): void
+    {
+        $out = social_prepare_image($this->jpeg('wide.jpg', 1600, 900), 'story');
+        [$w, $h] = getimagesize($_SERVER['DOCUMENT_ROOT'] . $out);
+        $this->assertSame([506, 900], [$w, $h]);   // 900 × 9/16
+        $this->assertStringEndsWith('-story.jpg', $out);
+    }
+
+    public function testInstagramStoryIsTheMainPhotoAloneAsAStory(): void
+    {
+        $a = $this->jpeg('a.jpg', 900, 1600);
+        $b = $this->jpeg('b.jpg', 800, 800);
+        $r = social_fb_insta_request(['image' => $b, 'photos' => [['src' => $a, 'caption' => ''], ['src' => $b, 'caption' => '']]], 'insta', true);
+        $this->assertCount(1, $r['urls']);
+        $this->assertStringEndsWith('b-story.jpg', $r['urls'][0]);
+        $this->assertSame('instagram: { type: story, shouldShareToFeed: false }', $r['metadata']);
+    }
+
     public function testFacebookSendsEveryPhotoAsAPost(): void
     {
         $a = $this->jpeg('a.jpg', 100, 100);

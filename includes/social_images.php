@@ -48,7 +48,8 @@ function _social_gd_save(\GdImage $im, string $abs, string $ext): bool {
 /**
  * The file to send for one photo. 'fit': at most 4800px wide (Buffer's limit is 5000).
  * 'insta': also between 4:5 and 1.91:1. 'square': also a centred 1:1 crop (every slide of
- * an Instagram carousel shares one shape). Returns a site path, or null if unreadable.
+ * an Instagram carousel shares one shape). 'story': a centred 9:16 crop (Stories are always
+ * shown at 9:16). Returns a site path, or null if unreadable.
  */
 function social_prepare_image(string $path, string $mode): ?string {
     $abs = $_SERVER['DOCUMENT_ROOT'] . $path;
@@ -66,6 +67,10 @@ function social_prepare_image(string $path, string $mode): ?string {
         $r = $w / $h;
         if ($r < 0.8)      { $ch = (int) round($w * 5 / 4); $cy = intdiv($h - $ch, 2); }
         elseif ($r > 1.91) { $cw = (int) round($h * 1.91);  $cx = intdiv($w - $cw, 2); }
+    } elseif ($mode === 'story') {
+        $t = 9 / 16;
+        if ($w / $h > $t)     { $cw = (int) round($h * $t); $cx = intdiv($w - $cw, 2); }
+        elseif ($w / $h < $t) { $ch = (int) round($w / $t); $cy = intdiv($h - $ch, 2); }
     }
     if ($scale === 1.0 && $cw === $w && $ch === $h) return $path;
 
@@ -75,7 +80,7 @@ function social_prepare_image(string $path, string $mode): ?string {
     $dst = imagecreatetruecolor($dw, $dh);
     if ($ext === 'png') { imagealphablending($dst, false); imagesavealpha($dst, true); }
     imagecopyresampled($dst, $src, 0, 0, $cx, $cy, $dw, $dh, $cw, $ch);
-    $suffix  = $mode === 'square' ? '-sq' : '-ig';
+    $suffix  = match ($mode) { 'square' => '-sq', 'story' => '-story', default => '-ig' };
     // Case-insensitive, and never the original's own name — an upper-case .JPG once made
     // the crop overwrite the photo on the website too.
     $outPath = preg_replace('/\.' . preg_quote($ext, '/') . '$/i', $suffix . '.' . $ext, $path);
@@ -87,20 +92,27 @@ function social_prepare_image(string $path, string $mode): ?string {
 
 /**
  * What social-ajax.php sends Buffer for Facebook or Instagram: the photo URLs (main
- * first) and the metadata. Instagram with several photos is a carousel of square slides.
+ * first) and the metadata. Instagram with several photos is a carousel of square slides;
+ * an Instagram story is the main photo alone, cropped to 9:16.
  */
-function social_fb_insta_request(array $article, string $channel): array {
+function social_fb_insta_request(array $article, string $channel, bool $is_story = false): array {
     $paths    = social_photo_paths($article);
+    $is_story = $is_story && $channel === 'insta';
+    if ($is_story) $paths = array_slice($paths, 0, 1);
     $carousel = $channel === 'insta' && count($paths) > 1;
-    $mode     = $channel === 'insta' ? ($carousel ? 'square' : 'insta') : 'fit';
+    $mode     = $is_story ? 'story' : ($channel === 'insta' ? ($carousel ? 'square' : 'insta') : 'fit');
     $urls = [];
     foreach ($paths as $p) {
         $ready = social_prepare_image($p, $mode);
         if ($ready !== null) $urls[] = social_image_url($ready);
     }
-    $metadata = $channel === 'fb'
-        ? 'facebook: { type: post }'
-        : 'instagram: { type: post, shouldShareToFeed: true }';   // several assets make the carousel; Buffer refuses type: carousel
+    if ($channel === 'fb') {
+        $metadata = 'facebook: { type: post }';
+    } elseif ($is_story) {
+        $metadata = 'instagram: { type: story, shouldShareToFeed: false }';
+    } else {
+        $metadata = 'instagram: { type: post, shouldShareToFeed: true }';   // several assets make the carousel; Buffer refuses type: carousel
+    }
     return ['urls' => $urls, 'metadata' => $metadata];
 }
 

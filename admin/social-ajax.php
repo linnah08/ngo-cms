@@ -180,8 +180,12 @@ if ($action === 'schedule') {
     $social_text = trim($body['social_text']  ?? '');
     $scheduled_at = trim($body['scheduled_at'] ?? '');
     $channel      = $body['channel'] ?? '';
+    $post_type    = in_array($body['post_type'] ?? 'post', ['post', 'story'], true) ? $body['post_type'] : 'post';
+    $is_story     = ($channel === 'insta' && $post_type === 'story');
 
-    if ($social_text === '') {
+    // Instagram Stories have no caption — the API doesn't support one — so
+    // there's nothing for the admin to type and nothing to require here.
+    if (!$is_story && $social_text === '') {
         echo json_encode(['ok' => false, 'error' => 'Няма текст за публикуване.']);
         exit;
     }
@@ -227,14 +231,15 @@ if ($action === 'schedule') {
     }
 
     $due_at       = gmdate('Y-m-d\TH:i:s\Z', $ts);
-    $post_id_key  = $channel === 'fb' ? 'fb_buffer_post_id' : 'insta_buffer_post_id';
-    $sched_key    = $channel === 'fb' ? 'fb_scheduled_at'   : 'insta_scheduled_at';
-    $due_key      = $channel === 'fb' ? 'fb_due_at'         : 'insta_due_at';
+    $post_id_key  = $channel === 'fb' ? 'fb_buffer_post_id' : ($is_story ? 'insta_story_buffer_post_id' : 'insta_buffer_post_id');
+    $sched_key    = $channel === 'fb' ? 'fb_scheduled_at'   : ($is_story ? 'insta_story_scheduled_at'   : 'insta_scheduled_at');
+    $due_key      = $channel === 'fb' ? 'fb_due_at'         : ($is_story ? 'insta_story_due_at'         : 'insta_due_at');
+    $text_key     = $channel === 'fb' ? 'fb_text'           : 'insta_text';
 
     $data               = load_json($file);
     $old_buffer_post_id = $data[$post_id_key] ?? '';
 
-    $req = social_fb_insta_request($data, $channel);
+    $req = social_fb_insta_request($data, $channel, $is_story);
     _om_log('INFO', "social-ajax schedule/{$channel}: " . count($req['urls']) . ' photo(s)');
 
     // Instagram requires an image
@@ -271,11 +276,10 @@ if ($action === 'schedule') {
         $edit = buffer_edit_outcome(json_decode((string)$uraw, true));
 
         if ($edit['status'] === 'ok') {
-            $data['social_text'] = $social_text;
-            if ($channel === 'fb') {
-                $data['fb_text'] = $social_text;
-            } else {
-                $data['insta_text'] = $social_text;
+            // A story has no text — keep the feed post's caption as it is.
+            if (!$is_story) {
+                $data['social_text'] = $social_text;
+                $data[$text_key]     = $social_text;
             }
             $data[$sched_key]    = $scheduled_at;
             $data[$due_key]      = $due_at;
@@ -342,11 +346,9 @@ if ($action === 'schedule') {
     if (isset($resp['data']['createPost']['post']['id'])) {
         $buffer_post_id = $resp['data']['createPost']['post']['id'];
 
-        $data['social_text']  = $social_text;
-        if ($channel === 'fb') {
-            $data['fb_text'] = $social_text;
-        } else {
-            $data['insta_text'] = $social_text;
+        if (!$is_story) {
+            $data['social_text'] = $social_text;
+            $data[$text_key]     = $social_text;
         }
         $data[$post_id_key]   = $buffer_post_id;
         $data[$sched_key]     = $scheduled_at;
