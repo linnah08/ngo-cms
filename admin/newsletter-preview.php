@@ -91,6 +91,11 @@ $admin_email  = $current_user['email'] ?? '';
   </div>
 </div>
 
+<div role="group" aria-label="Размер на прегледа" style="display:flex;gap:.5rem;margin-bottom:.75rem;flex-wrap:wrap;">
+  <button type="button" id="nlPreviewDesktopBtn" class="btn btn--primary" aria-pressed="true"  style="font-size:.85rem;">Компютър</button>
+  <button type="button" id="nlPreviewMobileBtn"  class="btn btn--outline" aria-pressed="false" style="font-size:.85rem;">Телефон</button>
+</div>
+
 <?php if (!empty($test_error)): ?>
 <div style="padding:.9rem 1.25rem;border-radius:6px;background:#fdf0ef;border:1px solid #f0c4c0;color:#c0392b;margin-bottom:1.5rem;"><?= h($test_error) ?></div>
 <?php elseif (!empty($test_success)): ?>
@@ -120,9 +125,36 @@ $admin_email  = $current_user['email'] ?? '';
   <div style="background:var(--off-white);padding:.6rem 1rem;font-size:.8rem;color:var(--text-muted);border-bottom:1px solid var(--border);">
     Тема: <strong><?= h($subject ?: '(без тема)') ?></strong>
   </div>
-  <iframe src="?id=<?= $id ?>&lang=<?= $lang ?>&raw=1"
-          style="width:100%;height:700px;border:none;display:block;"
-          title="Email preview"></iframe>
+  <div id="nlPreviewFrameWrap" style="padding:0;">
+    <iframe id="nlPreviewFrame" src="?id=<?= $id ?>&lang=<?= $lang ?>&raw=1"
+            style="width:100%;max-width:100%;height:700px;border:none;display:block;margin:0;background:#fff;"
+            title="Email preview"></iframe>
+  </div>
 </div>
+
+<script>
+// Desktop/Mobile toggle: the phone view renders the email inside a 390px-wide
+// iframe, so the email's own mobile media queries apply exactly as on a phone.
+(function () {
+  var frame      = document.getElementById('nlPreviewFrame');
+  var wrap       = document.getElementById('nlPreviewFrameWrap');
+  var desktopBtn = document.getElementById('nlPreviewDesktopBtn');
+  var mobileBtn  = document.getElementById('nlPreviewMobileBtn');
+
+  function setMode(isMobile) {
+    frame.style.width     = isMobile ? '390px' : '100%';
+    frame.style.margin    = isMobile ? '0 auto' : '0';
+    wrap.style.background = isMobile ? '#e5e2dd' : 'transparent';
+    wrap.style.padding    = isMobile ? '20px 0' : '0';
+    mobileBtn.className   = 'btn ' + (isMobile ? 'btn--primary' : 'btn--outline');
+    desktopBtn.className  = 'btn ' + (isMobile ? 'btn--outline' : 'btn--primary');
+    mobileBtn.setAttribute('aria-pressed', isMobile ? 'true' : 'false');
+    desktopBtn.setAttribute('aria-pressed', isMobile ? 'false' : 'true');
+  }
+
+  desktopBtn.addEventListener('click', function () { setMode(false); });
+  mobileBtn.addEventListener('click',  function () { setMode(true); });
+})();
+</script>
 
 <?php require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-footer.php'; ?>

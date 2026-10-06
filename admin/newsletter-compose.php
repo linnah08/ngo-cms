@@ -38,8 +38,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'forma
     $slugs_bg = $_POST['article_slugs_bg'] ?? [];
     $slugs_en = $_POST['article_slugs_en'] ?? [];
 
-    $articles_bg = array_filter(array_map(fn($s) => get_article($s, 'bg'), array_slice($slugs_bg, 0, 3)));
-    $articles_en = array_filter(array_map(fn($s) => get_article($s, 'en'), array_slice($slugs_en, 0, 3)));
+    // Per-article excerpt text edited in the picker, keyed by slug. Overrides
+    // the article's saved excerpt for THIS campaign's generated HTML only — the
+    // article's own JSON file is never touched.
+    $excerpt_overrides_bg = is_array($_POST['article_excerpt_bg'] ?? null) ? $_POST['article_excerpt_bg'] : [];
+    $excerpt_overrides_en = is_array($_POST['article_excerpt_en'] ?? null) ? $_POST['article_excerpt_en'] : [];
+    if (!is_array($slugs_bg)) $slugs_bg = [];
+    if (!is_array($slugs_en)) $slugs_en = [];
+
+    $articles_bg = array_filter(array_map(
+        fn($s) => newsletter_apply_excerpt_override(get_article(basename((string)$s), 'bg'), $excerpt_overrides_bg),
+        array_slice($slugs_bg, 0, 3)
+    ));
+    $articles_en = array_filter(array_map(
+        fn($s) => newsletter_apply_excerpt_override(get_article(basename((string)$s), 'en'), $excerpt_overrides_en),
+        array_slice($slugs_en, 0, 3)
+    ));
 
     // Carry current form state + inject generated bodies
     $campaign = array_merge($campaign ?? [], [
@@ -86,6 +100,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
 $articles_bg = get_articles('bg');
 $articles_en = get_articles('en');
 
+// EN article slug → its BG article's slug, so each EN excerpt can be
+// translated from the BG excerpt of the same article.
+$bg_slug_by_en = [];
+foreach ($articles_bg as $a) {
+    if (!empty($a['slug_en'])) $bg_slug_by_en[$a['slug_en']] = $a['slug'];
+}
+
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 ?>
 
@@ -129,35 +150,60 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <!-- Article picker -->
   <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;">
     <h3 style="margin:0 0 .5rem;font-size:.95rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);">Генерирай от статии</h3>
-    <p style="font-size:.85rem;color:var(--text-muted);margin:0 0 1rem;">Избери до 3 статии на всеки език. Генерирането ще замени съдържанието по-долу.</p>
+    <p style="font-size:.85rem;color:var(--text-muted);margin:0 0 1rem;">Избери до 3 статии на всеки език — щом отметнеш статия, можеш да промениш текста ѝ само за тази кампания (самата статия не се променя). Генерирането ще замени съдържанието по-долу.</p>
     <form method="POST">
       <?= csrf_field() ?>
       <input type="hidden" name="action" value="format_articles">
       <input type="hidden" name="subject_bg" id="hidden_subject_bg">
       <input type="hidden" name="subject_en" id="hidden_subject_en">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1rem;">
-        <div>
-          <strong style="font-size:.85rem;display:block;margin-bottom:.5rem;">БГ статии</strong>
-          <?php if (empty($articles_bg)): ?>
-            <p style="color:var(--text-muted);font-size:.85rem;">Няма публикувани статии.</p>
-          <?php else: foreach (array_slice($articles_bg, 0, 10) as $a): ?>
-          <label style="display:flex;align-items:flex-start;gap:.5rem;margin-bottom:.4rem;font-size:.85rem;cursor:pointer;">
-            <input type="checkbox" name="article_slugs_bg[]" value="<?= h($a['slug']) ?>" style="margin-top:.15rem;accent-color:var(--teal);">
-            <span><?= h($a['title']) ?> <span style="color:var(--text-muted);">(<?= h($a['date']) ?>)</span></span>
-          </label>
-          <?php endforeach; endif; ?>
+      <fieldset style="border:none;margin:0 0 1rem;padding:0;min-width:0;">
+        <legend style="font-size:.85rem;font-weight:700;margin-bottom:.5rem;padding:0;">БГ статии</legend>
+        <?php if (empty($articles_bg)): ?>
+          <p style="color:var(--text-muted);font-size:.85rem;">Няма публикувани статии.</p>
+        <?php else: ?>
+        <div style="max-height:320px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:6px;padding:.6rem .75rem;">
+          <?php foreach ($articles_bg as $i => $a): $exId = 'nlExBg' . $i; ?>
+          <div style="margin-bottom:.4rem;">
+            <label style="display:flex;align-items:flex-start;gap:.5rem;font-size:.85rem;cursor:pointer;">
+              <input type="checkbox" name="article_slugs_bg[]" value="<?= h($a['slug']) ?>" style="margin-top:.15rem;accent-color:var(--teal);" aria-controls="<?= $exId ?>" aria-expanded="false" onchange="toggleExcerptEditor(this)">
+              <span><?= h($a['title']) ?> <span style="color:var(--text-muted);">(<?= h($a['date']) ?>)</span></span>
+            </label>
+            <div class="excerpt-editor" id="<?= $exId ?>" style="display:none;margin:.35rem 0 .25rem 1.6rem;">
+              <label for="<?= $exId ?>Text" style="display:block;font-size:.75rem;color:var(--text-muted);margin-bottom:.2rem;">Текст в бюлетина</label>
+              <textarea id="<?= $exId ?>Text" name="article_excerpt_bg[<?= h($a['slug']) ?>]" rows="2" maxlength="400"
+                        style="width:100%;padding:.4rem .6rem;border:1px solid #d1d5db;border-radius:4px;font-size:.8rem;font-family:inherit;box-sizing:border-box;resize:vertical;"><?= h($a['excerpt'] ?? '') ?></textarea>
+            </div>
+          </div>
+          <?php endforeach; ?>
         </div>
-        <div>
-          <strong style="font-size:.85rem;display:block;margin-bottom:.5rem;">EN articles</strong>
+        <?php endif; ?>
+      </fieldset>
+
+      <div style="margin-bottom:1rem;">
+        <button type="button" id="toggleEnArticles" aria-expanded="false" aria-controls="enArticlesWrap"
+                style="background:none;border:none;padding:.25rem 0;font:inherit;font-size:.8rem;color:var(--teal);text-decoration:underline;cursor:pointer;">Покажи EN статии</button>
+        <fieldset id="enArticlesWrap" style="display:none;border:none;margin:.5rem 0 0;padding:0;min-width:0;">
+          <legend style="font-size:.85rem;font-weight:700;margin-bottom:.5rem;padding:0;">EN articles</legend>
           <?php if (empty($articles_en)): ?>
             <p style="color:var(--text-muted);font-size:.85rem;">No published articles.</p>
-          <?php else: foreach (array_slice($articles_en, 0, 10) as $a): ?>
-          <label style="display:flex;align-items:flex-start;gap:.5rem;margin-bottom:.4rem;font-size:.85rem;cursor:pointer;">
-            <input type="checkbox" name="article_slugs_en[]" value="<?= h($a['slug']) ?>" style="margin-top:.15rem;accent-color:var(--teal);">
-            <span><?= h($a['title']) ?> <span style="color:var(--text-muted);">(<?= h($a['date']) ?>)</span></span>
-          </label>
-          <?php endforeach; endif; ?>
-        </div>
+          <?php else: ?>
+          <div style="max-height:320px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:6px;padding:.6rem .75rem;">
+            <?php foreach ($articles_en as $i => $a): $exId = 'nlExEn' . $i; ?>
+            <div style="margin-bottom:.4rem;">
+              <label style="display:flex;align-items:flex-start;gap:.5rem;font-size:.85rem;cursor:pointer;">
+                <input type="checkbox" name="article_slugs_en[]" value="<?= h($a['slug']) ?>" style="margin-top:.15rem;accent-color:var(--teal);" aria-controls="<?= $exId ?>" aria-expanded="false" onchange="toggleExcerptEditor(this)">
+                <span><?= h($a['title']) ?> <span style="color:var(--text-muted);">(<?= h($a['date']) ?>)</span></span>
+              </label>
+              <div class="excerpt-editor" id="<?= $exId ?>" style="display:none;margin:.35rem 0 .25rem 1.6rem;">
+                <label for="<?= $exId ?>Text" style="display:block;font-size:.75rem;color:var(--text-muted);margin-bottom:.2rem;">Newsletter text</label>
+                <textarea id="<?= $exId ?>Text" name="article_excerpt_en[<?= h($a['slug']) ?>]" rows="2" maxlength="400"<?php if (isset($bg_slug_by_en[$a['slug']])): ?> data-translate-from="article_excerpt_bg[<?= h($bg_slug_by_en[$a['slug']]) ?>]"<?php endif; ?>
+                          style="width:100%;padding:.4rem .6rem;border:1px solid #d1d5db;border-radius:4px;font-size:.8rem;font-family:inherit;box-sizing:border-box;resize:vertical;"><?= h($a['excerpt'] ?? '') ?></textarea>
+              </div>
+            </div>
+            <?php endforeach; ?>
+          </div>
+          <?php endif; ?>
+        </fieldset>
       </div>
       <button type="submit" class="btn btn--outline" onclick="syncSubjects()">Генерирай HTML →</button>
     </form>
@@ -219,6 +265,25 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
 <script>
 tinymce.init(Object.assign({}, window._tinyBase, { selector: '#bodyBg, #bodyEn', min_height: 280 }));
+
+function toggleExcerptEditor(cb) {
+    var editor = document.getElementById(cb.getAttribute('aria-controls'));
+    if (!editor) return;
+    editor.style.display = cb.checked ? '' : 'none';
+    cb.setAttribute('aria-expanded', cb.checked ? 'true' : 'false');
+}
+// A browser restoring checked boxes on Back must show their editors too.
+document.querySelectorAll('input[aria-controls^="nlEx"]').forEach(function (cb) {
+    if (cb.checked) toggleExcerptEditor(cb);
+});
+
+document.getElementById('toggleEnArticles').addEventListener('click', function () {
+    var wrap = document.getElementById('enArticlesWrap');
+    var open = wrap.style.display !== 'none';
+    wrap.style.display = open ? 'none' : '';
+    this.setAttribute('aria-expanded', open ? 'false' : 'true');
+    this.textContent = open ? 'Покажи EN статии' : 'Скрий EN статии';
+});
 initAutosave({
   key:     <?= json_encode('newsletter:' . $id) ?>,
   formId:  'saveForm',

@@ -75,6 +75,24 @@ function newsletter_active_count(): array
     return ['total' => $bg + $en, 'bg' => $bg, 'en' => $en];
 }
 
+// ── Excerpt override (compose-time only) ─────────────────────────────────────
+
+/**
+ * Apply a per-campaign excerpt edit from the newsletter compose picker,
+ * keyed by article slug. Returns null unchanged for a missing article; when
+ * the override is blank/whitespace-only, the article's own saved excerpt is
+ * kept as-is — this never writes back to the article's JSON file, it only
+ * affects the HTML this one campaign bakes via newsletter_format_articles().
+ */
+function newsletter_apply_excerpt_override(?array $article, array $overrides): ?array
+{
+    if (!$article) return null;
+    $override = $overrides[$article['slug'] ?? ''] ?? '';
+    $override = is_string($override) ? trim($override) : '';
+    if ($override !== '') $article['excerpt'] = mb_substr($override, 0, 400);
+    return $article;
+}
+
 // ── Article → email formatter ──────────────────────────────────────────────────
 
 /**

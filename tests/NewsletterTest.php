@@ -333,4 +333,77 @@ final class NewsletterTest extends TestCase
             $this->deleteCampaign($id);
         }
     }
+
+    // ── newsletter_apply_excerpt_override ─────────────────────────────────────
+
+    private function loadNewsletter(): void
+    {
+        if (!function_exists('newsletter_apply_excerpt_override')) {
+            require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
+        }
+    }
+
+    public function test_excerpt_override_replaces_saved_excerpt(): void
+    {
+        $this->loadNewsletter();
+        $article = ['slug' => 'my-article', 'title' => 'T', 'excerpt' => 'Original excerpt'];
+        $result  = newsletter_apply_excerpt_override($article, ['my-article' => 'Edited for this send']);
+        $this->assertSame('Edited for this send', $result['excerpt']);
+    }
+
+    public function test_excerpt_override_blank_keeps_saved_excerpt(): void
+    {
+        $this->loadNewsletter();
+        $article = ['slug' => 'my-article', 'title' => 'T', 'excerpt' => 'Original excerpt'];
+        $result  = newsletter_apply_excerpt_override($article, ['my-article' => '   ']);
+        $this->assertSame('Original excerpt', $result['excerpt']);
+    }
+
+    public function test_excerpt_override_ignores_other_slugs(): void
+    {
+        $this->loadNewsletter();
+        $article = ['slug' => 'my-article', 'title' => 'T', 'excerpt' => 'Original excerpt'];
+        $result  = newsletter_apply_excerpt_override($article, ['other-slug' => 'Should not apply']);
+        $this->assertSame('Original excerpt', $result['excerpt']);
+    }
+
+    public function test_excerpt_override_null_article_stays_null(): void
+    {
+        $this->loadNewsletter();
+        $this->assertNull(newsletter_apply_excerpt_override(null, ['my-article' => 'x']));
+    }
+
+    public function test_excerpt_override_trims_whitespace(): void
+    {
+        $this->loadNewsletter();
+        $article = ['slug' => 'my-article', 'title' => 'T', 'excerpt' => 'Original'];
+        $result  = newsletter_apply_excerpt_override($article, ['my-article' => '  Trimmed text  ']);
+        $this->assertSame('Trimmed text', $result['excerpt']);
+    }
+
+    public function test_excerpt_override_ignores_non_string_values(): void
+    {
+        $this->loadNewsletter();
+        $article = ['slug' => 'my-article', 'title' => 'T', 'excerpt' => 'Original'];
+        $result  = newsletter_apply_excerpt_override($article, ['my-article' => ['nested']]);
+        $this->assertSame('Original', $result['excerpt']);
+    }
+
+    public function test_format_articles_uses_overridden_excerpt_in_html(): void
+    {
+        $this->loadNewsletter();
+        $article = ['slug' => 'my-article', 'title' => 'Title', 'excerpt' => 'Original excerpt', 'image' => ''];
+        $edited  = newsletter_apply_excerpt_override($article, ['my-article' => 'Edited excerpt for this campaign']);
+        $html    = newsletter_format_articles([$edited], 'bg');
+
+        $this->assertStringContainsString('Edited excerpt for this campaign', $html);
+        $this->assertStringNotContainsString('Original excerpt', $html);
+    }
+
+    public function test_compose_picker_lists_every_article_not_just_ten(): void
+    {
+        $src = file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/admin/newsletter-compose.php');
+        $this->assertStringNotContainsString('array_slice($articles_bg, 0, 10)', $src);
+        $this->assertStringNotContainsString('array_slice($articles_en, 0, 10)', $src);
+    }
 }
