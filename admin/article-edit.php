@@ -185,6 +185,22 @@ $grid_bg   = article_photos_for_editor($article);   // missing files included �
 $grid_en   = $article_en ? article_photos_for_editor(array_merge($article_en, ['image' => $article['image'] ?? ''])) : [];
 $grid_main = article_main_photo_index($article, $grid_bg);
 $en_caps   = array_column($grid_en, 'caption', 'src');
+
+// ── Content / Social tabs — split so editing an article doesn't require
+// scrolling past FB/Instagram/LinkedIn panels you may not be touching today.
+$tab      = ($_GET['tab'] ?? 'content') === 'social' ? 'social' : 'content';
+$tab_base = $is_new ? '/admin/article-edit.php' : '/admin/article-edit.php?slug=' . urlencode($slug_param);
+$tab_sep  = $is_new ? '?' : '&';
+
+// Social status — used for the compact badges on the Content tab and the full
+// panels on the Social tab.
+$li_scheduled      = !empty($article['linkedin_scheduled_at']);
+$li_posted         = !empty($article['linkedin_posted_at']);
+$fb_sched          = !empty($article['fb_scheduled_at']);
+$insta_sched       = !empty($article['insta_scheduled_at']);
+$insta_story_sched = !empty($article['insta_story_scheduled_at']);
+$has_social_badge  = $fb_sched || $insta_sched || $insta_story_sched || $li_scheduled || $li_posted;
+$badge_style       = 'font-size:.75rem;font-weight:600;border-radius:3px;padding:.15rem .5rem;';
 ?>
 
 <div class="admin-page-header">
@@ -197,14 +213,43 @@ $en_caps   = array_column($grid_en, 'caption', 'src');
     <?php if (!$is_new && $has_en_version): ?>
       <a href="/en/news/<?= urlencode($edit_slug_en ?: $edit_slug) ?>/" target="_blank" class="btn btn--outline" style="font-size:.85rem;">↗ EN</a>
     <?php endif; ?>
-    <button type="submit" form="articleForm" class="btn btn--primary">Запази</button>
+    <?php if ($tab === 'content'): ?>
+      <button type="submit" form="articleForm" class="btn btn--primary">Запази</button>
+    <?php endif; ?>
   </div>
 </div>
+
+<?php if ($tab === 'content' && $has_social_badge): ?>
+  <ul aria-label="Социални мрежи" style="display:flex;gap:.4rem;flex-wrap:wrap;margin:-.5rem 0 1.25rem;padding:0;list-style:none;">
+    <?php if ($fb_sched): ?>
+      <li style="<?= $badge_style ?>background:#fef3c7;color:#92400e;">⏱ FB <?= h(date('d.m H:i', strtotime($article['fb_scheduled_at']))) ?></li>
+    <?php endif; ?>
+    <?php if ($insta_sched): ?>
+      <li style="<?= $badge_style ?>background:#fef3c7;color:#92400e;">⏱ IG <?= h(date('d.m H:i', strtotime($article['insta_scheduled_at']))) ?></li>
+    <?php endif; ?>
+    <?php if ($insta_story_sched): ?>
+      <li style="<?= $badge_style ?>background:#fef3c7;color:#92400e;">⏱ IG Story <?= h(date('d.m H:i', strtotime($article['insta_story_scheduled_at']))) ?></li>
+    <?php endif; ?>
+    <?php if ($li_posted): ?>
+      <li style="<?= $badge_style ?>background:#dcfce7;color:#166534;">✓ LinkedIn <?= h(date('d.m', strtotime($article['linkedin_posted_at']))) ?></li>
+    <?php elseif ($li_scheduled): ?>
+      <li style="<?= $badge_style ?>background:#fef3c7;color:#92400e;">⏱ LinkedIn <?= h(date('d.m H:i', strtotime($article['linkedin_scheduled_at']))) ?></li>
+    <?php endif; ?>
+  </ul>
+<?php endif; ?>
+
+<nav aria-label="Части на статията" style="display:flex;gap:1.75rem;border-bottom:1px solid var(--border);margin-bottom:1.5rem;">
+  <a href="<?= h($tab_base . $tab_sep . 'tab=content') ?>"<?= $tab === 'content' ? ' aria-current="page"' : '' ?>
+     style="display:inline-flex;align-items:center;min-height:44px;font-size:.9rem;font-weight:600;text-decoration:none;border-bottom:3px solid <?= $tab === 'content' ? 'var(--teal)' : 'transparent' ?>;color:<?= $tab === 'content' ? 'var(--teal)' : 'var(--text-muted)' ?>;">Съдържание</a>
+  <a href="<?= h($tab_base . $tab_sep . 'tab=social') ?>"<?= $tab === 'social' ? ' aria-current="page"' : '' ?>
+     style="display:inline-flex;align-items:center;min-height:44px;font-size:.9rem;font-weight:600;text-decoration:none;border-bottom:3px solid <?= $tab === 'social' ? 'var(--teal)' : 'transparent' ?>;color:<?= $tab === 'social' ? 'var(--teal)' : 'var(--text-muted)' ?>;">Социални мрежи</a>
+</nav>
 
 <?php if ($error): ?>
   <div class="admin-alert admin-alert--error" style="margin-bottom:1.5rem;"><?= h($error) ?></div>
 <?php endif; ?>
 
+<?php if ($tab === 'content'): ?>
 <form method="POST" action="/admin/article-edit.php<?= $is_new ? '' : '?slug=' . urlencode($slug_param) ?>"
       enctype="multipart/form-data" class="admin-form" id="articleForm">
   <?= csrf_field() ?>
@@ -314,14 +359,19 @@ $en_caps   = array_column($grid_en, 'caption', 'src');
           <span class="badge badge--published" style="margin-left:.3rem;vertical-align:middle;font-size:.7rem;">✓</span>
         <?php endif; ?>
       </h2>
-      <?php if ($deepl_ready): ?>
-        <button type="button" id="translateToEnBtn" class="btn btn--outline" style="font-size:.8rem;">
-          ✦ Auto-translate from Bulgarian
-        </button>
-      <?php else: ?>
-        <a href="/admin/translate.php" style="font-size:.8rem;color:var(--text-muted);">Configure DeepL to enable auto-translate →</a>
-      <?php endif; ?>
+      <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+        <?php if ($deepl_ready): ?>
+          <button type="button" id="translateToEnBtn" class="btn btn--outline" style="font-size:.8rem;">
+            ✦ Auto-translate from Bulgarian
+          </button>
+        <?php else: ?>
+          <a href="/admin/translate.php" style="font-size:.8rem;color:var(--text-muted);">Configure DeepL to enable auto-translate →</a>
+        <?php endif; ?>
+        <button type="button" id="enToggleBtn" class="btn btn--outline" aria-expanded="false" aria-controls="enFieldsWrap" style="font-size:.8rem;min-height:44px;">▾ Покажи</button>
+      </div>
     </div>
+
+    <div id="enFieldsWrap" style="display:none;">
 
     <div class="form-group">
       <label for="title_en">Title (EN)</label>
@@ -340,7 +390,7 @@ $en_caps   = array_column($grid_en, 'caption', 'src');
 
     <div class="form-group">
       <label>Content (EN)</label>
-      <textarea id="content_en" name="content_en" class="rich-editor"><?= $article_en['content'] ?? '' ?></textarea>
+      <textarea id="content_en" name="content_en" class="rich-editor-en"><?= $article_en['content'] ?? '' ?></textarea>
     </div>
 
     <div class="form-group">
@@ -361,23 +411,27 @@ $en_caps   = array_column($grid_en, 'caption', 'src');
       Leave all EN fields empty to skip creating/updating the English version.
       Date, author, image and status are shared between BG and EN.
     </p>
+    </div><!-- /#enFieldsWrap -->
   </div>
 
   <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--border);">
     <button type="submit" class="btn btn--primary">Запази</button>
   </div>
 </form>
+<?php endif; // $tab === 'content' ?>
 
-<?php if (!$is_new && $claude_ready): ?>
+<?php if ($tab === 'social' && $is_new): ?>
+<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem;text-align:center;color:var(--text-muted);">
+  <p style="margin:0 0 1rem;">Запазете статията, за да публикувате в социалните мрежи.</p>
+  <a href="<?= h($tab_base . $tab_sep . 'tab=content') ?>" class="btn btn--outline">← Към съдържанието</a>
+</div>
+<?php endif; ?>
+
+<?php if ($tab === 'social' && !$is_new && $claude_ready): ?>
 <?php
-$li_scheduled      = !empty($article['linkedin_scheduled_at']);
-$li_posted         = !empty($article['linkedin_posted_at']);
 $buffer_ready      = setting_is_set('buffer_linkedin_channel_id') && setting_is_set('buffer_api_key');
 $fb_ready          = setting_is_set('buffer_facebook_channel_id')  && setting_is_set('buffer_api_key');
 $insta_ready       = setting_is_set('buffer_instagram_channel_id') && setting_is_set('buffer_api_key');
-$fb_sched          = !empty($article['fb_scheduled_at']);
-$insta_sched       = !empty($article['insta_scheduled_at']);
-$insta_story_sched = !empty($article['insta_story_scheduled_at']);
 $default_social_at = date('Y-m-d\TH:i', strtotime('+1 day 11:00'));
 
 // Which Instagram tab (Post/Story) should be shown on load. A scheduled post/story
@@ -385,7 +439,7 @@ $default_social_at = date('Y-m-d\TH:i', strtotime('+1 day 11:00'));
 $ig_default_story = !$insta_sched && $insta_story_sched;
 ?>
 <!-- ── FB / Insta panel ───────────────────────────────────────────────────── -->
-<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;margin-top:2rem;" id="socialPanel">
+<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;" id="socialPanel">
   <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap;">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="#1877f2" style="flex-shrink:0;"><path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.236 2.686.236v2.97h-1.513c-1.491 0-1.956.93-1.956 1.886v2.267h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/></svg>
     <svg width="18" height="18" viewBox="0 0 24 24" fill="url(#ig)" style="flex-shrink:0;">
@@ -635,19 +689,36 @@ $ig_default_story = !$insta_sched && $insta_story_sched;
     </div>
   </div>
 </div>
-<?php endif; ?>
-<?php if (!$is_new && !$claude_ready): ?>
+<?php endif; // $tab === 'social' && !$is_new && $claude_ready ?>
+<?php if ($tab === 'social' && !$is_new && !$claude_ready): ?>
 <div style="margin-top:1.5rem;padding:1rem;background:#f9fafb;border:1px solid var(--border);border-radius:var(--radius-lg);font-size:.88rem;color:var(--text-muted);">
   Социални мрежи: конфигурирайте Claude API ключ в <a href="/admin/payment.php">Плащания → Claude</a>.
 </div>
 <?php endif; ?>
 
+<?php if ($tab === 'content'): ?>
 <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--border);">
   <button type="submit" form="articleForm" class="btn btn--primary">Запази статията</button>
 </div>
+<?php endif; ?>
 
 <script>
+// ── Shared helpers — used by both tabs (the Content tab has the editors; the
+// Social tab's text generation falls back to reading them when they're there) ──
+function _tinyGet(id) {
+  var ed = tinymce.get(id);
+  if (ed) return ed.getContent();
+  var el = document.getElementById(id);
+  return el ? el.value : '';
+}
+function _tinySet(id, html) {
+  var ed = tinymce.get(id);
+  if (ed) { ed.setContent(html); return; }
+  var el = document.getElementById(id);
+  if (el) el.value = html;
+}
 
+<?php if ($tab === 'content'): ?>
 document.getElementById('tagsInput').addEventListener('input', function () {
   document.getElementById('tagsHidden').value = this.value;
 });
@@ -837,15 +908,43 @@ initAutosave({
   tinyIds: ['content', 'content_en']
 });
 
-function _tinyGet(id) {
-  var ed = tinymce.get(id);
-  return ed ? ed.getContent() : document.getElementById(id).value;
-}
-function _tinySet(id, html) {
-  var ed = tinymce.get(id);
-  if (ed) ed.setContent(html);
-  else document.getElementById(id).value = html;
-}
+// ── Collapsible EN section — collapsed by default, remembers the last state ────
+// Its editor starts only when the section is first opened.
+var _expandEnSection = (function () {
+  var wrap       = document.getElementById('enFieldsWrap');
+  var toggleBtn  = document.getElementById('enToggleBtn');
+  var storageKey = 'enSectionOpen:' + <?= json_encode($is_new ? 'new' : $slug_param) ?>;
+  var enTinyInited = false;
+
+  function initEnTiny() {
+    if (enTinyInited) return;
+    enTinyInited = true;
+    tinymce.init(Object.assign({}, window._tinyBase, { selector: '#content_en', min_height: 300 }));
+  }
+
+  function setOpen(open) {
+    wrap.style.display = open ? '' : 'none';
+    toggleBtn.textContent = open ? '▴ Скрий' : '▾ Покажи';
+    toggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) initEnTiny();
+    try { localStorage.setItem(storageKey, open ? '1' : '0'); } catch (e) {}
+  }
+
+  toggleBtn.addEventListener('click', function () {
+    setOpen(wrap.style.display === 'none');
+  });
+
+  // Open when it was left open, or when an unsaved draft exists — a restored draft
+  // must land in a visible, running editor, not in a hidden textarea.
+  var savedOpen = false;
+  try {
+    savedOpen = localStorage.getItem(storageKey) === '1'
+      || localStorage.getItem('autosave:' + <?= json_encode('article:' . ($is_new ? 'new' : $slug_param)) ?>) !== null;
+  } catch (e) {}
+  setOpen(savedOpen);
+
+  return function () { setOpen(true); };
+})();
 
 // ── Keyword suggestions ────────────────────────────────────────────────────────
 var suggestBtn = document.getElementById('suggestKeywordsBtn');
@@ -929,6 +1028,7 @@ if (translateBtn) {
     var btn = this;
     btn.disabled = true;
     btn.textContent = 'Translating…';
+    _expandEnSection();
 
     var bgTitle   = document.getElementById('title').value;
     var bgContent = _tinyGet('content');
@@ -960,6 +1060,9 @@ if (translateBtn) {
   });
 }
 
+<?php endif; // $tab === 'content' ?>
+
+<?php if ($tab === 'social'): ?>
 // ── LinkedIn panel ─────────────────────────────────────────────────────────────
 (function () {
   var generateNewsBtn = document.getElementById('liGenerateNewsBtn');
@@ -1463,6 +1566,7 @@ if (translateBtn) {
     liOut.innerHTML = counterSpan('LinkedIn', liEl.value.length, LIMITS.li);
   }
 })();
+<?php endif; // $tab === 'social' ?>
 </script>
 <script>
 // „Публикувай автоматично“ only applies to drafts.
