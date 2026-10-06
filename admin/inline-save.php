@@ -214,6 +214,9 @@ $allowed = [
         'topics_heading'        => ['topics_heading',        'topics_heading_en'],
         'topic_news_label'      => ['topic_news_label',      'topic_news_label_en'],
         'topic_education_label' => ['topic_education_label', 'topic_education_label_en'],
+        // Sign-up card on the confirmation pages (templates/newsletter-confirm-card.php).
+        'confirm_heading'       => ['confirm_heading',       'confirm_heading_en'],
+        'confirm_button'        => ['confirm_button',        'confirm_button_en'],
     ],
 ];
 

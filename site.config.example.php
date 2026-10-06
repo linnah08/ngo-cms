@@ -81,6 +81,13 @@ define('FEATURE_CAMPAIGN', true);
 // setting itself always wins, so a deliberate git clone can still say true.
 define('FEATURE_SELF_UPDATE', true);
 
+// ── Newsletter ────────────────────────────────────────────────────────────────
+// A "Donate now" box at the bottom of every newsletter sent to subscribers.
+// Off by default — not every organisation asks for donations by email. Easier
+// to switch (and reword) in Admin → Организация, which wins over this line.
+// Needs FEATURE_DONATIONS on.
+define('NEWSLETTER_DONATE_CTA', false);
+
 // ── While the site is still being filled in ───────────────────────────────────
 // A dark strip at the top of every public page saying the site is new. It is a
 // notice and nothing more: no page is blocked, no price hidden, no order

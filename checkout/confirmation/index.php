@@ -137,4 +137,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
   </div>
 </section>
 
+<?php $nl_flow = 'order'; require $_SERVER['DOCUMENT_ROOT'] . '/templates/newsletter-confirm-card.php'; ?>
+
 <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/footer.php'; ?>

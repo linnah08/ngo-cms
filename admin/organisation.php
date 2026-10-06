@@ -339,6 +339,44 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </div>
   </section>
 
+  <!-- ── Newsletter donate box ──────────────────────────────────────────────── -->
+  <section class="admin-card" style="<?= $card ?>" aria-labelledby="nl-donate-title">
+    <h2 class="admin-card__title" id="nl-donate-title">Покана за дарение в бюлетина</h2>
+    <p class="admin-meta" style="margin:0 0 1rem;line-height:1.6;">
+      Добавя кутийка с бутон „Дарете сега“ най-долу във всеки бюлетин, който изпращате на абонатите —
+      над връзката за отписване. Изключена е, докато не я включите. Работи само ако модулът „Дарения“
+      по-долу е включен. Как изглежда, виждате в „Преглед“ на всяка кампания.
+    </p>
+    <label class="admin-checkbox" style="margin-bottom:1rem;">
+      <input type="checkbox" name="newsletter_donate_cta" value="1" <?= in_array($val('newsletter_donate_cta'), ['1', 'true'], true) ? 'checked' : '' ?>>
+      Показвай поканата за дарение в бюлетина
+    </label>
+    <div class="admin-form-grid">
+      <label id="f-newsletter_donate_heading_bg">Заглавие на български
+        <input type="text" name="newsletter_donate_heading_bg" value="<?= h($val('newsletter_donate_heading_bg')) ?>" maxlength="120"
+               placeholder="<?= h(t_or('newsletter.donate.heading', 'Подкрепете каузата ни', 'Support our cause', 'bg')) ?>"<?= $fattr('newsletter_donate_heading_bg') ?>>
+        <?= $ferr('newsletter_donate_heading_bg') ?>
+      </label>
+      <label id="f-newsletter_donate_heading_en">Заглавие на английски
+        <input type="text" name="newsletter_donate_heading_en" data-translate-from="newsletter_donate_heading_bg" value="<?= h($val('newsletter_donate_heading_en')) ?>" maxlength="120"
+               placeholder="<?= h(t_or('newsletter.donate.heading', 'Подкрепете каузата ни', 'Support our cause', 'en')) ?>"<?= $fattr('newsletter_donate_heading_en') ?>>
+        <?= $ferr('newsletter_donate_heading_en') ?>
+      </label>
+      <label id="f-newsletter_donate_text_bg">Текст на български
+        <input type="text" name="newsletter_donate_text_bg" value="<?= h($val('newsletter_donate_text_bg')) ?>" maxlength="300"
+               placeholder="<?= h(t_or('newsletter.donate.text', 'Всяко дарение ни помага да продължим работата си.', 'Every donation helps us continue our work.', 'bg')) ?>"<?= $fattr('newsletter_donate_text_bg') ?>>
+        <?= $ferr('newsletter_donate_text_bg') ?>
+        <small style="<?= $hint ?>">Оставете празно, за да се показва текстът по подразбиране.</small>
+      </label>
+      <label id="f-newsletter_donate_text_en">Текст на английски
+        <input type="text" name="newsletter_donate_text_en" data-translate-from="newsletter_donate_text_bg" value="<?= h($val('newsletter_donate_text_en')) ?>" maxlength="300"
+               placeholder="<?= h(t_or('newsletter.donate.text', 'Всяко дарение ни помага да продължим работата си.', 'Every donation helps us continue our work.', 'en')) ?>"<?= $fattr('newsletter_donate_text_en') ?>>
+        <?= $ferr('newsletter_donate_text_en') ?>
+        <small style="<?= $hint ?>">Оставете празно, за да се показва текстът по подразбиране.</small>
+      </label>
+    </div>
+  </section>
+
   <!-- ── Optional modules ──────────────────────────────────────────────────── -->
   <section class="admin-card" style="<?= $card ?>" aria-labelledby="modules-title">
     <h2 class="admin-card__title" id="modules-title">Модули</h2>

@@ -424,9 +424,68 @@ function render_newsletter_email(
         ? '<p style="margin:0 0 20px;color:#4a4640;">' . htmlspecialchars($greeting, ENT_QUOTES, 'UTF-8') . '</p>'
         : '';
 
-    $inner = $greeting_html . $body_html . $unsub_block;
+    $inner = $greeting_html . $body_html . newsletter_cta_block($lang) . $unsub_block;
 
     return email_wrap($inner);
+}
+
+// ── Donate call-to-action ─────────────────────────────────────────────────────
+
+/**
+ * Is the "please donate" box at the bottom of every newsletter switched on?
+ *
+ * Off unless the site asks for it — not every organisation fundraises by email.
+ * Switched in Admin → Организация (saved to content/organisation.json), or by
+ * NEWSLETTER_DONATE_CTA in site.config.php until that page is saved. It also
+ * needs the donations module on: there is nowhere to send people otherwise.
+ */
+function newsletter_donate_cta_enabled(): bool
+{
+    if (!defined('NEWSLETTER_DONATE_CTA')) return false;
+    $v  = constant('NEWSLETTER_DONATE_CTA');
+    $on = is_string($v) ? filter_var(trim($v), FILTER_VALIDATE_BOOLEAN) : (bool) $v;
+    return $on && feature_enabled('donations');
+}
+
+/**
+ * Heading or text of the donate box: the site's own wording from Admin →
+ * Организация, else the strings.json default.
+ */
+function newsletter_donate_cta_text(string $part, string $lang): string
+{
+    $lang  = $lang === 'en' ? 'en' : 'bg';
+    $const = 'NEWSLETTER_DONATE_' . ($part === 'heading' ? 'HEADING' : 'TEXT') . '_' . strtoupper($lang);
+    $own   = defined($const) ? trim((string) constant($const)) : '';
+    if ($own !== '') return $own;
+    return $part === 'heading'
+        ? t_or('newsletter.donate.heading', 'Подкрепете каузата ни', 'Support our cause', $lang)
+        : t_or('newsletter.donate.text', 'Всяко дарение ни помага да продължим работата си.', 'Every donation helps us continue our work.', $lang);
+}
+
+/**
+ * Closing box inviting the reader to donate, placed between the campaign body
+ * and the unsubscribe link of every newsletter (send, test and preview alike).
+ * Empty when switched off ($enabled overrides the switch, for tests). Its link goes through newsletter_inject_tracking()
+ * like any other link in the body. Inline styles only — email clients ignore
+ * stylesheets — and nothing fixed-width, so it fits a 375px phone.
+ */
+function newsletter_cta_block(string $lang, ?bool $enabled = null): string
+{
+    if (!($enabled ?? newsletter_donate_cta_enabled())) return '';
+    if (!function_exists('donation_path')) {
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/donation.php';
+    }
+    $lang  = $lang === 'en' ? 'en' : 'bg';
+    $base  = defined('SITE_URL') ? rtrim((string) SITE_URL, '/') : '';
+    $url   = $base . donation_path('form', $lang);
+    $label = t_or('newsletter.donate.button', 'Дарете сега', 'Donate now', $lang);
+    $e     = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+
+    return '<div class="nl-donate" style="margin-top:32px;padding:24px 16px;background:#e4f0f5;border-radius:8px;text-align:center;">'
+        . '<p style="margin:0 0 12px;color:#1a1916;font-size:17px;font-weight:600;line-height:1.4;">' . $e(newsletter_donate_cta_text('heading', $lang)) . '</p>'
+        . '<p style="margin:0 0 20px;color:#4a4640;font-size:14px;line-height:1.6;">' . $e(newsletter_donate_cta_text('text', $lang)) . '</p>'
+        . '<a href="' . $e($url) . '" style="display:inline-block;background:#0387A5;color:#ffffff;padding:12px 28px;border-radius:4px;text-decoration:none;font-size:15px;font-weight:600;">' . $e($label) . '</a>'
+        . '</div>';
 }
 
 // ── Sending ────────────────────────────────────────────────────────────────────

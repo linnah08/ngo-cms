@@ -40,6 +40,11 @@ function org_fields(): array
         'launch_banner'    => 'SITE_LAUNCH_BANNER',
         'launch_banner_bg' => 'SITE_LAUNCH_BANNER_BG',
         'launch_banner_en' => 'SITE_LAUNCH_BANNER_EN',
+        'newsletter_donate_cta'        => 'NEWSLETTER_DONATE_CTA',
+        'newsletter_donate_heading_bg' => 'NEWSLETTER_DONATE_HEADING_BG',
+        'newsletter_donate_heading_en' => 'NEWSLETTER_DONATE_HEADING_EN',
+        'newsletter_donate_text_bg'    => 'NEWSLETTER_DONATE_TEXT_BG',
+        'newsletter_donate_text_en'    => 'NEWSLETTER_DONATE_TEXT_EN',
         'feature_donations' => 'FEATURE_DONATIONS',
         'feature_campaign'  => 'FEATURE_CAMPAIGN',
     ];
@@ -328,6 +333,8 @@ function org_validate(array $in, array $themeKeys): array
     // turns into ''. Store an explicit '0' instead — otherwise the saved value
     // reads as "not set", and the banner could never be switched back off.
     $v['launch_banner'] = ($in['launch_banner'] ?? '') === '1' ? '1' : '0';
+    // Same for the newsletter donate box — off unless ticked.
+    $v['newsletter_donate_cta'] = ($in['newsletter_donate_cta'] ?? '') === '1' ? '1' : '0';
 
     // Module switches: same explicit '1' / '0' as the banner, so "off" is saved
     // and wins over FEATURE_<NAME> in site.config.php. Anything other than the
@@ -348,6 +355,18 @@ function org_validate(array $in, array $themeKeys): array
     foreach (['launch_banner_bg' => 'на български', 'launch_banner_en' => 'на английски'] as $k => $lang) {
         if (mb_strlen($v[$k]) > 200) {
             $e[$k] = "Съобщението {$lang} е твърде дълго (най-много 200 знака).";
+        }
+    }
+
+    $nl_limits = [
+        'newsletter_donate_heading_bg' => ['заглавието на български', 120],
+        'newsletter_donate_heading_en' => ['заглавието на английски', 120],
+        'newsletter_donate_text_bg'    => ['текстът на български', 300],
+        'newsletter_donate_text_en'    => ['текстът на английски', 300],
+    ];
+    foreach ($nl_limits as $k => [$what, $max]) {
+        if (mb_strlen($v[$k]) > $max) {
+            $e[$k] = 'В поканата за дарение ' . $what . " е твърде дълъг (най-много {$max} знака).";
         }
     }
 
