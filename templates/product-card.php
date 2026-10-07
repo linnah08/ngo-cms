@@ -95,10 +95,17 @@ $single_vid     = $p['type'] === 'variant' ? (int)($variant_single[$p['id']] ?? 
       } else {
           $in_stock_count = (int)$p['stock'];
       }
+      require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
+      $card_preorder = product_is_preorder($p, $in_stock_count);
     ?>
     <?php if ($in_stock_count > 0 && $in_stock_count <= 5): ?>
       <p style="font-size:.78rem;color:#b45309;font-weight:600;margin:0 0 .5rem;">
         ⚠ <?= $lang === 'bg' ? "Само {$in_stock_count} бр. налични" : "Only {$in_stock_count} left" ?>
+      </p>
+    <?php elseif ($card_preorder): ?>
+      <p style="font-size:.78rem;color:#92400e;font-weight:600;margin:0 0 .5rem;">
+        <span aria-hidden="true">⏳ </span><?= h(product_preorder_label($lang)) ?>
+        <span style="display:block;font-weight:400;"><?= h(product_preorder_text($p, $lang)) ?></span>
       </p>
     <?php elseif ($in_stock_count === 0 && $p['type'] !== 'variant'): ?>
       <?php /* out-of-stock handled by button below */ ?>
@@ -116,7 +123,7 @@ $single_vid     = $p['type'] === 'variant' ? (int)($variant_single[$p['id']] ?? 
            style="width:100%;justify-content:center;font-size:.9rem;padding:.65rem 1rem;text-align:center;box-sizing:border-box;">
           <?= $lang === 'bg' ? 'Избери вариант' : 'Choose variant' ?>
         </a>
-      <?php elseif ($in_stock_count > 0): ?>
+      <?php elseif ($in_stock_count > 0 || $card_preorder): ?>
         <form method="POST" action="/cart/add.php">
           <?= csrf_field() ?>
           <input type="hidden" name="product_id" value="<?= (int)$p['id'] ?>">
@@ -127,7 +134,9 @@ $single_vid     = $p['type'] === 'variant' ? (int)($variant_single[$p['id']] ?? 
           <input type="hidden" name="_lang" value="<?= h($lang) ?>">
           <button type="submit" class="btn btn--primary"
                   style="width:100%;justify-content:center;font-size:.9rem;padding:.65rem 1rem;">
-            <?= $lang === 'bg' ? 'Добави в количката' : 'Add to cart' ?>
+            <?= $card_preorder
+                ? h(t_or('shop.preorder.button', 'Поръчай предварително', 'Pre-order now', $lang))
+                : ($lang === 'bg' ? 'Добави в количката' : 'Add to cart') ?>
           </button>
         </form>
       <?php else: ?>

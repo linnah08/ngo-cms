@@ -1,6 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
 start_session();
 
 $lang = post_lang();
@@ -17,11 +18,15 @@ $cart = $_SESSION['cart'] ?? [];
 $pdo = get_pdo();
 $product_ids = array_unique(array_column($cart, 'product_id'));
 $stock_by_product = [];
+$product_rows     = [];
 if ($product_ids) {
     $in = implode(',', array_fill(0, count($product_ids), '?'));
-    $stmt = $pdo->prepare("SELECT id, stock FROM products WHERE id IN ($in)");
-    $stmt->execute($product_ids);
-    foreach ($stmt->fetchAll() as $p) $stock_by_product[$p['id']] = (int)$p['stock'];
+    $stmt = $pdo->prepare("SELECT id, stock, preorder_enabled FROM products WHERE id IN ($in)");
+    $stmt->execute(array_values($product_ids));
+    foreach ($stmt->fetchAll() as $p) {
+        $stock_by_product[$p['id']] = (int)$p['stock'];
+        $product_rows[$p['id']]     = $p;
+    }
 }
 $variant_ids = array_filter(array_column($cart, 'variant_id'));
 $stock_by_variant = [];
@@ -45,6 +50,8 @@ foreach ($cart as $i => $item) {
         $limit = $stock_by_product[$item['product_id']] ?? 0;
     }
 
+    // Pre-order lines (out of stock, pre-orders on) are not capped.
+    $limit = product_line_limit($product_rows[$item['product_id']] ?? [], $limit);
     if ($qty > $limit) {
         $qty    = $limit;
         $capped = true;

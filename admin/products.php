@@ -248,8 +248,18 @@ try {
         <td>
           <?php if ($p['effective_stock'] > 0): ?>
             <span style="color:#2d6a35;font-weight:500;"><?= (int)$p['effective_stock'] ?></span>
+          <?php elseif (!empty($p['preorder_enabled'])): ?>
+            <span style="color:#92400e;font-weight:500;">0</span>
+            <br><span class="badge" style="margin-top:.35rem;background:#fef3c7;color:#92400e;white-space:nowrap;"
+                      title="Изчерпан, но клиентите могат да го поръчат предварително">⏳ Предв. поръчка</span>
+            <?php if ($p['effective_stock'] < 0): ?>
+              <br><small style="color:#92400e;"><?= -(int)$p['effective_stock'] ?> бр. чакат изпращане</small>
+            <?php endif; ?>
           <?php else: ?>
             <span style="color:#c0392b;font-weight:500;">0</span>
+            <?php if ($p['effective_stock'] < 0): ?>
+              <br><small style="color:#c0392b;" title="Предварителната поръчка е изключена, но има неизпратени предварителни поръчки"><?= -(int)$p['effective_stock'] ?> бр. чакат изпращане</small>
+            <?php endif; ?>
           <?php endif; ?>
         </td>
         <td>

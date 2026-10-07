@@ -4,6 +4,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/payment_errors.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
 start_session();
 
 $lang = get_lang();
@@ -32,9 +33,12 @@ function load_cart_products(array $cart, \PDO $pdo): array {
         $pid = $item['product_id'];
         if (!isset($by_id[$pid])) continue;
         $p    = $by_id[$pid];
-        $qty  = $p['type'] === 'variant'
+        $vid  = (int)($item['variant_id'] ?? 0);
+        // Out of stock + pre-orders on → a pre-order line, not capped by stock.
+        $preorder = product_is_preorder($p, product_line_stock($pdo, $p, $vid ?: null));
+        $qty  = ($p['type'] === 'variant' || $preorder)
             ? (int)$item['quantity']
-            : min((int)$item['quantity'], (int)$p['stock']);
+            : min((int)$item['quantity'], max(0, (int)$p['stock']));
         $line = $qty * (float)$p['price_eur'];
         $sub += $line;
         $rows[] = [
@@ -42,6 +46,7 @@ function load_cart_products(array $cart, \PDO $pdo): array {
             'product'         => $p,
             'quantity'        => $qty,
             'line_eur'        => $line,
+            'preorder'        => $preorder,
             'colour'          => $item['colour']          ?? null,
             'size'            => $item['size']            ?? null,
             'design_file'     => $item['design_file']     ?? null,
@@ -351,6 +356,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Variant fields
             if (!empty($row['variant_id']))    $entry['variant_id']    = (int)$row['variant_id'];
             if (!empty($row['variant_label'])) $entry['variant_label'] = $row['variant_label'];
+            // Pre-order snapshot: the order keeps the note it was bought with,
+            // whatever the product says later. includes/order_stock.php reads 'preorder'.
+            if (!empty($row['preorder'])) {
+                $entry['preorder']      = true;
+                $entry['preorder_note'] = product_preorder_note($p, $order_lang);
+            }
             $items_json[] = $entry;
         }
 
@@ -373,14 +384,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             foreach ($rows as $row) {
                 $p = $row['product'];
+                // A pre-order line skips the "enough stock" guard: its stock goes
+                // below zero, and that is the count of pre-ordered items still owed.
+                $guard = !empty($row['preorder']) ? '' : ' AND stock >= ?';
                 if ($p['type'] === 'variant' && !empty($row['variant_id'])) {
+                    $args = [$row['quantity'], $row['variant_id'], $p['id']];
+                    if ($guard) $args[] = $row['quantity'];
                     $pdo->prepare(
-                        'UPDATE product_variants SET stock = stock - ? WHERE id = ? AND product_id = ? AND stock >= ?'
-                    )->execute([$row['quantity'], $row['variant_id'], $p['id'], $row['quantity']]);
+                        'UPDATE product_variants SET stock = stock - ? WHERE id = ? AND product_id = ?' . $guard
+                    )->execute($args);
                 } else {
+                    $args = [$row['quantity'], $p['id']];
+                    if ($guard) $args[] = $row['quantity'];
                     $pdo->prepare(
-                        'UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?'
-                    )->execute([$row['quantity'], $p['id'], $row['quantity']]);
+                        'UPDATE products SET stock = stock - ? WHERE id = ?' . $guard
+                    )->execute($args);
                 }
                 $affected = $pdo->query('SELECT ROW_COUNT()')->fetchColumn();
                 if ((int)$affected === 0) {
@@ -574,6 +592,7 @@ $subtotal  = $cart_info['subtotal'];
       <input type="hidden" name="action" value="contact">
       <h2 style="margin-bottom:1.5rem;">1. <?= h(t_or('checkout.h.contact', 'Данни за контакт', 'Contact details')) ?></h2>
 
+      <?php if (array_filter(array_column($cart_info['rows'], 'preorder'))) require $_SERVER['DOCUMENT_ROOT'] . '/templates/preorder-notice.php'; ?>
       <!-- Editable cart summary -->
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1.5rem;">
         <table style="width:100%;border-collapse:collapse;">
@@ -593,15 +612,16 @@ $subtotal  = $cart_info['subtotal'];
                 <?php if (!empty($row['variant_label'])): ?>
                   <div style="font-size:.78rem;color:var(--text-muted);"><?= h($row['variant_label']) ?></div>
                 <?php endif; ?>
+                <?php if (!empty($row['preorder'])) require $_SERVER['DOCUMENT_ROOT'] . '/templates/preorder-line.php'; ?>
               </td>
               <td style="padding:.65rem 1rem;text-align:center;">
                 <input type="number" name="quantity[<?= $row['cart_index'] ?>]"
                        value="<?= $row['quantity'] ?>" min="1"
-                       data-max="<?= $p['type'] === 'variant' ? 999 : (int)$p['stock'] ?>"
+                       data-max="<?= !empty($row['preorder']) ? 999999 : ($p['type'] === 'variant' ? 999 : (int)$p['stock']) ?>"
                        data-price="<?= (float)$p['price_eur'] ?>"
                        oninput="onStep1QtyChange(this)"
                        style="width:60px;text-align:center;padding:.3rem .4rem;border:1px solid var(--border);border-radius:4px;font-size:.875rem;">
-                <?php if ($p['type'] !== 'variant'): ?>
+                <?php if ($p['type'] !== 'variant' && empty($row['preorder'])): ?>
                 <div class="checkout-stock-msg" style="display:none;font-size:.75rem;color:#c0392b;font-weight:600;margin-top:.3rem;white-space:nowrap;">
                   <?= h(t_or('checkout.stock_max', 'Налични: {n} бр.', 'Only {n} available', vars: ['n' => (int)$p['stock']])) ?>
                 </div>
@@ -884,6 +904,7 @@ $subtotal  = $cart_info['subtotal'];
 
       <h2 style="margin-bottom:1.5rem;">3. <?= h(t_or('checkout.h.review', 'Преглед и потвърждение', 'Review and confirm')) ?></h2>
 
+      <?php if (array_filter(array_column($cart_info['rows'], 'preorder'))) require $_SERVER['DOCUMENT_ROOT'] . '/templates/preorder-notice.php'; ?>
       <!-- Order summary with editable quantities -->
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1.5rem;">
         <table style="width:100%;border-collapse:collapse;">
@@ -903,15 +924,16 @@ $subtotal  = $cart_info['subtotal'];
                 <?php if (!empty($row['variant_label'])): ?>
                   <div style="font-size:.78rem;color:var(--text-muted);"><?= h($row['variant_label']) ?></div>
                 <?php endif; ?>
+                <?php if (!empty($row['preorder'])) require $_SERVER['DOCUMENT_ROOT'] . '/templates/preorder-line.php'; ?>
               </td>
               <td style="padding:.75rem 1rem;text-align:center;">
                 <input type="number" name="quantity[<?= $row['cart_index'] ?>]"
                        value="<?= $row['quantity'] ?>" min="1"
-                       data-max="<?= $p['type'] === 'variant' ? 999 : (int)$p['stock'] ?>"
+                       data-max="<?= !empty($row['preorder']) ? 999999 : ($p['type'] === 'variant' ? 999 : (int)$p['stock']) ?>"
                        data-price="<?= (float)$p['price_eur'] ?>"
                        oninput="onStep3QtyChange(this)"
                        style="width:60px;text-align:center;padding:.3rem .4rem;border:1px solid var(--border);border-radius:4px;font-size:.875rem;">
-                <?php if ($p['type'] !== 'variant'): ?>
+                <?php if ($p['type'] !== 'variant' && empty($row['preorder'])): ?>
                 <div class="checkout-stock-msg" style="display:none;font-size:.75rem;color:#c0392b;font-weight:600;margin-top:.3rem;white-space:nowrap;">
                   <?= h(t_or('checkout.stock_max', 'Налични: {n} бр.', 'Only {n} available', vars: ['n' => (int)$p['stock']])) ?>
                 </div>
