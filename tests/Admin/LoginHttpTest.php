@@ -4,42 +4,31 @@ declare(strict_types=1);
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\Group;
 
+require_once dirname(__DIR__) . '/Support/TestServer.php';
+
 /**
- * End-to-end login smoke test: verifies the full login round-trip through the
- * real web server (example.test), including document-root resolution, session
+ * End-to-end login smoke test: verifies the full login round-trip through a
+ * real web server (a throwaway one, see tests/Support/TestServer.php),
+ * including document-root resolution, session
  * creation, and redirect to the admin dashboard.
  */
 #[Group('http')]
 #[Group('admin')]
 final class LoginHttpTest extends TestCase
 {
-    private static string $base     = 'http://example.test';
+    private static string $base     = '';
     private static string $email    = 'test.login.http@example.test';
     private static string $password = 'LoginHttpTest_Pass_42!';
     private static ?int   $uid      = null;
 
-    /** Null when example.test is serving this site; otherwise why the tests skip. */
+    /** Null when the test server and DB are up; otherwise why the tests skip. */
     private static ?string $unavailable = null;
 
     public static function setUpBeforeClass(): void
     {
-        // Require HTTP 200 on /, not just a successful curl: a catch-all dev server
-        // (e.g. Laravel Herd) answers unknown hosts with its own 404, and the tests
-        // would then fail as though login were broken. See HttpTest::setUpBeforeClass().
-        $ch = curl_init(self::$base . '/');
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 3);
-        curl_setopt($ch, CURLOPT_NOBODY, true);
-        curl_exec($ch);
-        $errno = curl_errno($ch);
-        $code  = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        if ($errno !== 0) {
-            self::$unavailable = 'example.test is not reachable.';
-            return;
-        }
-        if ($code !== 200) {
-            self::$unavailable = "example.test answered HTTP $code for / — something other than this site is serving that host.";
+        self::$base = TestServer::start();
+        if (self::$base === '') {
+            self::$unavailable = 'Could not start a local test server.';
             return;
         }
 
@@ -51,6 +40,8 @@ final class LoginHttpTest extends TestCase
         require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/auth.php';
 
         $pdo  = get_pdo();
+        // A run that was killed before tearDown leaves its users behind; clear them first.
+        $pdo->prepare('DELETE FROM admin_users WHERE email = ?')->execute([self::$email]);
         $hash = password_hash(self::$password, PASSWORD_BCRYPT);
         $pdo->prepare(
             'INSERT INTO admin_users (name, email, password_hash, role) VALUES (?, ?, ?, ?)'
@@ -60,6 +51,7 @@ final class LoginHttpTest extends TestCase
 
     public static function tearDownAfterClass(): void
     {
+        TestServer::stop();
         if (self::$uid === null) return;
         get_pdo()->prepare('DELETE FROM admin_users WHERE id = ?')->execute([self::$uid]);
     }

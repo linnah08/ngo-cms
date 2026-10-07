@@ -67,6 +67,8 @@ final class OrderEmailComposerHttpTest extends TestCase
         } catch (\PDOException) {
         }
 
+        // A run that was killed before tearDown leaves its users behind; clear them first.
+        $pdo->prepare('DELETE FROM admin_users WHERE email IN (?, ?)')->execute(['test.orderemail.admin@example.test', 'test.orderemail.author@example.test']);
         foreach (['admin', 'author'] as $role) {
             $pdo->prepare('INSERT INTO admin_users (name, email, password_hash, role) VALUES (?, ?, ?, ?)')
                 ->execute(["Order Email Test $role", "test.orderemail.$role@example.test", password_hash(self::$password, PASSWORD_BCRYPT), $role]);

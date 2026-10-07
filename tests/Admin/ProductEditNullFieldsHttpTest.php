@@ -81,6 +81,8 @@ final class ProductEditNullFieldsHttpTest extends TestCase
             // Table doesn't exist yet — nothing to clear.
         }
 
+        // A run that was killed before tearDown leaves its users behind; clear them first.
+        $pdo->prepare('DELETE FROM admin_users WHERE email = ?')->execute([self::$adminEmail]);
         $pdo->prepare('INSERT INTO admin_users (name, email, password_hash, role) VALUES (?, ?, ?, ?)')
             ->execute(['Product Edit Test Admin', self::$adminEmail, password_hash(self::$adminPassword, PASSWORD_BCRYPT), 'admin']);
         self::$adminUid = (int) $pdo->lastInsertId();

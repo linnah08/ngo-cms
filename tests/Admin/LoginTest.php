@@ -19,6 +19,8 @@ final class LoginTest extends TestCase
         require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/auth.php';
 
         self::$pdo = get_pdo();
+        // A run that was killed before tearDown leaves its users behind; clear them first.
+        self::$pdo->prepare('DELETE FROM admin_users WHERE email = ?')->execute([self::$email]);
         $hash = password_hash(self::$password, PASSWORD_BCRYPT);
         self::$pdo->prepare(
             'INSERT INTO admin_users (name, email, password_hash, role) VALUES (?, ?, ?, ?)'
