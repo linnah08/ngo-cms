@@ -198,7 +198,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         $id   = 'cp_' . $name;
         $err  = $cpe[$name] ?? null;
         $desc = trim(($extra['hint_id'] ?? '') . ($err ? " {$id}_err" : ''));
-        return '<label for="' . $id . '">' . h($label) . $badge . '</label>'
+        $sr   = '<span style="' . HS_SR . '"> на ' . (str_ends_with($name, '_en') ? 'английски' : 'български') . '</span>';
+        return '<label for="' . $id . '">' . h($label) . $sr . $badge . '</label>'
              . ($extra['prefix'] ?? '')
              . '<input type="text" id="' . $id . '" name="' . $name . '" value="' . h((string) $cpv[$name]) . '"'
              . ' maxlength="' . (str_starts_with($name, 'slug') ? CPAGE_SLUG_MAX : CPAGE_TITLE_MAX) . '"'
@@ -236,7 +237,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <form method="POST" action="<?= h(hs_url()) ?>" class="admin-form" novalidate>
       <?= csrf_field() ?>
       <input type="hidden" name="action" value="page_settings">
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem 1.5rem;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:1rem 1.5rem;">
         <div class="form-group" style="margin:0;">
           <?= $cp_field('title_bg', 'Заглавие', hs_badge('bg'), ['attrs' => ' aria-required="true"']) ?>
         </div>
@@ -335,6 +336,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   var q = new URLSearchParams(location.search).get('focus');
   if (q) {
     var p = q.split(':'), el = document.getElementById('btn-' + p[0] + '-' + p[1]);
+    if (p[0] === 'settings') el = document.getElementById('cpSettingsTitle');   // a created page's title/address saved
     if (!el || el.disabled) el = document.getElementById('h-' + p[1]) || document.getElementById('hsListTitle');
     if (el) el.focus();
   }

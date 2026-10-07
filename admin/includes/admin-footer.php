@@ -341,7 +341,8 @@ document.querySelectorAll('.translate-legal-btn').forEach(function(btn) {
         msg.textContent = 'Българското поле е празно — първо попълнете него.';
         return;
       }
-      if (_tmGet(enEl).trim() && window._adminConfirm &&
+      // Nothing to lose when the English field only holds the Bulgarian text (not translated yet).
+      if (_tmGet(enEl).trim() && _tmGet(enEl).trim() !== text.trim() && window._adminConfirm &&
           !(await window._adminConfirm('Английският текст ще бъде заменен с превода. Продължаване?', 'Замени'))) {
         return;
       }

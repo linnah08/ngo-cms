@@ -82,7 +82,7 @@ switch ($action) {
         $r = cpage_set_status($id, $action === 'publish' ? 'published' : 'draft');
         $back = match ($post('back')) {
             'view'  => $r['ok'] && $action === 'publish' ? cpage_url($page, 'bg') : '/admin/page-edit.php?id=' . $id,
-            'edit'  => '/admin/page-edit.php?id=' . $id,
+            'edit'  => '/admin/page-edit.php?id=' . $id . '&focus=' . rawurlencode('publish:page'),   // focus back on the button
             default => '/admin/pages.php#cp-' . $id,
         };
         if (!$r['ok']) cp_done($json, false, $r['error'], $back);

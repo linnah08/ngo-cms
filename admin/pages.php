@@ -454,9 +454,9 @@ $cp_list  = cpage_all();
               <br><span style="color:var(--text-muted);font-size:.8rem;">В менюто: <?= h(implode(', ', $cp_menus)) ?></span>
             <?php endif; ?>
           </td>
-          <td style="font-size:.85rem;">
-            <a href="<?= h(cpage_url($cp, 'bg')) ?>" target="_blank" rel="noopener"><?= h(cpage_url($cp, 'bg')) ?></a><br>
-            <a href="<?= h(cpage_url($cp, 'en')) ?>" target="_blank" rel="noopener"><?= h(cpage_url($cp, 'en')) ?></a>
+          <td style="font-size:.85rem;white-space:nowrap;">
+            <a href="<?= h(cpage_url($cp, 'bg')) ?>" target="_blank" rel="noopener"><?= h(cpage_url($cp, 'bg')) ?><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;"> (отваря се в нов раздел)</span></a><br>
+            <a href="<?= h(cpage_url($cp, 'en')) ?>" target="_blank" rel="noopener"><?= h(cpage_url($cp, 'en')) ?><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;"> (отваря се в нов раздел)</span></a>
           </td>
           <td>
             <span style="display:inline-block;font-weight:600;padding:.2rem .55rem;border-radius:4px;white-space:nowrap;<?= $cp_draft ? 'background:#fef3c7;color:#78350f;' : 'background:#dcfce7;color:#14532d;' ?>">
