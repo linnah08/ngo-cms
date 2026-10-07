@@ -227,9 +227,19 @@ final class FeaturedProductsTest extends TestCase
         $card_removable  = $opts['card_removable'] ?? null;
         $card_redirect   = $opts['card_redirect'] ?? null;
 
+        // Who is looking: the "×" is only for someone who manages the shop.
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $had = $_SESSION[ADMIN_SESSION_NAME] ?? null;
+        if (isset($opts['role'])) $_SESSION[ADMIN_SESSION_NAME] = ['logged_in' => true, 'role' => $opts['role'], 'time' => time()];
+        else unset($_SESSION[ADMIN_SESSION_NAME]);
+
         ob_start();
         require $_SERVER['DOCUMENT_ROOT'] . '/templates/product-card.php';
-        return (string)ob_get_clean();
+        $html = (string)ob_get_clean();
+
+        if ($had === null) unset($_SESSION[ADMIN_SESSION_NAME]);
+        else $_SESSION[ADMIN_SESSION_NAME] = $had;
+        return $html;
     }
 
     private function sampleProduct(array $overrides = []): array
@@ -270,10 +280,20 @@ final class FeaturedProductsTest extends TestCase
         $html = $this->renderCard($this->sampleProduct(), [
             'card_removable' => true,
             'card_redirect'  => 'shop',
+            'role'           => 'shop_admin',
         ]);
 
         $this->assertStringContainsString('om-removable', $html);
         $this->assertStringContainsString('name="redirect" value="shop"', $html);
+    }
+
+    public function test_shop_card_offers_no_remove_control_to_an_author(): void
+    {
+        // inline-remove.php refuses products to authors, so they get no "×" to press.
+        $html = $this->renderCard($this->sampleProduct(), ['card_removable' => true, 'role' => 'author']);
+
+        $this->assertStringNotContainsString('om-removable', $html);
+        $this->assertStringNotContainsString('data-cms-remove-type', $html);
     }
 
     public function test_card_defaults_match_the_shop_listing(): void

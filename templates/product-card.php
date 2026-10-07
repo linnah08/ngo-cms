@@ -17,6 +17,8 @@
  *                              admin/inline-remove.php's 'product' case), so any other
  *                              page including this card (e.g. the homepage featured
  *                              picks) must leave it off to avoid that surprising side effect.
+ *                              Shown only to someone who manages the shop (admin or shop
+ *                              admin): authors may remove articles, not products.
  *   $card_redirect      string optional, default 'shop'. Where cart/add.php sends the
  *                              shopper back to on a failed add (out of stock, invalid
  *                              variant, etc.) — pass 'home' on pages other than the shop
@@ -28,7 +30,8 @@ $prod_url       = ($lang === 'bg' ? '/magazin/' : '/en/shop/') . h($p['slug']) .
 $card_img       = $p['type'] === 'variant'
     ? ($variant_images[$p['id']] ?? '')
     : $p['image'];
-$card_removable = $card_removable ?? false;
+// Only someone who manages the shop can remove a product (inline-remove.php refuses others).
+$card_removable = ($card_removable ?? false) && admin_can_manage_shop();
 $card_redirect  = $card_redirect ?? 'shop';
 $variant_single = $variant_single ?? [];
 // A product with exactly one active variant has nothing to choose — treat it

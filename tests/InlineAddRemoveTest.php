@@ -169,4 +169,37 @@ final class InlineAddRemoveTest extends TestCase
         $row->execute([$this->productId]);
         $this->assertSame(0, (int) $row->fetchColumn());
     }
+
+    /** Authors may remove articles, but products belong to whoever manages the shop. */
+    public function test_only_shop_managers_can_remove_a_product(): void
+    {
+        if (!test_db_available()) $this->markTestSkipped('DB not available.');
+        $pdo = get_pdo();
+        $pdo->prepare('INSERT INTO products (slug, name_bg, name_en, price_eur, stock, active) VALUES (?,?,?,?,?,?)')
+            ->execute(['pw-inline-remove-' . bin2hex(random_bytes(3)), 'Тест', 'Test', 5, 1, 1]);
+        $this->productId = (int) $pdo->lastInsertId();
+        $active = function () use ($pdo): int {
+            $row = $pdo->prepare('SELECT active FROM products WHERE id = ?');
+            $row->execute([$this->productId]);
+            return (int) $row->fetchColumn();
+        };
+
+        $r = $this->remove('product', $this->productId, ['role' => 'author']);
+        $this->assertSame(403, $r['status']);
+        $this->assertFalse($r['json']['ok'] ?? true);
+        $this->assertSame(1, $active(), 'an author must not hide a product');
+
+        $this->assertSame(['ok' => true], $this->remove('product', $this->productId, ['role' => 'shop_admin'])['json']);
+        $this->assertSame(0, $active());
+    }
+
+    public function test_author_can_still_remove_an_article(): void
+    {
+        foreach (['bg', 'en'] as $lang) {
+            if (!is_dir(dirname($this->articlePath($lang)))) mkdir(dirname($this->articlePath($lang)), 0755, true);
+            save_json($this->articlePath($lang), ['title' => 'x', 'status' => 'draft']);
+        }
+        $this->assertSame(['ok' => true], $this->remove('article', self::SLUG, ['role' => 'author'])['json']);
+        $this->assertFileDoesNotExist($this->articlePath('bg'));
+    }
 }

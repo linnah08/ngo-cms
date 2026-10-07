@@ -79,6 +79,11 @@ switch ($type) {
         break;
 
     case 'product':
+        // Authors may remove articles, but products belong to whoever manages the shop.
+        if (!admin_can_manage_shop()) {
+            http_response_code(403);
+            rm_json(['ok' => false, 'error' => 'forbidden']);
+        }
         $pid = (int)$id;
         if ($pid > 0) {
             $pdo = get_pdo();
