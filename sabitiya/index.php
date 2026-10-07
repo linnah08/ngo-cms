@@ -82,7 +82,7 @@ if (!$event):
           <p style="margin:.5rem 0 1rem;font-weight:600;color:<?= $state === 'on_sale' ? '#1e5128' : '#4b5563' ?>;">
             <?= $state === 'on_sale' ? '✓ ' : '' ?><?= h($state_label($state)) ?><?php if ($state === 'on_sale'): ?> · <?= h($money((float) $e['price_eur'])) ?><?php endif; ?>
           </p>
-          <a href="<?= h(event_url($e, $lang)) ?>" class="btn btn--primary" style="margin-top:auto;display:inline-flex;align-items:center;justify-content:center;min-height:44px;text-align:center;">
+          <a href="<?= h(event_url($e, $lang)) ?>" class="btn btn--primary" style="position:relative;margin-top:auto;display:inline-flex;align-items:center;justify-content:center;min-height:44px;text-align:center;">
             <?= h($state === 'on_sale' ? t_or('events.cta.buy', 'Виж и купи билет', 'See details and buy a ticket', $lang) : t_or('events.cta.view', 'Виж събитието', 'See the event', $lang)) ?>
             <span class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;">: <?= h(event_text($e, 'title', $lang)) ?></span>
           </a>

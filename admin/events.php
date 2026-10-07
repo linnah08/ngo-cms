@@ -129,7 +129,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         : 'Няма събития, които да отговарят на филтрите.' ?>
   </div>
 <?php else: ?>
-<div style="overflow-x:auto;background:#fff;border:1px solid var(--border,#e2e0db);border-radius:10px;">
+<div style="position:relative;overflow-x:auto;background:#fff;border:1px solid var(--border,#e2e0db);border-radius:10px;">
   <table style="width:100%;border-collapse:collapse;min-width:640px;">
     <caption style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">Събития</caption>
     <thead>

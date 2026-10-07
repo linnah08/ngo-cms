@@ -66,6 +66,8 @@ if ($event) {
 $sold    = $event ? event_tickets_sold($pdo, (int) $event['id']) : 0;
 $flashes = flash_get();
 $page_title_admin = $event ? 'Събитие: ' . $event['title'] : 'Ново събитие';
+$_tinymce_key     = setting_get('tinymce_api_key', 'no-api-key');
+$page_head_extra  = '<script src="https://cdn.tiny.cloud/1/' . h($_tinymce_key) . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>';
 
 $inp = 'width:100%;box-sizing:border-box;min-height:44px;padding:.55rem .75rem;border:1.5px solid #8a8f98;border-radius:6px;font-size:1rem;font-family:inherit;';
 $lbl = 'display:block;font-weight:600;margin-bottom:.3rem;text-transform:none;letter-spacing:normal;font-size:.95rem;';
@@ -182,7 +184,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <?php if (!$buyers): ?>
     <p style="margin:0;">Още няма купени билети.</p>
   <?php else: ?>
-  <div style="overflow-x:auto;background:#fff;border:1px solid var(--border,#e2e0db);border-radius:10px;">
+  <div style="position:relative;overflow-x:auto;background:#fff;border:1px solid var(--border,#e2e0db);border-radius:10px;">
     <table style="width:100%;border-collapse:collapse;min-width:560px;">
       <thead>
         <tr style="text-align:left;border-bottom:2px solid var(--border,#e2e0db);">
