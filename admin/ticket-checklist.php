@@ -1,56 +1,41 @@
 <?php
+/**
+ * Door list for one event: every paid ticket, one row per ticket, by buyer
+ * name, with an empty "Вход" column to tick off at the door. Printable.
+ * ?event=<id>. Module "events".
+ */
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/events.php';
 
-admin_require_admin();
+admin_require_shop();
 
-// Campaign module switched off in Admin → Модули — says so, with a way back.
+// Events module switched off in Admin → Модули — says so, with a way back.
 // Deliberately after the auth call: an anonymous request still gets the normal
 // login redirect, so this never becomes an oracle for which modules a site runs.
-module_admin_guard('campaign');
+module_admin_guard('events');
 
 $pdo = get_pdo();
+events_adopt_legacy($pdo);
 
-$rows = $pdo->query("
-    SELECT ticket_code, ticket_path, ticket_qty, name, created_at, amount_eur
-    FROM campaign_pledges
-    WHERE pledge_type = 'ticket'
-      AND payment_status = 'paid'
-    ORDER BY name ASC
-")->fetchAll(PDO::FETCH_ASSOC);
-
-// Expand multi-ticket pledges: one row per individual ticket.
-$tickets = [];
-foreach ($rows as $r) {
-    $qty   = max(1, (int)($r['ticket_qty'] ?? 1));
-    $paths = json_decode($r['ticket_path'] ?? '', true);
-    if (!is_array($paths)) {
-        $paths = $r['ticket_path'] ? [$r['ticket_path']] : [];
-    }
-    $price_each = $qty > 1 ? round((float)$r['amount_eur'] / $qty, 2) : (float)$r['amount_eur'];
-
-    if ($qty === 1 || empty($paths)) {
-        $tickets[] = [
-            'name'       => $r['name'],
-            'ticket_code'=> $r['ticket_code'] ?: '—',
-            'created_at' => $r['created_at'],
-            'amount_eur' => $price_each,
-        ];
+$event_id = filter_var($_GET['event'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: null;
+$event    = $event_id ? event_get($pdo, $event_id) : null;
+if (!$event) {
+    // No event chosen: the only event with tickets, if there is exactly one,
+    // otherwise back to the list, where each event has its own door list.
+    $ids = $pdo->query("SELECT DISTINCT event_id FROM campaign_pledges
+                         WHERE pledge_type = 'ticket' AND payment_status = 'paid' AND event_id IS NOT NULL")->fetchAll(PDO::FETCH_COLUMN);
+    if (count($ids) === 1) {
+        header('Location: /admin/ticket-checklist.php?event=' . (int) $ids[0]);
     } else {
-        foreach ($paths as $path) {
-            // Extract ticket code from filename: TKT-YYYYMMDD-XXXXXXXX_<pledge>.pdf
-            $filename = basename($path);
-            $code = strstr($filename, '_', true) ?: ($r['ticket_code'] ?: '—');
-            $tickets[] = [
-                'name'       => $r['name'],
-                'ticket_code'=> $code,
-                'created_at' => $r['created_at'],
-                'amount_eur' => $price_each,
-            ];
-        }
+        flash_set('error', 'Изберете събитие — „Списък за входа“ е до всяко събитие в списъка.');
+        header('Location: /admin/events.php?when=all');
     }
+    exit;
 }
 
+$tickets = event_door_list($pdo, (int) $event['id']);
 $total     = count($tickets);
 $total_eur = array_sum(array_column($tickets, 'amount_eur'));
 $generated = date('d.m.Y H:i');
@@ -58,13 +43,14 @@ $generated = date('d.m.Y H:i');
 <html lang="bg">
 <head>
 <meta charset="UTF-8">
-<title>Списък с билети — <?= $generated ?></title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Списък за входа — <?= h($event['title']) ?></title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: Arial, sans-serif; font-size: 10pt; color: #000; background: #fff; }
 
 .screen-header {
-    display: flex; align-items: center; gap: 1rem;
+    display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem;
     padding: .75rem 1.25rem; background: #f5f5f5;
     border-bottom: 1px solid #ccc;
 }
@@ -108,30 +94,31 @@ tfoot td.right { text-align: right; }
 <body>
 
 <div class="screen-header">
-    <h1>Списък с билети</h1>
+    <a href="/admin/event-edit.php?id=<?= (int) $event['id'] ?>" style="font-size:.9rem;">← Към събитието</a>
+    <h1>Списък за входа — <?= h($event['title']) ?></h1>
     <span class="meta">Генериран <?= $generated ?> &nbsp;·&nbsp; <?= $total ?> билета &nbsp;·&nbsp; <?= number_format($total_eur, 2, '.', ' ') ?> EUR</span>
-    <button class="btn-print" onclick="window.print()">Принтирай</button>
+    <button type="button" class="btn-print" onclick="window.print()" style="min-height:40px;">Принтирай</button>
 </div>
 
 <div style="padding:.75rem 1rem;">
 
 <div class="print-header">
-    <h1>Списък с билети</h1>
+    <h1><?= h($event['title']) ?><?= event_when($event, 'bg') !== '' ? ' — ' . h(event_when($event, 'bg')) : '' ?></h1>
     <p>Генериран <?= $generated ?> &nbsp;·&nbsp; <?= $total ?> билета &nbsp;·&nbsp; <?= number_format($total_eur, 2, '.', ' ') ?> EUR</p>
 </div>
 
 <?php if (empty($tickets)): ?>
-<div class="empty">Няма платени билети.</div>
+<div class="empty">Още няма платени билети за това събитие.</div>
 <?php else: ?>
 <table>
     <thead>
         <tr>
-            <th>#</th>
-            <th style="min-width:180px;">Купувач</th>
-            <th class="mono" style="min-width:160px;">Код на билет</th>
-            <th style="min-width:80px;">Дата</th>
-            <th class="right" style="min-width:60px;">EUR</th>
-            <th style="min-width:40px;">Вход</th>
+            <th scope="col">#</th>
+            <th scope="col" style="min-width:180px;">Купувач</th>
+            <th scope="col" class="mono" style="min-width:160px;">Код на билет</th>
+            <th scope="col" style="min-width:80px;">Купен на</th>
+            <th scope="col" class="right" style="min-width:60px;">EUR</th>
+            <th scope="col" style="min-width:40px;">Вход</th>
         </tr>
     </thead>
     <tbody>

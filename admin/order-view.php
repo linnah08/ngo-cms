@@ -322,80 +322,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'resend_ticket') {
-        if ($is_ticket) {
-            $qty = max(1, (int)($ticket_pledge['ticket_qty'] ?? count($ticket_paths) ?: 1));
-
-            // Regenerate if: count doesn't match qty, any file is missing, or no paths at all
+        if ($is_ticket && $ticket_pledge) {
+            require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/events.php';
+            $ticket_event = event_for_pledge($pdo, $ticket_pledge);
+            $qty = max(1, (int) $ticket_pledge['ticket_qty']);
+            // Make the PDFs again if any is missing (or the count is off).
             $all_exist = count($ticket_paths) === $qty
                 && count(array_filter($ticket_paths, fn($p) => file_exists($_SERVER['DOCUMENT_ROOT'] . $p))) === $qty;
-            if (!$all_exist) {
-                require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/TicketGenerator.php';
-                $year = date('Y');
-                $dir  = $_SERVER['DOCUMENT_ROOT'] . "/documents/tickets/{$year}/";
-                if (!is_dir($dir)) mkdir($dir, 0755, true);
-                $new_paths = [];
-                for ($i = 0; $i < $qty; $i++) {
-                    $tc   = 'TKT-' . date('Ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
-                    $suffix = $qty > 1 ? '-' . ($i + 1) : '';
-                    $fname = $tc . '_' . $order['order_number'] . $suffix . '.pdf';
-                    $fpath = $dir . $fname;
-                    $price_per = $qty > 1 ? round((float)$order['total_eur'] / $qty, 2) : (float)$order['total_eur'];
-                    $order_row = [
-                        'name'          => $order['customer_name'],
-                        'email'         => $order['customer_email'],
-                        'pledge_number' => $order['order_number'],
-                        'amount_eur'    => $price_per,
-                        'created_at'    => $order['created_at'],
-                    ];
-                    $doc_row = [
-                        'ticket_code'  => $tc,
-                        'event_name'   => setting_get('event_name',  'Събитие'),
-                        'event_date'   => setting_get('event_date',  ''),
-                        'event_time'   => setting_get('event_time',  ''),
-                        'event_place'  => setting_get('event_place', ''),
-                    ];
-                    file_put_contents($fpath, (new TicketGenerator())->generate($order_row, [], $doc_row));
-                    $new_paths[] = "/documents/tickets/{$year}/{$fname}";
-                    if ($i === 0) {
-                        $pdo->prepare("UPDATE campaign_pledges SET ticket_code=? WHERE pledge_number=?")
-                            ->execute([$tc, $order['order_number']]);
-                    }
+            try {
+                if (!$all_exist) {
+                    $ticket_paths = event_generate_ticket_pdfs($pdo, $ticket_pledge, $ticket_event);
+                    $ps = $pdo->prepare('SELECT * FROM campaign_pledges WHERE id = ?');
+                    $ps->execute([(int) $ticket_pledge['id']]);
+                    $ticket_pledge = $ps->fetch() ?: $ticket_pledge;
                 }
-                $ticket_paths = $new_paths;
-                $pdo->prepare("UPDATE campaign_pledges SET ticket_path=? WHERE pledge_number=?")
-                    ->execute([json_encode($ticket_paths), $order['order_number']]);
+                $ok = event_send_tickets($pdo, $ticket_pledge, $ticket_event, $ticket_paths, (int) $id);
+            } catch (Throwable $e) {
+                error_log('order-view resend_ticket: ' . $e->getMessage());
+                $ok = false;
             }
-
-            $attachments = [];
-            foreach ($ticket_paths as $i => $rel_path) {
-                $ffile = $_SERVER['DOCUMENT_ROOT'] . $rel_path;
-                if (file_exists($ffile)) {
-                    $n = $i + 1;
-                    $attachments[] = [
-                        'path' => $ffile,
-                        'name' => 'ticket-' . $order['order_number'] . ($qty > 1 ? "-{$n}" : '') . '.pdf',
-                    ];
-                }
-            }
-
-            // Build a pledge-shaped array for the email template
-            $pledge_for_email = [
-                'name'          => $order['customer_name'],
-                'email'         => $order['customer_email'],
-                'pledge_number' => $order['order_number'],
-                'amount_eur'    => $order['total_eur'],
-                'ticket_code'   => $ticket_pledge['ticket_code'] ?? ($ticket_item['ticket_code'] ?? ''),
-                'created_at'    => $order['created_at'],
-                'lang'          => $ticket_pledge['lang'] ?? 'bg',
-            ];
-            $_pledge_lang = $pledge_for_email['lang'];
-            $ok = send_order_mail(
-                (int)$id,
-                $order['customer_email'],
-                render_email_subject('campaign-ticket', $_pledge_lang, ['event_name' => setting_get('event_name', 'събитието'), 'pledge_number' => $order['order_number']]),
-                render_email('campaign-ticket', ['pledge' => $pledge_for_email, 'lang' => $_pledge_lang]),
-                ['template_key' => 'campaign-ticket', 'attachments' => $attachments]
-            );
             $success = $ok ? 'Билетът е изпратен отново.' : 'Грешка при изпращане.';
             // Re-fetch
             $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = ?');
@@ -403,6 +348,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $order = $stmt->fetch();
             $items = json_decode($order['items'], true) ?? [];
             $ticket_item = $items[0] ?? [];
+        } elseif ($is_ticket) {
+            $errors[] = 'Няма запис за този билет, затова не може да бъде изпратен отново.';
         }
     }
 

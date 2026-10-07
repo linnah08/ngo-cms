@@ -37,33 +37,39 @@ final class FeatureFlagsTest extends TestCase
         $this->assertSame($expected, feature_enabled('CaMpAiGn'));
     }
 
-    /** Entry points that must become unreachable when the module is off: [file, guard]. */
+    /** Entry points that must become unreachable when their module is off: [file, guard, module]. */
     public static function gatedEntryPoints(): array
     {
         return [
-            ['campaign/index.php', 'public'],
-            ['campaign/checkout.php', 'public'],
-            ['campaign/confirmation/index.php', 'public'],
-            ['campaign/payment-failed/index.php', 'public'],
-            ['tickets/index.php', 'public'],
-            ['api/campaign-payment-return.php', 'public'],
-            ['admin/campaign.php', 'admin'],
-            ['admin/campaign-backers.php', 'admin'],
-            ['admin/pledge-view.php', 'admin'],
-            ['admin/ticket-checklist.php', 'admin'],
+            ['campaign/index.php', 'public', 'campaign'],
+            ['campaign/checkout.php', 'public', 'campaign'],
+            ['campaign/confirmation/index.php', 'public', 'campaign'],
+            ['campaign/payment-failed/index.php', 'public', 'campaign'],
+            ['api/campaign-payment-return.php', 'public', 'campaign'],
+            ['admin/campaign.php', 'admin', 'campaign'],
+            ['admin/campaign-backers.php', 'admin', 'campaign'],
+            ['admin/pledge-view.php', 'admin', 'campaign'],
+            ['sabitiya/index.php', 'public', 'events'],
+            ['sabitiya/checkout.php', 'public', 'events'],
+            ['sabitiya/confirmation/index.php', 'public', 'events'],
+            ['tickets/index.php', 'public', 'events'],
+            ['api/event-payment-return.php', 'public', 'events'],
+            ['admin/events.php', 'admin', 'events'],
+            ['admin/event-edit.php', 'admin', 'events'],
+            ['admin/ticket-checklist.php', 'admin', 'events'],
         ];
     }
 
     #[DataProvider('gatedEntryPoints')]
-    public function test_entry_point_is_gated(string $rel, string $kind): void
+    public function test_entry_point_is_gated(string $rel, string $kind, string $module): void
     {
         $src = file_get_contents(self::root() . '/' . $rel);
         $this->assertIsString($src, "$rel should exist");
 
         // module_public_guard() answers with the site's 404, module_admin_guard()
         // with "Този модул е изключен" — see includes/modules.php.
-        $guard = $kind === 'public' ? "module_public_guard('campaign');" : "module_admin_guard('campaign');";
-        $this->assertStringContainsString($guard, $src, "$rel must refuse the request when the campaign module is off");
+        $guard = $kind === 'public' ? "module_public_guard('$module');" : "module_admin_guard('$module');";
+        $this->assertStringContainsString($guard, $src, "$rel must refuse the request when the $module module is off");
         if ($kind === 'admin') {
             $auth = preg_match('/admin_require_(admin|login|shop|editorial)\(\);/', $src, $m, PREG_OFFSET_CAPTURE) ? $m[0][1] : false;
             $this->assertNotFalse($auth, "$rel checks who is asking");
@@ -101,7 +107,9 @@ final class FeatureFlagsTest extends TestCase
     {
         $src = (string) file_get_contents(self::root() . '/admin/includes/admin-header.php');
         $this->assertStringContainsString("module_admin_page_visible('campaign.php')", $src);
+        $this->assertStringContainsString("module_admin_page_visible('events.php')", $src);
         $this->assertStringNotContainsString("feature_enabled('campaign')", $src, 'no hard-coded module ifs in the menu');
+        $this->assertStringNotContainsString("feature_enabled('events')", $src, 'no hard-coded module ifs in the menu');
     }
 
     /**
@@ -136,5 +144,7 @@ final class FeatureFlagsTest extends TestCase
             $src,
             "$rel is payment/history plumbing and must keep working for existing pledges"
         );
+        $this->assertStringNotContainsString("feature_enabled('events')", $src, "$rel must keep working for tickets already sold");
+        $this->assertStringNotContainsString("module_admin_guard('events')", $src, "$rel must keep working for tickets already sold");
     }
 }

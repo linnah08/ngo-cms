@@ -185,7 +185,9 @@ final class ModulesRegistryTest extends TestCase
         $entries = [
             'donations' => ['donation/index.php', 'donation/checkout.php', 'donation/confirmation/index.php'],
             'campaign'  => ['campaign/index.php', 'campaign/checkout.php', 'campaign/confirmation/index.php',
-                            'campaign/payment-failed/index.php', 'tickets/index.php', 'api/campaign-payment-return.php'],
+                            'campaign/payment-failed/index.php', 'api/campaign-payment-return.php'],
+            'events'    => ['sabitiya/index.php', 'sabitiya/checkout.php', 'sabitiya/confirmation/index.php',
+                            'tickets/index.php', 'api/event-payment-return.php'],
         ];
         foreach ($entries as $name => $files) {
             foreach ($files as $rel) {

@@ -43,7 +43,7 @@ final class BottomSaveButtonTest extends TestCase
             'campaign: budgetForm'              => [$dir . 'campaign.php',     'budgetForm',        'Campaign budget form'],
             'campaign: faqForm'                 => [$dir . 'campaign.php',     'faqForm',           'Campaign FAQ form'],
             'campaign: risksForm'               => [$dir . 'campaign.php',     'risksForm',         'Campaign risks form'],
-            'campaign: eventForm'               => [$dir . 'campaign.php',     'eventForm',         'Campaign event form'],
+            'event-edit: eventForm'             => [$dir . 'event-edit.php',   'eventForm',         'Event form'],
             'newsletter-compose: saveForm'      => [$dir . 'newsletter-compose.php', 'saveForm',    'Newsletter compose form'],
             'email-templates: tplForm'          => [$dir . 'email-templates.php',    'tplForm',     'Email templates form'],
         ];

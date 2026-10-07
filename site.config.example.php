@@ -75,6 +75,8 @@ define('GOOGLE_ADS_PURCHASE_LABEL', '');  // add-to-cart conversion label
 define('FEATURE_DONATIONS', true);
 // Crowdfunding campaigns (the campaign/ pages + reward pledges in checkout).
 define('FEATURE_CAMPAIGN', true);
+// Events and tickets (the /sabitiya/ pages, ticket sales, the door list).
+define('FEATURE_EVENTS', true);
 
 // Updating from Admin → Обновления. Set to false on a site a developer updates
 // through git (a fork with its own changes): a release would overwrite them.

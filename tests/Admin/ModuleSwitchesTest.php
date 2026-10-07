@@ -130,7 +130,7 @@ final class ModuleSwitchesTest extends TestCase
 
     // ── Validation of the POSTed switches (Admin → Модули) ───────────────────────
 
-    private function validate(array $in, array $current = ['donations' => true, 'campaign' => true]): array
+    private function validate(array $in, array $current = ['donations' => true, 'campaign' => true, 'events' => true]): array
     {
         return modules_validate_switches($in, $current);
     }
@@ -138,7 +138,7 @@ final class ModuleSwitchesTest extends TestCase
     public function test_every_module_has_a_field_label_and_warning(): void
     {
         $mods = org_modules();   // the compatibility shape still answers
-        $this->assertSame(['donations', 'campaign'], array_keys($mods));
+        $this->assertSame(['donations', 'campaign', 'events'], array_keys($mods));
         foreach ($mods as $name => $m) {
             $this->assertArrayHasKey($m['field'], org_fields());
             $this->assertSame('FEATURE_' . strtoupper($name), org_fields()[$m['field']]);
@@ -152,14 +152,14 @@ final class ModuleSwitchesTest extends TestCase
     {
         $r = $this->validate([]);
         $this->assertSame([], $r['errors']);
-        $this->assertSame(['feature_donations' => '0', 'feature_campaign' => '0'], $r['values']);
+        $this->assertSame(['feature_donations' => '0', 'feature_campaign' => '0', 'feature_events' => '0'], $r['values']);
     }
 
     public function test_ticked_switch_saves_on(): void
     {
-        $r = $this->validate(['feature_donations' => '1', 'feature_campaign' => '1'], ['donations' => false, 'campaign' => false]);
+        $r = $this->validate(['feature_donations' => '1', 'feature_campaign' => '1', 'feature_events' => '1'], ['donations' => false, 'campaign' => false, 'events' => false]);
         $this->assertSame([], $r['errors']);
-        $this->assertSame(['feature_donations' => '1', 'feature_campaign' => '1'], $r['values']);
+        $this->assertSame(['feature_donations' => '1', 'feature_campaign' => '1', 'feature_events' => '1'], $r['values']);
     }
 
     public static function notABoolean(): array
