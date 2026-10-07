@@ -4,6 +4,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/print_helpers.php';
 start_session();
 
+// Module switched off in Admin → Модули — the shop does not exist (site's 404).
+module_public_guard('shop');
+
 $lang     = post_lang();
 $shop_url = shop_path('shop', $lang);
 

@@ -183,6 +183,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <?php if ($s['type'] === 'campaign' && !feature_enabled('campaign')): ?>
           <p style="margin:.35rem 0 0;color:#4b5563;">Модулът „Кампания“ е изключен — секцията не се показва.</p>
         <?php endif; ?>
+        <?php if ($s['type'] === 'products' && !module_enabled_with_needs('shop')): ?>
+          <p style="margin:.35rem 0 0;color:#4b5563;">Модулът „Магазин“ е изключен — секцията не се показва.</p>
+        <?php endif; ?>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:.5rem;">
         <a id="btn-edit-<?= h($s['id']) ?>" href="/admin/home-sections.php?edit=<?= h(rawurlencode($s['id'])) ?>" class="btn btn--outline" style="min-height:44px;" aria-label="<?= h("Редактирай „{$name}“") ?>">Редактирай</a>

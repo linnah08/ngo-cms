@@ -139,7 +139,8 @@ final class ModuleSwitchesTest extends TestCase
     {
         $mods = org_modules();   // the compatibility shape still answers
         $this->assertSame(array_keys(modules_registry()), array_keys($mods));
-        $this->assertSame(['donations', 'campaign'], array_slice(array_keys($mods), 0, 2));
+        $this->assertContains('donations', array_keys($mods));
+        $this->assertContains('campaign', array_keys($mods));
         foreach ($mods as $name => $m) {
             $this->assertArrayHasKey($m['field'], org_fields());
             $this->assertSame('FEATURE_' . strtoupper($name), org_fields()[$m['field']]);

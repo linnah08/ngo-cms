@@ -1,5 +1,8 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+
+// Module switched off in Admin → Модули — the shop does not exist (site's 404).
+module_public_guard('shop');
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 
 header('Content-Type: application/json; charset=utf-8');

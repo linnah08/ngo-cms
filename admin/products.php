@@ -5,6 +5,7 @@ $page_title_admin = 'Продукти';
 $active_nav       = 'products';
 
 admin_require_shop();
+module_admin_guard('shop');
 
 $pdo = get_pdo();
 

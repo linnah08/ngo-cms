@@ -66,6 +66,9 @@ final class ModulesGatingTest extends TestCase
             'annual_reports'   => ['finansovi-otcheti/index.php', 'en/financial-reports/index.php'],
             'comments_reviews' => ['api/comment-submit.php', 'api/review-submit.php'],
             'newsletter'       => ['newsletter/subscribe.php', 'newsletter/subscribe-order.php'],
+            'shop'             => ['magazin/index.php', 'cart/index.php', 'cart/add.php', 'cart/update.php', 'cart/remove.php',
+                                   'cart/design-thumb.php', 'checkout/index.php', 'checkout/confirmation/index.php',
+                                   'api/calculate.php', 'api/cities.php', 'api/offices.php'],
         ];
         $out = [];
         foreach ($map as $module => $files) foreach ($files as $f) $out["$module: $f"] = [$module, $f];
@@ -158,6 +161,69 @@ final class ModulesGatingTest extends TestCase
         [$got, $plain] = json_decode($out, true);
         $this->assertSame($plain, $got);
         $this->assertStringContainsString("module_enabled_with_needs('ai_helpers')", self::src('cron/backfill-article-excerpts.php'));
+    }
+
+    // ── shop ─────────────────────────────────────────────────────────────────
+
+    public function test_english_shop_pages_reuse_the_guarded_bg_ones(): void
+    {
+        foreach (['en/shop/index.php' => '/magazin/index.php', 'en/cart/index.php' => '/cart/index.php',
+                  'en/checkout/index.php' => '/checkout/index.php', 'en/checkout/confirmation/index.php' => '/checkout/confirmation/index.php'] as $en => $bg) {
+            $this->assertStringContainsString("require \$_SERVER['DOCUMENT_ROOT'] . '{$bg}';", self::src($en), $en);
+        }
+    }
+
+    public function test_payment_plumbing_keeps_working_for_donations(): void
+    {
+        // Callbacks record money that may already be taken — never guarded.
+        foreach (['api/payment-callback.php', 'api/iris-payment-callback.php'] as $rel) {
+            $this->assertStringNotContainsString('module_public_guard', self::src($rel), $rel);
+        }
+        // Returns: only a retry of a shop order is refused.
+        foreach (['api/payment-return.php', 'api/iris-payment-return.php'] as $rel) {
+            $src = self::src($rel);
+            $this->assertStringContainsString("if (\$order['type'] === 'physical') module_public_guard('shop');", $src, $rel);
+            $this->assertSame(1, substr_count($src, 'module_public_guard'), $rel);
+        }
+        $failed = self::src('checkout/payment-failed/index.php');
+        $this->assertStringContainsString("if (!\$is_donation) module_public_guard('shop');", $failed, 'a failed donation still lands here');
+        $this->assertSame('shop', module_for_path('/checkout/payment-failed/'), 'link hiding only; the page guards itself');
+    }
+
+    public function test_shop_links_leave_header_news_and_front_page(): void
+    {
+        $this->assertMatchesRegularExpression("/<\?php if \(module_enabled_with_needs\('shop'\)\): \?>\s*<li class=\"nav-cta\">/", self::src('templates/header.php'));
+        foreach (['novini/index.php', 'en/news/index.php'] as $rel) {
+            $this->assertMatchesRegularExpression("/<\?php if \(module_enabled_with_needs\('shop'\)\): \?>\s*<!-- Shop -->/", self::src($rel), $rel);
+        }
+        require_once ROOT_PATH . '/includes/home_render.php';
+        $this->assertSame('shop', HOME_SECTION_MODULES['products'], 'the shop block on the front page');
+    }
+
+    public function test_campaign_works_without_the_shop_minus_rewards(): void
+    {
+        $this->assertSame([], modules_registry()['campaign']['needs'], 'plain support and tickets are paid directly, not through the shop');
+        $this->assertStringContainsString("\$rewards_raw = module_enabled_with_needs('shop')", self::src('campaign/index.php'));
+        $co = self::src('campaign/checkout.php');
+        $ignore = strpos($co, "if (!module_enabled_with_needs('shop')) \$reward_id = 0;");
+        $this->assertNotFalse($ignore);
+        $this->assertLessThan(strpos($co, "shop_path('checkout', \$pledge_lang)"), $ignore, 'no reward pledge is sent to the shop checkout');
+        $this->assertStringContainsString("Наградите не се показват", self::src('admin/campaign.php'));
+    }
+
+    public function test_shop_admin_endpoints_refuse_when_off(): void
+    {
+        foreach (['upload-product-image.php', 'inline-save-product.php', 'extract-size-dims.php'] as $f) {
+            $src  = self::src('admin/' . $f);
+            $auth = preg_match('/admin_require_\w+\(\);/', $src, $m, PREG_OFFSET_CAPTURE) ? $m[0][1] : PHP_INT_MAX;
+            $g    = strpos($src, "module_ajax_guard('shop');");
+            $this->assertNotFalse($g, $f);
+            $this->assertLessThan($g, $auth, "$f: auth first");
+        }
+        // Orders hold donations and tickets too; the money pages stay.
+        foreach (['orders.php', 'order-view.php', 'monthly-report.php', 'payment.php', 'generate-document.php', 'download-document.php'] as $f) {
+            $this->assertNull(module_for_admin_page($f), $f);
+        }
     }
 
     // ── newsletter ───────────────────────────────────────────────────────────
@@ -349,6 +415,8 @@ final class ModulesGatingTest extends TestCase
     {
         return [
             'donations' => ['donations', '/donation/'],
+            'shop'      => ['shop', '/magazin/'],
+            'shop (EN)' => ['shop', '/en/shop/'],
         ];
     }
 

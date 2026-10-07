@@ -6,6 +6,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 start_session();
 
+// Module switched off in Admin → Модули — the shop does not exist (site's 404).
+module_public_guard('shop');
+
 $lang = get_lang();
 $pdo  = get_pdo();
 

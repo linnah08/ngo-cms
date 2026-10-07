@@ -26,6 +26,10 @@ if (!$order) {
 
 $is_donation = $order['type'] === 'donation';
 
+// A shop order's page goes with the shop (Admin → Модули); a donation's stays,
+// since donations work without the shop.
+if (!$is_donation) module_public_guard('shop');
+
 // If already paid somehow (race), send to confirmation
 if ($order['payment_status'] === 'paid') {
     header('Location: ' . ($is_donation ? donation_path('confirmation', $order['lang'] ?? 'bg') : shop_path('confirmation', $order['lang'] ?? 'bg')) . '?order=' . urlencode($order_number));

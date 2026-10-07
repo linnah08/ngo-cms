@@ -418,6 +418,11 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       <button type="submit" form="rewardsForm" class="btn btn--primary">Запази</button>
     </div>
   </div>
+  <?php if (!module_enabled_with_needs('shop')): ?>
+  <p role="status" style="margin:0 0 1rem;padding:.65rem .85rem;background:#fef3c7;border:1px solid #b45309;border-radius:6px;font-size:.9rem;color:#78350f;">
+    Наградите не се показват на страницата на кампанията, защото модулът „Магазин“ е изключен — те се изпращат по пощата чрез поръчка от магазина. Дарителите могат да подкрепят кампанията без награда. Наградите ще се появят отново, когато включите „Магазин“ в <a href="/admin/modules.php">Модули</a>.
+  </p>
+  <?php endif; ?>
   <form method="POST" id="rewardsForm">
     <?= csrf_field() ?>
     <input type="hidden" name="section" value="rewards">

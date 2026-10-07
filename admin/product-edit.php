@@ -6,6 +6,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
 
 admin_require_shop();
+module_admin_guard('shop');
 
 $pdo    = get_pdo();
 $id     = (int)($_GET['id'] ?? 0);

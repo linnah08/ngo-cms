@@ -68,7 +68,12 @@ $faq = array_map(function ($row) use ($is_en) {
 }, $faq_raw);
 
 // Rewards — pick title_en/description_en when available
-$rewards_raw = $pdo->query("SELECT * FROM campaign_rewards WHERE active=1 ORDER BY position")->fetchAll();
+// A reward is posted to the backer through the shop's checkout, so rewards are
+// offered only while „Магазин“ is on (Admin → Модули). Plain support and tickets
+// work without it.
+$rewards_raw = module_enabled_with_needs('shop')
+    ? $pdo->query("SELECT * FROM campaign_rewards WHERE active=1 ORDER BY position")->fetchAll()
+    : [];
 $rewards = array_map(function ($r) use ($is_en) {
     $r['title']       = ($is_en && ($r['title_en'] ?? '') !== '') ? $r['title_en'] : $r['title'];
     $r['description'] = ($is_en && ($r['description_en'] ?? '') !== '') ? $r['description_en'] : $r['description'];

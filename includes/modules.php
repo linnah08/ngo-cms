@@ -76,6 +76,37 @@ function modules_registry(?array $replace = null): array
                     : $n . ' дарения още чакат плащане.';
             },
         ],
+        'shop' => [
+            'label'       => 'Магазин',
+            'description' => 'Онлайн магазин: продукти, количка, поръчка с доставка с куриер и плащане, фактури и бележки, а при включени „Коментари и отзиви“ — и отзиви за продуктите.',
+            'off_warning' => 'Изключвате магазина. Магазинът, страниците на продуктите, количката и поръчването ще изчезнат от сайта, заедно с връзките към тях в менютата и на началната страница. Даренията продължават да работят. Старите поръчки, продуктите и документите остават в админ панела.',
+            'needs'        => [],
+            // Not listed, on purpose: orders.php / order-view.php (donations and
+            // tickets are orders too), monthly-report.php (it covers donations),
+            // the label, print-file and document endpoints (past orders still
+            // ship and still need their papers), payment.php (donations pay too).
+            'admin_pages'  => ['products.php', 'product-edit.php', 'couriers.php'],
+            // /checkout/ also covers /checkout/confirmation/ and
+            // /checkout/payment-failed/ for link hiding; payment-failed guards only
+            // shop orders, so a failed donation still lands there. Payment returns
+            // and callbacks are never guarded: money may already be taken.
+            'public_paths' => ['/magazin/', '/en/shop/', '/cart/', '/en/cart/', '/checkout/', '/en/checkout/',
+                               '/api/calculate.php', '/api/cities.php', '/api/offices.php'],
+            'pending'      => static function (PDO $pdo): ?string {
+                $unshipped = (int) $pdo->query(
+                    "SELECT COUNT(*) FROM orders
+                      WHERE type = 'physical' AND payment_status = 'paid' AND status IN ('new', 'confirmed')"
+                )->fetchColumn();
+                $unpaid = (int) $pdo->query(
+                    "SELECT COUNT(*) FROM orders
+                      WHERE type = 'physical' AND payment_status = 'pending' AND status <> 'cancelled'"
+                )->fetchColumn();
+                $parts = [];
+                if ($unshipped > 0) $parts[] = $unshipped === 1 ? '1 платена поръчка още не е изпратена' : $unshipped . ' платени поръчки още не са изпратени';
+                if ($unpaid > 0)    $parts[] = $unpaid === 1 ? '1 поръчка още чака плащане' : $unpaid . ' поръчки още чакат плащане';
+                return $parts ? implode(', ', $parts) . '.' : null;
+            },
+        ],
         'campaign' => [
             'label'       => 'Кампании',
             'description' => 'Кампания за набиране на средства: страница с цел и напредък, награди за дарителите и билети за събития.',

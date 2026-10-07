@@ -7,6 +7,7 @@ header('Content-Type: application/json');
 function prod_json(array $d): never { echo json_encode($d); exit; }
 
 admin_require_login();
+module_ajax_guard('shop');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') prod_json(['ok' => false, 'error' => 'method']);
 
 $raw  = $GLOBALS['_om_raw_input'] ?? file_get_contents('php://input');

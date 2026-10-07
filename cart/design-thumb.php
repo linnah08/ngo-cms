@@ -3,6 +3,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/print_helpers.php';
 start_session();
 
+// Module switched off in Admin → Модули — the shop does not exist (site's 404).
+module_public_guard('shop');
+
 $file = basename($_GET['file'] ?? '');
 
 if (!print_filename_safe($file)) {

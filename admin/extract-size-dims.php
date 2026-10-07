@@ -18,6 +18,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 
 admin_require_shop();
+module_ajax_guard('shop');
 module_ajax_guard('ai_helpers');
 
 header('Content-Type: application/json; charset=UTF-8');

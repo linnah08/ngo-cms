@@ -242,6 +242,8 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
               </a>
             </li>
           <?php endforeach; ?>
+          <?php // Shop link and cart only while „Магазин“ is on (Admin → Модули). ?>
+          <?php if (module_enabled_with_needs('shop')): ?>
           <li class="nav-cta">
             <a href="<?= $shop_url ?>"><?= t('nav.shop') ?></a>
           </li>
@@ -253,6 +255,7 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
               <?php endif; ?>
             </a>
           </li>
+          <?php endif; ?>
           <li class="nav-lang-item">
             <?php require __DIR__ . '/lang-switcher.php'; ?>
           </li>

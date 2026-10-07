@@ -204,6 +204,87 @@ final class ModulesOffHttpTest extends TestCase
         return preg_match('#<a href="/admin/' . preg_quote($page, '#') . '"\s+class="admin-nav__link[^"]*"#', $html, $m) ? $m[0] : '';
     }
 
+    // ── shop ─────────────────────────────────────────────────────────────────
+
+    /** Insert a pending order straight into the database; returns its number. */
+    private function makeOrder(string $type, string $payment_status = 'pending'): string
+    {
+        $number = 'OM-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(2)));
+        get_pdo()->prepare(
+            "INSERT INTO orders (order_number, type, status, lang, customer_name, customer_email, items,
+                                 subtotal_eur, shipping_eur, total_eur, payment_method, payment_status)
+             VALUES (?, ?, 'new', 'bg', 'Модули Тест', 'modules-off@example.test', '[]', 10, 0, 10, 'card', ?)"
+        )->execute([$number, $type, $payment_status]);
+        $this->orders[] = $number;
+        return $number;
+    }
+
+    /** @var string[] */
+    private array $orders = [];
+
+    protected function assertPostConditions(): void
+    {
+        if ($this->orders && test_db_available()) {
+            $in = implode(',', array_fill(0, count($this->orders), '?'));
+            get_pdo()->prepare("DELETE FROM orders WHERE order_number IN ($in)")->execute($this->orders);
+            $this->orders = [];
+        }
+    }
+
+    public function test_shop_off_hides_the_shop_everywhere(): void
+    {
+        $this->switchOff('shop');
+        [, $page] = $this->http('/kontakti/');
+        $this->assertStringNotContainsString('class="cart-link"', $page, 'no cart in the header');
+        $this->assertStringNotContainsString('<li class="nav-cta">', $page, 'no shop link in the header');
+        foreach (['/magazin/', '/en/shop/', '/magazin/some-product/', '/cart/', '/en/cart/', '/checkout/', '/en/checkout/'] as $path) {
+            [$code] = $this->http($path);
+            $this->assertSame(404, $code, $path);
+        }
+        [$code] = $this->http('/cart/add.php', false, ['product_id' => 1]);
+        $this->assertSame(404, $code);
+        [, $xml] = $this->http('/sitemap.xml');
+        $this->assertStringNotContainsString('/magazin/', $xml);
+        $this->assertStringNotContainsString('/en/shop/', $xml);
+
+        // A shop order's own pages go with the shop.
+        $o = $this->makeOrder('physical');
+        [$code] = $this->http('/checkout/payment-failed/?order=' . $o);
+        $this->assertSame(404, $code);
+        [$code] = $this->http('/api/payment-return.php?retry=1&order=' . $o);
+        $this->assertSame(404, $code, 'no new payment for a shop order');
+    }
+
+    public function test_donations_work_end_to_end_with_the_shop_off(): void
+    {
+        $this->switchOff('shop');
+        if (!module_enabled_with_needs('donations')) $this->markTestSkipped('Donations are off on this site.');
+
+        [$code, $form] = $this->http('/donation/');
+        $this->assertSame(200, $code);
+        $this->assertStringContainsString('action="/donation/checkout.php"', $form);
+
+        // The form posts and comes back with a message (expired form), not a 404.
+        [$code, , $loc] = $this->http('/donation/checkout.php', false, ['csrf_token' => 'x', 'amount' => '10']);
+        $this->assertSame(302, $code);
+        $this->assertStringContainsString('/donation/', $loc);
+
+        // A donation whose payment failed lands on the shared payment-failed page.
+        $d = $this->makeOrder('donation');
+        [$code, $failed] = $this->http('/checkout/payment-failed/?order=' . $d);
+        $this->assertSame(200, $code, 'payment-failed stays for donations');
+        $this->assertStringContainsString('/api/payment-return.php?retry=1&amp;order=' . $d, $failed);
+        $this->assertStringContainsString('/donation/', $failed, 'and leads back to the donation form');
+
+        // Paid: the bank's return goes to the donation's confirmation, which shows.
+        get_pdo()->prepare("UPDATE orders SET payment_status = 'paid', dsk_order_id = 'modules-off-test' WHERE order_number = ?")->execute([$d]);
+        [$code, , $loc] = $this->http('/api/payment-return.php?order=' . $d);
+        $this->assertSame(302, $code);
+        $this->assertStringContainsString('/donation/confirmation/?order=' . $d, $loc);
+        [$code] = $this->http('/donation/confirmation/?order=' . $d);
+        $this->assertSame(200, $code);
+    }
+
     // ── newsletter ───────────────────────────────────────────────────────────
 
     public function test_newsletter_off_hides_sign_up_but_unsubscribe_works(): void

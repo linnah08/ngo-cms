@@ -66,6 +66,9 @@ if ($amount_eur > 100000)              $errors[] = 'Сумата е твърде
 
 // Validate reward exists if one was selected (donations only)
 $reward = null;
+// Rewards go through the shop's checkout: with „Магазин“ off a reward_id is
+// ignored and the pledge is plain support, paid straight away.
+if (!module_enabled_with_needs('shop')) $reward_id = 0;
 if (!$is_ticket && $reward_id > 0) {
     $reward = $pdo->prepare("SELECT * FROM campaign_rewards WHERE id=? AND active=1");
     $reward->execute([$reward_id]);
