@@ -158,6 +158,38 @@ final class ModulesGatingTest extends TestCase
         $this->assertStringContainsString("module_enabled_with_needs('ai_helpers')", self::src('cron/backfill-article-excerpts.php'));
     }
 
+    // ── social ───────────────────────────────────────────────────────────────
+
+    public function test_social_endpoints_refuse_when_off_and_the_editor_drops_the_tab(): void
+    {
+        foreach (['social-ajax.php', 'linkedin-ajax.php', 'buffer-setup-ajax.php'] as $f) {
+            $src = self::src('admin/' . $f);
+            $auth = preg_match('/admin_require_\w+\(\);/', $src, $m, PREG_OFFSET_CAPTURE) ? $m[0][1] : PHP_INT_MAX;
+            $guard = strpos($src, "module_ajax_guard('social');");
+            $this->assertNotFalse($guard, $f);
+            $this->assertLessThan($guard, $auth, "$f: auth first");
+        }
+        $edit = self::src('admin/article-edit.php');
+        $this->assertStringContainsString("\$tab      = \$social_on && (\$_GET['tab'] ?? 'content') === 'social' ? 'social' : 'content';", $edit);
+        $this->assertMatchesRegularExpression('/<\?php if \(\$social_on\): \?>\s*<nav aria-label="Части на статията"/', $edit);
+        $this->assertStringContainsString("if (!module_enabled_with_needs('social')) continue;", self::src('admin/dashboard.php'), 'calendar');
+        $this->assertMatchesRegularExpression("/module_enabled_with_needs\('social'\)\): \?>\s*<!-- ── Buffer/u", self::src('admin/payment.php'));
+    }
+
+    public function test_social_pending_counts_posts_still_waiting(): void
+    {
+        $dir = sys_get_temp_dir() . '/om-social-' . bin2hex(random_bytes(3));
+        mkdir($dir . '/bg', 0777, true);
+        $now = time();
+        file_put_contents($dir . '/bg/a.json', json_encode(['fb_scheduled_at' => date('Y-m-d\\TH:i', $now + 86400), 'linkedin_scheduled_at' => date('Y-m-d\\TH:i', $now + 7200)]));
+        file_put_contents($dir . '/bg/b.json', json_encode(['fb_scheduled_at' => date('Y-m-d\\TH:i', $now - 86400), 'insta_scheduled_at' => 'now']));
+        file_put_contents($dir . '/bg/c.json', 'not json');
+        $n = modules_social_scheduled_count($dir, $now);
+        exec('rm -rf ' . escapeshellarg($dir));
+        $this->assertSame(2, $n);
+        $this->assertSame(0, modules_social_scheduled_count($dir, $now), 'a missing folder is nothing to report');
+    }
+
     // ── Links to modules ─────────────────────────────────────────────────────
 
     public function test_module_for_path_matches_public_paths(): void

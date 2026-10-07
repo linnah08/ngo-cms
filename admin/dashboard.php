@@ -174,6 +174,9 @@ if (is_dir($articles_dir)) {
             }
         }
 
+        // The rest is social posts — not shown while „Социални мрежи“ is off (Admin → Модули).
+        if (!module_enabled_with_needs('social')) continue;
+
         // Social channels via *_scheduled_at (Europe/Sofia datetime-local strings)
         foreach ([
             'fb_scheduled_at'      => 'fb',

@@ -203,7 +203,9 @@ $en_caps   = array_column($grid_en, 'caption', 'src');
 
 // ── Content / Social tabs — split so editing an article doesn't require
 // scrolling past FB/Instagram/LinkedIn panels you may not be touching today.
-$tab      = ($_GET['tab'] ?? 'content') === 'social' ? 'social' : 'content';
+// „Социални мрежи“ switched off in Admin → Модули: no Social tab, no badges.
+$social_on = module_enabled_with_needs('social');
+$tab      = $social_on && ($_GET['tab'] ?? 'content') === 'social' ? 'social' : 'content';
 $tab_base = $is_new ? '/admin/article-edit.php' : '/admin/article-edit.php?slug=' . urlencode($slug_param);
 $tab_sep  = $is_new ? '?' : '&';
 
@@ -214,7 +216,7 @@ $li_posted         = !empty($article['linkedin_posted_at']);
 $fb_sched          = !empty($article['fb_scheduled_at']);
 $insta_sched       = !empty($article['insta_scheduled_at']);
 $insta_story_sched = !empty($article['insta_story_scheduled_at']);
-$has_social_badge  = $fb_sched || $insta_sched || $insta_story_sched || $li_scheduled || $li_posted;
+$has_social_badge  = $social_on && ($fb_sched || $insta_sched || $insta_story_sched || $li_scheduled || $li_posted);
 $badge_style       = 'font-size:.75rem;font-weight:600;border-radius:3px;padding:.15rem .5rem;';
 ?>
 
@@ -253,12 +255,14 @@ $badge_style       = 'font-size:.75rem;font-weight:600;border-radius:3px;padding
   </ul>
 <?php endif; ?>
 
+<?php if ($social_on): ?>
 <nav aria-label="Части на статията" style="display:flex;gap:1.75rem;border-bottom:1px solid var(--border);margin-bottom:1.5rem;">
   <a href="<?= h($tab_base . $tab_sep . 'tab=content') ?>"<?= $tab === 'content' ? ' aria-current="page"' : '' ?>
      style="display:inline-flex;align-items:center;min-height:44px;font-size:.9rem;font-weight:600;text-decoration:none;border-bottom:3px solid <?= $tab === 'content' ? 'var(--teal)' : 'transparent' ?>;color:<?= $tab === 'content' ? 'var(--teal)' : 'var(--text-muted)' ?>;">Съдържание</a>
   <a href="<?= h($tab_base . $tab_sep . 'tab=social') ?>"<?= $tab === 'social' ? ' aria-current="page"' : '' ?>
      style="display:inline-flex;align-items:center;min-height:44px;font-size:.9rem;font-weight:600;text-decoration:none;border-bottom:3px solid <?= $tab === 'social' ? 'var(--teal)' : 'transparent' ?>;color:<?= $tab === 'social' ? 'var(--teal)' : 'var(--text-muted)' ?>;">Социални мрежи</a>
 </nav>
+<?php endif; ?>
 
 <?php if ($error): ?>
   <div class="admin-alert admin-alert--error" style="margin-bottom:1.5rem;"><?= h($error) ?></div>

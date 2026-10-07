@@ -102,6 +102,25 @@ function modules_registry(?array $replace = null): array
             'admin_pages'  => ['financial-reports.php'],
             'public_paths' => ['/finansovi-otcheti/', '/en/financial-reports/'],
         ],
+        'social' => [
+            'label'       => 'Социални мрежи',
+            'description' => 'Раздел „Социални мрежи“ в редактора на статии: публикации за Facebook, Instagram и LinkedIn, написани с помощта на изкуствен интелект и планирани през Buffer.',
+            'off_warning' => 'Изключвате социалните мрежи. Разделът „Социални мрежи“ ще изчезне от редактора на статии, а настройките за Buffer — от „Плащания“. Публикации, които вече са планирани в Buffer, ще излязат по график, освен ако не ги изтриете в Buffer. Написаните текстове остават запазени.',
+            'needs'        => [],
+            // No page of its own: the Social tab lives in article-edit.php, Buffer
+            // settings in payment.php. Its JSON endpoints (social-ajax.php,
+            // linkedin-ajax.php, buffer-setup-ajax.php) call module_ajax_guard('social').
+            'admin_pages'  => [],
+            'public_paths' => [],
+            'pending'      => static function (PDO $pdo): ?string {
+                // Posts still waiting in Buffer — read from the articles, not the database.
+                $n = modules_social_scheduled_count(defined('ARTICLES_PATH') ? ARTICLES_PATH : dirname(__DIR__) . '/content/articles', time());
+                if ($n < 1) return null;
+                return $n === 1
+                    ? '1 публикация в социалните мрежи е планирана и още не е излязла.'
+                    : $n . ' публикации в социалните мрежи са планирани и още не са излезли.';
+            },
+        ],
         'ai_helpers' => [
             'label'       => 'Помощ от изкуствен интелект',
             'description' => 'Бутони „✦ Translate“, които превеждат текста от български на английски, предложения за ключови думи, автоматично кратко описание на статиите и разчитане на таблици с размери.',
@@ -116,6 +135,24 @@ function modules_registry(?array $replace = null): array
         ],
     ];
     return $registry;
+}
+
+/**
+ * Social posts (Facebook, Instagram, Instagram story, LinkedIn) scheduled for
+ * after $now, counted over the BG articles in $articles_dir.
+ */
+function modules_social_scheduled_count(string $articles_dir, int $now): int
+{
+    $n = 0;
+    foreach (glob($articles_dir . '/bg/*.json') ?: [] as $file) {
+        $a = json_decode((string) @file_get_contents($file), true);
+        if (!is_array($a)) continue;
+        foreach (['fb_scheduled_at', 'insta_scheduled_at', 'insta_story_scheduled_at', 'linkedin_scheduled_at'] as $k) {
+            $t = !empty($a[$k]) && $a[$k] !== 'now' ? strtotime((string) $a[$k]) : false;
+            if ($t !== false && $t > $now) $n++;
+        }
+    }
+    return $n;
 }
 
 /** The content/organisation.json key a module's switch is saved under. */

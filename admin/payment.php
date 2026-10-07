@@ -466,6 +466,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <?php endif; ?>
 </section>
 
+<?php // Only while „Социални мрежи“ is on (Admin → Модули); the key stays saved. ?>
+<?php if (module_enabled_with_needs('social')): ?>
 <!-- ── Buffer ─────────────────────────────────────────────────────────────────── -->
 <section class="admin-card" style="margin-bottom:2rem;">
   <h2 class="admin-card__title">Buffer (Социални мрежи)</h2>
@@ -523,6 +525,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <?php endif; ?>
   </div>
 </section>
+<?php endif; ?>
 
 <!-- ── Spam filter ────────────────────────────────────────────────────────────── -->
 <section class="admin-card" style="margin-bottom:2rem;">
@@ -587,6 +590,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   </form>
 </section>
 
+<?php if (module_enabled_with_needs('social')): ?>
 <script>
 document.getElementById('bufferConnectBtn').addEventListener('click', async function() {
   var btn     = this;
@@ -634,6 +638,7 @@ document.getElementById('bufferConnectBtn').addEventListener('click', async func
   spinner.style.display = 'none';
 });
 </script>
+<?php endif; ?>
 
 <style>
 .pwd-toggle {
