@@ -7,6 +7,7 @@
  * api/payment-callback.php (server-to-server).
  */
 require_once __DIR__ . '/unpaid_orders.php';
+require_once __DIR__ . '/payment_errors.php';
 
 /**
  * Send the "payment received" emails for a now-paid order.
@@ -64,8 +65,34 @@ function notify_order_paid(array $order): void
     }
 }
 
+/**
+ * Is this DSK status reply about THIS order or pledge? We start every card payment
+ * as register("<number>_<timestamp>", amount), and the bank echoes both back in
+ * getOrderStatusExtended (orderNumber, amount in cents — checked against a real
+ * reply). A payment id copied from another payment fails here, so it can neither
+ * mark this order paid nor cancel it.
+ */
+function dsk_status_belongs_to(array $status, string $number, float $amountEur): bool
+{
+    $ref = (string) ($status['orderNumber'] ?? '');
+    return $number !== ''
+        && str_starts_with($ref, $number . '_')
+        && isset($status['amount'])
+        && (int) $status['amount'] === (int) round($amountEur * 100);
+}
+
 function process_dsk_result(PDO $pdo, array $order, string $dskOrderId, array $status): void
 {
+    // Never act on a reply about some other payment — not to mark paid, not to cancel.
+    if (!dsk_status_belongs_to($status, (string) $order['order_number'], (float) $order['total_eur'])) {
+        payment_error_report(
+            'Отговорът на банката не е за тази поръчка — плащането не е отбелязано',
+            (string) $order['order_number'],
+            new RuntimeException('DSK reply for ' . ($status['orderNumber'] ?? '?') . ' / ' . ($status['amount'] ?? '?') . ' cents')
+        );
+        return;
+    }
+
     $orderStatus = (int)($status['orderStatus'] ?? -1);
 
     // Always persist the DSK order UUID if we don't have it yet

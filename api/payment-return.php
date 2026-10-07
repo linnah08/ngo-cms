@@ -67,7 +67,10 @@ if (isset($_GET['retry'])) {
 }
 
 // ── Normal return: verify payment status ─────────────────────────────────────
-$dsk_order_id = $_GET['mdOrder'] ?? $_GET['orderId'] ?? $order['dsk_order_id'] ?? '';
+// The id we saved when the payment started comes first: the one in the address
+// is only a fallback, and anything else could be pasted there. process_dsk_result()
+// also checks the bank's reply is about this order and amount.
+$dsk_order_id = ($order['dsk_order_id'] ?? '') ?: ($_GET['mdOrder'] ?? $_GET['orderId'] ?? '');
 
 if (!$dsk_order_id) {
     header('Location: ' . $failed_url);

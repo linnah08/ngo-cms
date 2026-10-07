@@ -145,19 +145,76 @@ final class ProcessPaymentTest extends TestCase
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    private function paidStatus(): array
+    /** A bank reply about $order itself — its own reference and amount. */
+    private function paidStatus(array $order): array
     {
-        return ['orderStatus' => DSKBankPayment::STATUS_DEPOSITED];
+        return ['orderStatus' => DSKBankPayment::STATUS_DEPOSITED, 'orderNumber' => $order['order_number'] . '_1700000000',
+                'amount' => (int) round((float) $order['total_eur'] * 100)];
     }
 
-    private function declinedStatus(): array
+    /** A bank reply about $order itself — its own reference and amount. */
+    private function declinedStatus(array $order): array
     {
-        return ['orderStatus' => DSKBankPayment::STATUS_DECLINED];
+        return ['orderStatus' => DSKBankPayment::STATUS_DECLINED, 'orderNumber' => $order['order_number'] . '_1700000000',
+                'amount' => (int) round((float) $order['total_eur'] * 100)];
     }
 
-    private function pendingStatus(): array
+    /** A bank reply about $order itself — its own reference and amount. */
+    private function pendingStatus(array $order): array
     {
-        return ['orderStatus' => DSKBankPayment::STATUS_CREATED];
+        return ['orderStatus' => DSKBankPayment::STATUS_CREATED, 'orderNumber' => $order['order_number'] . '_1700000000',
+                'amount' => (int) round((float) $order['total_eur'] * 100)];
+    }
+
+    // ── a bank reply about some other payment is never acted on ────────────────
+    // Before, the return page took the bank id from its address, so a cheap paid
+    // order's id could mark an expensive one paid, or a declined one's cancel it.
+
+    public function testReplyBelongsOnlyToItsOwnNumberAndAmount(): void
+    {
+        $real = ['orderNumber' => 'OM-20260928-C9EB_1790617761', 'amount' => 954];   // shape of a real DSK reply
+        $this->assertTrue(dsk_status_belongs_to($real, 'OM-20260928-C9EB', 9.54));
+        $this->assertFalse(dsk_status_belongs_to($real, 'OM-20260928-C9E', 9.54), 'a number that is only a prefix');
+        $this->assertFalse(dsk_status_belongs_to($real, 'OM-20260928-AAAA', 9.54), 'another order');
+        $this->assertFalse(dsk_status_belongs_to($real, 'OM-20260928-C9EB', 95.40), 'another amount');
+        $this->assertFalse(dsk_status_belongs_to(['orderStatus' => 2], 'OM-20260928-C9EB', 9.54), 'no reference at all');
+        $this->assertFalse(dsk_status_belongs_to($real, '', 9.54));
+    }
+
+    public function testAnotherOrdersPaidReplyDoesNotMarkThisOrderPaid(): void
+    {
+        $cheap  = $this->insertDonationOrder(['total_eur' => 1.00, 'subtotal_eur' => 1.00]);
+        $target = $this->insertDonationOrder(['total_eur' => 250.00, 'subtotal_eur' => 250.00]);
+        process_dsk_result(self::$pdo, $target, 'cheap-payment-uuid', $this->paidStatus($cheap));
+        $after = $this->freshOrder($target['id']);
+        $this->assertSame('pending', $after['payment_status']);
+        $this->assertNull($after['dsk_order_id'] ?: null, 'the foreign payment id is not stored on the order either');
+    }
+
+    public function testRightNumberWrongAmountIsNotPaid(): void
+    {
+        $order = $this->insertDonationOrder();
+        $reply = $this->paidStatus($order);
+        $reply['amount'] = 100;
+        process_dsk_result(self::$pdo, $order, 'dsk-uuid-amount', $reply);
+        $this->assertSame('pending', $this->freshOrder($order['id'])['payment_status']);
+    }
+
+    public function testAnotherOrdersDeclinedReplyDoesNotCancelThisOrder(): void
+    {
+        $other  = $this->insertPhysicalOrder();
+        $target = $this->insertPhysicalOrder();
+        process_dsk_result(self::$pdo, $target, 'declined-uuid', $this->declinedStatus($other));
+        $this->assertNotSame('cancelled', $this->freshOrder($target['id'])['status']);
+    }
+
+    public function testReturnPagesTrustTheSavedPaymentIdFirst(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $this->assertStringContainsString("(\$order['dsk_order_id'] ?? '') ?: (\$_GET['mdOrder']", (string) file_get_contents("$root/api/payment-return.php"));
+        $campaign = (string) file_get_contents("$root/api/campaign-payment-return.php");
+        $this->assertStringContainsString("(\$pledge['dsk_order_id'] ?? '') ?: (\$_GET['mdOrder']", $campaign);
+        $this->assertStringContainsString("dsk_status_belongs_to(\$status, (string) \$pledge['pledge_number'], (float) \$pledge['amount_eur'])", $campaign);
     }
 
     // ── donation: paid ────────────────────────────────────────────────────────
@@ -165,7 +222,7 @@ final class ProcessPaymentTest extends TestCase
     public function testDonationPaidSetsPaymentStatusToPaid(): void
     {
         $order = $this->insertDonationOrder();
-        process_dsk_result(self::$pdo, $order, 'dsk-uuid-001', $this->paidStatus());
+        process_dsk_result(self::$pdo, $order, 'dsk-uuid-001', $this->paidStatus($order));
 
         $fresh = $this->freshOrder((int)$order['id']);
         $this->assertSame('paid', $fresh['payment_status']);
@@ -174,7 +231,7 @@ final class ProcessPaymentTest extends TestCase
     public function testDonationPaidSetsStatusToConfirmed(): void
     {
         $order = $this->insertDonationOrder();
-        process_dsk_result(self::$pdo, $order, 'dsk-uuid-002', $this->paidStatus());
+        process_dsk_result(self::$pdo, $order, 'dsk-uuid-002', $this->paidStatus($order));
 
         $fresh = $this->freshOrder((int)$order['id']);
         $this->assertSame('confirmed', $fresh['status']);
@@ -183,7 +240,7 @@ final class ProcessPaymentTest extends TestCase
     public function testDonationPaidPersistsDskOrderId(): void
     {
         $order = $this->insertDonationOrder();
-        process_dsk_result(self::$pdo, $order, 'dsk-uuid-003', $this->paidStatus());
+        process_dsk_result(self::$pdo, $order, 'dsk-uuid-003', $this->paidStatus($order));
 
         $fresh = $this->freshOrder((int)$order['id']);
         $this->assertSame('dsk-uuid-003', $fresh['dsk_order_id']);
@@ -192,7 +249,7 @@ final class ProcessPaymentTest extends TestCase
     public function testDonationPaidDoesNotOverwriteExistingDskOrderId(): void
     {
         $order = $this->insertDonationOrder(['dsk_order_id' => 'original-uuid']);
-        process_dsk_result(self::$pdo, $order, 'different-uuid', $this->paidStatus());
+        process_dsk_result(self::$pdo, $order, 'different-uuid', $this->paidStatus($order));
 
         $fresh = $this->freshOrder((int)$order['id']);
         $this->assertSame('original-uuid', $fresh['dsk_order_id']);
@@ -201,11 +258,11 @@ final class ProcessPaymentTest extends TestCase
     public function testDonationPaidIsIdempotent(): void
     {
         $order = $this->insertDonationOrder();
-        process_dsk_result(self::$pdo, $order, 'dsk-uuid-004', $this->paidStatus());
+        process_dsk_result(self::$pdo, $order, 'dsk-uuid-004', $this->paidStatus($order));
 
         // Reload and call again — should not throw or corrupt state
         $order2 = $this->freshOrder((int)$order['id']);
-        process_dsk_result(self::$pdo, $order2, 'dsk-uuid-004', $this->paidStatus());
+        process_dsk_result(self::$pdo, $order2, 'dsk-uuid-004', $this->paidStatus($order2));
 
         $fresh = $this->freshOrder((int)$order['id']);
         $this->assertSame('paid', $fresh['payment_status']);
@@ -226,7 +283,7 @@ final class ProcessPaymentTest extends TestCase
     public function testEnglishDonationGetsAnEnglishConfirmationEmail(): void
     {
         $order = $this->insertDonationOrder(['lang' => 'en', 'customer_name' => 'Test Donor', 'donation_message' => 'For the kids']);
-        process_dsk_result(self::$pdo, $order, 'dsk-uuid-en-1', $this->paidStatus());
+        process_dsk_result(self::$pdo, $order, 'dsk-uuid-en-1', $this->paidStatus($order));
 
         $mail = $this->donorEmail((int)$order['id']);
         $this->assertSame(email_tpl_get('donation-confirmation-customer', 'en', ['donor_name' => 'Test Donor'])['subject'], $mail['subject']);
@@ -238,7 +295,7 @@ final class ProcessPaymentTest extends TestCase
     public function testBulgarianDonationKeepsTheBulgarianConfirmationEmail(): void
     {
         $order = $this->insertDonationOrder(['donation_message' => 'За децата']);
-        process_dsk_result(self::$pdo, $order, 'dsk-uuid-bg-1', $this->paidStatus());
+        process_dsk_result(self::$pdo, $order, 'dsk-uuid-bg-1', $this->paidStatus($order));
 
         $mail = $this->donorEmail((int)$order['id']);
         $this->assertSame(email_tpl_get('donation-confirmation-customer', 'bg', ['donor_name' => $order['customer_name']])['subject'], $mail['subject']);
@@ -250,7 +307,7 @@ final class ProcessPaymentTest extends TestCase
     public function testDonationDeclinedSetsStatusToCancelled(): void
     {
         $order = $this->insertDonationOrder();
-        process_dsk_result(self::$pdo, $order, 'dsk-uuid-005', $this->declinedStatus());
+        process_dsk_result(self::$pdo, $order, 'dsk-uuid-005', $this->declinedStatus($order));
 
         $fresh = $this->freshOrder((int)$order['id']);
         $this->assertSame('cancelled', $fresh['status']);
@@ -259,7 +316,7 @@ final class ProcessPaymentTest extends TestCase
     public function testDonationDeclinedDoesNotMarkAsPaid(): void
     {
         $order = $this->insertDonationOrder();
-        process_dsk_result(self::$pdo, $order, 'dsk-uuid-006', $this->declinedStatus());
+        process_dsk_result(self::$pdo, $order, 'dsk-uuid-006', $this->declinedStatus($order));
 
         $fresh = $this->freshOrder((int)$order['id']);
         $this->assertSame('pending', $fresh['payment_status']);
@@ -269,7 +326,7 @@ final class ProcessPaymentTest extends TestCase
     {
         // If somehow payment-return and callback both fire: confirmed order must not be cancelled
         $order = $this->insertDonationOrder(['payment_status' => 'paid', 'status' => 'confirmed']);
-        process_dsk_result(self::$pdo, $order, 'dsk-uuid-007', $this->declinedStatus());
+        process_dsk_result(self::$pdo, $order, 'dsk-uuid-007', $this->declinedStatus($order));
 
         $fresh = $this->freshOrder((int)$order['id']);
         $this->assertSame('confirmed', $fresh['status'], 'A paid order must not be cancelled by a late decline signal');
@@ -280,7 +337,7 @@ final class ProcessPaymentTest extends TestCase
     public function testDonationPendingStatusDoesNotChangeOrder(): void
     {
         $order = $this->insertDonationOrder();
-        process_dsk_result(self::$pdo, $order, 'dsk-uuid-008', $this->pendingStatus());
+        process_dsk_result(self::$pdo, $order, 'dsk-uuid-008', $this->pendingStatus($order));
 
         $fresh = $this->freshOrder((int)$order['id']);
         $this->assertSame('new', $fresh['status']);
@@ -292,7 +349,7 @@ final class ProcessPaymentTest extends TestCase
     public function testPhysicalOrderPaidSetsPaymentStatusToPaid(): void
     {
         $order = $this->insertPhysicalOrder();
-        process_dsk_result(self::$pdo, $order, 'dsk-uuid-009', $this->paidStatus());
+        process_dsk_result(self::$pdo, $order, 'dsk-uuid-009', $this->paidStatus($order));
 
         $fresh = $this->freshOrder((int)$order['id']);
         $this->assertSame('paid', $fresh['payment_status']);
@@ -301,7 +358,7 @@ final class ProcessPaymentTest extends TestCase
     public function testPhysicalOrderPaidSetsStatusToConfirmed(): void
     {
         $order = $this->insertPhysicalOrder();
-        process_dsk_result(self::$pdo, $order, 'dsk-uuid-010', $this->paidStatus());
+        process_dsk_result(self::$pdo, $order, 'dsk-uuid-010', $this->paidStatus($order));
 
         $fresh = $this->freshOrder((int)$order['id']);
         $this->assertSame('confirmed', $fresh['status']);
@@ -310,7 +367,7 @@ final class ProcessPaymentTest extends TestCase
     public function testPhysicalOrderDeclinedSetsStatusToCancelled(): void
     {
         $order = $this->insertPhysicalOrder();
-        process_dsk_result(self::$pdo, $order, 'dsk-uuid-011', $this->declinedStatus());
+        process_dsk_result(self::$pdo, $order, 'dsk-uuid-011', $this->declinedStatus($order));
 
         $fresh = $this->freshOrder((int)$order['id']);
         $this->assertSame('cancelled', $fresh['status']);
@@ -321,7 +378,7 @@ final class ProcessPaymentTest extends TestCase
     public function testDonationPreAuthApprovedAlsoMarksPaid(): void
     {
         $order = $this->insertDonationOrder();
-        process_dsk_result(self::$pdo, $order, 'dsk-uuid-012', ['orderStatus' => DSKBankPayment::STATUS_APPROVED]);
+        process_dsk_result(self::$pdo, $order, 'dsk-uuid-012', ['orderStatus' => DSKBankPayment::STATUS_APPROVED] + $this->paidStatus($order));
 
         $fresh = $this->freshOrder((int)$order['id']);
         $this->assertSame('paid', $fresh['payment_status']);

@@ -9,6 +9,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/process_payment.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DocumentGenerator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DonationCertGenerator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/TicketGenerator.php';
@@ -69,7 +70,10 @@ if (isset($_GET['retry'])) {
 }
 
 // ── Verify payment status ─────────────────────────────────────────────────────
-$dsk_order_id = $_GET['mdOrder'] ?? $_GET['orderId'] ?? $pledge['dsk_order_id'] ?? '';
+// The id we saved when the payment started comes first: the one in the address
+// is only a fallback, and anything else could be pasted there. The reply is also
+// checked against this pledge's number and amount before anything changes.
+$dsk_order_id = ($pledge['dsk_order_id'] ?? '') ?: ($_GET['mdOrder'] ?? $_GET['orderId'] ?? '');
 
 if (!$dsk_order_id) {
     header('Location: /campaign/payment-failed/?pledge=' . urlencode($pledge_number));
@@ -97,6 +101,16 @@ exit;
 // ── Handler ───────────────────────────────────────────────────────────────────
 function process_campaign_dsk_result(PDO $pdo, array $pledge, string $dskOrderId, array $status): void
 {
+    // Never act on a reply about some other payment — not to mark paid, not to fail.
+    if (!dsk_status_belongs_to($status, (string) $pledge['pledge_number'], (float) $pledge['amount_eur'])) {
+        payment_error_report(
+            'Отговорът на банката не е за тази подкрепа — плащането не е отбелязано',
+            (string) $pledge['pledge_number'],
+            new RuntimeException('DSK reply for ' . ($status['orderNumber'] ?? '?') . ' / ' . ($status['amount'] ?? '?') . ' cents')
+        );
+        return;
+    }
+
     $orderStatus = (int)($status['orderStatus'] ?? -1);
 
     if (!$pledge['dsk_order_id']) {
