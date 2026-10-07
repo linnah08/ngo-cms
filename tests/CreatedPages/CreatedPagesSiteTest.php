@@ -39,10 +39,12 @@ final class CreatedPagesSiteTest extends CreatedPagesTestCase
 
     // ── Menus ────────────────────────────────────────────────────────────────
 
-    public function testMenusHideLinksToDraftsAndMissingPages(): void
+    public function testMenusHideOnlyLinksToDraftsAndDeletedPages(): void
     {
         $this->storyPage('draft');
         $this->putPage(['id' => 'p_live0000', 'status' => 'published', 'slug_bg' => 'sabitiya', 'slug_en' => 'events']);
+        $gone = $this->putPage(['id' => 'p_gone0000', 'status' => 'published', 'slug_bg' => 'iztrita-stranitsa', 'slug_en' => 'deleted-page']);
+        $this->assertTrue(cpage_delete($gone['id']));
         $items = [
             0 => ['label' => 'Draft',      'url' => '/nashata-istoriya/'],
             1 => ['label' => 'Draft EN',   'url' => '/en/our-story'],
@@ -58,9 +60,24 @@ final class CreatedPagesSiteTest extends CreatedPagesTestCase
             11 => ['label' => 'Query',     'url' => '/sabitiya/?a=1#b'],
             12 => ['label' => 'Redirected', 'url' => '/about/'],
             13 => 'not an item',
+            14 => ['label' => 'Deleted EN', 'url' => '/en/deleted-page/'],
+            // Leads nowhere this site knows — but a site's own server rule may serve it.
+            15 => ['label' => 'Unknown',   'url' => '/nyakakva-stranitsa/'],
         ];
         $shown = menu_public_items($items);
-        $this->assertSame([2, 4, 5, 6, 7, 8, 9, 10, 11, 12], array_keys($shown), 'keys are kept for the on-page editor');
+        $this->assertSame([2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15], array_keys($shown), 'keys are kept for the on-page editor');
+        $this->assertSame('missing', menu_link_state('/nyakakva-stranitsa/')['state']);
+        $this->assertSame('deleted', menu_link_state('/iztrita-stranitsa/')['state']);
+        $this->assertSame('Т', menu_link_state('/en/deleted-page')['page']['title_bg']);
+    }
+
+    public function testAnAddressOfADeletedPageWorksAgainForANewPage(): void
+    {
+        $gone = $this->putPage(['id' => 'p_gone0000', 'status' => 'published', 'slug_bg' => 'sabitiya', 'slug_en' => 'events']);
+        cpage_delete($gone['id']);
+        $this->assertSame([], menu_public_items([['label' => 'x', 'url' => '/sabitiya/']]));
+        $this->putPage(['id' => 'p_new00000', 'status' => 'published', 'slug_bg' => 'sabitiya', 'slug_en' => 'events']);
+        $this->assertCount(1, menu_public_items([['label' => 'x', 'url' => '/sabitiya/']]));
     }
 
     public function testPublishingAPageShowsItsMenuLink(): void
@@ -83,23 +100,32 @@ final class CreatedPagesSiteTest extends CreatedPagesTestCase
 
     public function testMenuLinksFollowAnAddressChange(): void
     {
-        // cpage_menus_follow() edits content/menus.json — keep the site's own copy intact.
-        $file   = CONTENT_PATH . '/menus.json';
-        $backup = is_file($file) ? file_get_contents($file) : null;
-        try {
-            file_put_contents($file, json_encode(['header' => [
-                'bg' => [['label' => 'И', 'url' => '/stara/#x'], ['label' => 'Д', 'url' => '/drugo/']],
-                'en' => [['label' => 'S', 'url' => '/en/old']],
-            ]]));
-            $old = ['slug_bg' => 'stara', 'slug_en' => 'old'];
-            $this->assertTrue(cpage_menus_follow($old, ['slug_bg' => 'nova', 'slug_en' => 'new']));
-            $m = json_decode((string) file_get_contents($file), true);
-            $this->assertSame('/nova/#x', $m['header']['bg'][0]['url']);
-            $this->assertSame('/drugo/', $m['header']['bg'][1]['url']);
-            $this->assertSame('/en/new', $m['header']['en'][0]['url']);
-        } finally {
-            $backup !== null ? file_put_contents($file, $backup) : @unlink($file);
-        }
+        $file = cpage_menus_file();   // a temp file (CreatedPagesTestCase), never the site's menus
+        $this->assertStringStartsWith($this->dir, $file);
+        file_put_contents($file, json_encode(['header' => [
+            'bg' => [['label' => 'И', 'url' => '/stara/#x'], ['label' => 'Д', 'url' => '/drugo/']],
+            'en' => [['label' => 'S', 'url' => '/en/old']],
+        ]]));
+        $old = ['slug_bg' => 'stara', 'slug_en' => 'old'];
+        $this->assertTrue(cpage_menus_follow($old, ['slug_bg' => 'nova', 'slug_en' => 'new']));
+        $m = json_decode((string) file_get_contents($file), true);
+        $this->assertSame('/nova/#x', $m['header']['bg'][0]['url']);
+        $this->assertSame('/drugo/', $m['header']['bg'][1]['url']);
+        $this->assertSame('/en/new', $m['header']['en'][0]['url']);
+    }
+
+    public function testMenusUsingAPageNameEachLink(): void
+    {
+        $page = $this->storyPage();
+        file_put_contents(cpage_menus_file(), json_encode([
+            'header'      => ['bg' => [['label' => 'Историята ни', 'url' => '/nashata-istoriya/']], 'en' => [['label' => 'Our story', 'url' => '/en/our-story/']]],
+            'footer_nav'  => ['bg' => [['label' => 'Друго', 'url' => '/za-nas/']], 'en' => [['label' => 'Story', 'url' => '/en/our-story']]],
+            'footer_help' => ['bg' => [], 'en' => []],
+        ], JSON_UNESCAPED_UNICODE));
+        $this->assertSame([
+            "\u{201E}Историята ни\u{201C} (Хедър навигация)",
+            "\u{201E}Story\u{201C} (Футър — Навигация)",
+        ], cpage_menus_using($page));
     }
 
     // ── Sitemap ──────────────────────────────────────────────────────────────

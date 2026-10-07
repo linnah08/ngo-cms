@@ -387,20 +387,24 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
      ══════════════════════════════════════════════════════════════════════════ -->
 <h1 style="margin-bottom:1.5rem;">Съдържание</h1>
 
-<!-- ── Pages the admin created (content/pages/, admin/created-pages.php) ──── -->
 <?php
-require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/menus.php';
-$cp_list  = cpage_all();
+// The one message area of this screen: whatever any action left for it (a created
+// page made, published or deleted, a page that was not found…), read once, here,
+// at the top — not inside one block, where other messages would be lost or hidden.
 $cp_flash = flash_get();
-$cp_site  = rtrim(SITE_URL, '/');
 ?>
-<div id="cpLive" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;"><?php foreach ($cp_flash as $f) if ($f['type'] === 'success') echo h($f['message']) . ' '; ?></div>
-<?php foreach ($cp_flash as $f): $ok = $f['type'] === 'success'; ?>
+<div id="cpLive" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;"><?php foreach ($cp_flash as $f) if (($f['type'] ?? '') !== 'error') echo h($f['message']) . ' '; ?></div>
+<?php foreach ($cp_flash as $f): $ok = ($f['type'] ?? '') !== 'error'; ?>
   <div <?= $ok ? '' : 'role="alert" ' ?>style="border:2px solid <?= $ok ? '#15803d' : '#b91c1c' ?>;background:<?= $ok ? '#f0fdf4' : '#fef2f2' ?>;color:<?= $ok ? '#14532d' : '#7f1d1d' ?>;border-radius:8px;padding:.85rem 1.1rem;margin-bottom:1.25rem;font-weight:600;">
     <span aria-hidden="true"><?= $ok ? '✓' : '⚠' ?> </span><?= h($f['message']) ?>
   </div>
 <?php endforeach; ?>
 
+<!-- ── Pages the admin created (content/pages/, admin/created-pages.php) ──── -->
+<?php
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/menus.php';
+$cp_list  = cpage_all();
+?>
 <section aria-labelledby="cpListTitle" style="margin-bottom:2.5rem;">
   <h2 id="cpListTitle" style="margin:0 0 .5rem;font-size:1.15rem;">Вашите страници</h2>
   <p style="margin:0 0 1rem;color:var(--text-muted);">
@@ -435,13 +439,16 @@ $cp_site  = rtrim(SITE_URL, '/');
         $cp_draft = $cp['status'] !== 'published';
         $cp_menus = cpage_menus_using($cp);
         $cp_confirm = "Да изтрия ли страницата \u{201E}{$cp['title_bg']}\u{201C}? Това не може да се върне."
-            . ($cp_menus ? ' Тя е в менюто: ' . implode(', ', $cp_menus) . ' — връзката към нея ще изчезне от сайта.' : '');
+            . ' Снимките ѝ също ще бъдат изтрити.'
+            . ($cp_menus ? ' Страницата е в менюто: ' . implode(', ', $cp_menus) . '. Тази връзка ще изчезне от сайта, докато не я насочите другаде.' : '');
       ?>
         <tr id="cp-<?= h($cp['id']) ?>">
           <td>
             <strong><?= h($cp['title_bg']) ?></strong>
             <?php if ($cp['title_en'] !== '' && $cp['title_en'] !== $cp['title_bg']): ?>
               <br><span lang="en" style="color:var(--text-muted);font-size:.85rem;"><?= h($cp['title_en']) ?></span>
+            <?php elseif (preg_match('/\p{Cyrillic}/u', $cp['title_en'] !== '' ? $cp['title_en'] : $cp['title_bg'])): ?>
+              <br><span style="color:#92400e;font-size:.85rem;"><span aria-hidden="true">⚠ </span>Английското заглавие не е преведено</span>
             <?php endif; ?>
             <?php if ($cp_menus): ?>
               <br><span style="color:var(--text-muted);font-size:.8rem;">В менюто: <?= h(implode(', ', $cp_menus)) ?></span>

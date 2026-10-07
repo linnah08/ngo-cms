@@ -331,34 +331,140 @@ function cpage_save_settings(string $id, array $in): array
                     : ['ok' => false, 'errors' => ['_form' => $r['error']], 'values' => $v];
 }
 
+/**
+ * Delete a page: its file, and its own images folder
+ * (assets/images/pages/created/<id>/). Its addresses are remembered as deleted,
+ * so menu links that still point at them are hidden from visitors (and the menu
+ * editor can say the page is gone) — see menu_link_state().
+ */
 function cpage_delete(string $id): bool
 {
     $path = cpage_file($id);
     if ($path === null || !is_file($path)) return false;
+    $page = cpage_normalize(json_decode((string) @file_get_contents($path), true), $id);
     $ok = @unlink($path);
     @unlink($path . '.lock');
     cpage_cache_reset();
-    return $ok;
+    if (!$ok) return false;
+    if ($page !== null) cpage_remember_deleted($page);
+    cpage_delete_images($id);
+    return true;
+}
+
+/** The folder that holds the base of every created page's images folder. */
+function cpage_images_base(): string
+{
+    return $GLOBALS['_om_pages_img_dir'] ?? ROOT_PATH . '/assets/images/pages/created';
+}
+
+/**
+ * Remove assets/images/pages/created/<id>/ and everything in it. Only for a
+ * valid page id, only that one folder, and never through a symlink: a link
+ * inside is removed as a link, never followed.
+ */
+function cpage_delete_images(string $id): bool
+{
+    if (!cpage_valid_id($id)) return false;
+    $base = realpath(cpage_images_base());
+    if ($base === false) return true;   // no page has images yet
+    $dir = $base . '/' . $id;
+    if (is_link($dir)) return @unlink($dir);
+    if (!is_dir($dir)) return true;
+    $real = realpath($dir);
+    if ($real === false || dirname($real) !== $base) return false;
+    $rm = function (string $d) use (&$rm): bool {
+        $ok = true;
+        foreach (scandir($d) ?: [] as $e) {
+            if ($e === '.' || $e === '..') continue;
+            $f = $d . '/' . $e;
+            if (is_link($f) || !is_dir($f)) $ok = @unlink($f) && $ok;
+            else $ok = $rm($f) && $ok;
+        }
+        return @rmdir($d) && $ok;
+    };
+    return $rm($real);
+}
+
+// ── Deleted pages ────────────────────────────────────────────────────────────
+
+/** content/pages/deleted.json: the addresses of deleted pages, newest last. */
+function cpage_deleted_file(): string
+{
+    return cpage_dir() . '/deleted.json';
+}
+
+/** @return list<array{slug_bg: string, slug_en: string, title_bg: string}> */
+function cpage_deleted(): array
+{
+    $raw  = json_decode((string) @file_get_contents(cpage_deleted_file()), true);
+    $out  = [];
+    foreach (is_array($raw) ? $raw : [] as $d) {
+        if (!is_array($d)) continue;
+        $slug = fn(string $k): string => is_string($d[$k] ?? null) && preg_match(CPAGE_SLUG_RE, $d[$k]) ? $d[$k] : '';
+        $out[] = ['slug_bg' => $slug('slug_bg'), 'slug_en' => $slug('slug_en'),
+                  'title_bg' => is_string($d['title_bg'] ?? null) ? $d['title_bg'] : ''];
+    }
+    return $out;
+}
+
+function cpage_remember_deleted(array $page): void
+{
+    if ($page['slug_bg'] === '' && $page['slug_en'] === '') return;
+    $list   = cpage_deleted();
+    $list[] = ['slug_bg' => $page['slug_bg'], 'slug_en' => $page['slug_en'], 'title_bg' => $page['title_bg']];
+    $list   = array_slice($list, -500);   // a long-lived site never grows this without end
+    $json   = json_encode($list, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($json !== false) @file_put_contents(cpage_deleted_file(), $json, LOCK_EX);
+}
+
+/** The deleted page that had $slug as its address in $lang (the latest one), or null. */
+function cpage_deleted_by_slug(string $lang, string $slug): ?array
+{
+    if ($slug === '') return null;
+    $key = $lang === 'en' ? 'slug_en' : 'slug_bg';
+    foreach (array_reverse(cpage_deleted()) as $d) {
+        if ($d[$key] === $slug) return $d;
+    }
+    return null;
 }
 
 // ── Where a page is used ─────────────────────────────────────────────────────
 
-/** Names of the menus (as Admin → Менюта calls them) that link to this page. */
+/** content/menus.json (tests point it elsewhere). */
+function cpage_menus_file(): string
+{
+    return $GLOBALS['_om_menus_file'] ?? CONTENT_PATH . '/menus.json';
+}
+
+/** The menus, as Admin → Менюта calls them. */
+const CPAGE_MENU_NAMES = ['header' => 'Хедър навигация', 'footer_nav' => 'Футър — Навигация', 'footer_help' => 'Футър — Как да помогна'];
+
+/**
+ * The menu links to this page, named so an admin can find them:
+ * e.g. „Нашата история“ (Хедър навигация). One entry per link.
+ * @return list<string>
+ */
 function cpage_menus_using(array $page): array
 {
-    $names = ['header' => 'Хедър навигация', 'footer_nav' => 'Футър — Навигация', 'footer_help' => 'Футър — Как да помогна'];
-    $menus = load_json(CONTENT_PATH . '/menus.json');
-    $want  = ['/' . $page['slug_bg'], '/en/' . $page['slug_en']];
+    $menus = load_json(cpage_menus_file());
+    $want  = array_filter([$page['slug_bg'] !== '' ? '/' . $page['slug_bg'] : null,
+                           $page['slug_en'] !== '' ? '/en/' . $page['slug_en'] : null]);
     $out   = [];
-    foreach ($names as $key => $name) {
+    foreach (CPAGE_MENU_NAMES as $key => $name) {
+        // The BG items name the links; the EN menu only when no BG item links here.
         foreach (['bg', 'en'] as $l) {
+            $found = [];
             foreach (is_array($menus[$key][$l] ?? null) ? $menus[$key][$l] : [] as $item) {
+                if (!is_array($item)) continue;
                 $path = rtrim((string) strtok((string) ($item['url'] ?? ''), '?#'), '/');
-                if (in_array($path, $want, true)) { $out[$key] = $name; continue 3; }
+                if (!in_array($path, $want, true)) continue;
+                $label   = trim((string) ($item['label'] ?? ''));
+                $found[] = "\u{201E}" . ($label !== '' ? $label : 'без текст') . "\u{201C} ($name)";
             }
+            if ($found) { array_push($out, ...$found); break; }
         }
     }
-    return array_values($out);
+    return array_values(array_unique($out));
 }
 
 /**
@@ -372,7 +478,7 @@ function cpage_menus_follow(array $old, array $new): bool
     if ($old['slug_bg'] !== '' && $old['slug_bg'] !== $new['slug_bg']) $swap['/' . $old['slug_bg']] = '/' . $new['slug_bg'];
     if ($old['slug_en'] !== '' && $old['slug_en'] !== $new['slug_en']) $swap['/en/' . $old['slug_en']] = '/en/' . $new['slug_en'];
     if (!$swap) return false;
-    $file  = CONTENT_PATH . '/menus.json';
+    $file  = cpage_menus_file();
     $menus = load_json($file);
     $changed = false;
     foreach ($menus as $key => $section) {

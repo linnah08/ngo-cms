@@ -268,6 +268,18 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       <a href="<?= h(cpage_url($cpage, 'en')) ?>" target="_blank" rel="noopener"><?= h($site . cpage_url($cpage, 'en')) ?><span style="<?= HS_SR ?>"> (отваря се в нов раздел)</span></a>
     </p>
   </section>
+  <script>
+  (function () {   // "Не е преведено" goes away as soon as the English title is no longer the Bulgarian one
+    var bg = document.getElementById('cp_title_bg'), en = document.getElementById('cp_title_en'), note = document.getElementById('cp_title_en_note');
+    if (!bg || !en || !note) return;
+    function check() {
+      var on = en.value.trim() !== '' && en.value.trim() === bg.value.trim() && /[\u0400-\u04FF]/.test(en.value);
+      note.textContent = on ? '⚠ Не е преведено — на английски засега стои българското заглавие. Натиснете „✦ Translate“ или го напишете.' : '';
+      note.style.display = on ? '' : 'none';
+    }
+    en.addEventListener('input', check); bg.addEventListener('input', check);
+  })();
+  </script>
   <?php endif; ?>
   <?php if ($cpage !== null): ?>
   <h2 style="font-size:1.15rem;margin:0 0 .5rem;">Съдържание на страницата</h2>

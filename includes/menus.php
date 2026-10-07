@@ -93,12 +93,13 @@ function path_builtin_names(): array
 /**
  * What a site address in a menu points at:
  *   'page'    — a published created page        'draft' — a created page still in draft
+ *   'deleted' — the address of a created page that was deleted (and no page has it now)
  *   'missing' — shaped like a page address (/<name>/ or /en/<name>/), but no page,
  *               file or folder of the site has that name
  *   'ok'      — anything else: a built-in page, a file, an external link, an anchor.
  * Only one-segment addresses are judged, so a link to a product, an article or a
  * file is never mistaken for a missing page.
- * @return array{state: string, page: ?array}
+ * @return array{state: string, page: ?array}  ('deleted' gives the deleted page's addresses and title)
  */
 function menu_link_state(string $url): array
 {
@@ -114,19 +115,23 @@ function menu_link_state(string $url): array
     if (file_exists(ROOT_PATH . $rel) || in_array($slug, cpage_reserved_slugs($lang), true)) {
         return ['state' => 'ok', 'page' => null];
     }
+    $gone = cpage_deleted_by_slug($lang, $slug);
+    if ($gone !== null) return ['state' => 'deleted', 'page' => $gone];
     return ['state' => 'missing', 'page' => null];
 }
 
 /**
- * The menu items visitors see: links to a draft or to a page that does not exist
- * are left out. Keys are kept — the on-page editor addresses items by their
- * position in the stored menu.
+ * The menu items visitors see: links to a draft or to a deleted created page are
+ * left out. Any other address is shown, even one that seems to lead nowhere — a
+ * site's own server rule may serve it; the menu editor warns about it instead.
+ * Keys are kept — the on-page editor addresses items by their position in the
+ * stored menu.
  */
 function menu_public_items(array $items): array
 {
     return array_filter($items, function ($it) {
         if (!is_array($it)) return false;
-        return !in_array(menu_link_state((string) ($it['url'] ?? ''))['state'], ['draft', 'missing'], true);
+        return !in_array(menu_link_state((string) ($it['url'] ?? ''))['state'], ['draft', 'deleted'], true);
     });
 }
 

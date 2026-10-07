@@ -93,10 +93,11 @@ switch ($action) {
     case 'delete':
         $page = cpage_get($id);
         if ($page === null) cp_done($json, false, 'Страницата не е намерена — може би вече е изтрита.', '/admin/pages.php');
-        if (!cpage_delete($id)) cp_done($json, false, 'Страницата не можа да се изтрие. Опитайте отново след малко.', '/admin/pages.php');
         $menus = cpage_menus_using($page);
-        cp_done($json, true, "Страницата \u{201E}{$page['title_bg']}\u{201C} е изтрита."
-            . ($menus ? ' Връзката към нея в менюто (' . implode(', ', $menus) . ') вече не се показва на сайта — махнете я или я насочете другаде от Менюта.' : ''),
+        if (!cpage_delete($id)) cp_done($json, false, 'Страницата не можа да се изтрие. Опитайте отново след малко.', '/admin/pages.php');
+        cp_done($json, true, "Страницата \u{201E}{$page['title_bg']}\u{201C} е изтрита, заедно с нейните снимки."
+            . ($menus ? ' ' . (count($menus) > 1 ? 'Връзките' : 'Връзката') . ' към нея в менюто — ' . implode(', ', $menus)
+                . ' — вече не се показва на сайта. Махнете ' . (count($menus) > 1 ? 'ги' : 'я') . ' или насочете другаде от „Менюта“.' : ''),
             '/admin/pages.php');
 }
 

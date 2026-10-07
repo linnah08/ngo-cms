@@ -127,6 +127,58 @@ final class CreatedPagesStoreTest extends CreatedPagesTestCase
         $this->assertTrue(cpage_delete($p['id']));
         $this->assertNull(cpage_get($p['id']));
         $this->assertFileDoesNotExist($this->dir . '/' . $p['id'] . '.json');
+        $this->assertSame('za-triene', cpage_deleted_by_slug('bg', 'za-triene')['slug_bg'], 'its address is remembered as deleted');
+    }
+
+    public function testDeleteRemovesOnlyThatPagesImagesFolder(): void
+    {
+        $base = cpage_images_base();
+        $p     = cpage_create('Със снимки')['page'];
+        $other = cpage_create('Друга')['page'];
+        mkdir($base . '/' . $p['id'] . '/sub', 0755, true);
+        file_put_contents($base . '/' . $p['id'] . '/s_1-image-1.jpg', 'x');
+        file_put_contents($base . '/' . $p['id'] . '/sub/b.jpg', 'x');
+        mkdir($base . '/' . $other['id'], 0755, true);
+        file_put_contents($base . '/' . $other['id'] . '/keep.jpg', 'x');
+        // A link inside the folder is removed as a link — what it points at stays.
+        $outside = $this->dir . '-img/outside';
+        mkdir($outside);
+        file_put_contents($outside . '/precious.jpg', 'x');
+        symlink($outside, $base . '/' . $p['id'] . '/link');
+
+        $this->assertTrue(cpage_delete($p['id']));
+        $this->assertDirectoryDoesNotExist($base . '/' . $p['id']);
+        $this->assertFileExists($base . '/' . $other['id'] . '/keep.jpg');
+        $this->assertFileExists($outside . '/precious.jpg');
+    }
+
+    public function testImagesFolderDeletionTakesOnlyAPageId(): void
+    {
+        $base = cpage_images_base();
+        mkdir($base . '/keep', 0755, true);
+        file_put_contents($base . '/keep/a.jpg', 'x');
+        foreach (['', '.', '..', '../keep', 'keep', 'p_abcd1234/../keep', 'p_ABCD1234'] as $bad) {
+            $this->assertFalse(cpage_delete_images($bad), var_export($bad, true));
+        }
+        $this->assertFileExists($base . '/keep/a.jpg');
+        $this->assertTrue(cpage_delete_images('p_none0000'), 'a page without images is fine');
+    }
+
+    public function testDeletingAPageWhoseImagesFolderIsALinkRemovesOnlyTheLink(): void
+    {
+        $base = cpage_images_base();
+        mkdir($base, 0755, true);
+        $outside = $this->dir . '-img-target';
+        mkdir($outside);
+        file_put_contents($outside . '/precious.jpg', 'x');
+        try {
+            symlink($outside, $base . '/p_link0000');
+            $this->assertTrue(cpage_delete_images('p_link0000'));
+            $this->assertFalse(is_link($base . '/p_link0000'));
+            $this->assertFileExists($outside . '/precious.jpg');
+        } finally {
+            $this->rmTree($outside);
+        }
     }
 
     public function testSectionEditorSavesIntoThePageAndKeepsItsSettings(): void

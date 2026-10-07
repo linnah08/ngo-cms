@@ -84,6 +84,35 @@ final class CreatedPagesRoutingTest extends CreatedPagesTestCase
         }
     }
 
+    public function testNotFoundPageServesACreatedPageWhenHtaccessLacksTheRule(): void
+    {
+        // A site whose own .htaccess has no page.php rule: Apache's ErrorDocument
+        // brings /<name>/ to errors/404.php, which hands it to page.php.
+        $this->storyPage();
+        [$html, $code] = $this->request('errors/404.php', '/nashata-istoriya/', null, ['REDIRECT_STATUS' => '404']);
+        $this->assertSame(200, $code);
+        $this->assertStringContainsString('Тяло на страницата', $html);
+        [$html, $code] = $this->request('errors/404.php', '/en/our-story/?x=1', null, ['REDIRECT_STATUS' => '404']);
+        $this->assertSame(200, $code);
+        $this->assertStringContainsString('Body of the page', $html);
+    }
+
+    public function testNotFoundFallbackStillAnswers404ForEverythingElse(): void
+    {
+        $this->storyPage('draft');
+        $cases = [
+            ['/nashata-istoriya/', ['REDIRECT_STATUS' => '404']],   // a draft, for a visitor
+            ['/nyama-takava/',     ['REDIRECT_STATUS' => '404']],   // no such page
+            ['/a/b/c/',            ['REDIRECT_STATUS' => '404']],   // not a page address at all
+            ['/nashata-istoriya/', []],                              // not reached through ErrorDocument
+        ];
+        foreach ($cases as [$uri, $server]) {
+            [$html, $code] = $this->request('errors/404.php', $uri, null, $server);
+            $this->assertSame(404, $code, $uri);
+            $this->assertStringNotContainsString('Тяло на страницата', $html, $uri);
+        }
+    }
+
     public function testBulgarianAddressStartingWithEnStaysBulgarian(): void
     {
         $this->putPage(['id' => 'p_energy00', 'status' => 'published', 'title_bg' => 'Енергия', 'title_en' => 'Energy',
