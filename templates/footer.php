@@ -16,7 +16,8 @@ $pages      = $pages ?? load_json(CONTENT_PATH . '/pages.json');
 <?php
 // Show newsletter banner unless visitor already subscribed (cookie) or is in admin
 $_is_admin_page  = str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/admin');
-$_show_nl_banner = empty($_COOKIE['om_nl_sub']) && !$_is_admin_page;
+// No sign-up band while „Бюлетин“ is off (Admin → Модули).
+$_show_nl_banner = module_enabled_with_needs('newsletter') && empty($_COOKIE['om_nl_sub']) && !$_is_admin_page;
 ?>
 <?php // Messages nothing on the page has shown yet — above all the sign-up
       // band's own result. Shown whether or not the band is: a successful

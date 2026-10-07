@@ -7,6 +7,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
 $page_title_admin = 'Кампания';
 $active_nav       = 'newsletter-compose';
 admin_require_admin();
+module_admin_guard('newsletter');
 // Translate buttons only while „Помощ от изкуствен интелект“ is on (Admin → Модули).
 $deepl_ready = module_enabled_with_needs('ai_helpers') && deepl_is_configured();
 $lbl_bg_badge = '<span style="font-size:.68rem;font-weight:700;background:#dcfce7;color:#166534;border-radius:3px;padding:.05rem .35rem;margin-left:.4rem;vertical-align:middle;">BG</span>';

@@ -14,6 +14,8 @@
  * Layout-critical styles are inline (public-section rule: main.css may be
  * stale-cached on the server).
  */
+// No sign-up card while „Бюлетин“ is off (Admin → Модули).
+if (!module_enabled_with_needs('newsletter')) return;
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
 
 if (newsletter_session_owns_order((string) ($order['order_number'] ?? ''))):

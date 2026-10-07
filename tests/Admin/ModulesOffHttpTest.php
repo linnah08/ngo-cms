@@ -204,6 +204,27 @@ final class ModulesOffHttpTest extends TestCase
         return preg_match('#<a href="/admin/' . preg_quote($page, '#') . '"\s+class="admin-nav__link[^"]*"#', $html, $m) ? $m[0] : '';
     }
 
+    // ── newsletter ───────────────────────────────────────────────────────────
+
+    public function test_newsletter_off_hides_sign_up_but_unsubscribe_works(): void
+    {
+        $this->switchOff('newsletter');
+        [$code, $page] = $this->http('/kontakti/');
+        $this->assertSame(200, $code);
+        $this->assertStringNotContainsString('action="/newsletter/subscribe.php"', $page, 'no sign-up band');
+
+        [$code, $body] = $this->http('/newsletter/unsubscribe.php?token=' . str_repeat('0', 32));
+        $this->assertSame(200, $code, 'unsubscribe links in emails already sent keep working');
+        $this->assertStringContainsString('Отписани сте', $body);
+
+        [$code] = $this->http('/newsletter/subscribe.php', false, ['csrf_token' => 'x', 'email' => 'a@example.org']);
+        $this->assertSame(404, $code);
+
+        $this->switchOff();
+        [, $on] = $this->http('/kontakti/');
+        $this->assertStringContainsString('action="/newsletter/subscribe.php"', $on, 'back when on');
+    }
+
     // ── comments_reviews ─────────────────────────────────────────────────────
 
     public function test_comments_page_is_contacts_only_when_comments_are_off(): void

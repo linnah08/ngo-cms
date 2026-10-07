@@ -25,6 +25,13 @@ require_once dirname(__DIR__) . '/includes/mailer.php';
 require_once dirname(__DIR__) . '/includes/scheduled_jobs.php';
 scheduled_job_track('newsletter_scheduled');
 
+// „Бюлетин“ switched off in Admin → Модули: scheduled campaigns wait, unsent,
+// until it is switched back on.
+if (!module_enabled_with_needs('newsletter')) {
+    echo "The newsletter module is off (Admin → Модули) — nothing sent.\n";
+    exit(0);
+}
+
 $pdo          = get_pdo();
 $sent_total   = 0;
 $failed_total = 0;

@@ -159,6 +159,7 @@ function scheduled_job_needed(string $key): bool
                 return false;
 
             case 'newsletter_scheduled':
+                if (!module_enabled_with_needs('newsletter')) return false;
                 $stmt = get_pdo()->query("SELECT 1 FROM newsletter_campaigns WHERE status = 'draft' AND send_date IS NOT NULL LIMIT 1");
                 return (bool) $stmt->fetchColumn();
 

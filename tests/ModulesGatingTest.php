@@ -65,6 +65,7 @@ final class ModulesGatingTest extends TestCase
         $map = [
             'annual_reports'   => ['finansovi-otcheti/index.php', 'en/financial-reports/index.php'],
             'comments_reviews' => ['api/comment-submit.php', 'api/review-submit.php'],
+            'newsletter'       => ['newsletter/subscribe.php', 'newsletter/subscribe-order.php'],
         ];
         $out = [];
         foreach ($map as $module => $files) foreach ($files as $f) $out["$module: $f"] = [$module, $f];
@@ -157,6 +158,54 @@ final class ModulesGatingTest extends TestCase
         [$got, $plain] = json_decode($out, true);
         $this->assertSame($plain, $got);
         $this->assertStringContainsString("module_enabled_with_needs('ai_helpers')", self::src('cron/backfill-article-excerpts.php'));
+    }
+
+    // ── newsletter ───────────────────────────────────────────────────────────
+
+    public function test_unsubscribe_and_tracking_are_never_guarded(): void
+    {
+        foreach (['newsletter/unsubscribe.php', 'newsletter/track.php'] as $rel) {
+            $src = self::src($rel);
+            $this->assertStringNotContainsString('module_public_guard', $src, "$rel must work in emails already sent");
+            $this->assertStringNotContainsString("module_enabled_with_needs('newsletter')", $src, $rel);
+            $this->assertNull(module_for_path('/' . $rel), "$rel is no module's page, so no link to it is ever hidden");
+        }
+    }
+
+    public function test_unsubscribe_still_works_with_the_newsletter_off(): void
+    {
+        $out = $this->child('$_SERVER["REQUEST_URI"] = "/newsletter/unsubscribe.php?token=x"; $_GET["token"] = str_repeat("0", 32); require ROOT_PATH . "/newsletter/unsubscribe.php";', ['newsletter']);
+        $this->assertStringContainsString('Отписани сте', $out);
+        $this->assertStringNotContainsString('Страницата не е намерена', $out);
+    }
+
+    public function test_sign_up_forms_disappear_when_off(): void
+    {
+        $this->assertStringContainsString("\$_show_nl_banner = module_enabled_with_needs('newsletter') && ", self::src('templates/footer.php'));
+        $this->assertStringContainsString("if (!module_enabled_with_needs('newsletter')) return;", self::src('templates/newsletter-confirm-card.php'));
+        $checkout = self::src('checkout/index.php');
+        $this->assertStringContainsString("'newsletter'    => module_enabled_with_needs('newsletter') && (", $checkout, 'no opt-in recorded');
+        $this->assertMatchesRegularExpression("/<\?php if \(module_enabled_with_needs\('newsletter'\)\): \?>\s*<div[^>]*>\s*<\?php\s*\\\$nl_heading/", $checkout, 'no opt-in shown');
+    }
+
+    public function test_confirmation_card_renders_nothing_when_off(): void
+    {
+        $out = $this->child('$order = ["order_number" => "OM-20260101-ABCD"]; $nl_flow = "order"; require ROOT_PATH . "/templates/newsletter-confirm-card.php"; echo "[END]";', ['newsletter']);
+        $this->assertSame('[END]', trim($out));
+    }
+
+    public function test_scheduled_newsletters_wait_while_off(): void
+    {
+        $cron = self::src('cron/newsletter-send-scheduled-cron.php');
+        $skip = strpos($cron, "if (!module_enabled_with_needs('newsletter')) {");
+        $this->assertNotFalse($skip);
+        $this->assertLessThan(strpos($cron, 'newsletter_due_campaigns($pdo)'), $skip, 'skips before sending anything');
+        $this->assertStringContainsString("if (!module_enabled_with_needs('newsletter')) return false;", self::src('includes/scheduled_jobs.php'), 'no "cron missing" warning for an off module');
+
+        if (!defined('DB_HOST')) $this->markTestSkipped('No database.');
+        $out = $this->child('$argv = ["x"]; require ROOT_PATH . "/cron/newsletter-send-scheduled-cron.php"; echo "NOT STOPPED";', ['newsletter']);
+        $this->assertStringContainsString('nothing sent', $out);
+        $this->assertStringNotContainsString('NOT STOPPED', $out);
     }
 
     // ── comments_reviews ─────────────────────────────────────────────────────
