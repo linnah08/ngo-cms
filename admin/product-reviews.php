@@ -6,6 +6,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/auth.php';
 admin_require_shop();
+module_admin_guard('comments_reviews');
+// Reviews are of products: without the shop there is nothing to review.
+module_admin_guard('shop');
 
 $pdo = get_pdo();
 

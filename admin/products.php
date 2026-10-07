@@ -155,7 +155,8 @@ $products = $pdo->query(
 )->fetchAll();
 
 $review_stats = [];
-try {
+// Product reviews are part of „Коментари и отзиви“ (Admin → Модули).
+if (module_admin_page_visible('product-reviews.php')) try {
     $review_stats = $pdo->query(
         "SELECT product_id,
                 AVG(CASE WHEN status='approved' THEN rating END) AS avg_rating,

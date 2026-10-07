@@ -156,7 +156,8 @@ if ($slug) {
 </section>
 
 <?php
-    require $_SERVER['DOCUMENT_ROOT'] . '/templates/comments.php';
+    // Comments are part of „Коментари и отзиви“ (Admin → Модули).
+    if (module_enabled_with_needs('comments_reviews')) require $_SERVER['DOCUMENT_ROOT'] . '/templates/comments.php';
     require $_SERVER['DOCUMENT_ROOT'] . '/templates/footer.php';
     exit;
 }

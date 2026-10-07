@@ -174,7 +174,8 @@ $_tinymce_key = setting_get('tinymce_api_key', 'no-api-key');
 $page_head_extra = '<script src="https://cdn.tiny.cloud/1/' . h($_tinymce_key) . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>';
 
 $review_counts = ['approved' => 0, 'pending' => 0];
-if (!$is_new) {
+$reviews_on    = module_admin_page_visible('product-reviews.php');   // „Коментари и отзиви“ on
+if (!$is_new && $reviews_on) {
     try {
         $rc = $pdo->prepare("SELECT status, COUNT(*) n FROM product_reviews WHERE product_id = ? GROUP BY status");
         $rc->execute([$id]);
@@ -188,7 +189,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 <div class="admin-page-header">
   <h1><?= h($page_title_admin) ?></h1>
   <div style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;">
-    <?php if (!$is_new): ?>
+    <?php if (!$is_new && $reviews_on): ?>
       <a href="/admin/product-reviews.php?product_id=<?= (int)$id ?>" class="btn btn--outline">
         Отзиви (<?= $review_counts['approved'] ?>)<?php if ($review_counts['pending'] > 0): ?> · <?= $review_counts['pending'] ?> чакащи<?php endif; ?> →
       </a>

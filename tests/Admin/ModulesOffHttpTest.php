@@ -204,6 +204,20 @@ final class ModulesOffHttpTest extends TestCase
         return preg_match('#<a href="/admin/' . preg_quote($page, '#') . '"\s+class="admin-nav__link[^"]*"#', $html, $m) ? $m[0] : '';
     }
 
+    // ── comments_reviews ─────────────────────────────────────────────────────
+
+    public function test_comments_page_is_contacts_only_when_comments_are_off(): void
+    {
+        $this->switchOff('comments_reviews');
+        [$code, $body] = $this->http('/admin/comments.php?source=comments', true);
+        $this->assertSame(200, $code, 'contact messages still have their page');
+        $this->assertStringNotContainsString('Коментари към статии', $body);
+        $this->assertMatchesRegularExpression('#<a href="/admin/comments.php"\s+class="admin-nav__link[^"]*">\s*Контакти#u', $body);
+
+        [$code] = $this->http('/api/comment-submit.php', false, ['csrf_token' => 'x']);
+        $this->assertSame(404, $code);
+    }
+
     // ── social ───────────────────────────────────────────────────────────────
 
     public function test_article_editor_has_no_social_tab_when_social_is_off(): void

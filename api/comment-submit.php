@@ -4,6 +4,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/spam_filter.php';
 start_session();
 
+// Module switched off in Admin → Модули — the endpoint does not exist (site's 404).
+module_public_guard('comments_reviews');
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: /');
     exit;

@@ -117,15 +117,20 @@ $current_user = admin_user();
       </a>
       <?php endif; ?>
       <?php
+      // The page also holds contact messages, so it stays; with „Коментари и
+      // отзиви“ off it is just „Контакти“ and the waiting-comments badge goes.
+      $comments_on      = module_enabled_with_needs('comments_reviews');
       $pending_comments = 0;
-      try {
-          $pending_comments = (int)get_pdo()->query("SELECT COUNT(*) FROM comments WHERE status='pending'")->fetchColumn();
-      } catch (Throwable $e) {}
+      if ($comments_on) {
+          try {
+              $pending_comments = (int)get_pdo()->query("SELECT COUNT(*) FROM comments WHERE status='pending'")->fetchColumn();
+          } catch (Throwable $e) {}
+      }
       ?>
       <?php if (module_admin_page_visible('comments.php')): ?>
       <a href="/admin/comments.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'comments' ? 'active' : '' ?>">
-        Коментари<?php if ($pending_comments > 0): ?> <span style="background:var(--teal);color:#fff;border-radius:10px;padding:.05rem .4rem;font-size:.72rem;margin-left:.3rem;vertical-align:middle;"><?= $pending_comments ?></span><?php endif; ?>
+        <?= $comments_on ? 'Коментари' : 'Контакти' ?><?php if ($pending_comments > 0): ?> <span style="background:var(--teal);color:#fff;border-radius:10px;padding:.05rem .4rem;font-size:.72rem;margin-left:.3rem;vertical-align:middle;"><?= $pending_comments ?></span><?php endif; ?>
       </a>
       <?php endif; ?>
       <?php endif; ?>
@@ -160,9 +165,11 @@ $current_user = admin_user();
       <?php if (admin_can_manage_shop()): ?>
       <?php
       $pending_reviews = 0;
-      try {
-          $pending_reviews = (int)get_pdo()->query("SELECT COUNT(*) FROM product_reviews WHERE status='pending'")->fetchColumn();
-      } catch (Throwable $e) { /* table may not exist yet */ }
+      if (module_admin_page_visible('product-reviews.php')) {
+          try {
+              $pending_reviews = (int)get_pdo()->query("SELECT COUNT(*) FROM product_reviews WHERE status='pending'")->fetchColumn();
+          } catch (Throwable $e) { /* table may not exist yet */ }
+      }
       ?>
       <?php if (module_admin_page_visible('products.php')): ?>
       <a href="/admin/products.php"

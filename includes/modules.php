@@ -102,6 +102,30 @@ function modules_registry(?array $replace = null): array
             'admin_pages'  => ['financial-reports.php'],
             'public_paths' => ['/finansovi-otcheti/', '/en/financial-reports/'],
         ],
+        'comments_reviews' => [
+            'label'       => 'Коментари и отзиви',
+            'description' => 'Коментари под новините и отзиви със звезди за продуктите в магазина, които публикувате, след като ги прегледате.',
+            'off_warning' => 'Изключвате коментарите и отзивите. Формите за коментар и отзив, публикуваните коментари и отзиви и оценките със звезди ще изчезнат от сайта. Съобщенията от контактната форма остават. Нищо не се изтрива.',
+            'needs'        => [],
+            // Comments work without the shop; the product-review parts also check
+            // module_enabled_with_needs('shop'). admin/comments.php is not listed:
+            // it also holds the contact-form messages, so with this module off it
+            // stays as „Контакти“ only.
+            'admin_pages'  => ['product-reviews.php'],
+            'public_paths' => ['/api/comment-submit.php', '/api/review-submit.php'],
+            'pending'      => static function (PDO $pdo): ?string {
+                $c = (int) $pdo->query("SELECT COUNT(*) FROM comments WHERE status = 'pending'")->fetchColumn();
+                $r = 0;
+                try {
+                    $r = (int) $pdo->query("SELECT COUNT(*) FROM product_reviews WHERE status = 'pending'")->fetchColumn();
+                } catch (Throwable $e) { /* no reviews table yet */ }
+                $n = $c + $r;
+                if ($n < 1) return null;
+                return $n === 1
+                    ? '1 коментар или отзив още чака преглед.'
+                    : $n . ' коментара и отзива още чакат преглед.';
+            },
+        ],
         'social' => [
             'label'       => 'Социални мрежи',
             'description' => 'Раздел „Социални мрежи“ в редактора на статии: публикации за Facebook, Instagram и LinkedIn, написани с помощта на изкуствен интелект и планирани през Buffer.',

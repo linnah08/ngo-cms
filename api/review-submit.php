@@ -5,6 +5,11 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/product_reviews.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/spam_filter.php';
 start_session();
 
+// Module switched off in Admin → Модули — the endpoint does not exist (site's 404).
+// Product reviews need the shop too.
+module_public_guard('comments_reviews');
+module_public_guard('shop');
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { header('Location: /'); exit; }
 if (!csrf_verify()) { http_response_code(400); exit('Invalid token'); }
 

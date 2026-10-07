@@ -63,7 +63,8 @@ final class ModulesGatingTest extends TestCase
     public static function publicEntryPoints(): array
     {
         $map = [
-            'annual_reports' => ['finansovi-otcheti/index.php', 'en/financial-reports/index.php'],
+            'annual_reports'   => ['finansovi-otcheti/index.php', 'en/financial-reports/index.php'],
+            'comments_reviews' => ['api/comment-submit.php', 'api/review-submit.php'],
         ];
         $out = [];
         foreach ($map as $module => $files) foreach ($files as $f) $out["$module: $f"] = [$module, $f];
@@ -156,6 +157,40 @@ final class ModulesGatingTest extends TestCase
         [$got, $plain] = json_decode($out, true);
         $this->assertSame($plain, $got);
         $this->assertStringContainsString("module_enabled_with_needs('ai_helpers')", self::src('cron/backfill-article-excerpts.php'));
+    }
+
+    // ── comments_reviews ─────────────────────────────────────────────────────
+
+    public function test_comments_and_reviews_disappear_from_public_pages(): void
+    {
+        foreach (['novini/index.php', 'en/news/index.php'] as $rel) {
+            $this->assertStringContainsString("if (module_enabled_with_needs('comments_reviews')) require \$_SERVER['DOCUMENT_ROOT'] . '/templates/comments.php';", self::src($rel), $rel);
+        }
+        $shop = self::src('magazin/index.php');
+        $this->assertStringContainsString("\$approved_reviews = \$reviews_on ? product_reviews_fetch_approved(", $shop, 'no rating in the product schema either');
+        $this->assertStringContainsString("if (\$reviews_on) require \$_SERVER['DOCUMENT_ROOT'] . '/templates/product-reviews.php';", $shop);
+        // Product reviews need the shop as well; comments do not.
+        $this->assertStringContainsString("module_public_guard('shop');", self::src('api/review-submit.php'));
+        $this->assertStringNotContainsString("'shop'", self::src('api/comment-submit.php'));
+        $this->assertSame([], modules_registry()['comments_reviews']['needs'], 'comments work without the shop');
+        $rev = self::src('admin/product-reviews.php');
+        $this->assertLessThan(strpos($rev, "module_admin_guard('shop');"), strpos($rev, "module_admin_guard('comments_reviews');"));
+    }
+
+    public function test_comment_endpoint_is_a_404_when_off(): void
+    {
+        $out = $this->child('$_SERVER["REQUEST_METHOD"] = "POST"; $_SERVER["REQUEST_URI"] = "/api/comment-submit.php"; require ROOT_PATH . "/api/comment-submit.php"; echo "REACHED";', ['comments_reviews']);
+        $this->assertStringContainsString('Страницата не е намерена', $out);
+        $this->assertStringNotContainsString('REACHED', $out);
+    }
+
+    public function test_contact_messages_stay_when_comments_are_off(): void
+    {
+        $src = self::src('admin/comments.php');
+        $this->assertStringContainsString("if (!\$comments_on) \$source = 'contacts';", $src);
+        $this->assertStringContainsString("!module_enabled_with_needs('comments_reviews') && in_array(\$post_action, \$comment_actions, true)", $src, 'comment moderation refused');
+        $this->assertNotContains('comments.php', modules_registry()['comments_reviews']['admin_pages'], 'the page also holds contact messages');
+        $this->assertStringContainsString("if (\$can_editorial && module_enabled_with_needs('comments_reviews'))", self::src('admin/dashboard.php'));
     }
 
     // ── social ───────────────────────────────────────────────────────────────
