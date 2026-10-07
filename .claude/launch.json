@@ -1,0 +1,38 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ngo-cms",
+      "runtimeExecutable": "php",
+      "runtimeArgs": [
+        "-S",
+        "127.0.0.1:8765",
+        "-t",
+        "."
+      ],
+      "port": 8765
+    },
+    {
+      "name": "wizard-preview",
+      "runtimeExecutable": "php",
+      "runtimeArgs": [
+        "-S",
+        "127.0.0.1:8766",
+        "-t",
+        "/private/tmp/claude-501/-Users-detelinavasileva-Code-oddminds-oss/45d5e02b-37b4-4fa5-81a4-c304debb62d3/scratchpad/wiz"
+      ],
+      "port": 8766
+    },
+    {
+      "name": "nl-topics-wt",
+      "runtimeExecutable": "php",
+      "runtimeArgs": [
+        "-S",
+        "127.0.0.1:8767",
+        "-t",
+        "/Users/detelinavasileva/Code/oddminds-oss-wt/newsletter-topics"
+      ],
+      "port": 8767
+    }
+  ]
+}
