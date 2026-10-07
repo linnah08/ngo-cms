@@ -4,32 +4,49 @@ declare(strict_types=1);
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\Group;
 
+require_once __DIR__ . '/Support/TestServer.php';
+
+/**
+ * "How to help" (BG /kak-da-pomogna/, EN /en/how-to-help/): each way to help gets
+ * its button, and the contact form pre-selects the topic the button sends.
+ *
+ * The ways come from content/pages.json, which is site content and not in git,
+ * so the class writes its own and puts back whatever was there. Which buttons
+ * should show depends on this site's own settings (donations and campaign
+ * switched on, social addresses), read from the same config the server uses.
+ */
 #[Group('http')]
 final class HowToHelpCtaTest extends TestCase
 {
-    private static string $base = 'http://example.test';
+    private static string $base = '';
+    private static ?string $pagesBackup = null;
+
+    private const WAYS = [
+        ['title' => 'Стани доброволец', 'title_en' => 'Become a volunteer', 'text' => '<p>Д</p>', 'text_en' => '<p>V</p>'],
+        ['title' => 'Стани партньор', 'title_en' => 'Become a partner', 'text' => '<p>П</p>', 'text_en' => '<p>P</p>'],
+        ['title' => 'Стани дарител', 'title_en' => 'Become a donor', 'text' => '<p>Д</p>', 'text_en' => '<p>D</p>'],
+        ['title' => 'Стани наш приятел в социалните мрежи', 'title_en' => 'Be our friend on social media', 'text' => '<p>С</p>', 'text_en' => '<p>S</p>'],
+        ['title' => 'Подкрепи кампанията', 'title_en' => 'Support our campaign', 'text' => '<p>К</p>', 'text_en' => '<p>C</p>'],
+    ];
 
     public static function setUpBeforeClass(): void
     {
-        // Requiring 200 on /, not just a successful curl — see the note in
-        // HttpTest::setUpBeforeClass() about catch-all dev servers.
-        $ch = curl_init(self::$base . '/');
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 3);
-        curl_setopt($ch, CURLOPT_NOBODY, true);
-        curl_exec($ch);
-        $errno = curl_errno($ch);
-        $code  = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        if ($errno !== 0) {
-            self::markTestSkipped('example.test is not reachable — skipping HTTP tests.');
+        $pages = CONTENT_PATH . '/pages.json';
+        self::$pagesBackup = is_file($pages) ? file_get_contents($pages) : null;
+        save_json($pages, ['how_to_help' => ['title' => 'Как да помогна?', 'ways' => self::WAYS]]);
+
+        self::$base = TestServer::start();
+        if (self::$base === '') {
+            self::markTestSkipped('Could not start a local test server — skipping HTTP tests.');
         }
-        if ($code !== 200) {
-            self::markTestSkipped(
-                "example.test answered HTTP $code for / — something other than this site is "
-                . 'serving that host; skipping HTTP tests.'
-            );
-        }
+    }
+
+    public static function tearDownAfterClass(): void
+    {
+        TestServer::stop();
+        $pages = CONTENT_PATH . '/pages.json';
+        if (self::$pagesBackup !== null) file_put_contents($pages, self::$pagesBackup);
+        elseif (is_file($pages)) unlink($pages);
     }
 
     private function getBody(string $path): string
@@ -48,174 +65,74 @@ final class HowToHelpCtaTest extends TestCase
     public function testBgContactFormPreSelectsVolunteer(): void
     {
         $body = $this->getBody('/kontakti/?topic=' . urlencode('Искам да стана доброволец'));
-        $this->assertStringContainsString(
-            'value="Искам да стана доброволец" selected',
-            $body,
-            'BG contact form should pre-select "Искам да стана доброволец" via GET'
-        );
+        $this->assertStringContainsString('value="Искам да стана доброволец" selected', $body);
     }
 
     public function testBgContactFormPreSelectsPartner(): void
     {
         $body = $this->getBody('/kontakti/?topic=' . urlencode('Искам да стана партньор'));
-        $this->assertStringContainsString(
-            'value="Искам да стана партньор" selected',
-            $body,
-            'BG contact form should pre-select "Искам да стана партньор" via GET'
-        );
+        $this->assertStringContainsString('value="Искам да стана партньор" selected', $body);
     }
 
     public function testBgContactFormIgnoresInvalidTopic(): void
     {
         $body = $this->getBody('/kontakti/?topic=InvalidTopic');
-        $this->assertStringContainsString(
-            'selected>— Изберете тема —',
-            $body,
-            'BG contact form should show placeholder when topic is invalid'
-        );
+        $this->assertStringContainsString('selected>— Изберете тема —', $body);
     }
 
     public function testEnContactFormPreSelectsVolunteer(): void
     {
         $body = $this->getBody('/en/contacts/?topic=' . urlencode('I want to volunteer'));
-        $this->assertStringContainsString(
-            'value="I want to volunteer" selected',
-            $body,
-            'EN contact form should pre-select "I want to volunteer" via GET'
-        );
+        $this->assertStringContainsString('value="I want to volunteer" selected', $body);
     }
 
     public function testEnContactFormPreSelectsPartner(): void
     {
         $body = $this->getBody('/en/contacts/?topic=' . urlencode('I want to become a partner'));
-        $this->assertStringContainsString(
-            'value="I want to become a partner" selected',
-            $body,
-            'EN contact form should pre-select "I want to become a partner" via GET'
-        );
+        $this->assertStringContainsString('value="I want to become a partner" selected', $body);
     }
 
     public function testEnContactFormIgnoresInvalidTopic(): void
     {
         $body = $this->getBody('/en/contacts/?topic=InvalidTopic');
-        $this->assertStringContainsString(
-            'selected>— Select a topic —',
-            $body,
-            'EN contact form should show placeholder when topic is invalid'
-        );
+        $this->assertStringContainsString('selected>— Select a topic —', $body);
     }
 
-    // ── CTA buttons on BG how-to-help ─────────────────────────────────────────
+    // ── Buttons on how-to-help (BG and EN) ────────────────────────────────────
 
-    public function testBgHowToHelpHasVolunteerCta(): void
+    public function testBgHowToHelpButtons(): void
     {
-        $body = $this->getBody('/kak-da-pomogna/');
-        $this->assertStringContainsString(
-            '/kontakti/?topic=' . urlencode('Искам да стана доброволец'),
-            $body,
-            'BG page should have CTA link for volunteer way'
-        );
+        $this->assertWayButtons($this->getBody('/kak-da-pomogna/'), 'bg');
     }
 
-    public function testBgHowToHelpHasPartnerCta(): void
+    public function testEnHowToHelpButtons(): void
     {
-        $body = $this->getBody('/kak-da-pomogna/');
-        $this->assertStringContainsString(
-            '/kontakti/?topic=' . urlencode('Искам да стана партньор'),
-            $body,
-            'BG page should have CTA link for partner way'
-        );
+        $this->assertWayButtons($this->getBody('/en/how-to-help/'), 'en');
     }
 
-    public function testBgHowToHelpHasDonorCta(): void
+    private function assertWayButtons(string $body, string $lang): void
     {
-        $body = $this->getBody('/kak-da-pomogna/');
-        $this->assertStringContainsString(
-            'href="/donation/"',
-            $body,
-            'BG page should link the donor way to the donation form'
-        );
-    }
+        $en = $lang === 'en';
+        foreach (self::WAYS as $way) {
+            $this->assertStringContainsString(h($en ? $way['title_en'] : $way['title']), $body, 'every way is listed');
+        }
 
-    public function testBgHowToHelpHasSocialButtons(): void
-    {
-        $body = $this->getBody('/kak-da-pomogna/');
-        $this->assertStringContainsString(
-            'facebook.com/profile.php?id=61580050070685',
-            $body,
-            'BG page should have Facebook button in social media way'
-        );
-        $this->assertStringContainsString(
-            'instagram.com',
-            $body,
-            'BG page should have Instagram button in social media way'
-        );
-    }
+        $contact = $en ? '/en/contacts/?topic=' : '/kontakti/?topic=';
+        $this->assertStringContainsString($contact . urlencode($en ? 'I want to volunteer' : 'Искам да стана доброволец'), $body);
+        $this->assertStringContainsString($contact . urlencode($en ? 'I want to become a partner' : 'Искам да стана партньор'), $body);
 
-    public function testBgHowToHelpHasLafetkasCta(): void
-    {
-        $body = $this->getBody('/kak-da-pomogna/');
-        $this->assertStringContainsString(
-            'href="/campaign/"',
-            $body,
-            'BG page should have campaign link for the campaign'
-        );
-    }
+        $donate = 'href="' . h(donation_path('form', $lang)) . '"';
+        feature_enabled('donations')
+            ? $this->assertStringContainsString($donate, $body, 'the donor way links to the donation form')
+            : $this->assertStringNotContainsString($donate, $body, 'donations are off, so no donate button');
 
-    // ── CTA buttons on EN how-to-help ─────────────────────────────────────────
+        $campaign = 'href="' . ($en ? '/en/campaign/' : '/campaign/') . '"';
+        feature_enabled('campaign')
+            ? $this->assertStringContainsString($campaign, $body, 'the campaign way links to the campaign')
+            : $this->assertStringNotContainsString($campaign, $body, 'the campaign is off, so nothing links to it');
 
-    public function testEnHowToHelpHasVolunteerCta(): void
-    {
-        $body = $this->getBody('/en/how-to-help/');
-        $this->assertStringContainsString(
-            '/en/contacts/?topic=' . urlencode('I want to volunteer'),
-            $body,
-            'EN page should have CTA link for volunteer way'
-        );
-    }
-
-    public function testEnHowToHelpHasPartnerCta(): void
-    {
-        $body = $this->getBody('/en/how-to-help/');
-        $this->assertStringContainsString(
-            '/en/contacts/?topic=' . urlencode('I want to become a partner'),
-            $body,
-            'EN page should have CTA link for partner way'
-        );
-    }
-
-    public function testEnHowToHelpHasDonorCta(): void
-    {
-        $body = $this->getBody('/en/how-to-help/');
-        $this->assertStringContainsString(
-            'href="/en/donation/"',
-            $body,
-            'EN page should link the donor way to the English donation form'
-        );
-    }
-
-    public function testEnHowToHelpHasSocialButtons(): void
-    {
-        $body = $this->getBody('/en/how-to-help/');
-        $this->assertStringContainsString(
-            'facebook.com/profile.php?id=61580050070685',
-            $body,
-            'EN page should have Facebook button in social media way'
-        );
-        $this->assertStringContainsString(
-            'instagram.com',
-            $body,
-            'EN page should have Instagram button in social media way'
-        );
-    }
-
-    public function testEnHowToHelpHasLafetkasCta(): void
-    {
-        $body = $this->getBody('/en/how-to-help/');
-        $this->assertStringContainsString(
-            'href="/en/campaign/"',
-            $body,
-            'EN page should have EN campaign link for the campaign'
-        );
+        $this->assertStringContainsString($en ? 'Like us on Facebook' : 'Харесайте ни във Facebook', $body, 'the social way shows the follow buttons');
+        if (SOCIAL_FACEBOOK !== '') $this->assertStringContainsString('href="' . h(SOCIAL_FACEBOOK) . '"', $body);
+        if (SOCIAL_INSTAGRAM !== '') $this->assertStringContainsString('href="' . h(SOCIAL_INSTAGRAM) . '"', $body);
     }
 }

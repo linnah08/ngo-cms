@@ -3,198 +3,170 @@
 declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\Group;
 
-class InlineAddRemoveTest extends TestCase
+/**
+ * The on-page add (+) and remove (×) buttons: admin/inline-add.php (a form POST)
+ * and admin/inline-remove.php (a JSON body), each run for real via
+ * run_admin_page(). Every file they touch is put back byte for byte afterwards —
+ * impact, centres and partners are in git; pages.json and articles are not, so
+ * the tests write their own.
+ */
+#[Group('admin')]
+final class InlineAddRemoveTest extends TestCase
 {
-    private string $pagesPath;
-    private string $partnersPath;
-    private string $impactPath;
-    private string $centresPath;
-    /** Raw bytes of each content file before the test, or null if it did not exist. */
-    private array  $backup = [];
+    private const SLUG = 'pw-inline-remove';
+
+    /** Raw bytes of each file before the test, or null if it did not exist. */
+    private array $backup = [];
+    private ?int $productId = null;
+
+    private function articlePath(string $lang): string { return ARTICLES_PATH . "/$lang/" . self::SLUG . '.json'; }
 
     protected function setUp(): void
     {
-        $this->pagesPath    = CONTENT_PATH . '/pages.json';
-        $this->partnersPath = PARTNERS_FILE;
-        $this->impactPath   = IMPACT_FILE;
-        $this->centresPath  = CENTRES_FILE;
-        // Keep the exact bytes, so restoring never reformats a file that is in git.
-        foreach ([$this->pagesPath, $this->partnersPath, $this->impactPath, $this->centresPath] as $path) {
-            $this->backup[$path] = is_file($path) ? file_get_contents($path) : null;
-        }
-        if (session_status() === PHP_SESSION_NONE) session_start();
-        $_SESSION[ADMIN_SESSION_NAME] = ['role' => 'admin', 'time' => time()];
+        $files = [CONTENT_PATH . '/pages.json', PARTNERS_FILE, IMPACT_FILE, CENTRES_FILE, $this->articlePath('bg'), $this->articlePath('en')];
+        foreach ($files as $path) $this->backup[$path] = is_file($path) ? file_get_contents($path) : null;
+
+        save_json(CONTENT_PATH . '/pages.json', ['about' => ['team' => [
+            ['name' => 'Мария', 'name_en' => 'Maria', 'role' => 'Директор', 'role_en' => 'Director', 'photo' => ''],
+            ['name' => 'Иван', 'name_en' => 'Ivan', 'role' => 'Доброволец', 'role_en' => 'Volunteer', 'photo' => ''],
+        ]]]);
+        save_json(IMPACT_FILE, [['number' => '10', 'label_bg' => 'деца', 'label_en' => 'children'],
+                                ['number' => '3', 'label_bg' => 'центъра', 'label_en' => 'centres']]);
     }
 
     protected function tearDown(): void
     {
-        // Put every file back exactly as it was, and remove any the test created.
         foreach ($this->backup as $path => $bytes) {
-            if ($bytes !== null) {
-                file_put_contents($path, $bytes);
-            } elseif (is_file($path)) {
-                unlink($path);
-            }
+            if ($bytes !== null) file_put_contents($path, $bytes);
+            elseif (is_file($path)) unlink($path);
+        }
+        if ($this->productId !== null) {
+            get_pdo()->prepare('DELETE FROM products WHERE id = ?')->execute([$this->productId]);
         }
     }
 
-    /**
-     * pages.json holds the site's own content and is not in git, so a fresh
-     * checkout has none. Tests that edit it skip without it.
-     */
-    private function requireContentFile(string $path): void
+    private function add(array $post, array $opts = []): array
     {
-        if ($this->backup[$path] === null) {
-            $this->markTestSkipped(basename($path) . ' not present (it is not in git).');
-        }
+        $r = run_admin_page('admin/inline-add.php', $post, $opts);
+        $r['json'] = json_decode(trim($r['body']), true) ?? [];
+        return $r;
     }
 
-    // ── Type whitelist ────────────────────────────────────────────────────────
-
-    public function test_add_rejects_unknown_type(): void
+    private function remove(string $type, string|int $id, array $opts = []): array
     {
-        $allowed = ['team', 'partner', 'impact', 'centre'];
-        $this->assertFalse(in_array('unknown_type', $allowed, true));
+        $r = run_admin_page('admin/inline-remove.php', [], $opts + ['json' => ['type' => $type, 'id' => $id]]);
+        $r['json'] = json_decode(trim($r['body']), true) ?? [];
+        return $r;
     }
 
-    public function test_remove_rejects_unknown_type(): void
+    // ── Who may add or remove ────────────────────────────────────────────────
+
+    public function test_logged_out_visitor_can_neither_add_nor_remove(): void
     {
-        $allowed = ['team', 'partner', 'impact', 'centre', 'article', 'product'];
-        $this->assertFalse(in_array('unknown_type', $allowed, true));
+        $before = file_get_contents(IMPACT_FILE);
+        $this->assertSame(302, $this->add(['type' => 'impact', 'number' => '1'], ['role' => null])['status']);
+        $this->assertSame(302, $this->remove('impact', 0, ['role' => null])['status']);
+        $this->assertSame($before, file_get_contents(IMPACT_FILE));
     }
 
-    // ── Add: impact (direct logic test) ──────────────────────────────────────
-
-    public function test_add_impact_item(): void
+    public function test_missing_csrf_token_changes_nothing(): void
     {
-        // Impact is stored in content/impact.json with keys: number, label_bg, label_en
-        $items  = load_json(IMPACT_FILE);
-        $before = count($items);
-
-        $items[] = [
-            'number'   => '999',
-            'label_bg' => 'Тест',
-            'label_en' => 'Test',
-        ];
-        save_json(IMPACT_FILE, $items);
-
-        $saved = json_decode(file_get_contents($this->impactPath), true);
-        $this->assertCount($before + 1, $saved);
-        $last = end($saved);
-        $this->assertSame('999', $last['number']);
-        $this->assertSame('Тест', $last['label_bg']);
+        $before = file_get_contents(IMPACT_FILE);
+        $this->assertSame('csrf', $this->add(['type' => 'impact', 'number' => '1'], ['csrf' => false])['json']['error'] ?? null);
+        $this->assertSame('csrf', $this->remove('impact', 0, ['csrf' => false])['json']['error'] ?? null);
+        $this->assertSame($before, file_get_contents(IMPACT_FILE));
     }
 
-    // ── Remove: impact item (direct logic test) ───────────────────────────────
-
-    public function test_remove_impact_item(): void
+    public function test_unknown_type_is_refused(): void
     {
+        $this->assertSame('unknown type', $this->add(['type' => 'unknown_type'])['json']['error'] ?? null);
+        $this->assertSame('unknown type', $this->remove('unknown_type', 0)['json']['error'] ?? null);
+    }
+
+    // ── Add ──────────────────────────────────────────────────────────────────
+
+    public function test_add_impact_item_appends_it_without_tags(): void
+    {
+        $r = $this->add(['type' => 'impact', 'number' => ' 999 ', 'label_bg' => '<b>Тест</b>', 'label_en' => 'Test']);
+        $this->assertSame(['ok' => true], $r['json'], $r['body']);
+
         $items = load_json(IMPACT_FILE);
-        // Add a dummy item first
-        $items[] = ['number' => '0', 'label_bg' => 'Тест', 'label_en' => 'Test'];
-        save_json(IMPACT_FILE, $items);
-
-        $items  = load_json(IMPACT_FILE);
-        $before = count($items);
-        $idx    = $before - 1;
-        array_splice($items, $idx, 1);
-        save_json(IMPACT_FILE, $items);
-
-        $saved = json_decode(file_get_contents($this->impactPath), true);
-        $this->assertCount($before - 1, $saved);
+        $this->assertCount(3, $items);
+        $this->assertSame(['number' => '999', 'label_bg' => 'Тест', 'label_en' => 'Test'], end($items));
     }
 
-    // ── Add: centre (direct logic test) ──────────────────────────────────────
-
-    public function test_add_centre_item(): void
+    public function test_add_centre_and_team_member(): void
     {
-        // Centres are stored in content/centres.json with keys: name_bg, name_en, description_bg, description_en, image, active
-        $centres = load_json(CENTRES_FILE);
-        $before  = count($centres);
+        $centres = count(load_json(CENTRES_FILE));
+        $this->add(['type' => 'centre', 'name_bg' => 'Тест център', 'name_en' => 'Test Centre',
+                    'description_bg' => 'Описание', 'description_en' => 'Description']);
+        $last = load_json(CENTRES_FILE);
+        $this->assertCount($centres + 1, $last);
+        $this->assertSame(['Тест център', 'Test Centre', true], [end($last)['name_bg'], end($last)['name_en'], end($last)['active']]);
 
-        $centres[] = [
-            'name_bg'        => 'Тест център',
-            'name_en'        => 'Test Centre',
-            'description_bg' => 'Описание',
-            'description_en' => 'Description',
-            'image'          => '',
-            'active'         => true,
-        ];
-        save_json(CENTRES_FILE, $centres);
-
-        $saved = json_decode(file_get_contents($this->centresPath), true);
-        $this->assertCount($before + 1, $saved);
-        $last = end($saved);
-        $this->assertSame('Тест център', $last['name_bg']);
-        $this->assertSame('Test Centre', $last['name_en']);
+        $this->add(['type' => 'team', 'name_bg' => 'Петя', 'name_en' => 'Petya', 'role_bg' => 'Касиер', 'role_en' => 'Treasurer']);
+        $team = load_json(CONTENT_PATH . '/pages.json')['about']['team'];
+        $this->assertCount(3, $team);
+        $this->assertSame(['Петя', 'Treasurer'], [$team[2]['name'], $team[2]['role_en']]);
     }
 
-    // ── Remove: team member (direct logic test) ───────────────────────────────
-
-    public function test_remove_team_member(): void
+    public function test_partner_link_must_be_a_web_address(): void
     {
-        $this->requireContentFile($this->pagesPath);
-        $pages = load_json(CONTENT_PATH . '/pages.json');
-        // Add a dummy member first
-        if (!isset($pages['about']['team'])) $pages['about']['team'] = [];
-        $pages['about']['team'][] = ['name' => 'Тест', 'name_en' => 'Test', 'role' => 'Role', 'role_en' => 'Role', 'photo' => ''];
-        save_json(CONTENT_PATH . '/pages.json', $pages);
-
-        $pages  = load_json(CONTENT_PATH . '/pages.json');
-        $team   = $pages['about']['team'] ?? [];
-        $before = count($team);
-        $idx    = $before - 1; // last item (the one we just added)
-        array_splice($team, $idx, 1);
-        $pages['about']['team'] = $team;
-        save_json(CONTENT_PATH . '/pages.json', $pages);
-
-        $saved = json_decode(file_get_contents($this->pagesPath), true);
-        $this->assertCount($before - 1, $saved['about']['team'] ?? []);
+        $this->add(['type' => 'partner', 'name' => 'Добър', 'url' => 'https://example.com']);
+        $this->add(['type' => 'partner', 'name' => 'Лош', 'url' => 'javascript:alert(1)']);
+        $partners = load_json(PARTNERS_FILE);
+        [$good, $bad] = array_slice($partners, -2);
+        $this->assertSame(['Добър', 'https://example.com'], [$good['name'], $good['url']]);
+        $this->assertSame(['Лош', ''], [$bad['name'], $bad['url']]);
     }
 
-    // ── Remove: article slug sanitisation ────────────────────────────────────
+    // ── Remove ───────────────────────────────────────────────────────────────
 
-    public function test_remove_article_slug_sanitised(): void
+    public function test_remove_takes_out_exactly_the_chosen_item(): void
     {
-        $slug = '../../../etc/passwd';
-        $sanitised = basename(str_replace(['..', "\0"], '', $slug));
-        $this->assertStringNotContainsString('..', $sanitised);
-        $this->assertStringNotContainsString('/', $sanitised);
+        $this->assertSame(['ok' => true], $this->remove('team', 0)['json']);
+        $team = load_json(CONTENT_PATH . '/pages.json')['about']['team'];
+        $this->assertSame(['Иван'], array_column($team, 'name'));
+
+        $this->remove('impact', 1);
+        $this->assertSame(['10'], array_column(load_json(IMPACT_FILE), 'number'));
     }
 
-    // ── Remove: product deactivation (DB) ────────────────────────────────────
+    public function test_remove_with_an_index_that_does_not_exist_changes_nothing(): void
+    {
+        $before = file_get_contents(IMPACT_FILE);
+        $this->assertSame(['ok' => true], $this->remove('impact', 99)['json']);
+        $this->assertSame($before, file_get_contents(IMPACT_FILE));
+    }
 
-    public function test_remove_product_deactivates(): void
+    public function test_remove_article_deletes_both_languages_and_cannot_leave_the_folder(): void
+    {
+        foreach (['bg', 'en'] as $lang) {
+            if (!is_dir(dirname($this->articlePath($lang)))) mkdir(dirname($this->articlePath($lang)), 0755, true);
+            save_json($this->articlePath($lang), ['title' => 'x', 'status' => 'draft']);
+        }
+
+        $this->remove('article', '../../pages');
+        $this->assertFileExists(CONTENT_PATH . '/pages.json', 'a slug with ../ must not reach other content');
+
+        $this->remove('article', self::SLUG);
+        $this->assertFileDoesNotExist($this->articlePath('bg'));
+        $this->assertFileDoesNotExist($this->articlePath('en'));
+    }
+
+    public function test_remove_product_hides_it_rather_than_deleting_it(): void
     {
         if (!test_db_available()) $this->markTestSkipped('DB not available.');
-        require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
-        $pdo  = get_pdo();
-        $prod = $pdo->query('SELECT id, active FROM products WHERE active = 1 LIMIT 1')->fetch();
-        if (!$prod) $this->markTestSkipped('No active products');
+        $pdo = get_pdo();
+        $pdo->prepare('INSERT INTO products (slug, name_bg, name_en, price_eur, stock, active) VALUES (?,?,?,?,?,?)')
+            ->execute(['pw-inline-remove-' . bin2hex(random_bytes(3)), 'Тест', 'Test', 5, 1, 1]);
+        $this->productId = (int) $pdo->lastInsertId();
 
-        $pid = (int)$prod['id'];
-        $pdo->prepare('UPDATE products SET active = 0 WHERE id = ?')->execute([$pid]);
-
+        $this->assertSame(['ok' => true], $this->remove('product', $this->productId)['json']);
         $row = $pdo->prepare('SELECT active FROM products WHERE id = ?');
-        $row->execute([$pid]);
-        $this->assertSame(0, (int)$row->fetch()['active']);
-
-        // Restore
-        $pdo->prepare('UPDATE products SET active = 1 WHERE id = ?')->execute([$pid]);
-    }
-
-    // ── Partner URL validation ────────────────────────────────────────────────
-
-    public function test_invalid_partner_url_stored_as_empty(): void
-    {
-        $url = filter_var('not-a-url', FILTER_VALIDATE_URL);
-        $this->assertSame('', $url ?: '');
-    }
-
-    public function test_valid_partner_url_passes(): void
-    {
-        $url = filter_var('https://example.com', FILTER_VALIDATE_URL);
-        $this->assertSame('https://example.com', $url ?: '');
+        $row->execute([$this->productId]);
+        $this->assertSame(0, (int) $row->fetchColumn());
     }
 }

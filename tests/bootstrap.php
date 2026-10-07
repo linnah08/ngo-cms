@@ -171,7 +171,8 @@ function with_setting(string $key, string $value, callable $fn): mixed {
  *
  * $opts: role ('admin' | 'author' | 'shop_admin' | null = logged out),
  *        csrf (true = valid token, false = none, string = that token),
- *        get (query params), method ('POST'), ip (REMOTE_ADDR).
+ *        get (query params), method ('POST'), ip (REMOTE_ADDR),
+ *        json (array: sent as the raw JSON body, with the CSRF token inside it).
  */
 function run_admin_page(string $rel, array $post = [], array $opts = []): array {
     $spec = [
@@ -183,6 +184,7 @@ function run_admin_page(string $rel, array $post = [], array $opts = []): array 
         'role'   => array_key_exists('role', $opts) ? $opts['role'] : 'admin',
         'csrf'   => $opts['csrf'] ?? true,
         'ip'     => $opts['ip'] ?? '127.0.0.1',
+        'json'   => $opts['json'] ?? null,
     ];
     $code = <<<'PHP'
 $s = json_decode($argv[1], true);
@@ -203,6 +205,11 @@ if ($s['role'] !== null) {
 $token = csrf_token();
 if ($s['csrf'] === true) $_POST['csrf_token'] = $token;
 elseif (is_string($s['csrf'])) $_POST['csrf_token'] = $s['csrf'];
+if (is_array($s['json'])) {
+    // A JSON-body endpoint (the inline editors): the token travels inside the body.
+    if (isset($_POST['csrf_token'])) $s['json']['csrf_token'] = $_POST['csrf_token'];
+    $GLOBALS['_om_raw_input'] = json_encode($s['json']);
+}
 register_shutdown_function(function () {
     echo "\n@@RESULT@@" . json_encode(['status' => http_response_code() ?: 200, 'flash' => $_SESSION['flash'] ?? [], 'session' => $_SESSION ?? []]);
     session_destroy();
