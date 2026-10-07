@@ -192,7 +192,8 @@ $edit_date    = $article['date'] ?? date('Y-m-d');
 $edit_scheduled = !$is_new && article_is_scheduled($article, @filemtime(ARTICLES_PATH . '/bg/' . $slug_param . '.json') ?: null);
 $edit_tags    = implode(', ', $article['tags'] ?? []);
 $has_en_version = !empty($article_en);
-$deepl_ready    = deepl_is_configured();
+// Translate buttons only while „Помощ от изкуствен интелект“ is on (Admin → Модули).
+$deepl_ready    = module_enabled_with_needs('ai_helpers') && deepl_is_configured();
 $claude_ready   = claude_is_configured();
 
 $grid_bg   = article_photos_for_editor($article);   // missing files included — they show as such, never drop silently
@@ -325,7 +326,7 @@ $badge_style       = 'font-size:.75rem;font-weight:600;border-radius:3px;padding
       <div class="form-group">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.4rem;">
           <label for="tagsInput" style="margin-bottom:0;">Тагове / SEO ключови думи <small style="font-weight:normal;text-transform:none;">(разделени със запетая)</small></label>
-          <?php if ($claude_ready): ?>
+          <?php if ($claude_ready && module_enabled_with_needs('ai_helpers')): ?>
             <button type="button" id="suggestKeywordsBtn" class="btn btn--outline" style="font-size:.8rem;padding:.3rem .7rem;">✦ Предложи ключови думи</button>
           <?php endif; ?>
         </div>

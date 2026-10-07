@@ -31,6 +31,8 @@ $current_user = admin_user();
   <script>
   window._sessionExpiresAt = <?= ($current_user['time'] ?? 0) + ADMIN_SESSION_HOURS * 3600 ?>;
   window._csrfToken = <?= json_encode(csrf_token()) ?>;
+  // „Помощ от изкуствен интелект“ (Admin → Модули): off = no translate / AI buttons anywhere.
+  window._aiHelpersOn = <?= module_enabled_with_needs('ai_helpers') ? 'true' : 'false' ?>;
   </script>
   <script src="/admin/js/autosave.js"></script>
   <!-- ── Shared image cropper (Cropper.js vendored locally) -->

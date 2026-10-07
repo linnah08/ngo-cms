@@ -103,6 +103,61 @@ final class ModulesGatingTest extends TestCase
         $this->assertStringNotContainsString('REACHED', $out);
     }
 
+    // ── ai_helpers ───────────────────────────────────────────────────────────
+
+    public function test_translate_buttons_absent_when_ai_helpers_off(): void
+    {
+        $code = 'require ROOT_PATH . "/admin/includes/admin-footer.php";';
+        $off = $this->child($code, ['ai_helpers']);
+        $this->assertStringNotContainsString('data-translate-from', $off, 'no button is attached to EN fields');
+        $this->assertStringNotContainsString('/admin/translate-ajax.php', $off);
+        $this->assertStringContainsString('function txField() {}', $off, 'inline handlers on a page never throw');
+        $on = $this->child($code);
+        if (!module_enabled_with_needs('ai_helpers')) $this->markTestSkipped('ai_helpers is off on this site.');
+        $this->assertStringContainsString("querySelectorAll('[data-translate-from]').forEach(attach)", $on);
+    }
+
+    public function test_page_level_ai_buttons_follow_the_switch(): void
+    {
+        foreach (['admin/articles.php', 'admin/campaign.php', 'admin/email-templates.php', 'admin/newsletter-compose.php', 'admin/product-edit.php', 'admin/article-edit.php'] as $rel) {
+            $this->assertStringContainsString("module_enabled_with_needs('ai_helpers') && deepl_is_configured()", self::src($rel), $rel);
+        }
+        $pages = self::src('admin/pages.php');
+        $this->assertSame(0, preg_match('/^(?!.*ai_helpers).*<button[^>]*(txField\(|txEl\(|translate-legal-btn)/m', $pages), 'every translate button in pages.php is wrapped');
+        $this->assertStringContainsString("\$claude_ready && module_enabled_with_needs('ai_helpers')", self::src('admin/article-edit.php'), 'keyword suggestions');
+        $this->assertMatchesRegularExpression("/module_enabled_with_needs\('ai_helpers'\)\): \?>\s*<button type=\"button\" id=\"extractDimsBtn\"/", self::src('admin/product-edit.php'));
+        $this->assertStringContainsString("window._aiHelpersOn", self::src('admin/includes/admin-header.php'));
+        $this->assertStringContainsString("window._aiHelpersOn !== false", self::src('admin/menus.php'));
+    }
+
+    public function test_ai_endpoints_refuse_when_off(): void
+    {
+        foreach (['translate-ajax.php', 'translate-article-ajax.php', 'suggest-keywords-ajax.php', 'extract-size-dims.php'] as $f) {
+            $src = self::src('admin/' . $f);
+            $auth = preg_match('/admin_require_\w+\(\);/', $src, $m, PREG_OFFSET_CAPTURE) ? $m[0][1] : PHP_INT_MAX;
+            $guard = strpos($src, "module_ajax_guard('ai_helpers');");
+            $this->assertNotFalse($guard, $f);
+            $this->assertLessThan($guard, $auth, "$f: auth first");
+        }
+        $out = $this->child('module_ajax_guard("ai_helpers"); echo "REACHED";', ['ai_helpers']);
+        $this->assertStringNotContainsString('REACHED', $out);
+        $r = json_decode($out, true);
+        $this->assertFalse($r['ok']);
+        $this->assertStringContainsString('Помощ от изкуствен интелект', $r['error']);
+    }
+
+    public function test_excerpts_fall_back_to_the_plain_cut_without_an_api_call(): void
+    {
+        $out = $this->child(<<<'PHP'
+            require_once ROOT_PATH . '/includes/ai_excerpt.php';
+            $html = '<p>' . str_repeat('Дума текст ', 40) . '</p>';
+            echo json_encode([article_auto_excerpt('Заглавие', $html, 'bg'), article_excerpt_from_content($html)], JSON_UNESCAPED_UNICODE);
+            PHP, ['ai_helpers']);
+        [$got, $plain] = json_decode($out, true);
+        $this->assertSame($plain, $got);
+        $this->assertStringContainsString("module_enabled_with_needs('ai_helpers')", self::src('cron/backfill-article-excerpts.php'));
+    }
+
     // ── Links to modules ─────────────────────────────────────────────────────
 
     public function test_module_for_path_matches_public_paths(): void

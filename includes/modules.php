@@ -102,6 +102,18 @@ function modules_registry(?array $replace = null): array
             'admin_pages'  => ['financial-reports.php'],
             'public_paths' => ['/finansovi-otcheti/', '/en/financial-reports/'],
         ],
+        'ai_helpers' => [
+            'label'       => 'Помощ от изкуствен интелект',
+            'description' => 'Бутони „✦ Translate“, които превеждат текста от български на английски, предложения за ключови думи, автоматично кратко описание на статиите и разчитане на таблици с размери.',
+            'off_warning' => 'Изключвате помощта от изкуствен интелект. Бутоните за превод и предложенията ще изчезнат от админ панела и английските текстове ще се попълват на ръка. Краткото описание на статия ще се взима от началото на текста. Ключовете за DeepL и Claude остават запазени.',
+            'needs'        => [],
+            // No page of its own: its buttons live on other pages, and its JSON
+            // endpoints (translate-ajax.php, translate-article-ajax.php,
+            // suggest-keywords-ajax.php, extract-size-dims.php) call
+            // module_ajax_guard('ai_helpers').
+            'admin_pages'  => [],
+            'public_paths' => [],
+        ],
     ];
     return $registry;
 }
@@ -273,6 +285,23 @@ function module_admin_guard(string $module): void
     </section>
     <?php
     require $root . '/admin/includes/admin-footer.php';
+    exit;
+}
+
+/**
+ * For an admin AJAX/JSON endpoint of a module, after its own auth call: if the
+ * module is off, answer HTTP 404 with {"ok":false,"error":"…"} in plain words
+ * and stop. Admin pages that render HTML use module_admin_guard() instead.
+ */
+function module_ajax_guard(string $module): void
+{
+    if (module_enabled_with_needs($module)) return;
+    http_response_code(404);
+    if (!headers_sent()) header('Content-Type: application/json; charset=UTF-8');
+    echo json_encode([
+        'ok'    => false,
+        'error' => 'Модулът „' . module_label($module) . '“ е изключен. Може да бъде включен отново от „Модули“ в админ панела.',
+    ], JSON_UNESCAPED_UNICODE);
     exit;
 }
 

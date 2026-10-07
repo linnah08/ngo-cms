@@ -220,7 +220,7 @@ foreach ($sections as $key => $title):
     if (p.len.dataset.auto !== '1' || bg === '') return;
     var known = KNOWN[bg.toLowerCase()];
     var en = known || '';
-    if (!en) {
+    if (!en && window._aiHelpersOn !== false) {
       try {
         var res = await fetch('/admin/translate-ajax.php', {
           method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -235,7 +235,9 @@ foreach ($sections as $key => $title):
     p.len.value = en || bg;
     showNote(p);
     say(en ? 'Текстът на английски е попълнен: ' + en
-           : 'Текстът не можа да се преведе — на английски засега стои „' + bg + '“. Проверете го.');
+           : (window._aiHelpersOn === false
+              ? 'На английски засега стои „' + bg + '“. Попълнете превода.'
+              : 'Текстът не можа да се преведе — на английски засега стои „' + bg + '“. Проверете го.'));
   }
 
   function wire(row) {

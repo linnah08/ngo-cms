@@ -30,7 +30,8 @@ if (!$is_new) {
 
 $page_title_admin = $is_new ? 'Нов продукт' : 'Редакция: ' . $product['name_bg'];
 $active_nav       = 'products';
-$deepl_ready      = deepl_is_configured();
+// Translate buttons only while „Помощ от изкуствен интелект“ is on (Admin → Модули).
+$deepl_ready      = module_enabled_with_needs('ai_helpers') && deepl_is_configured();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) { http_response_code(400); exit('Invalid token'); }
@@ -376,9 +377,12 @@ if (($product['type'] ?? '') === 'variant' && !$is_new) {
       <button type="button" class="btn btn--outline" style="font-size:.82rem;" onclick="document.getElementById('sizeGuideInput').click()">
         <?= $vsize_guide ? 'Смени снимката' : 'Качи таблица с размери' ?>
       </button>
+<?php // AI reads the size chart — only while „Помощ от изкуствен интелект“ is on. ?>
+      <?php if (module_enabled_with_needs('ai_helpers')): ?>
       <button type="button" id="extractDimsBtn" class="btn btn--outline" style="font-size:.82rem;<?= $vsize_guide ? '' : 'display:none;' ?>" onclick="extractSizeDims()">
         Извлечи размери от снимката
       </button>
+      <?php endif; ?>
     </div>
     <small id="sizeGuideStatus" style="display:block;color:var(--text-muted);margin-top:.25rem;">JPG, PNG, WebP — качва се веднага</small>
   </div>
@@ -1037,7 +1041,7 @@ document.getElementById('sizeGuideInput').addEventListener('change', function ()
         document.getElementById('sizeGuideImg').src = '/assets/images/products/' + data.filename;
         document.getElementById('sizeGuideName').textContent = data.filename;
         document.getElementById('sizeGuidePreview').style.display = '';
-        document.getElementById('extractDimsBtn').style.display = '';
+        var _xb = document.getElementById('extractDimsBtn'); if (_xb) _xb.style.display = '';
         status.textContent = 'Качено успешно.';
         status.style.color = '#2d6a35';
       } else {
