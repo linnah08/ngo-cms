@@ -148,6 +148,59 @@ function module_admin_page_visible(string $page): bool
     return $module === null || module_enabled_with_needs($module);
 }
 
+/**
+ * Which module a site address belongs to, from the modules' public_paths, or
+ * null for core pages, other sites, mailto:/tel: and #anchors. Accepts a bare
+ * path (/magazin/x/?a=1#b) or an absolute address on this site (SITE_URL…).
+ * The longest matching prefix wins.
+ */
+function module_for_path(string $url): ?string
+{
+    $url = trim($url);
+    if ($url === '') return null;
+    if (defined('SITE_URL')) {
+        $base = rtrim((string) SITE_URL, '/');
+        if ($base !== '' && stripos($url, $base . '/') === 0) $url = substr($url, strlen($base));
+        elseif ($base !== '' && strcasecmp($url, $base) === 0) $url = '/';
+    }
+    if ($url[0] !== '/' || str_starts_with($url, '//')) return null;
+    $path = rawurldecode(substr($url, 0, strcspn($url, '?#')));
+
+    $best = null; $best_len = 0;
+    foreach (modules_registry() as $name => $m) {
+        foreach ($m['public_paths'] as $prefix) {
+            $p = rtrim($prefix, '/');
+            // '/x.php' matches only itself; '/dir/' matches /dir and everything under it.
+            $hit = str_ends_with($prefix, '/')
+                ? ($path === $p || str_starts_with($path, $p . '/'))
+                : $path === $prefix;
+            if ($hit && strlen($p) > $best_len) { $best = $name; $best_len = strlen($p); }
+        }
+    }
+    return $best;
+}
+
+/**
+ * Should a link to this address be shown? False only when it points at a page
+ * of a module that is off — so menus, front-page buttons and the sitemap drop
+ * it quietly instead of sending visitors to a 404.
+ */
+function module_link_visible(string $url): bool
+{
+    $module = module_for_path($url);
+    return $module === null || module_enabled_with_needs($module);
+}
+
+/**
+ * A menu list ([i => ['url' => …, 'label' => …]]) without the items that point
+ * at an off module. Keys are kept: the on-page editor addresses items by their
+ * index in content/menus.json.
+ */
+function module_filter_links(array $items): array
+{
+    return array_filter($items, static fn($it) => !is_array($it) || module_link_visible((string) ($it['url'] ?? '')));
+}
+
 /** Label of a module, or the name itself if it is not registered. */
 function module_label(string $name): string
 {

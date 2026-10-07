@@ -82,6 +82,13 @@ function menu_editor_row(string $uid, array $row, array $err = []): void
         ⚠ Тази връзка е само в английското меню. Попълнете текста и адреса на български или премахнете реда.
       </p>
       <?php endif; ?>
+      <?php $off_module = module_for_path($row['url_bg']) ?? module_for_path($row['url_en']);
+            if ($off_module !== null && module_enabled_with_needs($off_module)) $off_module = null; ?>
+      <?php if ($off_module !== null): ?>
+      <p class="menu-pair-module-off" style="margin:0 0 .6rem;padding:.5rem .65rem;background:#f1f5f9;border:1px solid #64748b;border-radius:6px;font-size:.85rem;color:#334155;">
+        Скрита от сайта: води към модул „<?= h(module_label($off_module)) ?>“, който е изключен. Ще се покаже отново, когато го включите в „Модули“.
+      </p>
+      <?php endif; ?>
       <div style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-start;">
         <div style="flex:1 1 18rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:.5rem;">
           <div>

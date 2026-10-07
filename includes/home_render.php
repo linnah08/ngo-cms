@@ -67,6 +67,8 @@ function home_buttons(string $sid, array $f, string $lang, array $styles, string
         $label = hf($f, "btn{$n}_label", $lang);
         $url   = home_current_link(hf($f, "btn{$n}_url", $lang));
         if ($label === '' || $url === '' || home_clean_link($url) === null) continue;
+        // A button to a page of a switched-off module would lead to a 404 — leave it out.
+        if (!module_link_visible($url)) continue;
         [$class, $style] = $styles[$n - 1];
         $ext  = preg_match('#^https?://#i', $url) ? ' target="_blank" rel="noopener noreferrer"' : '';
         $out .= '<a href="' . h($url) . '"' . $ext . ' class="' . h($class) . '"' . ($style !== '' ? ' style="' . h($style) . '"' : '')
@@ -75,11 +77,22 @@ function home_buttons(string $sid, array $f, string $lang, array $styles, string
     return $out === '' ? '' : '<div class="btn-group"' . ($group_style !== '' ? ' style="' . h($group_style) . '"' : '') . '>' . $out . '</div>';
 }
 
+/**
+ * Front-page blocks that belong to an optional module: such a block is not
+ * drawn while its module is off (Admin → Модули). Its settings are kept.
+ */
+const HOME_SECTION_MODULES = ['products' => 'shop', 'campaign' => 'campaign'];
+
+function home_section_module_on(string $type): bool {
+    $module = HOME_SECTION_MODULES[$type] ?? null;
+    return $module === null || module_enabled_with_needs($module);
+}
+
 /** Load only the data that visible built-in sections need. */
 function home_context(array $doc, string $lang): array {
     $on = [];
     foreach ($doc['sections'] as $s) {
-        if (!empty($s['visible'])) $on[$s['type']] = $s;
+        if (!empty($s['visible']) && home_section_module_on((string) ($s['type'] ?? ''))) $on[$s['type']] = $s;
     }
     $ctx = ['impact' => [], 'centres' => [], 'partners' => [], 'articles' => [],
             'featured_products' => [], 'variant_images' => [], 'variant_stock' => [], 'variant_single' => [],
@@ -170,6 +183,7 @@ function home_render(array $doc, string $lang): void {
     }
     foreach ($doc['sections'] as $s) {
         if (empty($s['visible']) || !isset($types[$s['type'] ?? ''])) continue;
+        if (!home_section_module_on((string) $s['type'])) continue;
         home_render_section($s, $lang, $ctx, $show_admin);
     }
 }

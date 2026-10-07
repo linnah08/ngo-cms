@@ -4,10 +4,11 @@ if (!defined('SITE_NAME_BG')) require_once $_SERVER['DOCUMENT_ROOT'] . '/config.
 $lang      = get_lang();
 $site_name = $lang === 'bg' ? SITE_NAME_BG : SITE_NAME_EN;
 $_fmenus    = load_json(CONTENT_PATH . '/menus.json');
-$_fnav      = $_fmenus['footer_nav'][$lang]   ?? [];
+// Items pointing at a switched-off module are skipped; keys kept for the on-page editor.
+$_fnav      = module_filter_links($_fmenus['footer_nav'][$lang]   ?? []);
 $_fnav_bg   = $_fmenus['footer_nav']['bg']    ?? [];
 $_fnav_en   = $_fmenus['footer_nav']['en']    ?? [];
-$_fhelp     = $_fmenus['footer_help'][$lang]  ?? [];
+$_fhelp     = module_filter_links($_fmenus['footer_help'][$lang]  ?? []);
 $_fhelp_bg  = $_fmenus['footer_help']['bg']   ?? [];
 $_fhelp_en  = $_fmenus['footer_help']['en']   ?? [];
 $pages      = $pages ?? load_json(CONTENT_PATH . '/pages.json');

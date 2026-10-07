@@ -16,7 +16,9 @@ function _switch_lang(string $path, string $current_lang): string {
 }
 
 $_menus    = load_json(CONTENT_PATH . '/menus.json');
-$nav       = $_menus['header'][$lang] ?? [];
+// Items pointing at a page of a switched-off module are skipped (keys kept for
+// the on-page editor) — module_filter_links(), includes/modules.php.
+$nav       = module_filter_links($_menus['header'][$lang] ?? []);
 $_nav_bg   = $_menus['header']['bg'] ?? [];
 $_nav_en   = $_menus['header']['en'] ?? [];
 $shop_url  = shop_path('shop', $lang);
