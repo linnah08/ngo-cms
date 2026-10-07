@@ -139,7 +139,7 @@ $_show_nl_banner = empty($_COOKIE['om_nl_sub']) && !$_is_admin_page;
         <a href="<?= $lang === 'bg' ? '/politika-za-poveritelnost/' : '/en/privacy-policy/' ?>"><?= t('footer.privacy') ?></a>
         <a href="<?= $lang === 'bg' ? '/pravna-informaciya/' : '/en/legal/' ?>"><?= t('footer.legal') ?></a>
         <a href="<?= $lang === 'bg' ? '/usloviya/' : '/en/terms/' ?>"><?= t('footer.terms') ?></a>
-        <?php require_once ROOT_PATH . '/includes/financial_reports.php'; if (reports_any_published()): ?>
+        <?php require_once ROOT_PATH . '/includes/financial_reports.php'; if (module_enabled_with_needs('annual_reports') && reports_any_published()): ?>
         <a href="<?= $lang === 'bg' ? '/finansovi-otcheti/' : '/en/financial-reports/' ?>"><?= t('footer.reports') ?></a>
         <?php endif; ?>
         <a href="<?= $lang === 'bg' ? '/politika-za-biskvitki/' : '/en/cookie-policy/' ?>"><?= t('footer.cookies') ?></a>

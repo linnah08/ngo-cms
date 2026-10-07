@@ -138,7 +138,8 @@ final class ModuleSwitchesTest extends TestCase
     public function test_every_module_has_a_field_label_and_warning(): void
     {
         $mods = org_modules();   // the compatibility shape still answers
-        $this->assertSame(['donations', 'campaign'], array_keys($mods));
+        $this->assertSame(array_keys(modules_registry()), array_keys($mods));
+        $this->assertSame(['donations', 'campaign'], array_slice(array_keys($mods), 0, 2));
         foreach ($mods as $name => $m) {
             $this->assertArrayHasKey($m['field'], org_fields());
             $this->assertSame('FEATURE_' . strtoupper($name), org_fields()[$m['field']]);
@@ -152,14 +153,16 @@ final class ModuleSwitchesTest extends TestCase
     {
         $r = $this->validate([]);
         $this->assertSame([], $r['errors']);
-        $this->assertSame(['feature_donations' => '0', 'feature_campaign' => '0'], $r['values']);
+        $this->assertSame(array_map('module_field', array_keys(modules_registry())), array_keys($r['values']), 'every module gets a value');
+        $this->assertSame(['0'], array_values(array_unique($r['values'])), 'nothing ticked = everything off');
     }
 
     public function test_ticked_switch_saves_on(): void
     {
         $r = $this->validate(['feature_donations' => '1', 'feature_campaign' => '1'], ['donations' => false, 'campaign' => false]);
         $this->assertSame([], $r['errors']);
-        $this->assertSame(['feature_donations' => '1', 'feature_campaign' => '1'], $r['values']);
+        $this->assertSame('1', $r['values']['feature_donations']);
+        $this->assertSame('1', $r['values']['feature_campaign']);
     }
 
     public static function notABoolean(): array

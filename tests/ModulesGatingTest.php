@@ -57,6 +57,52 @@ final class ModulesGatingTest extends TestCase
         return implode("\n", $out);
     }
 
+    // ── Guards ───────────────────────────────────────────────────────────────
+
+    /** Every public entry point of the step-2 modules: [module, file]. */
+    public static function publicEntryPoints(): array
+    {
+        $map = [
+            'annual_reports' => ['finansovi-otcheti/index.php', 'en/financial-reports/index.php'],
+        ];
+        $out = [];
+        foreach ($map as $module => $files) foreach ($files as $f) $out["$module: $f"] = [$module, $f];
+        return $out;
+    }
+
+    #[DataProvider('publicEntryPoints')]
+    public function test_public_entry_point_is_guarded(string $module, string $rel): void
+    {
+        $this->assertStringContainsString("module_public_guard('{$module}');", self::src($rel), $rel);
+    }
+
+    /** Admin pages call their guard after their own auth check, so visitors never learn which modules a site runs. */
+    public function test_admin_guards_come_after_auth(): void
+    {
+        foreach (modules_registry() as $name => $m) {
+            foreach ($m['admin_pages'] as $page) {
+                $src   = self::src('admin/' . $page);
+                $guard = strpos($src, "module_admin_guard('{$name}');");
+                $this->assertNotFalse($guard, "$page has its guard");
+                $this->assertSame(1, preg_match('/admin_require_(admin|login|shop|editorial|social)\(\);/', $src, $mm, PREG_OFFSET_CAPTURE), "$page checks who is asking");
+                $this->assertLessThan($guard, $mm[0][1], "$page: auth before the module guard");
+            }
+        }
+    }
+
+    public function test_annual_reports_footer_link_and_content_list_follow_the_switch(): void
+    {
+        $this->assertStringContainsString("module_enabled_with_needs('annual_reports') && reports_any_published()", self::src('templates/footer.php'));
+        $this->assertStringContainsString('module_link_visible($r[2])', self::src('admin/pages.php'));
+    }
+
+    public function test_annual_reports_page_is_a_404_when_off(): void
+    {
+        $out = $this->child('$_SERVER["REQUEST_URI"] = "/finansovi-otcheti/"; require ROOT_PATH . "/finansovi-otcheti/index.php"; echo "REACHED";', ['annual_reports']);
+        $this->assertStringContainsString('Страницата не е намерена', $out);
+        $this->assertStringNotContainsString('REACHED', $out);
+    }
+
     // ── Links to modules ─────────────────────────────────────────────────────
 
     public function test_module_for_path_matches_public_paths(): void

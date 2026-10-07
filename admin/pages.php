@@ -410,6 +410,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
           ['legal_terms',   'Условия за ползване',             '/usloviya/'],
           ['reports',       'Финансови отчети',                '/finansovi-otcheti/'],
       ];
+      // Pages of a switched-off module (Admin → Модули) are not listed.
+      $rows = array_filter($rows, static fn(array $r): bool => module_link_visible($r[2]));
       foreach ($rows as [$key, $label, $url]):
       ?>
       <tr>

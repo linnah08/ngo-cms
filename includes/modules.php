@@ -94,6 +94,14 @@ function modules_registry(?array $replace = null): array
                     : $n . ' награди за дарители още не са изпратени.';
             },
         ],
+        'annual_reports' => [
+            'label'       => 'Годишни отчети',
+            'description' => 'Страница „Годишни отчети“, на която публикувате финансовите отчети и докладите за дейността си, с връзка към нея във футъра.',
+            'off_warning' => 'Изключвате годишните отчети. Страницата с отчетите и връзката към нея във футъра ще изчезнат от сайта. Качените документи остават запазени.',
+            'needs'        => [],
+            'admin_pages'  => ['financial-reports.php'],
+            'public_paths' => ['/finansovi-otcheti/', '/en/financial-reports/'],
+        ],
     ];
     return $registry;
 }
