@@ -5,7 +5,7 @@
 <!-- ── Confirmation modal ──────────────────────────────────────────────────── -->
 <div id="adminConfirmOverlay"
      style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;padding:1rem;"
-     role="dialog" aria-modal="true">
+     role="dialog" aria-modal="true" aria-describedby="adminConfirmMsg">
   <div style="background:#fff;border-radius:10px;padding:2rem;max-width:420px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.25);">
     <p id="adminConfirmMsg" style="font-size:1rem;line-height:1.55;margin:0 0 1.5rem;color:#111;"></p>
     <div style="display:flex;gap:.75rem;justify-content:flex-end;">
@@ -20,10 +20,10 @@
 <!-- ── Media library picker ──────────────────────────────────────────────── -->
 <div id="mediaLibOverlay"
      style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;align-items:flex-start;justify-content:center;padding:2rem;overflow-y:auto;"
-     role="dialog" aria-modal="true">
+     role="dialog" aria-modal="true" aria-labelledby="mediaLibTitle">
   <div style="background:#fff;border-radius:10px;padding:1.5rem;width:100%;max-width:780px;box-shadow:0 24px 64px rgba(0,0,0,.25);margin:auto;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-      <h2 style="margin:0;font-size:1rem;font-weight:600;">Избери снимка от библиотеката</h2>
+      <h2 id="mediaLibTitle" style="margin:0;font-size:1rem;font-weight:600;">Избери снимка от библиотеката</h2>
       <button id="mediaLibClose" type="button"
               style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#666;line-height:1;padding:.25rem .5rem;">✕</button>
     </div>
@@ -191,25 +191,37 @@
   var cancelBtn = document.getElementById('adminConfirmCancel');
   var okBtn     = document.getElementById('adminConfirmOk');
   var _resolve  = null;
+  var _returnTo = null;
 
+  /* Focus starts on "Отказ": these dialogs confirm destructive or overwriting
+     actions, so Enter must never carry them out by accident. Focus stays in the
+     dialog while it is open and goes back where it came from on close. */
   function showConfirm(msg, okLabel) {
+    _returnTo = document.activeElement;
     msgEl.textContent   = msg;
     okBtn.textContent   = okLabel || 'Изтрий';
     overlay.style.display = 'flex';
-    okBtn.focus();
+    cancelBtn.focus();
     return new Promise(function (res) { _resolve = res; });
   }
 
   function closeModal(result) {
     overlay.style.display = 'none';
     if (_resolve) { _resolve(result); _resolve = null; }
+    if (_returnTo && document.contains(_returnTo) && typeof _returnTo.focus === 'function') _returnTo.focus();
+    _returnTo = null;
   }
 
   cancelBtn.addEventListener('click', function () { closeModal(false); });
   okBtn.addEventListener('click',     function () { closeModal(true);  });
   overlay.addEventListener('click',   function (e) { if (e.target === overlay) closeModal(false); });
   document.addEventListener('keydown', function (e) {
-    if (overlay.style.display !== 'none' && e.key === 'Escape') closeModal(false);
+    if (overlay.style.display === 'none') return;
+    if (e.key === 'Escape') { closeModal(false); return; }
+    if (e.key === 'Tab') { // keep focus on the two buttons
+      e.preventDefault();
+      (document.activeElement === cancelBtn ? okBtn : cancelBtn).focus();
+    }
   });
 
   /* Submit a form on behalf of a clicked button, preserving that button's
