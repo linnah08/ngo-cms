@@ -183,6 +183,12 @@ $current_user = admin_user();
         Поръчки
       </a>
       <?php endif; ?>
+      <?php if (module_admin_page_visible('events.php')): ?>
+      <a href="/admin/events.php"
+         class="admin-nav__link <?= ($active_nav ?? '') === 'events' ? 'active' : '' ?>">
+        Събития
+      </a>
+      <?php endif; ?>
       <?php if (module_admin_page_visible('monthly-report.php')): ?>
       <a href="/admin/monthly-report.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'monthly-report' ? 'active' : '' ?>">

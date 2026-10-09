@@ -45,6 +45,21 @@ try {
     error_log('sitemap products error: ' . $e->getMessage());
 }
 
+// ── Published events → /sabitiya/SLUG/ and /en/events/SLUG/ ──────────────
+if (module_enabled_with_needs('events')) {
+    try {
+        require_once __DIR__ . '/includes/events.php';
+        array_push($urls, [$base . '/sabitiya/', null], [$base . '/en/events/', null]);
+        foreach (events_public_list(get_pdo()) as $e) {
+            $enc = rawurlencode($e['slug']);
+            $urls[] = [$base . '/sabitiya/' . $enc . '/', null];
+            $urls[] = [$base . '/en/events/' . $enc . '/', null];
+        }
+    } catch (Throwable $e) {
+        error_log('sitemap events error: ' . $e->getMessage());
+    }
+}
+
 // ── Published articles → /novini/SLUG/ (bg) and /en/news/SLUG/ (en) ───────
 foreach (['bg' => '/novini/', 'en' => '/en/news/'] as $lang => $prefix) {
     foreach (get_articles($lang) as $article) {

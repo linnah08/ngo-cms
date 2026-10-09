@@ -109,11 +109,11 @@ function modules_registry(?array $replace = null): array
         ],
         'campaign' => [
             'label'       => 'Кампании',
-            'description' => 'Кампания за набиране на средства: страница с цел и напредък, награди за дарителите и билети за събития.',
+            'description' => 'Кампания за набиране на средства: страница с цел и напредък и награди за дарителите.',
             'off_warning' => 'Изключвате кампаниите. Страниците на кампанията ще изчезнат от сайта и посетителите няма да могат да ги отварят.',
             'needs'        => [],
-            'admin_pages'  => ['campaign.php', 'campaign-backers.php', 'pledge-view.php', 'ticket-checklist.php'],
-            'public_paths' => ['/campaign/', '/en/campaign/', '/tickets/', '/api/campaign-payment-return.php'],
+            'admin_pages'  => ['campaign.php', 'campaign-backers.php', 'pledge-view.php'],
+            'public_paths' => ['/campaign/', '/en/campaign/', '/api/campaign-payment-return.php'],
             'pending'      => static function (PDO $pdo): ?string {
                 $n = (int) $pdo->query(
                     "SELECT COUNT(*) FROM campaign_pledges
@@ -207,6 +207,22 @@ function modules_registry(?array $replace = null): array
             // module_ajax_guard('ai_helpers').
             'admin_pages'  => [],
             'public_paths' => [],
+        ],
+        'events' => [
+            'label'       => 'Събития и билети',
+            'description' => 'Събития с онлайн продажба на билети: страница за всяко събитие, билети в PDF по имейл и списък за входа. Не е нужна кампания.',
+            'off_warning' => 'Изключвате събитията. Страниците на събитията ще изчезнат от сайта и никой няма да може да купи билет. Вече продадените билети остават валидни и се виждат в Поръчки.',
+            'needs'        => [],
+            // Card payments are site-wide (Admin → Плащания), not a module: an
+            // event page says plainly when they are not set up yet.
+            // download-ticket.php stays outside: past tickets must stay
+            // downloadable from Поръчки with the module off.
+            'admin_pages'  => ['events.php', 'event-edit.php', 'ticket-checklist.php'],
+            'public_paths' => ['/sabitiya/', '/en/events/', '/tickets/', '/api/event-payment-return.php'],
+            'pending'      => static function (PDO $pdo): ?string {
+                require_once __DIR__ . '/events.php';
+                return events_pending_text($pdo);
+            },
         ],
     ];
     return $registry;

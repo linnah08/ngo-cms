@@ -130,7 +130,7 @@ final class ModuleSwitchesTest extends TestCase
 
     // ── Validation of the POSTed switches (Admin → Модули) ───────────────────────
 
-    private function validate(array $in, array $current = ['donations' => true, 'campaign' => true]): array
+    private function validate(array $in, array $current = ['donations' => true, 'campaign' => true, 'events' => true]): array
     {
         return modules_validate_switches($in, $current);
     }
@@ -141,6 +141,7 @@ final class ModuleSwitchesTest extends TestCase
         $this->assertSame(array_keys(modules_registry()), array_keys($mods));
         $this->assertContains('donations', array_keys($mods));
         $this->assertContains('campaign', array_keys($mods));
+        $this->assertContains('events', array_keys($mods));
         foreach ($mods as $name => $m) {
             $this->assertArrayHasKey($m['field'], org_fields());
             $this->assertSame('FEATURE_' . strtoupper($name), org_fields()[$m['field']]);
@@ -160,10 +161,11 @@ final class ModuleSwitchesTest extends TestCase
 
     public function test_ticked_switch_saves_on(): void
     {
-        $r = $this->validate(['feature_donations' => '1', 'feature_campaign' => '1'], ['donations' => false, 'campaign' => false]);
+        $r = $this->validate(['feature_donations' => '1', 'feature_campaign' => '1', 'feature_events' => '1'], ['donations' => false, 'campaign' => false, 'events' => false]);
         $this->assertSame([], $r['errors']);
         $this->assertSame('1', $r['values']['feature_donations']);
         $this->assertSame('1', $r['values']['feature_campaign']);
+        $this->assertSame('1', $r['values']['feature_events']);
     }
 
     public static function notABoolean(): array

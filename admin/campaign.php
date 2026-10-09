@@ -180,34 +180,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $saved = true;
     }
 
-    // ── Event / ticket settings ───────────────────────────────────────────────
-    if ($section === 'event') {
-        $ev_active  = isset($_POST['event_active']) ? '1' : '0';
-        $ev_name    = trim($_POST['event_name']    ?? '');
-        $ev_date    = trim($_POST['event_date']    ?? '');
-        $ev_time    = trim($_POST['event_time']    ?? '');
-        $ev_place   = trim($_POST['event_place']   ?? '');
-        $ev_fb_url  = trim($_POST['event_fb_url']  ?? '');
-        $ev_price   = round((float)($_POST['event_ticket_price'] ?? 0), 2);
-        $ev_desc    = trim($_POST['event_description'] ?? '');
-
-        if ($ev_name === '')  $errors[] = 'Въведете название на събитието.';
-        if ($ev_date === '')  $errors[] = 'Въведете дата на събитието.';
-        if ($ev_price <= 0)   $errors[] = 'Цената на билета трябва да е положително число.';
-
-        if (empty($errors)) {
-            setting_set('event_active',        $ev_active);
-            setting_set('event_name',          $ev_name);
-            setting_set('event_date',          $ev_date);
-            setting_set('event_time',          $ev_time);
-            setting_set('event_place',         $ev_place);
-            setting_set('event_fb_url',        $ev_fb_url);
-            setting_set('event_ticket_price',  (string)$ev_price);
-            setting_set('event_description',   $ev_desc);
-            $saved = true;
-        }
-    }
-
     if (empty($errors)) {
         header('Location: /admin/campaign.php' . ($saved ? '?saved=1&_asclear=campaign' : ''));
         exit;
@@ -232,23 +204,6 @@ $risks       = setting_get('campaign_risks', '');
 $risks_en    = setting_get('campaign_risks_en', '');
 $rewards     = $pdo->query("SELECT * FROM campaign_rewards ORDER BY position")->fetchAll();
 
-// Event / ticket settings
-$ev_active  = setting_get('event_active',        '0');
-$ev_name    = setting_get('event_name',          '');
-$ev_date    = setting_get('event_date',          '');
-$ev_time    = setting_get('event_time',          '');
-$ev_place   = setting_get('event_place',         '');
-$ev_fb_url  = setting_get('event_fb_url',        '');
-$ev_price   = setting_get('event_ticket_price',  '');
-$ev_desc    = setting_get('event_description',   '');
-
-try {
-    $ticket_stats = $pdo->query("
-        SELECT COUNT(*) AS sold FROM campaign_pledges WHERE payment_status='paid' AND pledge_type='ticket'
-    ")->fetch();
-} catch (Throwable) {
-    $ticket_stats = ['sold' => 0];
-}
 
 try {
     $stats = $pdo->query("
@@ -664,61 +619,17 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   </form>
 </div>
 
-<!-- ── Event / Ticket ────────────────────────────────────────────────────────── -->
+<!-- ── Events moved to their own module ───────────────────────────────────── -->
 <div id="sec-event" style="background:#fff;border:1px solid #e8ddd5;border-radius:8px;padding:1.5rem;margin-bottom:1.5rem;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap;gap:.5rem;">
-    <h2 style="margin:0;font-size:1.05rem;">🎟 Събитие &amp; билети</h2>
-    <div style="display:flex;gap:.5rem;align-items:center;">
-      <span style="font-size:.82rem;color:var(--text-muted);">Продадени билети: <strong><?= (int)$ticket_stats['sold'] ?></strong></span>
-      <button type="button" class="btn btn--primary" onclick="tinymce.triggerSave();document.getElementById('eventForm').submit();">Запази</button>
-    </div>
-  </div>
-  <form method="POST" id="eventForm">
-    <?= csrf_field() ?>
-    <input type="hidden" name="section" value="event">
-
-    <div style="margin-bottom:1.25rem;">
-      <label style="display:flex;align-items:center;gap:.5rem;font-weight:600;cursor:pointer;">
-        <input type="checkbox" name="event_active" value="1" <?= $ev_active === '1' ? 'checked' : '' ?>>
-        Събитието е активно (показва блок за билети на публичната страница)
-      </label>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
-      <div>
-        <label style="<?= $lbl ?>">Название на събитието</label>
-        <input type="text" name="event_name" value="<?= h($ev_name) ?>" style="<?= $inp ?>" placeholder="напр. Парти за старт на кампанията">
-      </div>
-      <div>
-        <label style="<?= $lbl ?>">Линк към Facebook събитие</label>
-        <input type="url" name="event_fb_url" value="<?= h($ev_fb_url) ?>" style="<?= $inp ?>" placeholder="https://www.facebook.com/events/...">
-      </div>
-      <div>
-        <label style="<?= $lbl ?>">Дата</label>
-        <input type="date" name="event_date" value="<?= h($ev_date) ?>" style="<?= $inp ?>">
-      </div>
-      <div>
-        <label style="<?= $lbl ?>">Час (незадължително)</label>
-        <input type="time" name="event_time" value="<?= h($ev_time) ?>" style="<?= $inp ?>">
-      </div>
-      <div>
-        <label style="<?= $lbl ?>">Място (незадължително)</label>
-        <input type="text" name="event_place" value="<?= h($ev_place) ?>" style="<?= $inp ?>" placeholder="напр. Лаборатория за приключения, Лозен">
-      </div>
-      <div>
-        <label style="<?= $lbl ?>">Цена на билет (EUR)</label>
-        <input type="number" name="event_ticket_price" value="<?= h($ev_price) ?>" min="1" step="0.01" style="<?= $inp ?>">
-      </div>
-    </div>
-
-    <div>
-      <label style="<?= $lbl ?>">Описание на събитието (незадължително)</label>
-      <textarea id="eventDesc" name="event_description" rows="3" style="<?= $inp ?> resize:vertical;"><?= h($ev_desc) ?></textarea>
-    </div>
-    <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--border);">
-      <button type="button" class="btn btn--primary" onclick="tinymce.triggerSave();document.getElementById('eventForm').submit();">Запази</button>
-    </div>
-  </form>
+  <h2 style="margin:0 0 .5rem;font-size:1.05rem;">🎟 Събития и билети</h2>
+  <p style="margin:0;line-height:1.6;">
+    Събитията и продажбата на билети вече са отделен модул — с тях може да продавате билети и без кампания.
+    <?php if (module_admin_page_visible('events.php')): ?>
+      <a href="/admin/events.php" style="font-weight:600;">Към „Събития“ →</a>
+    <?php else: ?>
+      Включете модула „Събития и билети“ в <a href="/admin/modules.php" style="font-weight:600;">Модули</a>.
+    <?php endif; ?>
+  </p>
 </div>
 
 <script>
@@ -799,11 +710,11 @@ function _pickCampaignPhoto() {
 </script>
 
 <script>
-tinymce.init(Object.assign({}, window._tinyBase, { selector: '#campaignDesc, #campaignDescEn, #campaignRisks, #campaignRisksEn, #eventDesc', min_height: 200 }));
+tinymce.init(Object.assign({}, window._tinyBase, { selector: '#campaignDesc, #campaignDescEn, #campaignRisks, #campaignRisksEn', min_height: 200 }));
 initAutosave({
   key:     'campaign',
   formId:  'generalForm',
-  tinyIds: ['campaignDesc', 'campaignDescEn', 'campaignRisks', 'campaignRisksEn', 'eventDesc']
+  tinyIds: ['campaignDesc', 'campaignDescEn', 'campaignRisks', 'campaignRisksEn']
 });
 tinymce.init(Object.assign({}, window._tinyBase, { selector: '.reward-desc, .reward-desc-en', min_height: 120 }));
 tinymce.init(Object.assign({}, window._tinyBase, { selector: '.faq-answer, .faq-answer-en', min_height: 120 }));
