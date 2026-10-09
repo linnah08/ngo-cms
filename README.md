@@ -29,10 +29,10 @@ For a non-technical setup on shared cPanel hosting:
 2. In cPanel open **File Manager**, go to your domain's folder (e.g.
    `public_html`), click **Upload**, choose the ZIP, then **Extract** it there.
 3. **Open your website** in a browser. The setup wizard (in Bulgarian) launches automatically.
-4. Pick **“Създай нова база данни”** (create a new database), fill in your
-   organisation's name, contact details and an admin login, and click **Инсталирай**.
-5. When it finishes, delete the `install/` folder (File Manager → select →
-   Delete). Log in at `your-site.org/admin/`.
+4. Follow the six short steps. On cPanel the database is created for you; you
+   only choose an admin login and type the organisation's name.
+5. When it finishes, log in at `your-site.org/admin/`. The wizard locks itself
+   and deletes its own `install/` folder — nothing to remove by hand.
 6. To change the organisation's name, contacts, bank account, colours or logo
    later, open **Организация** in the admin menu — no files need editing.
 

@@ -14,14 +14,19 @@
  * kept in the session until the install finishes (the admin password only as
  * a hash), then cleared. Works without JavaScript.
  *
- * SECURITY: refuses to run once site.config.php exists. Delete this install/
- * directory after a successful install.
+ * SECURITY: refuses to run once site.config.php and db.config.php exist (it
+ * sends people to the admin instead), and deletes itself after a successful
+ * install where the server allows it. Nobody is ever asked to remove it by hand.
  */
 
 $ROOT = dirname(__DIR__);
 
 // ── Guard: already installed? ────────────────────────────────────────────────
 $already = is_file($ROOT . '/site.config.php') && is_file($ROOT . '/db.config.php');
+if ($already) {
+    header('Location: /admin/', true, 303);
+    exit;
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function e(string $s): string { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
@@ -304,12 +309,7 @@ $prev    = $step_no > 1 ? $keys[$step_no - 2] : null;
 <div class="wrap">
   <p class="site-title">Инсталиране на сайта</p>
   <div class="card">
-<?php if ($already): ?>
-    <h1>Сайтът вече е инсталиран</h1>
-    <p>От съображения за сигурност изтрийте папката <code>install</code> от File Manager в cPanel.
-       Администраторският панел е на адрес <a href="/admin/">/admin/</a>.</p>
-
-<?php elseif ($success): ?>
+<?php if ($success): ?>
     <h1 tabindex="-1" id="focus-target">Готово — сайтът работи</h1>
     <div class="alert alert-ok">
       Сайтът е на адрес <a href="<?= e($done_final['org']['site_url']) ?>"><?= e($done_final['org']['site_url']) ?></a>.
@@ -326,9 +326,6 @@ $prev    = $step_no > 1 ? $keys[$step_no - 2] : null;
       <li><a href="/admin/organisation.php#f-site_phone">Телефон за контакт</a></li>
       <li><a href="/admin/modules.php">Модули</a> — включвайте и изключвайте допълнителните части по всяко време. Нищо не се губи, когато изключите модул.</li>
     </ul>
-    <div class="alert alert-error" style="margin:1.25rem 0 0;">
-      <strong>Последна стъпка за сигурност:</strong> изтрийте папката <code>install</code> от File Manager в cPanel.
-    </div>
 
 <?php else: ?>
     <nav class="progress" aria-label="Напредък">
