@@ -11,6 +11,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_shipping.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_view.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/unpaid_orders.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/order_refund.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_email_composer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/couriers/order_shipment.php';
 
@@ -145,37 +146,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'Поръчката е отменена, но: ' . $shipment_error;
             }
 
-            // Initiate DSK Bank refund when cancelling a paid order
+            // Give the card payment back when cancelling a paid order
             if ($new_status === 'cancelled' && $order['status'] !== 'cancelled'
-                && $order['payment_status'] === 'paid' && !empty($order['dsk_order_id'])) {
-                require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
-                $returned = (new DSKBankPayment())->returnPayment($order['dsk_order_id'], (float)$order['total_eur']);
-                if (!$returned['ok']) {
-                    payment_error_report('Автоматичното връщане на парите при отмяна не успя — върнете сумата ръчно в DSK', $order['order_number'],
-                        new RuntimeException('DSK: ' . $returned['detail']));
-                    $success = 'Поръчката е отменена, но сумата не беше върната автоматично (в DSK плащането е „'
-                        . DSKBankPayment::stateLabel($returned['state']) . '“). Моля, върнете я ръчно в DSK Bank.';
-                } else {
-                    try {
-                        $pdo->prepare('UPDATE orders SET payment_status = ?, updated_at = NOW() WHERE id = ?')
-                            ->execute(['refunded', $id]);
-                        $lang = $order['lang'] ?? 'bg';
-                        $tpl  = email_tpl_get('order-cancelled-customer', $lang, [
-                            'customer_name' => $order['customer_name'],
-                            'order_number'  => $order['order_number'],
-                        ]);
-                        send_order_mail(
-                            (int)$id,
-                            $order['customer_email'],
-                            $tpl['subject'],
-                            render_email('order-cancelled-customer', ['order' => $order, 'tpl' => $tpl]),
-                            ['template_key' => 'order-cancelled-customer']
-                        );
-                    } catch (Throwable $e) {
-                        // The money is back; only marking it or the customer email failed.
-                        payment_error_report('Сумата е върната в DSK, но поръчката не беше отбелязана или клиентът не получи имейл', $order['order_number'], $e);
-                    }
-                }
+                && $order['payment_status'] === 'paid' && !empty($order['dsk_order_id'])
+                && ($refund_error = order_return_card_payment($pdo, $order)) !== null) {
+                $success = 'Поръчката е отменена, но: ' . $refund_error;
             }
 
             // Send shipped email
@@ -499,6 +474,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email_draft = ['preset' => $_post_str('email_preset'), 'subject' => $_post_str('email_subject'), 'body' => $_post_str('email_body')];
     }
 
+    // ── Cancelled, but the money hasn't gone back ──────────────────────────────
+    if ($action === 'return_payment') {
+        if (!order_card_payment_owed($order)) {
+            $errors[] = 'Тази поръчка няма плащане с карта за връщане.';
+        } elseif (($refund_error = order_return_card_payment($pdo, $order)) !== null) {
+            $errors[] = $refund_error;
+        } else {
+            $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = ?');
+            $stmt->execute([$id]);
+            $order = $stmt->fetch();
+            $success = 'Сумата е при клиента — поръчката е отбелязана като „Върнато“ и клиентът получи имейл.';
+        }
+    }
+
     if ($action === 'update_payment') {
         $payment_status = $_POST['payment_status'] ?? '';
         if (in_array($payment_status, ['pending','paid','refunded'])) {
@@ -745,6 +734,19 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <span>Изпратен на <?= h(substr($order['payment_failed_email_at'], 0, 16)) ?>, че плащането не е минало</span>
         <?php endif; ?>
       </div>
+
+      <?php if (order_card_payment_owed($order)): ?>
+      <div style="margin-top:1rem;padding:.85rem 1rem;border:1px solid #f0c36d;background:#fff8e6;border-radius:8px;font-size:.88rem;line-height:1.5;">
+        <p style="margin:0 0 .65rem;">⚠ Поръчката е отменена, но плащането все още е отбелязано като платено. Бутонът проверява в DSK: ако сумата вече е при клиента, само отбелязва поръчката като „Върнато“; ако не е — връща я.</p>
+        <form method="POST" style="margin:0;"
+              data-confirm="Да се провери в DSK и, ако е нужно, да се върнат <?= h(number_format((float)$order['total_eur'], 2, ',', '.')) ?> EUR на картата на клиента? Клиентът ще получи имейл за отмяната."
+              data-confirm-ok="Върни сумата">
+          <?= csrf_field() ?>
+          <input type="hidden" name="action" value="return_payment">
+          <button type="submit" class="btn btn--primary" style="min-height:44px;">Върни сумата на клиента</button>
+        </form>
+      </div>
+      <?php endif; ?>
     </div>
     <?php endif; ?>
 
