@@ -790,3 +790,8 @@ function variant_gallery(array $pv): array {
 function admin_can_sign(): bool {
     return admin_logged_in() && (admin_user()['email'] ?? '') === SIGNING_ADMIN_EMAIL;
 }
+
+// Going live: a new site is closed to visitors (a "Скоро отваряме" page) until
+// the admin presses „Пусни сайта“ on the dashboard. See includes/launch.php.
+require_once __DIR__ . '/includes/launch.php';
+launch_holding_guard();

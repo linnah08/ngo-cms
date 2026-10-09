@@ -141,6 +141,29 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <?= $ferr('site_legal_name_en') ?>
       </label>
     </div>
+    <label class="admin-checkbox" style="margin-top:.75rem;">
+      <input type="checkbox" name="site_legal_same" value="1" <?= $val('site_legal_same') === '1' ? 'checked' : '' ?>>
+      Организацията е регистрирана с името по-горе — няма отделно юридическо име
+    </label>
+
+    <h3 style="margin:1.5rem 0 .25rem;font-size:.95rem;">Регистрация</h3>
+    <p style="<?= $hint ?>margin:0 0 .75rem;">
+      От документите за регистрация на организацията (Търговски регистър или БУЛСТАТ). Законът изисква сайтът да посочва кой стои зад него, а фактурите — ЕИК и адрес.
+    </p>
+    <div class="admin-form-grid">
+      <label id="f-site_eik">ЕИК / БУЛСТАТ
+        <input type="text" name="site_eik" value="<?= h($val('site_eik')) ?>" maxlength="20" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="123456789"<?= $fattr('site_eik') ?>>
+        <?= $ferr('site_eik') ?>
+      </label>
+      <label id="f-site_mol">Представляващ (МОЛ)
+        <input type="text" name="site_mol" value="<?= h($val('site_mol')) ?>" maxlength="150" placeholder="Иван Иванов"<?= $fattr('site_mol') ?>>
+        <?= $ferr('site_mol') ?>
+      </label>
+      <label id="f-site_address" style="grid-column:1/-1;">Адрес на управление
+        <input type="text" name="site_address" value="<?= h($val('site_address')) ?>" maxlength="250" placeholder="гр. София 1000, ул. Примерна 1"<?= $fattr('site_address') ?>>
+        <?= $ferr('site_address') ?>
+      </label>
+    </div>
   </section>
 
   <!-- ── Contacts ──────────────────────────────────────────────────────────── -->

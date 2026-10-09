@@ -144,6 +144,11 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
   <div class="om-bar-spacer"></div>
   <a href="<?= $_admin_base ?>/" class="om-exit-link">← Admin</a>
 </div>
+<?php if (!site_launched()): ?>
+<div role="status" style="background:#fff8eb;color:#5c3d06;border-bottom:1px solid #f3d9a4;padding:.55rem 1rem;font-size:.88rem;text-align:center;font-family:system-ui,sans-serif;">
+  Сайтът още не е отворен — посетителите виждат „Скоро отваряме“. <a href="<?= $_admin_base ?>/#go-live" style="color:#7a4e00;font-weight:600;">Какво остава</a>
+</div>
+<?php endif; ?>
 <button id="om-save-btn" onclick="OmCMS.save()">💾 Save changes</button>
 <div id="om-add-modal">
   <div class="om-modal-box">

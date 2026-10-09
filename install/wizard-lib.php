@@ -182,7 +182,8 @@ function wizard_site_config(array $done): array
         'SOCIAL_INSTAGRAM' => '',
         'SOCIAL_LINKEDIN'  => '',
         'GTM_ID' => '', 'GA4_ID' => '', 'GOOGLE_ADS_ID' => '', 'GOOGLE_ADS_PURCHASE_LABEL' => '',
-        'HOME_START_MINIMAL' => true,   // front page starts with the banner + chosen modules (home_start_hidden())
+        'HOME_START_MINIMAL' => true,
+        'SITE_LAUNCHED'      => false,  // visitors see "Скоро отваряме" until „Пусни сайта“ (includes/launch.php)   // front page starts with the banner + chosen modules (home_start_hidden())
     ], modules_install_flags($done['modules']['modules'] ?? []));
 }
 

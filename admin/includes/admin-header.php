@@ -319,3 +319,17 @@ $current_user = admin_user();
     </div>
 
     <div class="admin-content">
+<?php
+    // Go-live reminder on every page but the dashboard, which has the full list.
+    if (($active_nav ?? '') !== 'dashboard' && function_exists('site_launched') && admin_is_admin()):
+        $_lr_open = launch_required_open();
+        if (!site_launched() || $_lr_open > 0):
+?>
+      <div role="status" style="display:flex;flex-wrap:wrap;gap:.4rem 1rem;align-items:center;background:#fff8eb;border:1px solid #f3d9a4;border-radius:8px;padding:.6rem .9rem;margin-bottom:1rem;font-size:.88rem;line-height:1.4;color:#5c3d06;">
+        <span style="flex:1 1 260px;min-width:0;">
+          <?= !site_launched() ? 'Сайтът още не е отворен за посетители.' : 'Липсват неща, които законът изисква.' ?>
+          <?= $_lr_open > 0 ? 'Остават ' . $_lr_open . ' задължителни.' : 'Всичко задължително е готово.' ?>
+        </span>
+        <a href="/admin/#go-live" style="font-weight:600;color:#7a4e00;white-space:nowrap;">Към списъка</a>
+      </div>
+<?php endif; endif; ?>

@@ -26,6 +26,7 @@ $page_labels = [
     'legal_privacy' => 'Политика за поверителност',
     'legal_info'    => 'Правна информация',
     'legal_terms'   => 'Условия за ползване',
+    'legal_cookies' => 'Политика за бисквитки',
 ];
 
 $page_urls = [
@@ -40,6 +41,7 @@ $page_urls = [
     'legal_privacy' => '/politika-za-poveritelnost/',
     'legal_info'    => '/pravna-informaciya/',
     'legal_terms'   => '/usloviya/',
+    'legal_cookies' => '/politika-za-biskvitki/',
 ];
 
 $page_title_admin = $page && isset($page_labels[$page])
@@ -312,13 +314,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($section === 'legal') {
         $pages = load_json(CONTENT_PATH . '/pages.json');
         $key   = $_POST['legal_key'] ?? '';
-        if (in_array($key, ['privacy', 'legal_info', 'terms'], true)) {
+        if (in_array($key, ['privacy', 'legal_info', 'terms', 'cookies'], true)) {
             if (!isset($pages['legal'])) $pages['legal'] = [];
-            $pages['legal'][$key]          = $_POST['legal_content']    ?? '';
-            $pages['legal'][$key . '_en']  = $_POST['legal_content_en'] ?? '';
+            // The cookie policy pages read cookie_policy_bg / cookie_policy_en.
+            [$kbg, $ken] = $key === 'cookies' ? ['cookie_policy_bg', 'cookie_policy_en'] : [$key, $key . '_en'];
+            $pages['legal'][$kbg] = $_POST['legal_content']    ?? '';
+            $pages['legal'][$ken] = $_POST['legal_content_en'] ?? '';
             save_json(CONTENT_PATH . '/pages.json', $pages);
-            $legal_page_map = ['privacy' => 'legal_privacy', 'legal_info' => 'legal_info', 'terms' => 'legal_terms'];
-            $legal_as_map   = ['privacy' => 'legal-privacy', 'legal_info' => 'legal-info', 'terms' => 'legal-terms'];
+            $legal_page_map = ['privacy' => 'legal_privacy', 'legal_info' => 'legal_info', 'terms' => 'legal_terms', 'cookies' => 'legal_cookies'];
+            $legal_as_map   = ['privacy' => 'legal-privacy', 'legal_info' => 'legal-info', 'terms' => 'legal-terms', 'cookies' => 'legal-cookies'];
             header('Location: /admin/pages.php?page=' . $legal_page_map[$key] . '&saved=1&_asclear=page:' . $legal_as_map[$key]); exit;
         }
 
@@ -511,6 +515,7 @@ $cp_list  = cpage_all();
           ['legal_privacy', 'Политика за поверителност',       '/politika-za-poveritelnost/'],
           ['legal_info',    'Правна информация',               '/pravna-informaciya/'],
           ['legal_terms',   'Условия за ползване',             '/usloviya/'],
+          ['legal_cookies', 'Политика за бисквитки',           '/politika-za-biskvitki/'],
           ['reports',       'Финансови отчети',                '/finansovi-otcheti/'],
       ];
       // Pages of a switched-off module (Admin → Модули) are not listed.
@@ -2197,6 +2202,41 @@ tinymce.init(Object.assign({}, window._tinyBase, { selector: '#legalBg, #legalEn
 tinymce.init(Object.assign({}, window._tinyBase, { selector: '#legalBg, #legalEn', min_height: 400, menubar: true }));
 </script>
 
+<?php elseif ($page === 'legal_cookies'): ?>
+<!-- ══ COOKIES ══ -->
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;gap:1rem;">
+  <div>
+    <a href="/admin/pages.php" style="color:var(--text-muted);font-size:0.9rem;display:block;margin-bottom:.25rem;">← Назад</a>
+    <h1 style="margin:0;">Политика за бисквитки</h1>
+  </div>
+  <button type="submit" form="legalCookiesForm" class="btn btn--primary">Запази</button>
+</div>
+<p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1.5rem;">Съдържанието се записва като HTML.</p>
+<form id="legalCookiesForm" method="POST" action="/admin/pages.php?page=legal_cookies" class="admin-form">
+  <?= csrf_field() ?>
+  <input type="hidden" name="section" value="legal">
+  <input type="hidden" name="legal_key" value="cookies">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+    <div class="form-group">
+      <label>Съдържание <?= $lbl_bg_badge ?></label>
+      <textarea id="legalBg" name="legal_content" rows="30" style="font-family:monospace;font-size:0.85rem;"><?= h($legal['cookie_policy_bg'] ?? '') ?></textarea>
+    </div>
+    <div class="form-group">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
+        <label style="margin:0;">Content <?= $lbl_en_badge ?></label>
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline translate-legal-btn" data-src="legalBg" data-tgt="legalEn" style="font-size:.78rem;padding:.25rem .6rem;">✦ Translate from BG</button><?php endif; ?>
+      </div>
+      <textarea id="legalEn" name="legal_content_en" rows="30" style="font-family:monospace;font-size:0.85rem;"><?= h($legal['cookie_policy_en'] ?? '') ?></textarea>
+    </div>
+  </div>
+  <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--border);">
+    <button type="submit" class="btn btn--primary">Запази</button>
+  </div>
+</form>
+<script>
+tinymce.init(Object.assign({}, window._tinyBase, { selector: '#legalBg, #legalEn', min_height: 400, menubar: true }));
+</script>
+
 <?php else: ?>
   <p>Непозната страница. <a href="/admin/pages.php">← Назад</a></p>
 <?php endif; ?>
@@ -2246,6 +2286,9 @@ initAutosave({ key: 'page:legal-info', formId: 'legalInfoForm', tinyIds: ['legal
 <?php endif; ?>
 <?php if ($page === 'legal_terms'): ?>
 initAutosave({ key: 'page:legal-terms', formId: 'legalTermsForm', tinyIds: ['legalBg', 'legalEn'] });
+<?php endif; ?>
+<?php if ($page === 'legal_cookies'): ?>
+initAutosave({ key: 'page:legal-cookies', formId: 'legalCookiesForm', tinyIds: ['legalBg', 'legalEn'] });
 <?php endif; ?>
 </script>
 

@@ -25,6 +25,10 @@ function org_fields(): array
         'site_name_en'     => 'SITE_NAME_EN',
         'site_legal_name_bg' => 'SITE_LEGAL_NAME_BG',
         'site_legal_name_en' => 'SITE_LEGAL_NAME_EN',
+        'site_legal_same'  => 'SITE_LEGAL_SAME',   // '1': the name above is also the registered name
+        'site_eik'         => 'SITE_EIK',
+        'site_address'     => 'SITE_ADDRESS',
+        'site_mol'         => 'SITE_MOL',
         'site_email'       => 'SITE_EMAIL',
         'site_phone'       => 'SITE_PHONE',
         'site_iban'        => 'SITE_IBAN',
@@ -46,7 +50,40 @@ function org_fields(): array
         'newsletter_donate_heading_en' => 'NEWSLETTER_DONATE_HEADING_EN',
         'newsletter_donate_text_bg'    => 'NEWSLETTER_DONATE_TEXT_BG',
         'newsletter_donate_text_en'    => 'NEWSLETTER_DONATE_TEXT_EN',
+        'site_launched'    => 'SITE_LAUNCHED',     // set by „Пусни сайта“ (admin/launch.php), not by the form
     ] + org_module_fields();
+}
+
+/** Fields the Организация form never posts: module switches and the launch state. */
+function org_system_fields(): array
+{
+    return org_module_fields() + ['site_launched' => 'SITE_LAUNCHED'];
+}
+
+/**
+ * A Bulgarian ЕИК (9 digits) or БУЛСТАТ (13), with its check digits. Spaces and
+ * a "BG" VAT prefix are allowed and removed. Returns the clean number or null.
+ */
+function org_eik_normalize(string $eik): ?string
+{
+    $d = preg_replace('/\s+/', '', strtoupper($eik));
+    if (str_starts_with($d, 'BG')) $d = substr($d, 2);
+    if (!preg_match('/^(\d{9}|\d{13})$/', $d)) return null;
+    $check = static function (array $digits, array $w1, array $w2): int {
+        $sum = 0; foreach ($w1 as $i => $w) $sum += $digits[$i] * $w;
+        $r = $sum % 11;
+        if ($r !== 10) return $r;
+        $sum = 0; foreach ($w2 as $i => $w) $sum += $digits[$i] * $w;
+        $r = $sum % 11;
+        return $r === 10 ? 0 : $r;
+    };
+    $n = array_map('intval', str_split($d));
+    if ($check($n, [1, 2, 3, 4, 5, 6, 7, 8], [3, 4, 5, 6, 7, 8, 9, 10]) !== $n[8]) return null;
+    if (strlen($d) === 13) {
+        $tail = array_slice($n, 8, 4);
+        if ($check($tail, [2, 7, 3, 5], [4, 9, 5, 7]) !== $n[12]) return null;
+    }
+    return $d;
 }
 
 /**
@@ -256,7 +293,7 @@ function org_validate(array $in, array $themeKeys): array
 {
     $v = [];
     // Module switches are not part of this form (Admin → Модули saves them).
-    foreach (array_keys(array_diff_key(org_fields(), org_module_fields())) as $k) {
+    foreach (array_keys(array_diff_key(org_fields(), org_system_fields())) as $k) {
         $v[$k] = is_string($in[$k] ?? null) ? trim($in[$k]) : '';
     }
     $e = [];
@@ -280,6 +317,19 @@ function org_validate(array $in, array $themeKeys): array
             $e[$k] = 'Името е твърде дълго (най-много 150 знака).';
         }
     }
+
+    $v['site_legal_same'] = in_array($v['site_legal_same'], ['1', 'on', 'true'], true) ? '1' : '0';
+
+    if ($v['site_eik'] !== '') {
+        $eik = org_eik_normalize($v['site_eik']);
+        if ($eik === null) {
+            $e['site_eik'] = 'Този ЕИК не е правилен — трябва да е 9 цифри (13 за БУЛСТАТ) и вероятно има сгрешена цифра. Препишете го от регистрацията на организацията.';
+        } else {
+            $v['site_eik'] = $eik;
+        }
+    }
+    if (mb_strlen($v['site_address']) > 250) $e['site_address'] = 'Адресът е твърде дълъг (най-много 250 знака).';
+    if (mb_strlen($v['site_mol']) > 150)     $e['site_mol'] = 'Името е твърде дълго (най-много 150 знака).';
 
     if (filter_var($v['site_email'], FILTER_VALIDATE_EMAIL) === false) {
         $e['site_email'] = 'Моля, въведете правилен имейл адрес, например info@vashata-organizacia.bg';

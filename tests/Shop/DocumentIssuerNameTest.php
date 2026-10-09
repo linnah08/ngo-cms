@@ -138,7 +138,10 @@ final class DocumentIssuerNameTest extends TestCase
         ]);
         $this->assertSame('', $config['SITE_LEGAL_NAME_BG']);
         $this->assertSame('', $config['SITE_LEGAL_NAME_EN']);
-        $wizard = (string) file_get_contents(self::root() . '/install/index.php');
-        $this->assertStringContainsString('/admin/organisation.php#f-site_legal_name_bg', $wizard);
+        // …and the go-live checklist sends the admin straight to the field.
+        require_once self::root() . '/includes/launch.php';
+        $item = array_values(array_filter(launch_checklist([], true), fn($i) => $i['key'] === 'legal_name'))[0];
+        $this->assertSame('/admin/organisation.php#f-site_legal_name_bg', $item['href']);
+        $this->assertTrue($item['required']);
     }
 }

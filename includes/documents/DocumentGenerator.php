@@ -8,8 +8,7 @@ abstract class DocumentGenerator {
      * entity's (org_legal_name(): Admin → Организация → "Юридическо име",
      * falling back to the site name) — a site run as a brand or project of a
      * foundation issues its documents in the foundation's name. Bank and
-     * contact fields come from site.config / Admin → Организация. TODO: the
-     * legal-registry fields (address, MOL, EIK) are not configurable yet.
+     * contact fields, ЕИК, address and МОЛ come from site.config / Admin → Организация.
      */
     protected static function foundation(string $lang = 'bg'): array {
         return [
@@ -20,9 +19,9 @@ abstract class DocumentGenerator {
             'phone'        => SITE_PHONE,
             'email'        => SITE_EMAIL,
             'website'      => SITE_URL,
-            'address'      => '',
-            'mol'          => '',
-            'eik'          => '',
+            'address'      => self::h(defined('SITE_ADDRESS') ? (string) SITE_ADDRESS : ''),
+            'mol'          => self::h(defined('SITE_MOL') ? (string) SITE_MOL : ''),
+            'eik'          => self::h(defined('SITE_EIK') ? (string) SITE_EIK : ''),
             'registration' => '',
         ];
     }
