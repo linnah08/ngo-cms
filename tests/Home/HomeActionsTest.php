@@ -119,4 +119,13 @@ final class HomeActionsTest extends TestCase
         $this->assertSame('Помогнете', home_section_name($this->doc()['sections'][1]));
         $this->assertSame('YouTube видео', home_section_preview(['type' => 'video', 'fields' => ['video' => ['provider' => 'youtube', 'id' => 'dQw4w9WgXcQ']]]));
     }
+
+    /** Formatted text is HTML: the admin list shows its words, not "&nbsp;" or "&amp;". */
+    public function test_preview_of_formatted_text_shows_the_characters(): void
+    {
+        $this->assertSame('Игри & терапии за деца', home_section_preview(['type' => 'richtext',
+            'fields' => ['body' => ['bg' => '<p>Игри &amp; <b>терапии</b>&nbsp;за деца&nbsp;</p>', 'en' => '']]]));
+        // Plain text is stored as typed: an "&amp;" typed on purpose is shown as it is.
+        $this->assertSame('A &amp; B', home_section_name(['type' => 'cta', 'fields' => ['heading' => ['bg' => 'A &amp; B', 'en' => '']]]));
+    }
 }

@@ -134,6 +134,53 @@ final class HomeStoreTest extends TestCase
         $this->assertCount(count($full['sections']), $out['sections']);
     }
 
+    private function field(array $doc, string $type, string $key): mixed
+    {
+        $s = array_values(array_filter($doc['sections'], fn($s) => $s['type'] === $type))[0];
+        return $s['fields'][$key];
+    }
+
+    /** pages.json text was saved by the old inline editor as HTML: "&nbsp;" showed on the page. */
+    public function test_seed_turns_saved_page_text_into_plain_text(): void
+    {
+        $doc = $this->seed(['cta_body' => 'Сензорна терапия.&nbsp;', 'cta_body_en' => 'Fish &amp; <b>chips</b>',
+                            'hero_title' => 'Добре&nbsp;дошли']);
+        $this->assertSame(['bg' => 'Сензорна терапия.', 'en' => 'Fish & chips'], $this->field($doc, 'cta', 'text'));
+        $this->assertSame('Добре дошли', $this->field($doc, 'hero', 'title')['bg']);
+    }
+
+    public function test_load_repairs_text_saved_before_it_was_decoded(): void
+    {
+        file_put_contents($GLOBALS['_om_home_file'], json_encode(['version' => 1, 'rev' => 5, 'sections' => [
+            ['id' => 's_cta', 'type' => 'cta', 'visible' => true, 'fields' => [
+                'heading' => ['bg' => 'Всяко дете &quot;заслужава&quot;', 'en' => ''],
+                'text'    => ['bg' => 'Сензорна терапия.&nbsp;', 'en' => 'Fish &amp; chips'],
+            ]],
+            ['id' => 's_mission', 'type' => 'mission', 'visible' => true, 'fields' => [
+                'text' => ['bg' => '<p>А&nbsp;Б</p>', 'en' => ''],
+            ]],
+        ]]));
+        $doc = home_load()['doc'];
+        $this->assertSame(['bg' => 'Сензорна терапия.', 'en' => 'Fish & chips'], $this->field($doc, 'cta', 'text'));
+        $this->assertSame('Всяко дете "заслужава"', $this->field($doc, 'cta', 'heading')['bg']);
+        $this->assertSame('<p>А&nbsp;Б</p>', $this->field($doc, 'mission', 'text')['bg'], 'formatted text is HTML and stays as it is');
+
+        // Saved once, the file is repaired for good and the next load leaves it alone.
+        $this->assertTrue(home_save($doc, 5)['ok']);
+        $this->assertSame('Сензорна терапия.', $this->field(json_decode(file_get_contents($GLOBALS['_om_home_file']), true), 'cta', 'text')['bg']);
+    }
+
+    /** After the repair, text is stored exactly as typed — "&amp;" typed on purpose stays. */
+    public function test_load_leaves_text_alone_once_repaired(): void
+    {
+        $this->assertTrue(home_save($this->seed(), 0)['ok']);
+        $doc = home_load()['doc'];
+        $i = array_search('cta', array_column($doc['sections'], 'type'), true);
+        $doc['sections'][$i]['fields']['text']['bg'] = 'Пишем &amp; така';
+        $this->assertTrue(home_save($doc, 1)['ok']);
+        $this->assertSame('Пишем &amp; така', $this->field(home_load()['doc'], 'cta', 'text')['bg']);
+    }
+
     public function test_plain_fallback_keeps_the_words_and_escapes_everything(): void
     {
         $out = home_clean_html_plain('<p>Здравей &amp; <b>добре</b> дошли</p><p><script>alert(1)</script>Втори</p>');

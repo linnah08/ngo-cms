@@ -9,6 +9,10 @@
 require_once __DIR__ . '/url.php';
 require_once __DIR__ . '/created_pages.php';
 
+// home.json format. 2: text fields hold plain text. Version 1 files could hold HTML
+// entities ("&nbsp;") from the old inline editor; home_load() decodes them once.
+// Created pages never had that problem and stay at 1.
+const HOME_DOC_VERSION = 2;
 const HOME_IMAGE_RE  = '#^/assets/images/[a-zA-Z0-9/_.\-]+$#';
 const HOME_HTML_TAGS = ['p', 'br', 'b', 'strong', 'em', 'i', 'u', 's', 'a', 'ul', 'ol', 'li',
                         'h2', 'h3', 'h4', 'blockquote', 'hr', 'img',
@@ -82,6 +86,26 @@ function home_clean_html_plain(string $html): string {
     $html = (string) preg_replace('#<br\s*/?>|</(?:p|li|h[2-4]|blockquote|tr)>#i', "\n", $html);
     $text = trim(html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
     return $text === '' ? '' : '<p>' . nl2br(htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8'), false) . '</p>';
+}
+
+/**
+ * HTML — the page's innerHTML, or text the old inline editor saved to pages.json — as the
+ * plain text a text field stores: "&nbsp;" and "&amp;" become the characters themselves,
+ * because output is escaped again and they would show on the page literally.
+ */
+function home_plain_text(string $html): string {
+    return html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+}
+
+/** A section's text fields (not formatted text) through home_plain_text(), then cleaned as on save. */
+function home_plain_text_fields(array $s): array {
+    foreach (home_types()[$s['type'] ?? '']['fields'] ?? [] as $key => $def) {
+        if (!in_array($def['kind'], ['text', 'textarea', 'alt'], true) || !isset($s['fields'][$key])) continue;
+        $pair = array_map('home_plain_text', home_pair($s['fields'][$key]));
+        // Too long or empty-but-required is still better shown than lost: keep the text, skip the errors.
+        $s['fields'][$key] = home_clean_field($def, $pair, (string) $key)[0];
+    }
+    return $s;
 }
 
 function home_parse_video_url(string $url): ?array {
@@ -272,7 +296,9 @@ function home_clean_field(array $def, mixed $raw, string $key): array {
                     }
                     $v = $clean;
                 } else {
-                    $v = trim(strip_tags($v));
+                    // \s with /u also trims a non-breaking space, which trim() leaves (null: not UTF-8).
+                    $v = strip_tags($v);
+                    $v = preg_replace('/^\s+|\s+$/u', '', $v) ?? trim($v);
                     if ($def['kind'] !== 'textarea') $v = (string) preg_replace('/\s+/u', ' ', $v);
                 }
                 $max = (int) ($def['max'] ?? 0);
@@ -424,12 +450,12 @@ function home_seed(array $home, array $sbg, array $sen, ?array $start_hidden = n
         'en' => (string) (($home[$key . '_en'] ?? '') ?: ($skey !== '' ? ($sen[$skey] ?? '') : '') ?: $den),
     ];
     $pair = fn(string $bg, string $en): array => ['bg' => $bg, 'en' => $en];
-    $sec  = fn(string $type, array $fields): array => ['id' => 's_' . $type, 'type' => $type,
-        'visible' => !in_array($type, $start_hidden, true), 'fields' => $fields];
+    $sec  = fn(string $type, array $fields): array => home_plain_text_fields(['id' => 's_' . $type, 'type' => $type,
+        'visible' => !in_array($type, $start_hidden, true), 'fields' => $fields]);
     $name = $pair(SITE_NAME_BG, SITE_NAME_EN);
     $img  = fn(string $path, string $fallback = ''): string => home_valid_image_path($path) ? $path : $fallback;
 
-    return ['version' => 1, 'rev' => 0, 'sections' => [
+    return ['version' => HOME_DOC_VERSION, 'rev' => 0, 'sections' => [
         $sec('hero', [
             'title' => $p('hero_title', 'home.hero.title'),
             'text'  => $p('hero_text', 'home.hero.text'),
@@ -527,13 +553,15 @@ function home_load(): array {
         error_log(basename($path) . ' is unreadable or invalid — showing ' . ($page ? 'an empty page' : 'the default front page'));
         return ['doc' => $empty(), 'corrupt' => true, 'exists' => true];
     }
-    $doc['version']  = 1;
+    $repair = !$page && (int) ($doc['version'] ?? 1) < HOME_DOC_VERSION;
+    $doc['version']  = $page ? 1 : HOME_DOC_VERSION;
     $doc['rev']      = (int) ($doc['rev'] ?? 0);
     $doc['sections'] = array_values(array_filter($doc['sections'], fn($s) =>
         is_array($s) && is_string($s['id'] ?? null) && is_string($s['type'] ?? null)));
     foreach ($doc['sections'] as &$s) {
         $s['visible'] = !empty($s['visible']);
         $s['fields']  = is_array($s['fields'] ?? null) ? $s['fields'] : [];
+        if ($repair) $s = home_plain_text_fields($s);
     }
     unset($s);
     return ['doc' => $page ? $doc : home_ensure_builtins($doc), 'corrupt' => false, 'exists' => true];
@@ -587,7 +615,7 @@ function home_save(array $doc, int $expected_rev): array {
             error_log('home.json was damaged — kept a copy as ' . basename($backup) . ' before saving');
         }
 
-        $doc['version']  = 1;
+        $doc['version']  = home_is_page() ? 1 : HOME_DOC_VERSION;
         $doc['rev']      = $current + 1;
         $doc['sections'] = array_values($doc['sections']);
         if (home_is_page()) $doc['updated'] = date('c');
@@ -647,8 +675,12 @@ function home_section_preview(array $s): string {
         return ($f['video']['provider'] === 'youtube' ? 'YouTube' : 'Vimeo') . ' видео';
     }
     if (($s['type'] ?? '') === 'cards') return count($f['cards'] ?? []) . ' карти';
+    $defs = home_types()[$s['type'] ?? '']['fields'] ?? [];
     foreach (['heading', 'title', 'text', 'body', 'intro'] as $k) {
-        $v = trim((string) preg_replace('/\s+/u', ' ', strip_tags((string) ($f[$k]['bg'] ?? ''))));
+        $v = (string) ($f[$k]['bg'] ?? '');
+        // Formatted text is HTML: show "&nbsp;" and "&amp;" as the characters (output is escaped again).
+        $v = ($defs[$k]['kind'] ?? '') === 'html' ? home_plain_text($v) : strip_tags($v);
+        $v = trim((string) preg_replace('/\s+/u', ' ', $v));
         if ($v !== '') return mb_strimwidth($v, 0, 90, '…');
     }
     return home_types()[$s['type'] ?? '']['desc'] ?? '';
@@ -797,7 +829,7 @@ function home_inline_save(string $id, array $fields): array {
                 if (!array_key_exists($l, $values)) continue;
                 $v = is_string($values[$l]) ? $values[$l] : '';
                 // The page sends innerHTML: "&amp;" must be stored as "&" (output is escaped again).
-                if ($def['kind'] !== 'html') $v = html_entity_decode(strip_tags($v), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                if ($def['kind'] !== 'html') $v = home_plain_text($v);
                 $raw[$l] = $v;
             }
         }
