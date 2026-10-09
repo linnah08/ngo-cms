@@ -26,6 +26,18 @@ function site_legal_same(): bool
     return is_string($v) ? filter_var(trim($v), FILTER_VALIDATE_BOOLEAN) : (bool) $v;
 }
 
+/** A legal text counts once it has words and no gaps left from the template. */
+function launch_legal_ok(array $legal, string $key): bool
+{
+    return launch_text_filled($legal, $key) && !launch_text_has_gaps($legal, $key);
+}
+
+/** Does a saved legal text still have highlighted gaps from the template? */
+function launch_text_has_gaps(array $legal, string $key): bool
+{
+    return str_contains((string) ($legal[$key] ?? ''), '<mark>[');
+}
+
 function launch_text_filled(array $legal, string $key): bool
 {
     // "<p>&nbsp;</p>" from an emptied editor is still empty.
@@ -61,15 +73,25 @@ function launch_checklist(?array $pages = null, bool $only_required = false): ar
     $add('address', 'Адрес на управление', 'Адресът от регистрацията на организацията. Показва се в правната информация и на документите.',
         $const('SITE_ADDRESS') !== '', $org . '#f-site_address', true);
     $add('privacy', 'Политика за поверителност', 'Задължителна по закон (GDPR): как събирате и пазите личните данни на посетителите.',
-        launch_text_filled($legal, 'privacy'), '/admin/pages.php?page=legal_privacy', true);
+        launch_legal_ok($legal, 'privacy'), '/admin/pages.php?page=legal_privacy', true);
     $add('cookies', 'Политика за бисквитки', 'Обяснява на посетителите какви бисквитки ползва сайтът. Банерът за бисквитки води към нея.',
-        launch_text_filled($legal, 'cookie_policy_bg'), '/admin/pages.php?page=legal_cookies', true);
+        launch_legal_ok($legal, 'cookie_policy_bg'), '/admin/pages.php?page=legal_cookies', true);
     $add('legal_info', 'Правна информация', 'Кой стои зад сайта и как да се свържат с вас — изисква се от Закона за електронната търговия.',
-        launch_text_filled($legal, 'legal_info'), '/admin/pages.php?page=legal_info', true);
+        launch_legal_ok($legal, 'legal_info'), '/admin/pages.php?page=legal_info', true);
     if ($takes_money) {
         $add('terms', 'Условия за ползване', 'Правилата за поръчки, плащане, доставка и връщане. Купувачите се съгласяват с тях при плащане.',
-            launch_text_filled($legal, 'terms'), '/admin/pages.php?page=legal_terms', true);
+            launch_legal_ok($legal, 'terms'), '/admin/pages.php?page=legal_terms', true);
     }
+    // A text that still has gaps from the template says so, instead of its usual reason.
+    foreach ($items as &$i) {
+        $store = ['privacy' => 'privacy', 'cookies' => 'cookie_policy_bg', 'legal_info' => 'legal_info', 'terms' => 'terms'][$i['key']] ?? null;
+        if ($store !== null && launch_text_has_gaps($legal, $store)) {
+            $i['why'] = 'В текста има места, отбелязани в жълто, които още не сте попълнили.';
+        } elseif ($store !== null && !$i['done']) {
+            $i['why'] .= ' Има готов примерен текст, от който да започнете.';
+        }
+    }
+    unset($i);
     if ($only_required) return $items;
 
     if ($takes_money) {

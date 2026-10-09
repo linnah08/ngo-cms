@@ -370,6 +370,33 @@ $shop      = $all_pages['shop']        ?? [];
 $donation  = $all_pages['donation']    ?? [];
 $legal     = $all_pages['legal']       ?? [];
 
+/**
+ * „Попълни с примерен текст“ above a legal page's editors: puts the starting
+ * text (includes/legal_templates.php) into both editors, to be read and saved.
+ */
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/legal_templates.php';
+$legal_template_box = function (string $key): string {
+    $tpl = ['bg' => legal_template($key, 'bg'), 'en' => legal_template($key, 'en')];
+    $json = json_encode($tpl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE);
+    return '<div style="background:#f4f9fa;border:1px solid var(--border);border-radius:8px;padding:.9rem 1rem;margin-bottom:1.5rem;font-size:.9rem;line-height:1.55;">'
+         . '<p style="margin:0 0 .6rem;">Нямате текст? Започнете от примерен — съставен е според данните на организацията (Организация) и модулите, които ползвате. '
+         . 'Прочетете го и го допълнете: местата <mark>[в жълто]</mark> трябва да попълните вие. Примерният текст не е правен съвет.</p>'
+         . '<button type="button" class="btn btn--outline" id="legalTemplateBtn" style="min-height:44px;">Попълни с примерен текст</button>'
+         . '<span id="legalTemplateMsg" role="status" style="margin-left:.75rem;color:var(--text-muted);"></span>'
+         . '</div>'
+         . '<script>(function () {'
+         . 'var T = ' . $json . ';'
+         . 'document.getElementById("legalTemplateBtn").addEventListener("click", async function () {'
+         . '  var bg = window.tinymce && tinymce.get("legalBg"), en = window.tinymce && tinymce.get("legalEn");'
+         . '  if (!bg || !en) return;'
+         . '  var has = bg.getContent({format: "text"}).trim() || en.getContent({format: "text"}).trim();'
+         . '  if (has && !(await window._adminConfirm("Сегашният текст на двата езика ще бъде заменен с примерния. Продължаване?", "Замени"))) return;'
+         . '  bg.setContent(T.bg); en.setContent(T.en); bg.focus();'
+         . '  document.getElementById("legalTemplateMsg").textContent = "Примерният текст е в редактора. Прегледайте го и натиснете „Запази“.";'
+         . '});'
+         . '})();</script>';
+};
+
 $saved        = isset($_GET['saved']);
 $deepl_ready  = deepl_is_configured();
 $lbl_bg_badge = '<span style="font-size:.68rem;font-weight:700;background:#dcfce7;color:#166534;border-radius:3px;padding:.05rem .35rem;margin-left:.4rem;vertical-align:middle;">BG</span>';
@@ -2106,7 +2133,7 @@ tinymce.init(Object.assign({}, window._tinyBase, { selector: '#shopBg, #shopEn',
   </div>
   <button type="submit" form="legalPrivacyForm" class="btn btn--primary">Запази</button>
 </div>
-<p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1.5rem;">Съдържанието се записва като HTML. Използвайте &lt;h2&gt;, &lt;p&gt;, &lt;ul&gt;/&lt;li&gt; и &lt;a&gt; тагове.</p>
+<?= $legal_template_box('privacy') ?>
 <form id="legalPrivacyForm" method="POST" action="/admin/pages.php?page=legal_privacy" class="admin-form">
   <?= csrf_field() ?>
   <input type="hidden" name="section" value="legal">
@@ -2141,7 +2168,7 @@ tinymce.init(Object.assign({}, window._tinyBase, { selector: '#legalBg, #legalEn
   </div>
   <button type="submit" form="legalInfoForm" class="btn btn--primary">Запази</button>
 </div>
-<p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1.5rem;">Съдържанието се записва като HTML.</p>
+<?= $legal_template_box('legal_info') ?>
 <form id="legalInfoForm" method="POST" action="/admin/pages.php?page=legal_info" class="admin-form">
   <?= csrf_field() ?>
   <input type="hidden" name="section" value="legal">
@@ -2176,7 +2203,7 @@ tinymce.init(Object.assign({}, window._tinyBase, { selector: '#legalBg, #legalEn
   </div>
   <button type="submit" form="legalTermsForm" class="btn btn--primary">Запази</button>
 </div>
-<p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1.5rem;">Съдържанието се записва като HTML.</p>
+<?= $legal_template_box('terms') ?>
 <form id="legalTermsForm" method="POST" action="/admin/pages.php?page=legal_terms" class="admin-form">
   <?= csrf_field() ?>
   <input type="hidden" name="section" value="legal">
@@ -2211,7 +2238,7 @@ tinymce.init(Object.assign({}, window._tinyBase, { selector: '#legalBg, #legalEn
   </div>
   <button type="submit" form="legalCookiesForm" class="btn btn--primary">Запази</button>
 </div>
-<p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1.5rem;">Съдържанието се записва като HTML.</p>
+<?= $legal_template_box('cookies') ?>
 <form id="legalCookiesForm" method="POST" action="/admin/pages.php?page=legal_cookies" class="admin-form">
   <?= csrf_field() ?>
   <input type="hidden" name="section" value="legal">
