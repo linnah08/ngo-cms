@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
 
+require_once __DIR__ . '/Support/ExifJpeg.php';
+
 /**
  * includes/organisation.php — admin-editable organisation identity
  * (admin/organisation.php) that overrides the site.config.php constants.
@@ -277,6 +279,23 @@ final class OrganisationTest extends TestCase
             $fav = getimagesize($this->tmp . '/favicon.png');
             $this->assertSame([64, 64], [$fav[0], $fav[1]], $type);
         }
+    }
+
+    /** A logo photographed on a phone is saved the way the browser showed it, not sideways. */
+    public function test_logo_photo_with_a_rotate_flag_is_saved_upright(): void
+    {
+        if (!function_exists('imagecreatetruecolor') || !function_exists('exif_read_data')) {
+            $this->markTestSkipped('GD or exif not available');
+        }
+        $src = $this->tmp . '/phone-logo.jpg';
+        ExifJpeg::write($src, 200, 100, 6);
+        $this->assertNull(org_save_logo($this->upload($src), $this->tmp, false));
+
+        $im = imagecreatefrompng($this->tmp . '/logo.png');
+        $this->assertSame([100, 200], [imagesx($im), imagesy($im)]);
+        [$x, $y] = ExifJpeg::upright(ExifJpeg::MARK_X, ExifJpeg::MARK_Y, 200, 100, 6);
+        $this->assertTrue(ExifJpeg::isRed($im, $x, $y));
+        imagedestroy($im);
     }
 
     /**

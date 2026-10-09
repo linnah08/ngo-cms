@@ -11,6 +11,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/print_helpers.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
 
 admin_require_shop();
 
@@ -56,12 +57,14 @@ foreach ([$shirt_path, $design_path] as $f) {
 function load_gd_image(string $path): GdImage|false
 {
     $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-    return match ($ext) {
+    $im = match ($ext) {
         'jpg', 'jpeg' => imagecreatefromjpeg($path),
         'png'         => imagecreatefrompng($path),
         'webp'        => imagecreatefromwebp($path),
         default       => false,
     };
+    // Upright, as the shopper saw it — designs uploaded before cart/add.php fixed this may still carry the flag.
+    return $im ? image_apply_orientation($im, image_exif_orientation($path)) : false;
 }
 
 // ── Load and tint shirt ───────────────────────────────────────────────────────
@@ -158,7 +161,7 @@ $spec_line  = null;
 $spec_line2 = null;
 $fname_spec = '';
 if ($pos) {
-    $dim          = @getimagesize($design_path);
+    $dim          = image_upright_size($design_path);
     $ar           = ($dim && $dim[0] > 0) ? ($dim[1] / $dim[0]) : 1.0;
     $ordered_size = $item['size'] ?? '';
     $pvars_c      = json_decode($product['variants'] ?? '{}', true) ?? [];

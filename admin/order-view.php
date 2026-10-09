@@ -9,6 +9,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DocumentGenerator.
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/TicketGenerator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_shipping.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_view.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/unpaid_orders.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_email_composer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/couriers/order_shipment.php';
@@ -600,7 +601,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
                   $spec_str = null;
                   if (is_array($pos_v)) {
                       $dpath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($item['design_file'], '/');
-                      $dim   = @getimagesize($dpath);
+                      $dim   = image_upright_size($dpath);
                       $ar    = ($dim && $dim[0] > 0) ? ($dim[1] / $dim[0]) : 1.0;
                       $ordered_size = $item['size'] ?? '';
                       $pvars_v   = $_print_variants[(int)($item['product_id'] ?? 0)] ?? [];

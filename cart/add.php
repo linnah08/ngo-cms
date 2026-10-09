@@ -2,6 +2,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/print_helpers.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
 start_session();
 
 $lang     = post_lang();
@@ -125,6 +126,9 @@ if ($product['type'] === 'print') {
             header('Location: ' . $redirect);
             exit;
         }
+        // A phone photo is stored sideways with a rotate flag; save it the way the
+        // shopper saw it while placing it on the shirt (GD, used for the print files, ignores the flag).
+        image_fix_orientation($upload_dir . $safe_name, 95);
         $design_file = 'uploads/print-designs/' . $safe_name;
 
         $raw_pos         = $_POST['design_position'] ?? '{}';

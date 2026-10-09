@@ -471,6 +471,9 @@ function org_save_logo(array $upload, string $imagesDir, bool $requireUploaded =
     if (!$im) {
         return 'Картинката изглежда повредена и не може да се отвори. Опитайте с друг файл.';
     }
+    // A phone photo of the logo: turn it the way the browser showed it (GD ignores EXIF).
+    require_once __DIR__ . '/images.php';
+    $im = image_apply_orientation($im, image_exif_orientation($tmp));
     if (!imageistruecolor($im)) imagepalettetotruecolor($im);
     imagealphablending($im, false);
     imagesavealpha($im, true);

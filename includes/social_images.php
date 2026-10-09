@@ -4,6 +4,7 @@
  * admin/linkedin-ajax.php so both share it and it works on a list of photos.
  */
 require_once __DIR__ . '/articles.php';
+require_once __DIR__ . '/images.php';
 
 function social_image_url(string $path): string {
     return SITE_URL . '/' . implode('/', array_map('rawurlencode', explode('/', ltrim($path, '/'))));
@@ -26,14 +27,15 @@ function social_buffer_assets_gql(array $urls): string {
     return 'assets: [' . implode(', ', $items) . '],';
 }
 
-/** @return \GdImage|false */
+/** Opened upright: a phone photo's EXIF rotate flag is applied, as the browser does. @return \GdImage|false */
 function _social_gd_open(string $abs, string $ext) {
-    return match ($ext) {
+    $im = match ($ext) {
         'jpg', 'jpeg' => @imagecreatefromjpeg($abs),
         'png'         => @imagecreatefrompng($abs),
         'webp'        => @imagecreatefromwebp($abs),
         default       => false,
     };
+    return $im ? image_apply_orientation($im, image_exif_orientation($abs)) : false;
 }
 
 function _social_gd_save(\GdImage $im, string $abs, string $ext): bool {
@@ -130,14 +132,17 @@ function social_saved_crop(array $article, ?string $kind, string $src): ?array {
  */
 function social_prepare_image(string $path, string $mode, ?array $rect = null): ?string {
     $abs = $_SERVER['DOCUMENT_ROOT'] . $path;
-    $size = @getimagesize($abs);
+    // Sizes and crops are of the photo as the author sees it in the browser: upright.
+    $size = image_upright_size($abs);
     if (!$size) return null;
     $ext = strtolower(pathinfo($abs, PATHINFO_EXTENSION));
     [$w, $h] = $size;
+    $orientation = image_exif_orientation($abs);
 
     $scale = $w > 4800 ? 4800 / $w : 1.0;
     [$cx, $cy, $cw, $ch] = social_crop_box($w, $h, $mode, $rect);
-    if ($scale === 1.0 && $cw === $w && $ch === $h) return $path;
+    // A photo with a rotate flag is always re-saved upright — Instagram doesn't obey the flag.
+    if ($scale === 1.0 && $cw === $w && $ch === $h && $orientation === 1) return $path;
 
     $src = _social_gd_open($abs, $ext);
     if (!$src) return $path;   // can't read it with GD — send the original, as before
@@ -146,7 +151,9 @@ function social_prepare_image(string $path, string $mode, ?array $rect = null): 
     if ($ext === 'png') { imagealphablending($dst, false); imagesavealpha($dst, true); }
     imagecopyresampled($dst, $src, 0, 0, $cx, $cy, $dw, $dh, $cw, $ch);
     $suffix  = match ($mode) { 'square' => '-sq', 'story' => '-story', 'carousel' => '-4x5', default => '-ig' };
-    $suffix .= '-' . substr(md5("{$cx},{$cy},{$cw},{$ch},{$dw},{$dh}"), 0, 8);
+    // The orientation is in the hash so a copy saved sideways before this fix is never reused.
+    $key = "{$cx},{$cy},{$cw},{$ch},{$dw},{$dh}" . ($orientation === 1 ? '' : ",o{$orientation}");
+    $suffix .= '-' . substr(md5($key), 0, 8);
     // Case-insensitive, and never the original's own name — an upper-case .JPG once made
     // the crop overwrite the photo on the website too.
     $outPath = preg_replace('/\.' . preg_quote($ext, '/') . '$/i', $suffix . '.' . $ext, $path);
@@ -200,7 +207,7 @@ function social_insta_preview(array $article): array {
     $paths = social_photo_paths($article);
     $carousel = count($paths) > 1;
     foreach ($paths as $i => $p) {
-        $size = @getimagesize($_SERVER['DOCUMENT_ROOT'] . $p);
+        $size = image_upright_size($_SERVER['DOCUMENT_ROOT'] . $p);
         if (!$size) continue;
         [$w, $h] = $size;
         foreach (['post' => $carousel ? 'carousel' : 'insta', 'story' => 'story'] as $kind => $mode) {

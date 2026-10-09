@@ -13,6 +13,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
 
 admin_require_shop();
 csrf_verify();
@@ -50,12 +51,14 @@ $all_items = json_decode($order['items'], true) ?? [];
 
 function _epf_load_gd(string $path): GdImage|false
 {
-    return match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
+    $im = match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
         'jpg','jpeg' => imagecreatefromjpeg($path),
         'png'        => imagecreatefrompng($path),
         'webp'       => imagecreatefromwebp($path),
         default      => false,
     };
+    // Upright, as the shopper saw it — designs uploaded before cart/add.php fixed this may still carry the flag.
+    return $im ? image_apply_orientation($im, image_exif_orientation($path)) : false;
 }
 
 // Font for spec footer
@@ -178,7 +181,7 @@ foreach ($item_indices as $item_index) {
     // Spec footer
     $spec_line = $spec_line2 = null;
     if ($pos) {
-        $dim          = @getimagesize($design_path);
+        $dim          = image_upright_size($design_path);
         $ar           = ($dim && $dim[0] > 0) ? ($dim[1] / $dim[0]) : 1.0;
         $ordered_size = $item['size'] ?? '';
         $pvars_c      = json_decode($product['variants'] ?? '{}', true) ?? [];

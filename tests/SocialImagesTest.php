@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
 
+require_once __DIR__ . '/Support/ExifJpeg.php';
+
 /** Getting a post's photos ready for Buffer: sizes Instagram accepts, main photo first. */
 final class SocialImagesTest extends TestCase
 {
@@ -226,5 +228,47 @@ final class SocialImagesTest extends TestCase
         $this->assertNotSame($p, $out);
         $this->assertSame([1200, 800], array_slice(getimagesize($_SERVER['DOCUMENT_ROOT'] . $p), 0, 2), 'original untouched');
         $this->assertSame([800, 800], array_slice(getimagesize($_SERVER['DOCUMENT_ROOT'] . $out), 0, 2));
+    }
+
+    /** A phone photo stored sideways with a rotate flag (see tests/Support/ExifJpeg.php). */
+    private function phonePhoto(string $name, int $w, int $h, int $orientation): string
+    {
+        if (!function_exists('exif_read_data')) $this->markTestSkipped('No exif extension.');
+        ExifJpeg::write($this->dir . '/' . $name, $w, $h, $orientation);
+        return $this->rel . '/' . $name;
+    }
+
+    /** Already a fine shape once upright — but Instagram ignores the flag, so it's still re-saved upright. */
+    public function testFlaggedPhotoIsSentUprightEvenWithoutACrop(): void
+    {
+        $p   = $this->phonePhoto('phone.jpg', 1000, 800, 6);   // upright: 800×1000 = 4:5
+        $out = social_prepare_image($p, 'insta');
+        $this->assertNotSame($p, $out);
+        $im = imagecreatefromjpeg($_SERVER['DOCUMENT_ROOT'] . $out);
+        $this->assertSame([800, 1000], [imagesx($im), imagesy($im)]);
+        [$x, $y] = ExifJpeg::upright(ExifJpeg::MARK_X, ExifJpeg::MARK_Y, 1000, 800, 6);
+        $this->assertTrue(ExifJpeg::isRed($im, $x, $y), 'turned the way the browser shows it');
+        imagedestroy($im);
+    }
+
+    /** The author draws the crop on the upright photo in the browser; it must cut the same part. */
+    public function testSavedCropOfAFlaggedPhotoCutsTheUprightPhoto(): void
+    {
+        $p    = $this->phonePhoto('phone.jpg', 2000, 900, 6);   // upright: 900×2000
+        $rect = ['x' => 0.5, 'y' => 0.0, 'w' => 0.5, 'h' => 0.28125, 'ar' => 0.8];   // top-right 450×563
+        $out  = social_prepare_image($p, 'carousel', $rect);
+        $im   = imagecreatefromjpeg($_SERVER['DOCUMENT_ROOT'] . $out);
+        $this->assertSame([450, 563], [imagesx($im), imagesy($im)]);
+        // The red block sits at the upright photo's top-right corner, so it's inside this crop.
+        [$x, $y] = ExifJpeg::upright(ExifJpeg::MARK_X, ExifJpeg::MARK_Y, 2000, 900, 6);
+        $this->assertTrue(ExifJpeg::isRed($im, $x - 450, $y));
+        imagedestroy($im);
+    }
+
+    public function testPreviewGivesTheUprightSize(): void
+    {
+        $p  = $this->phonePhoto('phone.jpg', 2000, 900, 6);
+        $pv = social_insta_preview(['image' => $p]);
+        $this->assertSame([900, 2000], [$pv['post'][0]['w'], $pv['post'][0]['h']]);
     }
 }
