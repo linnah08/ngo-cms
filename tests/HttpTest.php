@@ -31,8 +31,8 @@ final class HttpTest extends TestCase
 
     public static function publicPages(): array
     {
-        // The addresses the site really serves (BG and EN pairs). /campaign/ and
-        // /tickets/ redirect home when the campaign module is off; followed, still 200.
+        // The addresses the site really serves (BG and EN pairs). A third value names
+        // the module the page belongs to: with that module off the page is a 404.
         return [
             // ── Public BG pages ────────────────────────────────────────────
             ['/', 'Home BG'],
@@ -41,9 +41,9 @@ final class HttpTest extends TestCase
             ['/kak-da-pomogna/', 'How to help BG'],
             ['/kontakti/', 'Contact BG'],
             ['/magazin/', 'Shop BG'],
-            ['/donation/', 'Donation BG'],
-            ['/campaign/', 'Campaign BG'],
-            ['/tickets/', 'Tickets'],
+            ['/donation/', 'Donation BG', 'donations'],
+            ['/campaign/', 'Campaign BG', 'campaign'],
+            ['/tickets/', 'Tickets', 'campaign'],
             ['/novini/', 'News BG'],
             ['/finansovi-otcheti/', 'Financial reports BG'],
             // ── Public EN pages ────────────────────────────────────────────
@@ -53,8 +53,8 @@ final class HttpTest extends TestCase
             ['/en/how-to-help/', 'How to help EN'],
             ['/en/contacts/', 'Contact EN'],
             ['/en/shop/', 'Shop EN'],
-            ['/en/donation/', 'Donation EN'],
-            ['/en/campaign/', 'Campaign EN'],
+            ['/en/donation/', 'Donation EN', 'donations'],
+            ['/en/campaign/', 'Campaign EN', 'campaign'],
             ['/en/news/', 'News EN'],
             ['/en/financial-reports/', 'Financial reports EN'],
             // ── Legal ──────────────────────────────────────────────────────
@@ -93,8 +93,9 @@ final class HttpTest extends TestCase
     }
 
     #[DataProvider('publicPages')]
-    public function testPageReturns200(string $path, string $label): void
+    public function testPageReturns200(string $path, string $label, ?string $module = null): void
     {
+        $expected = ($module === null || feature_enabled($module)) ? 200 : 404;
         $ch = curl_init(self::$base . $path);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
@@ -104,7 +105,8 @@ final class HttpTest extends TestCase
         $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        $this->assertSame(200, $code, "$label ({$path}) returned HTTP $code");
+        $this->assertSame($expected, $code, "$label ({$path}) returned HTTP $code"
+            . ($module !== null ? " (module '$module' is " . ($expected === 200 ? 'on' : 'off') . ')' : ''));
     }
 
     /** Guards the test above: an address the site doesn't have must not pass as a page. */
