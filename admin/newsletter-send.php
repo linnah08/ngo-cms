@@ -4,6 +4,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 admin_require_admin();
+module_admin_guard('newsletter');
 
 $pdo = get_pdo();
 $id  = (int)($_GET['id'] ?? 0);

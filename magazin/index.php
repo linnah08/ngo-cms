@@ -4,6 +4,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
 start_session();
 
+// Module switched off in Admin → Модули — the shop does not exist (site's 404).
+module_public_guard('shop');
+
 $lang = get_lang();
 $pdo  = get_pdo();
 
@@ -91,7 +94,9 @@ if ($slug) {
     }
     // ── Reviews: real aggregateRating + review (only when ≥1 approved) ──
     require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/product_reviews.php';
-    $approved_reviews = product_reviews_fetch_approved($pdo, (int)$p['id']);
+    // Reviews are part of „Коментари и отзиви“ (Admin → Модули): off = no reviews, no rating.
+    $reviews_on       = module_enabled_with_needs('comments_reviews');
+    $approved_reviews = $reviews_on ? product_reviews_fetch_approved($pdo, (int)$p['id']) : [];
     $review_schema = product_reviews_schema($approved_reviews);
     if ($review_schema) {
         $_prod_schema = array_merge($_prod_schema, $review_schema);
@@ -579,7 +584,7 @@ renderGallery(<?= (int)($default_pv ?? $prod_variants[0])['id'] ?>);
 <?php
     $slug    = $p['slug'];
     $reviews = $approved_reviews;   // already fetched above for the schema
-    require $_SERVER['DOCUMENT_ROOT'] . '/templates/product-reviews.php';
+    if ($reviews_on) require $_SERVER['DOCUMENT_ROOT'] . '/templates/product-reviews.php';
     require $_SERVER['DOCUMENT_ROOT'] . '/templates/footer.php';
     exit;
 }

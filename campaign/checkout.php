@@ -9,11 +9,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
 start_session();
 
-// Campaign module switched off for this install — the page does not exist.
-if (!feature_enabled('campaign')) {
-    require $_SERVER['DOCUMENT_ROOT'] . '/errors/404.php';
-    exit;
-}
+// Module switched off in Admin → Модули — the page does not exist (site's 404).
+module_public_guard('campaign');
 
 // Must be POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -69,6 +66,9 @@ if ($amount_eur > 100000)              $errors[] = 'Сумата е твърде
 
 // Validate reward exists if one was selected (donations only)
 $reward = null;
+// Rewards go through the shop's checkout: with „Магазин“ off a reward_id is
+// ignored and the pledge is plain support, paid straight away.
+if (!module_enabled_with_needs('shop')) $reward_id = 0;
 if (!$is_ticket && $reward_id > 0) {
     $reward = $pdo->prepare("SELECT * FROM campaign_rewards WHERE id=? AND active=1");
     $reward->execute([$reward_id]);

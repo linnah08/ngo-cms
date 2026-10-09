@@ -6,6 +6,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 start_session();
 
+// Module switched off in Admin → Модули — the shop does not exist (site's 404).
+module_public_guard('shop');
+
 $lang = get_lang();
 $pdo  = get_pdo();
 
@@ -298,7 +301,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'accepted_at'   => date('c'),
             'documents'     => ['terms', 'privacy', 'withdrawal'],
             // Ticking any newsletter topic is the opt-in.
-            'newsletter'    => !empty($_POST['wants_news']) || !empty($_POST['wants_education']),
+            // Ticking a topic is only possible while „Бюлетин“ is on (Admin → Модули).
+            'newsletter'    => module_enabled_with_needs('newsletter') && (!empty($_POST['wants_news']) || !empty($_POST['wants_education'])),
         ];
 
         // Online payment only — COD is not offered. Resolve to an enabled provider.
@@ -1033,6 +1037,7 @@ $subtotal  = $cart_info['subtotal'];
           </span>
         </label>
 
+        <?php if (module_enabled_with_needs('newsletter')): ?>
         <div style="padding:.25rem 1.25rem;border:2px solid var(--border);border-radius:var(--radius-lg);">
           <?php
             $nl_heading = t_or('checkout.newsletter_optin', 'Искам да получавам новини от {name}.', 'Send me news from {name}.',
@@ -1041,6 +1046,7 @@ $subtotal  = $cart_info['subtotal'];
             require $_SERVER['DOCUMENT_ROOT'] . '/templates/newsletter-topics.php';
           ?>
         </div>
+        <?php endif; ?>
       </fieldset>
 
       <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:center;">

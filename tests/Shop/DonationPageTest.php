@@ -57,10 +57,7 @@ final class DonationPageTest extends TestCase
 
     public function testThePageRespectsTheDonationsSwitch(): void
     {
-        $this->assertMatchesRegularExpression(
-            "/if \(!feature_enabled\('donations'\)\) \{\s*require [^;]*errors\/404\.php';\s*exit;/",
-            self::src('donation/index.php')
-        );
+        $this->assertStringContainsString("module_public_guard('donations');", self::src('donation/index.php'));
     }
 
     // ── title and intro ──────────────────────────────────────────────────────

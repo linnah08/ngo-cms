@@ -135,6 +135,7 @@ if ($slug) {
       </div>
       <?php endif; ?>
 
+      <?php if (module_enabled_with_needs('shop')): ?>
       <!-- Shop -->
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem 1.75rem;flex:1;min-width:220px;max-width:280px;display:flex;flex-direction:column;align-items:center;gap:1rem;">
         <div style="font-size:2rem;">🛍️</div>
@@ -142,6 +143,7 @@ if ($slug) {
         <p style="margin:0;font-size:.88rem;color:var(--text-muted);text-align:center;">Купете продукт от нашия магазин и помогнете за финансирането на програмите ни.</p>
         <a href="/magazin/" class="btn btn--outline" style="margin-top:auto;width:100%;text-align:center;justify-content:center;">Към магазина</a>
       </div>
+      <?php endif; ?>
 
       <!-- Partner -->
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem 1.75rem;flex:1;min-width:220px;max-width:280px;display:flex;flex-direction:column;align-items:center;gap:1rem;">
@@ -156,7 +158,8 @@ if ($slug) {
 </section>
 
 <?php
-    require $_SERVER['DOCUMENT_ROOT'] . '/templates/comments.php';
+    // Comments are part of „Коментари и отзиви“ (Admin → Модули).
+    if (module_enabled_with_needs('comments_reviews')) require $_SERVER['DOCUMENT_ROOT'] . '/templates/comments.php';
     require $_SERVER['DOCUMENT_ROOT'] . '/templates/footer.php';
     exit;
 }

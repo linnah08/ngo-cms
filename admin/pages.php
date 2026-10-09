@@ -513,6 +513,8 @@ $cp_list  = cpage_all();
           ['legal_terms',   'Условия за ползване',             '/usloviya/'],
           ['reports',       'Финансови отчети',                '/finansovi-otcheti/'],
       ];
+      // Pages of a switched-off module (Admin → Модули) are not listed.
+      $rows = array_filter($rows, static fn(array $r): bool => module_link_visible($r[2]));
       foreach ($rows as [$key, $label, $url]):
       ?>
       <tr>
@@ -534,6 +536,7 @@ $cp_list  = cpage_all();
   </table>
 </div>
 
+<?php if (module_enabled_with_needs('ai_helpers')): ?>
 <!-- ── DeepL settings card ──────────────────────────────────────────────────── -->
 <h2 style="margin:2rem 0 1rem;font-size:1rem;">Автоматичен превод (DeepL)</h2>
 <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;max-width:560px;">
@@ -631,6 +634,9 @@ $cp_list  = cpage_all();
     </div>
   </form>
 </div>
+<?php else: ?>
+<p style="margin:2rem 0 0;max-width:560px;font-size:.875rem;color:var(--text-muted);">Автоматичният превод е изключен заедно с модула „<?= h(module_label('ai_helpers')) ?>“. Ключът и речникът са запазени — ще се появят отново, когато го включите в <a href="/admin/modules.php">Модули</a>.</p>
+<?php endif; ?>
 
 <?php elseif ($page === 'home_campaign'): ?>
 <!-- ══ HOME — CAMPAIGN BLOCK ══ -->
@@ -665,7 +671,7 @@ $cp_list  = cpage_all();
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Title <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline" onclick="txField('campTitleBg','campTitleEn',this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline" onclick="txField('campTitleBg','campTitleEn',this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <input type="text" id="campTitleEn" name="campaign_title_en" value="<?= h($campaign['title_en'] ?? '') ?>">
     </div>
@@ -676,7 +682,7 @@ $cp_list  = cpage_all();
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Text <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline" onclick="txField('campTextBg','campTextEn',this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline" onclick="txField('campTextBg','campTextEn',this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <textarea id="campTextEn" name="campaign_text_en" rows="5"><?= h($campaign['text_en'] ?? '') ?></textarea>
     </div>
@@ -687,7 +693,7 @@ $cp_list  = cpage_all();
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Button text <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline" onclick="txField('campCtaBg','campCtaEn',this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline" onclick="txField('campCtaBg','campCtaEn',this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <input type="text" id="campCtaEn" name="campaign_cta_en" value="<?= h($campaign['cta_en'] ?? 'Support our campaign →') ?>">
     </div>
@@ -804,9 +810,9 @@ if ($edit_idx !== null):
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Label <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('impactLabelBg','impactLabelEn',this)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <input type="text" id="impactLabelEn" name="impact_label_en" value="<?= h($edit_item['label_en'] ?? '') ?>" placeholder="children">
     </div>
@@ -1026,7 +1032,7 @@ usort($impact, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
         <div class="form-group">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
             <label style="margin:0;">Name <?= $lbl_en_badge ?></label>
-            <button type="button" class="btn btn--outline" onclick="var c=this.closest('.centre-card');txEl(c.querySelector('.c-name-bg'),c.querySelector('.c-name-en'),this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+            <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline" onclick="var c=this.closest('.centre-card');txEl(c.querySelector('.c-name-bg'),c.querySelector('.c-name-en'),this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
           </div>
           <input type="text" name="centre_name_en[]" class="c-name-en" value="<?= h($centre['name_en'] ?? '') ?>">
         </div>
@@ -1037,7 +1043,7 @@ usort($impact, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
         <div class="form-group">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
             <label style="margin:0;">Description <?= $lbl_en_badge ?></label>
-            <button type="button" class="btn btn--outline" onclick="var c=this.closest('.centre-card');txEl(c.querySelector('.c-desc-bg'),c.querySelector('.c-desc-en'),this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+            <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline" onclick="var c=this.closest('.centre-card');txEl(c.querySelector('.c-desc-bg'),c.querySelector('.c-desc-en'),this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
           </div>
           <textarea name="centre_desc_en[]" class="c-desc-en" rows="3"><?= h($centre['description_en'] ?? '') ?></textarea>
         </div>
@@ -1113,9 +1119,9 @@ if ($edit_team_idx !== null):
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Role <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('memberRoleBg','memberRoleEn',this)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <input type="text" id="memberRoleEn" name="member_role_en"
              value="<?= h($edit_member['role_en'] ?? '') ?>">
@@ -1127,9 +1133,9 @@ if ($edit_team_idx !== null):
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Bio <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('teamBioBg','teamBioEn',this,true)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <textarea id="teamBioEn" name="member_bio_en" rows="8"><?= h($edit_member['bio_en'] ?? '') ?></textarea>
     </div>
@@ -1185,9 +1191,9 @@ endif; // end $edit_team_idx !== null
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Title <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('aboutTitleBg','aboutTitleEn',this)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <input type="text" id="aboutTitleEn" name="about_title_en" value="<?= h($about['title_en'] ?? '') ?>">
     </div>
@@ -1199,9 +1205,9 @@ endif; // end $edit_team_idx !== null
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Intro <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('aboutIntroBg','aboutIntroEn',this)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <textarea id="aboutIntroEn" name="about_intro_en" rows="8"><?= h($about['intro_en'] ?? '') ?></textarea>
     </div>
@@ -1444,9 +1450,9 @@ if ($edit_idx !== null):
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Title <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('projTitleBg','projTitleEn',this)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <input type="text" id="projTitleEn" name="proj_title_en"
              value="<?= h($project['title_en'] ?? '') ?>">
@@ -1458,9 +1464,9 @@ if ($edit_idx !== null):
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Text <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('projTextBg','projTextEn',this,true)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <textarea id="projTextEn" name="proj_text_en" rows="8"><?= h($project['text_en'] ?? '') ?></textarea>
     </div>
@@ -1780,9 +1786,9 @@ if ($edit_way_idx !== null):
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Title <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('wayTitleBg','wayTitleEn',this)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <input type="text" id="wayTitleEn" name="way_title_en"
              value="<?= h($edit_way['title_en'] ?? '') ?>">
@@ -1794,9 +1800,9 @@ if ($edit_way_idx !== null):
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Text <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('wayTextBg','wayTextEn',this,true)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <textarea id="wayTextEn" name="way_text_en" rows="8"><?= h($edit_way['text_en'] ?? '') ?></textarea>
     </div>
@@ -1842,9 +1848,9 @@ endif; // end $edit_way_idx !== null
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Title <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('helpTitleBg','helpTitleEn',this)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <input type="text" id="helpTitleEn" name="help_title_en" value="<?= h($help['title_en'] ?? '') ?>">
     </div>
@@ -1855,9 +1861,9 @@ endif; // end $edit_way_idx !== null
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Intro <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('helpIntroBg','helpIntroEn',this)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <input type="text" id="helpIntroEn" name="help_intro_en" value="<?= h($help['intro_en'] ?? '') ?>">
     </div>
@@ -2074,7 +2080,7 @@ usort($ways_list, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
   <div class="form-group">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
       <label for="shopEn" style="margin:0;">Text <?= $lbl_en_badge ?></label>
-      <button type="button" class="btn btn--outline translate-legal-btn" data-src="shopBg" data-tgt="shopEn" style="font-size:.78rem;padding:.25rem .6rem;">✦ Translate from BG</button>
+      <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline translate-legal-btn" data-src="shopBg" data-tgt="shopEn" style="font-size:.78rem;padding:.25rem .6rem;">✦ Translate from BG</button><?php endif; ?>
     </div>
     <textarea id="shopEn" name="donation_text_en" rows="4"><?= h($shop['donation_text_en'] ?? '') ?></textarea>
   </div>
@@ -2108,7 +2114,7 @@ tinymce.init(Object.assign({}, window._tinyBase, { selector: '#shopBg, #shopEn',
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Content <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline translate-legal-btn" data-src="legalBg" data-tgt="legalEn" style="font-size:.78rem;padding:.25rem .6rem;">✦ Translate from BG</button>
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline translate-legal-btn" data-src="legalBg" data-tgt="legalEn" style="font-size:.78rem;padding:.25rem .6rem;">✦ Translate from BG</button><?php endif; ?>
       </div>
       <textarea id="legalEn" name="legal_content_en" rows="30" style="font-family:monospace;font-size:0.85rem;"><?= h($legal['privacy_en'] ?? '') ?></textarea>
     </div>
@@ -2143,7 +2149,7 @@ tinymce.init(Object.assign({}, window._tinyBase, { selector: '#legalBg, #legalEn
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Content <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline translate-legal-btn" data-src="legalBg" data-tgt="legalEn" style="font-size:.78rem;padding:.25rem .6rem;">✦ Translate from BG</button>
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline translate-legal-btn" data-src="legalBg" data-tgt="legalEn" style="font-size:.78rem;padding:.25rem .6rem;">✦ Translate from BG</button><?php endif; ?>
       </div>
       <textarea id="legalEn" name="legal_content_en" rows="30" style="font-family:monospace;font-size:0.85rem;"><?= h($legal['legal_info_en'] ?? '') ?></textarea>
     </div>
@@ -2178,7 +2184,7 @@ tinymce.init(Object.assign({}, window._tinyBase, { selector: '#legalBg, #legalEn
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Content <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline translate-legal-btn" data-src="legalBg" data-tgt="legalEn" style="font-size:.78rem;padding:.25rem .6rem;">✦ Translate from BG</button>
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline translate-legal-btn" data-src="legalBg" data-tgt="legalEn" style="font-size:.78rem;padding:.25rem .6rem;">✦ Translate from BG</button><?php endif; ?>
       </div>
       <textarea id="legalEn" name="legal_content_en" rows="30" style="font-family:monospace;font-size:0.85rem;"><?= h($legal['terms_en'] ?? '') ?></textarea>
     </div>

@@ -2,6 +2,9 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
 
+// Module switched off in Admin → Модули — the sign-up does not exist (site's 404).
+module_public_guard('newsletter');
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: /');
     exit;

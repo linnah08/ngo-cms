@@ -16,8 +16,9 @@ function _switch_lang(string $path, string $current_lang): string {
 }
 
 $_menus    = load_json(CONTENT_PATH . '/menus.json');
-// Links to a draft or a missing page are left out (keys kept for the on-page editor).
-$nav       = menu_public_items(is_array($_menus['header'][$lang] ?? null) ? $_menus['header'][$lang] : []);
+// Links to a draft or a missing page, or to a switched-off module (Admin → Модули),
+// are left out (keys kept for the on-page editor).
+$nav       = module_filter_links(menu_public_items(is_array($_menus['header'][$lang] ?? null) ? $_menus['header'][$lang] : []));
 $_nav_bg   = $_menus['header']['bg'] ?? [];
 $_nav_en   = $_menus['header']['en'] ?? [];
 $shop_url  = shop_path('shop', $lang);
@@ -241,6 +242,8 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
               </a>
             </li>
           <?php endforeach; ?>
+          <?php // Shop link and cart only while „Магазин“ is on (Admin → Модули). ?>
+          <?php if (module_enabled_with_needs('shop')): ?>
           <li class="nav-cta">
             <a href="<?= $shop_url ?>"><?= t('nav.shop') ?></a>
           </li>
@@ -252,6 +255,7 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
               <?php endif; ?>
             </a>
           </li>
+          <?php endif; ?>
           <li class="nav-lang-item">
             <?php require __DIR__ . '/lang-switcher.php'; ?>
           </li>

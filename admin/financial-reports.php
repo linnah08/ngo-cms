@@ -3,6 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/financial_reports.php';
 
 admin_require_editorial();
+module_admin_guard('annual_reports');
 
 $messages = [
     'year_added' => 'Годината е добавена.',

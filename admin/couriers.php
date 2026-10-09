@@ -6,6 +6,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/auth.php';
 admin_require_admin();
+module_admin_guard('shop');
 
 $pdo   = get_pdo();
 $saved = false;

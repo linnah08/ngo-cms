@@ -6,6 +6,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
 
 admin_require_shop();
+module_admin_guard('shop');
 
 $pdo    = get_pdo();
 $id     = (int)($_GET['id'] ?? 0);
@@ -30,7 +31,8 @@ if (!$is_new) {
 
 $page_title_admin = $is_new ? 'Нов продукт' : 'Редакция: ' . $product['name_bg'];
 $active_nav       = 'products';
-$deepl_ready      = deepl_is_configured();
+// Translate buttons only while „Помощ от изкуствен интелект“ is on (Admin → Модули).
+$deepl_ready      = module_enabled_with_needs('ai_helpers') && deepl_is_configured();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) { http_response_code(400); exit('Invalid token'); }
@@ -173,7 +175,8 @@ $_tinymce_key = setting_get('tinymce_api_key', 'no-api-key');
 $page_head_extra = '<script src="https://cdn.tiny.cloud/1/' . h($_tinymce_key) . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>';
 
 $review_counts = ['approved' => 0, 'pending' => 0];
-if (!$is_new) {
+$reviews_on    = module_admin_page_visible('product-reviews.php');   // „Коментари и отзиви“ on
+if (!$is_new && $reviews_on) {
     try {
         $rc = $pdo->prepare("SELECT status, COUNT(*) n FROM product_reviews WHERE product_id = ? GROUP BY status");
         $rc->execute([$id]);
@@ -187,7 +190,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 <div class="admin-page-header">
   <h1><?= h($page_title_admin) ?></h1>
   <div style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;">
-    <?php if (!$is_new): ?>
+    <?php if (!$is_new && $reviews_on): ?>
       <a href="/admin/product-reviews.php?product_id=<?= (int)$id ?>" class="btn btn--outline">
         Отзиви (<?= $review_counts['approved'] ?>)<?php if ($review_counts['pending'] > 0): ?> · <?= $review_counts['pending'] ?> чакащи<?php endif; ?> →
       </a>
@@ -376,9 +379,12 @@ if (($product['type'] ?? '') === 'variant' && !$is_new) {
       <button type="button" class="btn btn--outline" style="font-size:.82rem;" onclick="document.getElementById('sizeGuideInput').click()">
         <?= $vsize_guide ? 'Смени снимката' : 'Качи таблица с размери' ?>
       </button>
+<?php // AI reads the size chart — only while „Помощ от изкуствен интелект“ is on. ?>
+      <?php if (module_enabled_with_needs('ai_helpers')): ?>
       <button type="button" id="extractDimsBtn" class="btn btn--outline" style="font-size:.82rem;<?= $vsize_guide ? '' : 'display:none;' ?>" onclick="extractSizeDims()">
         Извлечи размери от снимката
       </button>
+      <?php endif; ?>
     </div>
     <small id="sizeGuideStatus" style="display:block;color:var(--text-muted);margin-top:.25rem;">JPG, PNG, WebP — качва се веднага</small>
   </div>
@@ -1037,7 +1043,7 @@ document.getElementById('sizeGuideInput').addEventListener('change', function ()
         document.getElementById('sizeGuideImg').src = '/assets/images/products/' + data.filename;
         document.getElementById('sizeGuideName').textContent = data.filename;
         document.getElementById('sizeGuidePreview').style.display = '';
-        document.getElementById('extractDimsBtn').style.display = '';
+        var _xb = document.getElementById('extractDimsBtn'); if (_xb) _xb.style.display = '';
         status.textContent = 'Качено успешно.';
         status.style.color = '#2d6a35';
       } else {

@@ -63,6 +63,9 @@ foreach (cpage_all() as $cp) {
     $urls[]  = [$base . cpage_url($cp, 'en'), $lastmod];
 }
 
+// ── Pages of switched-off modules (Admin → Модули) do not exist ───────────
+$urls = array_filter($urls, static fn(array $u): bool => module_link_visible($u[0]));
+
 // ── Render ───────────────────────────────────────────────────────────────
 echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
 echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";

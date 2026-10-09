@@ -1,5 +1,4 @@
 <?php
-$page_title_admin = 'Коментари & Контакти';
 $active_nav       = 'comments';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
@@ -7,6 +6,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/auth.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/spam_filter.php';
 admin_require_editorial();
+$page_title_admin = module_enabled_with_needs('comments_reviews') ? 'Коментари & Контакти' : 'Контакти';
 
 $pdo = get_pdo();
 
@@ -46,6 +46,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) { http_response_code(400); exit('Invalid token'); }
 
     $post_action = $_POST['action'] ?? '';
+
+    // „Коментари и отзиви“ switched off (Admin → Модули): contact messages still
+    // work here, comment moderation does not.
+    $comment_actions = ['approve', 'reject', 'delete', 'spam', 'bulk_spam_comments', 'bulk_approve_comments', 'bulk_reject_comments', 'bulk_delete_comments'];
+    if (!module_enabled_with_needs('comments_reviews') && in_array($post_action, $comment_actions, true)) {
+        header('Location: /admin/comments.php?source=contacts');
+        exit;
+    }
 
     // Save contact topics
     if ($post_action === 'save_topics') {
@@ -240,6 +248,9 @@ if (!empty($_GET['spam_review'])) {
 
 // ── Source toggle: comments | contacts | both ──────────────────────────────────
 $source = in_array($_GET['source'] ?? '', ['comments', 'contacts', 'both']) ? $_GET['source'] : 'both';
+// Comments switched off in Admin → Модули: this page is just the contact messages.
+$comments_on = module_enabled_with_needs('comments_reviews');
+if (!$comments_on) $source = 'contacts';
 
 // ── Comment filter ─────────────────────────────────────────────────────────────
 $comment_filter = in_array($_GET['filter'] ?? '', ['pending', 'approved', 'rejected', 'spam']) ? $_GET['filter'] : 'pending';
@@ -334,6 +345,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   </div>
 <?php endif; ?>
 
+<?php if ($comments_on): ?>
 <!-- ── Source toggle ──────────────────────────────────────────────────────────── -->
 <div style="display:flex;gap:.5rem;margin-bottom:1.75rem;flex-wrap:wrap;">
   <?php
@@ -348,6 +360,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </a>
   <?php endforeach; ?>
 </div>
+<?php endif; ?>
 
 <?php if ($source !== 'contacts'): ?>
 <!-- ── Comments section ───────────────────────────────────────────────────────── -->

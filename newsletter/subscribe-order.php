@@ -13,6 +13,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/donation.php';
 start_session();
 
+// Module switched off in Admin → Модули — the sign-up does not exist (site's 404).
+module_public_guard('newsletter');
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: /');
     exit;

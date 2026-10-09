@@ -12,7 +12,8 @@ $cols = max(1, min(4, count($cards)));
       <?php foreach ($cards as $c):
         $title = hf($c, 'title', $lang);
         $link  = hf($c, 'link', $lang);
-        $link  = home_clean_link($link) ? $link : '';
+        // A card pointing at a switched-off module keeps its text, just without the link.
+        $link  = home_clean_link($link) && module_link_visible($link) ? $link : '';
         $img   = home_valid_image_path((string) ($c['image'] ?? '')) ? $c['image'] : '';
         $ext   = preg_match('#^https?://#i', $link) ? ' target="_blank" rel="noopener noreferrer"' : '';
       ?>

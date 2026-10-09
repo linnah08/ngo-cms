@@ -13,11 +13,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/donation.php';
 start_session();
 
-// Donations switched off for this install (FEATURE_DONATIONS) — the page does not exist.
-if (!feature_enabled('donations')) {
-    require $_SERVER['DOCUMENT_ROOT'] . '/errors/404.php';
-    exit;
-}
+// Module switched off in Admin → Модули — the page does not exist (site's 404).
+module_public_guard('donations');
 
 $lang  = get_lang();
 $pages = load_json(CONTENT_PATH . '/pages.json');

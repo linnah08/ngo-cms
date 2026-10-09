@@ -96,6 +96,7 @@ register_shutdown_function(function(): void {
 // and are defined first, so they win over site.config.php (see
 // includes/organisation.php).
 require_once __DIR__ . '/includes/organisation.php';
+require_once __DIR__ . '/includes/modules.php';   // also loaded by organisation.php; here too for a site that kept an older one
 $_org_predefined = org_define_overrides(org_load_overrides());
 if (file_exists(__DIR__ . '/site.config.php')) {
     org_require_config(__DIR__ . '/site.config.php', $_org_predefined);
@@ -107,8 +108,8 @@ unset($_org_predefined);
 // Visual theme presets (brand_themes() / current_theme()).
 require_once __DIR__ . '/includes/themes.php';
 
-// feature_enabled('<module>') lives in includes/organisation.php (loaded above),
-// next to the admin switch that sets it.
+// feature_enabled('<module>') lives in includes/organisation.php (loaded above);
+// the list of optional modules and their guards in includes/modules.php.
 
 /**
  * The phone number where it is shown by choice — header, footer, contact pages

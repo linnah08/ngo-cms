@@ -4,12 +4,13 @@ if (!defined('SITE_NAME_BG')) require_once $_SERVER['DOCUMENT_ROOT'] . '/config.
 $lang      = get_lang();
 $site_name = $lang === 'bg' ? SITE_NAME_BG : SITE_NAME_EN;
 $_fmenus    = load_json(CONTENT_PATH . '/menus.json');
-// Links to a draft or a missing page are left out (keys kept for the on-page editor).
+// Links to a draft or a missing page, or to a switched-off module (Admin → Модули),
+// are left out (keys kept for the on-page editor).
 require_once __DIR__ . '/../includes/menus.php';
-$_fnav      = menu_public_items(is_array($_fmenus['footer_nav'][$lang] ?? null) ? $_fmenus['footer_nav'][$lang] : []);
+$_fnav      = module_filter_links(menu_public_items(is_array($_fmenus['footer_nav'][$lang] ?? null) ? $_fmenus['footer_nav'][$lang] : []));
 $_fnav_bg   = $_fmenus['footer_nav']['bg']    ?? [];
 $_fnav_en   = $_fmenus['footer_nav']['en']    ?? [];
-$_fhelp     = menu_public_items(is_array($_fmenus['footer_help'][$lang] ?? null) ? $_fmenus['footer_help'][$lang] : []);
+$_fhelp     = module_filter_links(menu_public_items(is_array($_fmenus['footer_help'][$lang] ?? null) ? $_fmenus['footer_help'][$lang] : []));
 $_fhelp_bg  = $_fmenus['footer_help']['bg']   ?? [];
 $_fhelp_en  = $_fmenus['footer_help']['en']   ?? [];
 $pages      = $pages ?? load_json(CONTENT_PATH . '/pages.json');
@@ -17,7 +18,8 @@ $pages      = $pages ?? load_json(CONTENT_PATH . '/pages.json');
 <?php
 // Show newsletter banner unless visitor already subscribed (cookie) or is in admin
 $_is_admin_page  = str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/admin');
-$_show_nl_banner = empty($_COOKIE['om_nl_sub']) && !$_is_admin_page;
+// No sign-up band while „Бюлетин“ is off (Admin → Модули).
+$_show_nl_banner = module_enabled_with_needs('newsletter') && empty($_COOKIE['om_nl_sub']) && !$_is_admin_page;
 ?>
 <?php // Messages nothing on the page has shown yet — above all the sign-up
       // band's own result. Shown whether or not the band is: a successful
@@ -140,7 +142,7 @@ $_show_nl_banner = empty($_COOKIE['om_nl_sub']) && !$_is_admin_page;
         <a href="<?= $lang === 'bg' ? '/politika-za-poveritelnost/' : '/en/privacy-policy/' ?>"><?= t('footer.privacy') ?></a>
         <a href="<?= $lang === 'bg' ? '/pravna-informaciya/' : '/en/legal/' ?>"><?= t('footer.legal') ?></a>
         <a href="<?= $lang === 'bg' ? '/usloviya/' : '/en/terms/' ?>"><?= t('footer.terms') ?></a>
-        <?php require_once ROOT_PATH . '/includes/financial_reports.php'; if (reports_any_published()): ?>
+        <?php require_once ROOT_PATH . '/includes/financial_reports.php'; if (module_enabled_with_needs('annual_reports') && reports_any_published()): ?>
         <a href="<?= $lang === 'bg' ? '/finansovi-otcheti/' : '/en/financial-reports/' ?>"><?= t('footer.reports') ?></a>
         <?php endif; ?>
         <a href="<?= $lang === 'bg' ? '/politika-za-biskvitki/' : '/en/cookie-policy/' ?>"><?= t('footer.cookies') ?></a>

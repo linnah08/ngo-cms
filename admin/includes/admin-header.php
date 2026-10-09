@@ -31,6 +31,8 @@ $current_user = admin_user();
   <script>
   window._sessionExpiresAt = <?= ($current_user['time'] ?? 0) + ADMIN_SESSION_HOURS * 3600 ?>;
   window._csrfToken = <?= json_encode(csrf_token()) ?>;
+  // „Помощ от изкуствен интелект“ (Admin → Модули): off = no translate / AI buttons anywhere.
+  window._aiHelpersOn = <?= module_enabled_with_needs('ai_helpers') ? 'true' : 'false' ?>;
   </script>
   <script src="/admin/js/autosave.js"></script>
   <!-- ── Shared image cropper (Cropper.js vendored locally) -->
@@ -99,26 +101,38 @@ $current_user = admin_user();
       </a>
     </div>
 
+    <?php /* Each link to a page that belongs to an optional module is hidden while
+             that module is off — module_admin_page_visible() reads admin_pages in
+             modules_registry() (includes/modules.php). */ ?>
     <nav class="admin-nav">
       <a href="/admin/dashboard.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'dashboard' ? 'active' : '' ?>">
         Начало
       </a>
       <?php if (admin_can_editorial()): ?>
+      <?php if (module_admin_page_visible('articles.php')): ?>
       <a href="/admin/articles.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'articles' ? 'active' : '' ?>">
         Статии
       </a>
+      <?php endif; ?>
       <?php
+      // The page also holds contact messages, so it stays; with „Коментари и
+      // отзиви“ off it is just „Контакти“ and the waiting-comments badge goes.
+      $comments_on      = module_enabled_with_needs('comments_reviews');
       $pending_comments = 0;
-      try {
-          $pending_comments = (int)get_pdo()->query("SELECT COUNT(*) FROM comments WHERE status='pending'")->fetchColumn();
-      } catch (Throwable $e) {}
+      if ($comments_on) {
+          try {
+              $pending_comments = (int)get_pdo()->query("SELECT COUNT(*) FROM comments WHERE status='pending'")->fetchColumn();
+          } catch (Throwable $e) {}
+      }
       ?>
+      <?php if (module_admin_page_visible('comments.php')): ?>
       <a href="/admin/comments.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'comments' ? 'active' : '' ?>">
-        Коментари<?php if ($pending_comments > 0): ?> <span style="background:var(--teal);color:#fff;border-radius:10px;padding:.05rem .4rem;font-size:.72rem;margin-left:.3rem;vertical-align:middle;"><?= $pending_comments ?></span><?php endif; ?>
+        <?= $comments_on ? 'Коментари' : 'Контакти' ?><?php if ($pending_comments > 0): ?> <span style="background:var(--teal);color:#fff;border-radius:10px;padding:.05rem .4rem;font-size:.72rem;margin-left:.3rem;vertical-align:middle;"><?= $pending_comments ?></span><?php endif; ?>
       </a>
+      <?php endif; ?>
       <?php endif; ?>
       <?php if (admin_is_admin()): ?>
       <?php
@@ -141,87 +155,125 @@ $current_user = admin_user();
         Партньори
       </a>
       <?php endif; ?>
+      <?php if (module_admin_page_visible('pages.php')): ?>
       <a href="/admin/pages.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'pages' ? 'active' : '' ?>">
         Съдържание
       </a>
       <?php endif; ?>
+      <?php endif; ?>
       <?php if (admin_can_manage_shop()): ?>
       <?php
       $pending_reviews = 0;
-      try {
-          $pending_reviews = (int)get_pdo()->query("SELECT COUNT(*) FROM product_reviews WHERE status='pending'")->fetchColumn();
-      } catch (Throwable $e) { /* table may not exist yet */ }
+      if (module_admin_page_visible('product-reviews.php')) {
+          try {
+              $pending_reviews = (int)get_pdo()->query("SELECT COUNT(*) FROM product_reviews WHERE status='pending'")->fetchColumn();
+          } catch (Throwable $e) { /* table may not exist yet */ }
+      }
       ?>
+      <?php if (module_admin_page_visible('products.php')): ?>
       <a href="/admin/products.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'products' ? 'active' : '' ?>">
         Продукти<?php if ($pending_reviews > 0): ?> <span title="Чакащи отзиви" style="background:var(--teal);color:#fff;border-radius:10px;padding:.05rem .4rem;font-size:.72rem;margin-left:.3rem;vertical-align:middle;"><?= $pending_reviews ?></span><?php endif; ?>
       </a>
+      <?php endif; ?>
+      <?php if (module_admin_page_visible('orders.php')): ?>
       <a href="/admin/orders.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'orders' ? 'active' : '' ?>">
         Поръчки
       </a>
+      <?php endif; ?>
+      <?php if (module_admin_page_visible('monthly-report.php')): ?>
       <a href="/admin/monthly-report.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'monthly-report' ? 'active' : '' ?>">
         Месечен отчет
       </a>
       <?php endif; ?>
+      <?php endif; ?>
       <?php if (admin_is_admin()): ?>
+      <?php if (module_admin_page_visible('menus.php')): ?>
       <a href="/admin/menus.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'menus' ? 'active' : '' ?>">
         Менюта
       </a>
+      <?php endif; ?>
+      <?php if (module_admin_page_visible('couriers.php')): ?>
       <a href="/admin/couriers.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'couriers' ? 'active' : '' ?>">
         Куриери
       </a>
+      <?php endif; ?>
+      <?php if (module_admin_page_visible('organisation.php')): ?>
       <a href="/admin/organisation.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'organisation' ? 'active' : '' ?>">
         Организация
       </a>
+      <?php endif; ?>
+      <a href="/admin/modules.php"
+         class="admin-nav__link <?= ($active_nav ?? '') === 'modules' ? 'active' : '' ?>">
+        Модули
+      </a>
+      <?php if (module_admin_page_visible('payment.php')): ?>
       <a href="/admin/payment.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'payment' ? 'active' : '' ?>">
         Плащания
       </a>
+      <?php endif; ?>
+      <?php if (module_admin_page_visible('users.php')): ?>
       <a href="/admin/users.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'users' ? 'active' : '' ?>">
         Потребители
       </a>
+      <?php endif; ?>
+      <?php if (module_admin_page_visible('newsletter.php')): ?>
       <a href="/admin/newsletter.php"
          class="admin-nav__link <?= in_array($active_nav ?? '', ['newsletter','newsletter-compose','newsletter-send','newsletter-subscribers']) ? 'active' : '' ?>">
         Бюлетин
       </a>
-      <?php if (feature_enabled('campaign')): ?>
+      <?php endif; ?>
+      <?php if (module_admin_page_visible('campaign.php')): ?>
       <a href="/admin/campaign.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'campaign' ? 'active' : '' ?>">
         Кампания
       </a>
       <?php endif; ?>
+      <?php if (module_admin_page_visible('email-templates.php')): ?>
       <a href="/admin/email-templates.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'email-templates' ? 'active' : '' ?>">
         Имейл шаблони
       </a>
+      <?php endif; ?>
+      <?php if (module_admin_page_visible('error-alerts.php')): ?>
       <a href="/admin/error-alerts.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'error-alerts' ? 'active' : '' ?>">
         Известия за грешки
       </a>
+      <?php endif; ?>
+      <?php if (module_admin_page_visible('scheduled-jobs.php')): ?>
       <a href="/admin/scheduled-jobs.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'scheduled-jobs' ? 'active' : '' ?>">
         Автоматични задачи
       </a>
+      <?php endif; ?>
+      <?php if (module_admin_page_visible('updates.php')): ?>
       <a href="/admin/updates.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'updates' ? 'active' : '' ?>">
         Обновления
       </a>
+      <?php endif; ?>
+      <?php if (module_admin_page_visible('email-settings.php')): ?>
       <a href="/admin/email-settings.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'email-settings' ? 'active' : '' ?>">
         Имейл
       </a>
+      <?php endif; ?>
       <?php if (admin_can_sign()): ?>
+      <?php if (module_admin_page_visible('signature.php')): ?>
       <a href="/admin/signature.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'signature' ? 'active' : '' ?>">
         Подпис
       </a>
+      <?php endif; ?>
       <?php endif; ?>
       <?php endif; ?>
       <a href="/admin/support.php"

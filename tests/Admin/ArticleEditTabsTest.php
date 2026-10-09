@@ -20,7 +20,8 @@ final class ArticleEditTabsTest extends TestCase
     public function testTabIsAWhitelistDefaultingToContent(): void
     {
         $this->assertStringContainsString(
-            "\$tab      = (\$_GET['tab'] ?? 'content') === 'social' ? 'social' : 'content';",
+            // The Social tab only exists while the social module is on (Admin → Модули).
+            "\$tab      = \$social_on && (\$_GET['tab'] ?? 'content') === 'social' ? 'social' : 'content';",
             $this->src
         );
     }

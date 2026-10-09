@@ -5,6 +5,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
 $page_title_admin = 'Абонати на бюлетина';
 $active_nav       = 'newsletter-subscribers';
 admin_require_admin();
+module_admin_guard('newsletter');
 
 $pdo = get_pdo();
 

@@ -9,16 +9,14 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
 admin_require_admin();
 
-// Campaign module switched off for this install — the page does not exist.
+// Campaign module switched off in Admin → Модули — says so, with a way back.
 // Deliberately after the auth call: an anonymous request still gets the normal
 // login redirect, so this never becomes an oracle for which modules a site runs.
-if (!feature_enabled('campaign')) {
-    require $_SERVER['DOCUMENT_ROOT'] . '/errors/404.php';
-    exit;
-}
+module_admin_guard('campaign');
 
 $_tinymce_key    = setting_get('tinymce_api_key', 'no-api-key');
-$deepl_ready     = deepl_is_configured();
+// Translate buttons only while „Помощ от изкуствен интелект“ is on (Admin → Модули).
+$deepl_ready     = module_enabled_with_needs('ai_helpers') && deepl_is_configured();
 $page_head_extra = '<script src="https://cdn.tiny.cloud/1/' . h($_tinymce_key) . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>';
 
 $pdo    = get_pdo();
@@ -420,6 +418,11 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       <button type="submit" form="rewardsForm" class="btn btn--primary">Запази</button>
     </div>
   </div>
+  <?php if (!module_enabled_with_needs('shop')): ?>
+  <p role="status" style="margin:0 0 1rem;padding:.65rem .85rem;background:#fef3c7;border:1px solid #b45309;border-radius:6px;font-size:.9rem;color:#78350f;">
+    Наградите не се показват на страницата на кампанията, защото модулът „Магазин“ е изключен — те се изпращат по пощата чрез поръчка от магазина. Дарителите могат да подкрепят кампанията без награда. Наградите ще се появят отново, когато включите „Магазин“ в <a href="/admin/modules.php">Модули</a>.
+  </p>
+  <?php endif; ?>
   <form method="POST" id="rewardsForm">
     <?= csrf_field() ?>
     <input type="hidden" name="section" value="rewards">

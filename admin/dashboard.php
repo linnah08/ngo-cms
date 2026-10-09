@@ -31,7 +31,7 @@ if (admin_is_admin()) {
 
 // ── Unified moderation inbox: pending comments, reviews & new contacts ──
 $inbox = [];
-if ($can_editorial) {
+if ($can_editorial && module_enabled_with_needs('comments_reviews')) {
     try {
         foreach ($pdo->query("SELECT author_name, content, created_at FROM comments WHERE status='pending' ORDER BY created_at DESC")->fetchAll() as $c) {
             $inbox[] = [
@@ -42,6 +42,8 @@ if ($can_editorial) {
             ];
         }
     } catch (Throwable $e) { /* table may not exist */ }
+}
+if ($can_editorial) {
     try {
         foreach ($pdo->query("SELECT name, message, created_at FROM contact_submissions WHERE status='new' ORDER BY created_at DESC")->fetchAll() as $m) {
             $inbox[] = [
@@ -53,7 +55,7 @@ if ($can_editorial) {
         }
     } catch (Throwable $e) { /* table may not exist */ }
 }
-if ($can_shop) {
+if ($can_shop && module_admin_page_visible('product-reviews.php')) {
     try {
         foreach ($pdo->query("SELECT r.author_name, r.content, r.created_at, r.product_id, p.name_bg AS product_name
                               FROM product_reviews r LEFT JOIN products p ON p.id = r.product_id
@@ -173,6 +175,9 @@ if (is_dir($articles_dir)) {
                 $calendar[$d][] = ['ch' => 'web', 'title' => $title, 'time' => 'публикуване', 'slug' => $slug];
             }
         }
+
+        // The rest is social posts — not shown while „Социални мрежи“ is off (Admin → Модули).
+        if (!module_enabled_with_needs('social')) continue;
 
         // Social channels via *_scheduled_at (Europe/Sofia datetime-local strings)
         foreach ([

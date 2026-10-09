@@ -75,14 +75,17 @@ function claude_suggest_excerpt(string $title, string $content, string $lang = '
 
 /**
  * Generate an excerpt for content that doesn't have one yet: Claude when
- * configured, otherwise a plain truncation. Never blocks article saving —
+ * configured and the ai_helpers module is on, otherwise a plain truncation. Never blocks article saving —
  * returns '' only when the content itself is empty.
  */
 function article_auto_excerpt(string $title, string $content, string $lang = 'bg'): string
 {
     if (trim(strip_tags($content)) === '') return '';
 
-    if (claude_is_configured()) {
+    // „Помощ от изкуствен интелект“ switched off in Admin → Модули: the plain
+    // cut, with no call to the API.
+    $ai_on = !function_exists('module_enabled_with_needs') || module_enabled_with_needs('ai_helpers');
+    if ($ai_on && claude_is_configured()) {
         $excerpt = claude_suggest_excerpt($title, $content, $lang);
         if ($excerpt !== '') return $excerpt;
     }

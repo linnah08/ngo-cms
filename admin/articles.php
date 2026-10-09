@@ -91,7 +91,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
 $articles_dir = ARTICLES_PATH . '/bg';
 $en_dir       = ARTICLES_PATH . '/en';
-$deepl_ready  = deepl_is_configured();
+// Translate buttons only while „Помощ от изкуствен интелект“ is on (Admin → Модули).
+$deepl_ready  = module_enabled_with_needs('ai_helpers') && deepl_is_configured();
 $articles = [];
 if (is_dir($articles_dir)) {
     foreach (glob($articles_dir . '/*.json') as $file) {

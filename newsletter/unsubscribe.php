@@ -1,4 +1,6 @@
 <?php
+// Never guarded by the newsletter module: the unsubscribe link in every email
+// already sent must keep working even after the module is switched off.
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
 
