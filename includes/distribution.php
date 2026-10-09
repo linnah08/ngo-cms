@@ -39,9 +39,7 @@ const DISTRIBUTION_DESTINATIONS = ['distributor', 'online', 'personal', 'sample'
  */
 function distribution_require_enabled(): void
 {
-    if (feature_enabled('distribution')) return;
-    http_response_code(404);
-    exit('Модулът „Разпространение“ е изключен.');
+    module_admin_guard('distribution');   // also off while the shop is off (needs)
 }
 
 // ── Items (product + variant) ──────────────────────────────────────────────────

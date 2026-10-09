@@ -15,6 +15,8 @@ use PHPUnit\Framework\Attributes\Group;
 #[Group('distribution')]
 final class DistributionHttpTest extends TestCase
 {
+    private static string $orgFile = '';
+    private static ?string $orgBackup = null;
     private static string $root;
     private static string $base;
     /** @var resource|null */
@@ -33,6 +35,15 @@ final class DistributionHttpTest extends TestCase
     public static function setUpBeforeClass(): void
     {
         self::$root = dirname(__DIR__, 2);
+        // Distribution is new (off until switched on) and needs the shop: switch both on
+        // for the test server, keeping the rest of organisation.json; restored afterwards.
+        self::$orgFile   = self::$root . '/content/organisation.json';
+        self::$orgBackup = is_file(self::$orgFile) ? (string) file_get_contents(self::$orgFile) : null;
+        $org = self::$orgBackup !== null ? (json_decode(self::$orgBackup, true) ?: []) : [];
+        $org['feature_shop'] = '1';
+        $org['feature_distribution'] = '1';
+        if (!is_dir(dirname(self::$orgFile))) mkdir(dirname(self::$orgFile), 0755, true);
+        file_put_contents(self::$orgFile, json_encode($org, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         $port       = 8000 + random_int(100, 900);
         self::$base = "http://127.0.0.1:{$port}";
 
@@ -79,6 +90,8 @@ final class DistributionHttpTest extends TestCase
 
     public static function tearDownAfterClass(): void
     {
+        if (self::$orgBackup !== null) file_put_contents(self::$orgFile, self::$orgBackup);
+        elseif (self::$orgFile !== '') @unlink(self::$orgFile);
         if (test_db_available() && self::$productId) {
             $pdo = get_pdo();
             $dist = $pdo->prepare('SELECT DISTINCT distributor_id FROM distribution_allocations WHERE product_id = ? AND distributor_id IS NOT NULL');

@@ -380,10 +380,10 @@ final class ModulesGatingTest extends TestCase
 
     public function test_menus_front_page_buttons_cards_and_sitemap_use_the_link_check(): void
     {
-        $this->assertStringContainsString("module_filter_links(\$_menus['header'][\$lang] ?? [])", self::src('templates/header.php'));
+        $this->assertStringContainsString("module_filter_links(menu_public_items(is_array(\$_menus['header'][\$lang]", self::src('templates/header.php'));
         $footer = self::src('templates/footer.php');
-        $this->assertStringContainsString("module_filter_links(\$_fmenus['footer_nav'][\$lang]   ?? [])", $footer);
-        $this->assertStringContainsString("module_filter_links(\$_fmenus['footer_help'][\$lang]  ?? [])", $footer);
+        $this->assertStringContainsString("module_filter_links(menu_public_items(is_array(\$_fmenus['footer_nav'][\$lang]", $footer);
+        $this->assertStringContainsString("module_filter_links(menu_public_items(is_array(\$_fmenus['footer_help'][\$lang]", $footer);
         $home = self::src('includes/home_render.php');
         $this->assertStringContainsString('if (!module_link_visible($url)) continue;', $home);
         $this->assertStringContainsString("if (!home_section_module_on((string) \$s['type'])) continue;", $home);

@@ -9,12 +9,12 @@ final class CreatedPagesMenuPickerTest extends CreatedPagesTestCase
     public function testPickerListsBuiltInPagesByNameAndCreatedPagesWithTheirStatus(): void
     {
         $this->storyPage('draft');
-        $this->putPage(['id' => 'p_live0000', 'status' => 'published', 'title_bg' => 'Събития', 'slug_bg' => 'sabitiya', 'slug_en' => 'events']);
+        $this->putPage(['id' => 'p_live0000', 'status' => 'published', 'title_bg' => 'Събития', 'slug_bg' => 'nashi-sabitiya', 'slug_en' => 'our-events']);
         $this->putPage(['id' => 'p_noaddr00', 'title_bg' => 'Без адрес']);   // cannot be linked yet
         $o = menu_pick_options();
         $this->assertSame('За нас', $o['builtin']['/za-nas/']);
         $this->assertSame('Начална страница', $o['builtin']['/']);
-        $this->assertSame(['/nashata-istoriya/', '/sabitiya/'], array_keys($o['created']));
+        $this->assertSame(['/nashata-istoriya/', '/nashi-sabitiya/'], array_keys($o['created']));
         $this->assertSame('draft', $o['created']['/nashata-istoriya/']['status']);
     }
 

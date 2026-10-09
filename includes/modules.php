@@ -224,6 +224,18 @@ function modules_registry(?array $replace = null): array
                 return events_pending_text($pdo);
             },
         ],
+        'distribution' => [
+            'label'       => 'Разпространение',
+            'description' => 'Проследява стоката, която давате извън онлайн магазина: партиди, дистрибутори, предаване с приемо-предавателен протокол, продажби и плащания от дистрибуторите — за всеки продукт от магазина.',
+            'off_warning' => 'Изключвате разпространението. Страницата „Разпространение“ ще изчезне от администрацията. Записите и протоколите остават запазени и се връщат, щом го включите отново.',
+            'needs'        => ['shop'],
+            // New in this release: a site that updates doesn't get it switched on.
+            'unset_default' => false,
+            // download-distribution-protocol.php stays outside, like download-ticket.php:
+            // a protocol already handed over must stay downloadable.
+            'admin_pages'  => ['distribution.php'],
+            'public_paths' => [],
+        ],
     ];
     return $registry;
 }
@@ -468,16 +480,22 @@ function modules_validate_switches(array $in, array $current): array
         } elseif ($raw === '1') {
             $wanted[$name] = true;
         } else {
-            $wanted[$name] = (bool) ($current[$name] ?? true);
+            $wanted[$name] = (bool) ($current[$name] ?? module_unset_default($name));
             $errors[module_field($name)] = 'Невалидна стойност за „' . $m['label'] . '“. Презаредете страницата и опитайте отново.';
         }
     }
     foreach (modules_registry() as $name => $m) {
         $on = $wanted[$name];
-        if (!modules_needs_met($name, $wanted)) $on = (bool) ($current[$name] ?? true);
+        if (!modules_needs_met($name, $wanted)) $on = (bool) ($current[$name] ?? module_unset_default($name));
         $values[module_field($name)] = $on ? '1' : '0';
     }
     return ['values' => $values, 'errors' => $errors];
+}
+
+/** A module's state when nothing was ever saved for it: on, unless it is new in a release. */
+function module_unset_default(string $name): bool
+{
+    return (bool) (modules_registry()[$name]['unset_default'] ?? true);
 }
 
 /** Are all of a module's needs (and theirs) on in this [name => bool] set? */

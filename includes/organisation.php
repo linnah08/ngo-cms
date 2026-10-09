@@ -108,7 +108,12 @@ function org_legal_name(string $lang = 'bg'): string
 if (!function_exists('feature_enabled')) {
 function feature_enabled(string $name): bool {
     $const = 'FEATURE_' . strtoupper($name);
-    if (!defined($const)) return true;
+    // Never set: on, so a site that updates keeps what it had — except a module
+    // that is new in a release (registry 'unset_default' => false), which a site
+    // gets only when someone switches it on.
+    if (!defined($const)) {
+        return function_exists('module_unset_default') ? module_unset_default($name) : true;
+    }
     $value = constant($const);
     // The admin switch saves '1' / '0'; a hand-edited "false" / "off" means off too.
     if (is_string($value)) return filter_var(trim($value), FILTER_VALIDATE_BOOLEAN);

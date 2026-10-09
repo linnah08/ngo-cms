@@ -12,7 +12,7 @@ $page_title_admin = 'Разпространение';
 $active_nav       = 'distribution';
 
 admin_require_shop();
-distribution_require_enabled();
+module_admin_guard('distribution');   // also off while the shop is off (needs)
 
 $pdo = get_pdo();
 

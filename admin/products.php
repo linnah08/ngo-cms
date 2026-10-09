@@ -175,7 +175,7 @@ if (module_admin_page_visible('product-reviews.php')) try {
 <div class="admin-page-header">
   <h1>Продукти</h1>
   <div style="display:flex;flex-wrap:wrap;gap:.5rem;">
-    <?php if (feature_enabled('distribution')): ?>
+    <?php if (module_enabled_with_needs('distribution')): ?>
     <a href="/admin/distribution.php" class="btn btn--outline">Разпространение</a>
     <?php endif; ?>
     <a href="/admin/product-edit.php" class="btn btn--primary">+ Нов продукт</a>

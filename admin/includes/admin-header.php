@@ -183,6 +183,12 @@ $current_user = admin_user();
         Поръчки
       </a>
       <?php endif; ?>
+      <?php if (module_admin_page_visible('distribution.php')): ?>
+      <a href="/admin/distribution.php"
+         class="admin-nav__link <?= ($active_nav ?? '') === 'distribution' ? 'active' : '' ?>">
+        Разпространение
+      </a>
+      <?php endif; ?>
       <?php if (module_admin_page_visible('events.php')): ?>
       <a href="/admin/events.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'events' ? 'active' : '' ?>">

@@ -47,7 +47,6 @@ final class HttpTest extends TestCase
             ['/novini/', 'News BG'],
             ['/finansovi-otcheti/', 'Financial reports BG'],
             ['/sabitiya/', 'Events BG'],
-            ['/articles/', 'Articles BG'],
             // ── Public EN pages ────────────────────────────────────────────
             ['/en/', 'Home EN'],
             ['/en/about/', 'About EN'],
@@ -60,7 +59,6 @@ final class HttpTest extends TestCase
             ['/en/news/', 'News EN'],
             ['/en/financial-reports/', 'Financial reports EN'],
             ['/en/events/', 'Events EN'],
-            ['/en/articles/', 'Articles EN'],
             // ── Legal ──────────────────────────────────────────────────────
             ['/politika-za-poveritelnost/', 'Privacy policy BG'],
             ['/en/privacy-policy/', 'Privacy policy EN'],
