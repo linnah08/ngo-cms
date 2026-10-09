@@ -154,4 +154,32 @@ final class InstallWizardTest extends TestCase
         // Every text input goes through $field(), which writes the marker.
         $this->assertDoesNotMatchRegularExpression('/<input type="(text|email|url|password)"/', $src);
     }
+
+    public function test_the_wizard_removes_itself_but_never_from_a_git_checkout(): void
+    {
+        $site = sys_get_temp_dir() . '/wiz-' . bin2hex(random_bytes(4));
+        mkdir($site . '/install', 0777, true);
+        touch($site . '/install/index.php');
+        touch($site . '/install/.htaccess');
+        $this->assertTrue(wizard_remove_installer($site . '/install'));
+        $this->assertDirectoryDoesNotExist($site . '/install');
+
+        mkdir($site . '/install');
+        touch($site . '/install/index.php');
+        touch($site . '/.git');   // a worktree's .git is a file
+        $this->assertFalse(wizard_remove_installer($site . '/install'), 'tracked files stay in a git checkout');
+        $this->assertFileExists($site . '/install/index.php');
+        $this->assertFalse(wizard_remove_installer($site), 'only ever a folder called install');
+        exec('rm -rf ' . escapeshellarg($site));
+    }
+
+    public function test_nobody_is_asked_to_delete_files_or_change_permissions(): void
+    {
+        foreach (['index.php', 'install-run.php'] as $f) {
+            $src = (string) file_get_contents(dirname(__DIR__) . '/install/' . $f);
+            $this->assertStringNotContainsString('File Manager', $src, $f);
+            $this->assertStringNotContainsString('изтрийте', $src, $f);
+            $this->assertStringNotContainsString('755', $src, $f);
+        }
+    }
 }

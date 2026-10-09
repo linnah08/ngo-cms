@@ -184,3 +184,17 @@ function wizard_site_config(array $done): array
         'GTM_ID' => '', 'GA4_ID' => '', 'GOOGLE_ADS_ID' => '', 'GOOGLE_ADS_PURCHASE_LABEL' => '',
     ], modules_install_flags($done['modules']['modules'] ?? []));
 }
+
+/**
+ * Delete the wizard's own folder after a successful install. Skipped in a git
+ * checkout (a developer's copy or a git-deployed server), where the files are
+ * tracked and the lock on the config files is enough. True when removed.
+ */
+function wizard_remove_installer(string $dir): bool
+{
+    if (basename($dir) !== 'install' || is_dir(dirname($dir) . '/.git') || is_file(dirname($dir) . '/.git')) return false;
+    foreach (glob($dir . '/{,.}*', GLOB_BRACE) ?: [] as $f) {
+        if (is_file($f) || is_link($f)) @unlink($f);
+    }
+    return @rmdir($dir);
+}
