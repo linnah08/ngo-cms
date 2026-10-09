@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($section === 'doc_sequence_set') {
             $seq_type = $_POST['seq_type'] ?? '';
             $next_num = (int) ($_POST['next_number'] ?? 0);
-            $valid_types = ['invoice', 'receipt', 'donation_cert'];
+            $valid_types = module_certificates_enabled() ? ['invoice', 'receipt', 'donation_cert'] : ['invoice', 'receipt'];
             if (!in_array($seq_type, $valid_types, true)) {
                 $errors[] = 'Невалиден тип документ.';
             } elseif ($next_num < 1) {
@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // ── Document sequence: reset to 0 ─────────────────────────────────────
         if ($section === 'doc_sequence_reset') {
             $seq_type = $_POST['seq_type'] ?? '';
-            $valid_types = ['invoice', 'receipt', 'donation_cert'];
+            $valid_types = module_certificates_enabled() ? ['invoice', 'receipt', 'donation_cert'] : ['invoice', 'receipt'];
             if (in_array($seq_type, $valid_types, true)) {
                 $pdo->prepare('UPDATE document_sequences SET last_number = 0 WHERE type = ?')
                     ->execute([$seq_type]);
@@ -666,6 +666,7 @@ $seq_labels = [
     'receipt'       => 'Електронни бележки',
     'donation_cert' => 'Сертификати за дарение',
 ];
+if (!module_certificates_enabled()) unset($seq_labels['donation_cert']);   // Админ → Модули
 $seq_formats = [
     'invoice'       => '0000000001 (10 цифри)',
     'receipt'       => '0000000001 (10 цифри)',

@@ -199,7 +199,7 @@
   "nav.cart": "Количка",
   "donation.confirm.title": "Благодарим за дарението!",
   "donation.confirm.thanks": "Благодарим от сърце!",
-  "donation.confirm.lead": "Вашето дарение ще помогне на деца, на които е нужна подкрепа.",
+  "donation.confirm.lead": "Вашето дарение ни помага да продължим работата си.",
   "donation.confirm.paid": "Плащането е успешно!",
   "donation.confirm.paid_text": "Дарението ви от {amount} е прието. Изпратихме потвърждение на имейла ви.",
   "donation.confirm.details_in_email": "Подробностите за дарението са в имейла, който ви изпратихме.",

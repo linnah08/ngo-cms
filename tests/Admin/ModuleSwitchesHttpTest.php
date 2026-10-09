@@ -160,6 +160,14 @@ final class ModuleSwitchesHttpTest extends TestCase
         ], $over);
     }
 
+    /** Switch modules on/off directly in organisation.json (restored after the class). */
+    private function setModules(array $on): void
+    {
+        $data = $this->saved();
+        foreach ($on as $name => $state) $data['feature_' . $name] = $state ? '1' : '0';
+        file_put_contents(self::$orgFile, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    }
+
     private function saved(): array
     {
         clearstatcache();
@@ -292,6 +300,7 @@ final class ModuleSwitchesHttpTest extends TestCase
 
     public function test_admin_sees_the_newsletter_band_choice_as_labelled_radios_with_a_preview(): void
     {
+        $this->setModules(['newsletter' => true]);   // the band belongs to Бюлетин
         $jar = $this->login(self::$adminEmail);
         [$code, $body] = $this->http('/admin/organisation.php', $jar);
         @unlink($jar);
@@ -310,6 +319,7 @@ final class ModuleSwitchesHttpTest extends TestCase
 
     public function test_a_saved_band_colour_reaches_the_public_page_with_contrasting_text(): void
     {
+        $this->setModules(['newsletter' => true]);   // the band belongs to Бюлетин
         $jar = $this->login(self::$adminEmail);
         [, $page] = $this->http('/admin/organisation.php', $jar);
         [$code] = $this->http('/admin/organisation.php', $jar, $this->validForm($this->csrf($page), [
@@ -333,5 +343,37 @@ final class ModuleSwitchesHttpTest extends TestCase
         $this->assertSame(200, $code);
         $this->assertStringContainsString('Моля, изберете цвят за лентата за бюлетина от палитрата.', $body);
         $this->assertSame('#FBB04A', $this->saved()['newsletter_band_color'] ?? null);
+    }
+
+    public function test_settings_of_switched_off_modules_are_hidden_and_kept(): void
+    {
+        $this->setModules(['newsletter' => true, 'donations' => true]);
+        $jar = $this->login(self::$adminEmail);
+        [, $page] = $this->http('/admin/organisation.php', $jar);
+        $this->assertStringContainsString('Покана за дарение в бюлетина', $page);
+        $this->http('/admin/organisation.php', $jar, $this->validForm($this->csrf($page), [
+            'newsletter_band' => 'accent', 'newsletter_donate_heading_bg' => 'Помогнете ни',
+        ]));
+        $this->assertSame('accent', $this->saved()['newsletter_band'] ?? null);
+
+        $this->setModules(['newsletter' => false, 'donations' => false]);
+        [, $page] = $this->http('/admin/organisation.php', $jar);
+        $this->assertStringNotContainsString('Цвят на лентата за бюлетина', $page);
+        $this->assertStringNotContainsString('Покана за дарение в бюлетина', $page);
+        $this->assertStringContainsString('<h2 class="admin-card__title">Банкова сметка</h2>', $page);
+        [$code] = $this->http('/admin/organisation.php', $jar, $this->validForm($this->csrf($page)));
+        $this->assertSame(302, $code);
+        $this->assertSame('accent', $this->saved()['newsletter_band'] ?? null, 'saving the page does not wipe a hidden setting');
+        $this->assertSame('Помогнете ни', $this->saved()['newsletter_donate_heading_bg'] ?? null);
+
+        // The signature and manual certificates exist only for donations and campaigns.
+        $this->setModules(['donations' => false, 'campaign' => false]);
+        [$code] = $this->http('/admin/manual-cert.php', $jar);
+        $this->assertSame(404, $code);
+        [, $orders] = $this->http('/admin/orders.php', $jar);
+        $this->assertStringNotContainsString('/admin/manual-cert.php', $orders);
+        [, $templates] = $this->http('/admin/email-templates.php', $jar);
+        $this->assertStringNotContainsString('Неуспешно плащане на дарение', $templates);
+        @unlink($jar);
     }
 }

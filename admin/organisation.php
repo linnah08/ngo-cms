@@ -162,9 +162,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
   <!-- ── Bank ──────────────────────────────────────────────────────────────── -->
   <section class="admin-card" style="<?= $card ?>">
-    <h2 class="admin-card__title">Банкова сметка за дарения</h2>
+    <h2 class="admin-card__title">Банкова сметка</h2>
     <p class="admin-meta" style="margin:0 0 1rem;line-height:1.6;">
-      Показва се на дарителите и във фактурите. Проверяваме IBAN-а автоматично, така че сгрешена цифра няма да мине.
+      Показва се в „Контакти“ и във фактурите<?= module_enabled_with_needs('donations') ? ', и на дарителите' : '' ?>. Проверяваме IBAN-а автоматично, така че сгрешена цифра няма да мине.
       Оставете полетата празни, ако не искате да показвате сметка.
     </p>
     <div class="admin-form-grid">
@@ -233,6 +233,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     $nl_read   = 'Текстът се чете добре.';
     $nl_hard   = 'Текстът се чете трудно — изберете по-тъмен или по-светъл цвят.';
     ?>
+    <?php if (module_enabled_with_needs('newsletter')): ?>
     <fieldset id="f-newsletter_band" style="border:none;margin:1.5rem 0 0;padding:0;min-width:0;">
       <legend style="font-weight:600;margin-bottom:.25rem;padding:0;">Цвят на лентата за бюлетина</legend>
       <small id="nlHint" style="<?= $hint ?>margin:0 0 .6rem;">Цветната лента над долната част на всяка страница, в която посетителите се записват за бюлетина. Цветът на текста се избира сам, така че да се чете.</small>
@@ -269,6 +270,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         </p>
       </div>
     </fieldset>
+    <?php endif; ?>
 
     <div id="f-logo" style="margin-top:1.5rem;">
       <div style="font-weight:600;margin-bottom:.5rem;">Лого</div>
@@ -336,13 +338,13 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </div>
   </section>
 
+  <?php if (module_enabled_with_needs('newsletter') && module_enabled_with_needs('donations')): ?>
   <!-- ── Newsletter donate box ──────────────────────────────────────────────── -->
   <section class="admin-card" style="<?= $card ?>" aria-labelledby="nl-donate-title">
     <h2 class="admin-card__title" id="nl-donate-title">Покана за дарение в бюлетина</h2>
     <p class="admin-meta" style="margin:0 0 1rem;line-height:1.6;">
       Добавя кутийка с бутон „Дарете сега“ най-долу във всеки бюлетин, който изпращате на абонатите —
-      над връзката за отписване. Изключена е, докато не я включите. Работи само ако модулът „Дарения“
-      по-долу е включен. Как изглежда, виждате в „Преглед“ на всяка кампания.
+      над връзката за отписване. Изключена е, докато не я включите. Как изглежда, виждате в „Преглед“ на всяка кампания.
     </p>
     <label class="admin-checkbox" style="margin-bottom:1rem;">
       <input type="checkbox" name="newsletter_donate_cta" value="1" <?= in_array($val('newsletter_donate_cta'), ['1', 'true'], true) ? 'checked' : '' ?>>
@@ -373,6 +375,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       </label>
     </div>
   </section>
+  <?php endif; ?>
 
   <p class="admin-meta" style="margin:0 0 1.5rem;line-height:1.6;">
     Кои части от сайта ползвате (дарения, кампании и др.) се избира на страница <a href="/admin/modules.php">„Модули“</a>.

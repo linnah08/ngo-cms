@@ -66,7 +66,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     <div style="font-size:3rem;margin-bottom:1rem;" aria-hidden="true">💛</div>
     <h1 style="color:#fff;"><?= h(t_or('donation.confirm.thanks', 'Благодарим от сърце!', 'Thank you from the heart!')) ?></h1>
     <p style="color:rgba(255,255,255,.85);font-size:1.1rem;">
-      <?= h(t_or('donation.confirm.lead', 'Вашето дарение ще помогне на деца, на които е нужна подкрепа.', 'Your donation will help children who need support.')) ?>
+      <?= h(t_or('donation.confirm.lead', 'Вашето дарение ни помага да продължим работата си.', 'Your donation helps us continue our work.')) ?>
     </p>
   </div>
 </section>

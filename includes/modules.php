@@ -60,9 +60,9 @@ function modules_registry(?array $replace = null): array
             'description' => 'Страница за онлайн дарение, форма за дарение в магазина и бутони „Дари сега“ под новините.',
             'off_warning' => 'Изключвате даренията. Страницата за дарение, формата за дарение и бутоните „Дари сега“ ще изчезнат от сайта и посетителите няма да могат да даряват онлайн.',
             'needs'        => [],
-            // Past donations stay in Поръчки, and certificates for donations made
-            // outside the site (manual-cert.php) are still needed — no page of its own.
-            'admin_pages'  => [],
+            // Past donations stay in Поръчки. manual-cert.php issues certificates for
+            // donations made outside the site (bank transfer, cash) — a donations job too.
+            'admin_pages'  => ['manual-cert.php'],
             'public_paths' => ['/donation/', '/en/donation/'],
             'pending'      => static function (PDO $pdo): ?string {
                 $n = (int) $pdo->query(
@@ -301,6 +301,24 @@ function module_for_admin_page(string $page): ?string
     return null;
 }
 
+/** Is at least one of these modules on (with what it needs)? */
+function module_any_enabled(string ...$names): bool
+{
+    foreach ($names as $n) if (module_enabled_with_needs($n)) return true;
+    return false;
+}
+
+/**
+ * Donation certificates and the e-signature that signs them exist only for
+ * donations: online ones (Дарения) and campaign pledges (Кампании).
+ */
+const MODULES_ISSUING_CERTIFICATES = ['donations', 'campaign'];
+
+function module_certificates_enabled(): bool
+{
+    return module_any_enabled(...MODULES_ISSUING_CERTIFICATES);
+}
+
 /** Should the admin menu show a link to this admin/*.php page? */
 function module_admin_page_visible(string $page): bool
 {
@@ -391,9 +409,12 @@ function module_pending(string $name, ?PDO $pdo): ?string
  * изключен" inside the admin, with a button to Admin → Модули for admins, and
  * stops with HTTP 404.
  */
-function module_admin_guard(string $module): void
+function module_admin_guard(string|array $module): void
 {
-    if (module_enabled_with_needs($module)) return;
+    // A page shared by several modules (e.g. the signature) opens when any is on.
+    $all = (array) $module;
+    if (module_any_enabled(...$all)) return;
+    $module = $all[0];
 
     admin_require_login();
     $root = dirname(__DIR__);
@@ -402,8 +423,8 @@ function module_admin_guard(string $module): void
     http_response_code(404);
     $page_title_admin = 'Модулът е изключен';
     $active_nav       = 'modules';
-    $label   = module_label($module);
-    $missing = array_map('module_label', module_missing_needs($module));
+    $label   = implode('“ или „', array_map('module_label', $all));
+    $missing = count($all) === 1 ? array_map('module_label', module_missing_needs($module)) : [];
     $is_admin = admin_is_admin();
 
     require $root . '/admin/includes/admin-header.php';

@@ -280,7 +280,7 @@ $current_user = admin_user();
       </a>
       <?php endif; ?>
       <?php if (admin_can_sign()): ?>
-      <?php if (module_admin_page_visible('signature.php')): ?>
+      <?php if (module_certificates_enabled()): ?>
       <a href="/admin/signature.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'signature' ? 'active' : '' ?>">
         Подпис

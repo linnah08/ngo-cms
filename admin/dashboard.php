@@ -9,7 +9,7 @@ admin_require_login();
 $page_title_admin = 'Начало';
 $active_nav       = 'dashboard';
 
-$can_sign      = admin_can_sign();
+$can_sign      = admin_can_sign() && module_certificates_enabled();
 $can_shop      = admin_can_manage_shop();
 $can_editorial = admin_can_editorial();
 $pdo           = get_pdo();
@@ -86,7 +86,7 @@ if ($can_sign) {
 
 // ── Paid donations without a cert ────────────────────────────────────────────
 $uncerted_donations = [];
-if ($can_shop) {
+if ($can_shop && module_certificates_enabled()) {
     // Dedicated donation orders AND product orders with a donation add-on line.
     $uncerted_donations = orders_paid_donations_without_cert($pdo);
 }
@@ -373,6 +373,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <?php endif; ?>
 
   <?php if ($can_shop): ?>
+  <?php if (module_certificates_enabled()): ?>
   <!-- Paid donations without a cert -->
   <div style="flex:1;min-width:0;background:#fff;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;">
     <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.6rem;">
@@ -398,6 +399,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       </div>
     <?php endif; ?>
   </div>
+  <?php endif; ?>
 
   <!-- Physical orders + pledges awaiting shipping -->
   <div style="flex:1;min-width:0;background:#fff;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;">

@@ -182,6 +182,7 @@ function wizard_site_config(array $done): array
         'SOCIAL_INSTAGRAM' => '',
         'SOCIAL_LINKEDIN'  => '',
         'GTM_ID' => '', 'GA4_ID' => '', 'GOOGLE_ADS_ID' => '', 'GOOGLE_ADS_PURCHASE_LABEL' => '',
+        'HOME_START_MINIMAL' => true,   // front page starts with the banner + chosen modules (home_start_hidden())
     ], modules_install_flags($done['modules']['modules'] ?? []));
 }
 

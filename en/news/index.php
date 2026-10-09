@@ -89,7 +89,7 @@ if ($slug) {
   <div style="max-width:900px;margin:0 auto;text-align:center;">
     <p style="font-size:.8rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin:0 0 .6rem;font-weight:600;">Support us</p>
     <h2 style="font-size:1.6rem;margin:0 0 .75rem;line-height:1.3;">Stories like this are possible with your help.</h2>
-    <p style="color:var(--text-muted);font-size:1rem;margin:0 0 2.5rem;max-width:560px;margin-left:auto;margin-right:auto;">Every contribution — large or small — helps children with developmental differences get the support they need.</p>
+    <p style="color:var(--text-muted);font-size:1rem;margin:0 0 2.5rem;max-width:560px;margin-left:auto;margin-right:auto;">Every contribution — large or small — helps us continue our work.</p>
     <div style="display:flex;flex-wrap:wrap;gap:1.25rem;justify-content:center;align-items:stretch;">
 
       <?php if (feature_enabled('donations')): ?>
@@ -97,7 +97,7 @@ if ($slug) {
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem 1.75rem;flex:1;min-width:220px;max-width:280px;display:flex;flex-direction:column;align-items:center;gap:1rem;">
         <div style="font-size:2rem;">❤️</div>
         <h3 style="margin:0;font-size:1.05rem;">Make a donation</h3>
-        <p style="margin:0;font-size:.88rem;color:var(--text-muted);text-align:center;">Support the children and foundation programmes directly.</p>
+        <p style="margin:0;font-size:.88rem;color:var(--text-muted);text-align:center;">Support our work directly.</p>
         <a href="/en/donation/" class="btn btn--primary" style="margin-top:auto;width:100%;text-align:center;justify-content:center;">Donate now</a>
       </div>
       <?php endif; ?>
@@ -142,7 +142,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
   <div class="container">
     <span class="section-label">News</span>
     <h1>News &amp; stories</h1>
-    <p class="lead" style="margin-top:1rem;">Follow our work and the stories of the children we support.</p>
+    <p class="lead" style="margin-top:1rem;">News and stories from our work.</p>
   </div>
 </section>
 

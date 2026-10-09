@@ -67,6 +67,23 @@ function org_module_fields(): array
 // org_modules() — the old shape of the module list — now lives in includes/modules.php.
 
 /**
+ * Организация fields whose section is hidden because a module it serves is off
+ * (Админ → Модули): the newsletter band colour without Бюлетин, the newsletter
+ * donation box without Бюлетин or Дарения. Their saved values are kept.
+ */
+function org_hidden_fields(): array
+{
+    $hidden = [];
+    $newsletter = module_enabled_with_needs('newsletter');
+    if (!$newsletter) array_push($hidden, 'newsletter_band', 'newsletter_band_color');
+    if (!$newsletter || !module_enabled_with_needs('donations')) {
+        array_push($hidden, 'newsletter_donate_cta', 'newsletter_donate_heading_bg', 'newsletter_donate_heading_en',
+            'newsletter_donate_text_bg', 'newsletter_donate_text_en');
+    }
+    return $hidden;
+}
+
+/**
  * The registered legal name of whoever issues documents and receives the
  * money — printed on donation certificates, invoices and receipts. Set in
  * Admin → Организация ("Юридическо име"). A site that is a brand or project
@@ -349,6 +366,9 @@ function org_validate(array $in, array $themeKeys): array
         }
     }
 
+    // Sections the page hides because their module is off are not posted:
+    // leave them out, so org_save_overrides() keeps what is saved for them.
+    foreach (org_hidden_fields() as $k) unset($v[$k], $e[$k]);
     return ['values' => $v, 'errors' => $e];
 }
 

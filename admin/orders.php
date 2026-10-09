@@ -89,7 +89,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <div style="display:flex;flex-wrap:wrap;gap:.5rem;">
     <a href="/admin/boxnow-bulk-labels.php" class="btn btn--primary">Печат на BoxNow етикети<?= $boxnow_ready ? ' (' . $boxnow_ready . ')' : '' ?></a>
     <a href="/admin/manual-invoice.php" class="btn btn--outline">+ Фактура</a>
+    <?php if (module_admin_page_visible('manual-cert.php')): ?>
     <a href="/admin/manual-cert.php" class="btn btn--outline">+ Сертификат за дарение</a>
+    <?php endif; ?>
   </div>
 </div>
 
@@ -118,6 +120,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.5rem;">
   <?php
   $type_filters = ['all'=>'Всички','physical'=>'Продукти','donation'=>'Дарения','ticket'=>'Билети'];
+  // Only the kinds of order this site can take (Админ → Модули).
+  if (!module_certificates_enabled())           unset($type_filters['donation']);
+  if (!module_any_enabled('events', 'campaign')) unset($type_filters['ticket']);
   foreach ($type_filters as $val => $label): ?>
     <a href="<?= h(orders_list_url($filter, ['type' => $val])) ?>"<?= $filter_type === $val ? ' aria-current="true"' : '' ?>
        style="padding:.35rem .9rem;border-radius:20px;font-size:.85rem;text-decoration:none;

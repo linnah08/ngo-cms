@@ -3,6 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 
 admin_require_admin();
+module_admin_guard(MODULES_ISSUING_CERTIFICATES);   // the signature only signs donation certificates
 
 if (!admin_can_sign()) {
     http_response_code(403);

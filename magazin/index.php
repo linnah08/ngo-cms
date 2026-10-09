@@ -644,12 +644,25 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 <section class="section section--grey" style="padding-bottom:2rem;">
   <div class="container">
     <span class="section-label"><?= $lang === 'bg' ? 'Магазин' : 'Shop' ?></span>
-    <h1><?= $lang === 'bg' ? 'Дари и подкрепи' : 'Shop & Support' ?></h1>
-    <p class="lead" style="margin-top:1rem;max-width:640px;">
-      <?= $lang === 'bg'
-        ? 'Всяка покупка директно финансира работата ни с децата.'
-        : 'Every purchase directly funds our work with children.' ?>
-    </p>
+<?php
+    // Editable on the page (inline CMS). The defaults don't mention donating
+    // unless the site takes donations (Админ → Модули).
+    $_shop_hero = [
+        'title' => ($pages['shop']['hero_title_' . $lang] ?? '') ?: ($_donations_on
+            ? ($lang === 'bg' ? 'Пазарувай и подкрепи' : 'Shop & Support')
+            : ($lang === 'bg' ? 'Магазин' : 'Shop')),
+        'text'  => ($pages['shop']['hero_text_' . $lang] ?? '') ?: ($lang === 'bg'
+            ? 'Всяка покупка подкрепя каузата ни.'
+            : 'Every purchase supports our cause.'),
+    ];
+?>
+    <h1 data-cms-field="hero_title" data-cms-section="shop" data-cms-type="text"
+        data-cms-bg="<?= h($pages['shop']['hero_title_bg'] ?? '') ?>"
+        data-cms-en="<?= h($pages['shop']['hero_title_en'] ?? '') ?>"><?= h($_shop_hero['title']) ?></h1>
+    <p class="lead" style="margin-top:1rem;max-width:640px;"
+       data-cms-field="hero_text" data-cms-section="shop" data-cms-type="text"
+       data-cms-bg="<?= h($pages['shop']['hero_text_bg'] ?? '') ?>"
+       data-cms-en="<?= h($pages['shop']['hero_text_en'] ?? '') ?>"><?= h($_shop_hero['text']) ?></p>
   </div>
 </section>
 

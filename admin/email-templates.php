@@ -75,6 +75,23 @@ foreach (admin_message_presets() as $_pk => $_pm) {
     $templates[$_pk] = ['label' => $_pm['label'], 'vars' => $_pm['vars']];
 }
 
+// Only the emails this site can send (Админ → Модули). Saved texts stay.
+$_tpl_modules = [
+    'campaign-confirmation' => ['campaign'],
+    'campaign-ticket'       => ['campaign', 'events'],
+    'donation-'             => ['donations'],
+    'order-'                => ['shop'],
+    'credit-note-'          => ['shop'],
+];
+foreach (array_keys($templates) as $_tk) {
+    foreach ($_tpl_modules as $_prefix => $_mods) {
+        if (str_starts_with($_tk, $_prefix) && !module_any_enabled(...$_mods)) unset($templates[$_tk]);
+    }
+}
+foreach (admin_message_presets() as $_pk => $_pm) {
+    if (!module_any_enabled('shop', 'campaign', 'donations')) unset($templates[$_pk]);
+}
+
 // ── POST: save one template ───────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) { http_response_code(400); exit('Invalid token'); }
