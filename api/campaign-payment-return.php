@@ -193,7 +193,8 @@ function process_campaign_dsk_result(PDO $pdo, array $pledge, string $dskOrderId
                 render_email('campaign-admin-notification', ['pledge' => $pledge])
             );
         }
-    } elseif ($orderStatus === 3) {
+    } elseif ($orderStatus === 6 || $orderStatus === 3) {
+        // Declined, or the hold was cancelled before the pledge was paid
         $pdo->prepare("UPDATE campaign_pledges SET payment_status='failed' WHERE id=? AND payment_status='pending'")
             ->execute([$pledge['id']]);
     }

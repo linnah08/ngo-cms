@@ -149,25 +149,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($new_status === 'cancelled' && $order['status'] !== 'cancelled'
                 && $order['payment_status'] === 'paid' && !empty($order['dsk_order_id'])) {
                 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
-                try {
-                    (new DSKBankPayment())->refund($order['dsk_order_id'], (float)$order['total_eur']);
-                    $pdo->prepare('UPDATE orders SET payment_status = ?, updated_at = NOW() WHERE id = ?')
-                        ->execute(['refunded', $id]);
-                    $lang = $order['lang'] ?? 'bg';
-                    $tpl  = email_tpl_get('order-cancelled-customer', $lang, [
-                        'customer_name' => $order['customer_name'],
-                        'order_number'  => $order['order_number'],
-                    ]);
-                    send_order_mail(
-                        (int)$id,
-                        $order['customer_email'],
-                        $tpl['subject'],
-                        render_email('order-cancelled-customer', ['order' => $order, 'tpl' => $tpl]),
-                        ['template_key' => 'order-cancelled-customer']
-                    );
-                } catch (Throwable $e) {
-                    payment_error_report('Автоматичното връщане на парите при отмяна не успя — върнете сумата ръчно в DSK', $order['order_number'], $e);
-                    $success = 'Поръчката е отменена, но автоматичното връщане на сумата не успя. Моля, обработете го ръчно в DSK Bank.';
+                $returned = (new DSKBankPayment())->returnPayment($order['dsk_order_id'], (float)$order['total_eur']);
+                if (!$returned['ok']) {
+                    payment_error_report('Автоматичното връщане на парите при отмяна не успя — върнете сумата ръчно в DSK', $order['order_number'],
+                        new RuntimeException('DSK: ' . $returned['detail']));
+                    $success = 'Поръчката е отменена, но сумата не беше върната автоматично (в DSK плащането е „'
+                        . DSKBankPayment::stateLabel($returned['state']) . '“). Моля, върнете я ръчно в DSK Bank.';
+                } else {
+                    try {
+                        $pdo->prepare('UPDATE orders SET payment_status = ?, updated_at = NOW() WHERE id = ?')
+                            ->execute(['refunded', $id]);
+                        $lang = $order['lang'] ?? 'bg';
+                        $tpl  = email_tpl_get('order-cancelled-customer', $lang, [
+                            'customer_name' => $order['customer_name'],
+                            'order_number'  => $order['order_number'],
+                        ]);
+                        send_order_mail(
+                            (int)$id,
+                            $order['customer_email'],
+                            $tpl['subject'],
+                            render_email('order-cancelled-customer', ['order' => $order, 'tpl' => $tpl]),
+                            ['template_key' => 'order-cancelled-customer']
+                        );
+                    } catch (Throwable $e) {
+                        // The money is back; only marking it or the customer email failed.
+                        payment_error_report('Сумата е върната в DSK, но поръчката не беше отбелязана или клиентът не получи имейл', $order['order_number'], $e);
+                    }
                 }
             }
 

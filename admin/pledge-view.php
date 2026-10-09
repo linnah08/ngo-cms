@@ -88,28 +88,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Няма DSK поръчка за връщане.';
         } else {
             require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
-            try {
-                (new DSKBankPayment())->refund($pledge['dsk_order_id'], (float)$pledge['amount_eur']);
-                pledge_update_refunded_statuses($pdo, (int)$pledge['id'], $pledge['pledge_number']);
+            require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/payment_errors.php';
+            $returned = (new DSKBankPayment())->returnPayment($pledge['dsk_order_id'], (float)$pledge['amount_eur']);
+            if (!$returned['ok']) {
+                payment_error_report('Връщането на вноската не успя — върнете сумата ръчно в DSK', $pledge['pledge_number'],
+                    new RuntimeException('DSK: ' . $returned['detail']));
+                $errors[] = 'Сумата не беше върната автоматично (в DSK плащането е „'
+                    . DSKBankPayment::stateLabel($returned['state']) . '“). Моля, върнете я ръчно в DSK Bank.';
+            } else {
+                try {
+                    pledge_update_refunded_statuses($pdo, (int)$pledge['id'], $pledge['pledge_number']);
 
-                $tpl = email_tpl_get('pledge-reversed-customer', 'bg', [
-                    'name'          => $pledge['name'],
-                    'pledge_number' => $pledge['pledge_number'],
-                    'amount_eur'    => number_format((float)$pledge['amount_eur'], 2, '.', ' '),
-                ]);
-                send_order_mail(
-                    pledge_ensure_order_row($pdo, $pledge),
-                    $pledge['email'],
-                    $tpl['subject'],
-                    render_email('pledge-reversed-customer', ['pledge' => $pledge, 'tpl' => $tpl]),
-                    ['template_key' => 'pledge-reversed-customer']
-                );
+                    $tpl = email_tpl_get('pledge-reversed-customer', 'bg', [
+                        'name'          => $pledge['name'],
+                        'pledge_number' => $pledge['pledge_number'],
+                        'amount_eur'    => number_format((float)$pledge['amount_eur'], 2, '.', ' '),
+                    ]);
+                    send_order_mail(
+                        pledge_ensure_order_row($pdo, $pledge),
+                        $pledge['email'],
+                        $tpl['subject'],
+                        render_email('pledge-reversed-customer', ['pledge' => $pledge, 'tpl' => $tpl]),
+                        ['template_key' => 'pledge-reversed-customer']
+                    );
 
-                header('Location: /admin/pledge-view.php?id=' . $id . '&refund_ok=1');
-                exit;
-            } catch (Throwable $e) {
-                error_log('pledge refund id=' . $id . ': ' . $e->getMessage());
-                $errors[] = 'Грешка при връщане на плащането. Моля, обработете го ръчно в DSK Bank.';
+                    header('Location: /admin/pledge-view.php?id=' . $id . '&refund_ok=1');
+                    exit;
+                } catch (Throwable $e) {
+                    // The money is back; only marking it or the supporter email failed.
+                    payment_error_report('Сумата е върната в DSK, но вноската не беше отбелязана или поддръжникът не получи имейл', $pledge['pledge_number'], $e);
+                    $errors[] = 'Сумата е върната в DSK, но вноската не беше отбелязана като върната. Отбележете я ръчно.';
+                }
             }
         }
     }

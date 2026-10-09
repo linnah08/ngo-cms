@@ -13,11 +13,13 @@ class DSKBankPayment
     private string $base;
 
     // Payment status codes returned by getOrderStatusExtended.do
-    const STATUS_CREATED   = 0;
-    const STATUS_APPROVED  = 1;   // 2-stage: pre-auth approved, not yet captured
-    const STATUS_DEPOSITED = 2;   // Payment captured / completed
-    const STATUS_DECLINED  = 3;
-    const STATUS_REVERSED  = 4;   // Refunded / reversed
+    const STATUS_CREATED      = 0;
+    const STATUS_APPROVED     = 1;   // 2-stage: pre-auth approved, not yet captured
+    const STATUS_DEPOSITED    = 2;   // Payment captured / completed
+    const STATUS_REVERSED     = 3;   // Cancelled before settlement — money never left the card
+    const STATUS_REFUNDED     = 4;   // Money sent back after settlement
+    const STATUS_AUTH_STARTED = 5;   // 3-D Secure check in progress
+    const STATUS_DECLINED     = 6;
 
     public function __construct()
     {
@@ -38,7 +40,7 @@ class DSKBankPayment
 
     // ── Internal ───────────────────────────────────────────────────────────────
 
-    private function post(string $endpoint, array $params): array
+    protected function post(string $endpoint, array $params): array
     {
         $ch = curl_init($this->base . $endpoint);
         curl_setopt_array($ch, [
@@ -133,5 +135,93 @@ class DSKBankPayment
             throw new RuntimeException('DSK Bank refund error: ' . ($data['errorMessage'] ?? json_encode($data)));
         }
         return $data;
+    }
+
+    /**
+     * Cancel a payment before the bank settles it (same day, or a pre-auth hold).
+     */
+    public function reverse(string $dskOrderId): array
+    {
+        $data = $this->post('reverse.do', [
+            'userName' => $this->merchant,
+            'password' => $this->password,
+            'orderId'  => $dskOrderId,
+        ]);
+        $code = (string)($data['errorCode'] ?? '');
+        if ($code !== '' && $code !== '0') {
+            throw new RuntimeException('DSK Bank reverse error: ' . ($data['errorMessage'] ?? json_encode($data)));
+        }
+        return $data;
+    }
+
+    /**
+     * Give a card payment back in full, whichever way the bank allows for its state,
+     * and report what the bank says afterwards.
+     *
+     * The bank's status is the only thing trusted: DSK has answered a refund with an
+     * error while still reversing the payment, so every call is followed by a fresh
+     * status check, and only "reversed" or "refunded" counts as done.
+     *
+     * @return array{ok: bool, state: ?int, detail: string}
+     *         ok    — the money is back with the customer (state 3 or 4)
+     *         state — the bank's last reported orderStatus, null if it never answered
+     *         detail — what was tried and what the bank said, for the admin error report
+     */
+    public function returnPayment(string $dskOrderId, float $amountEur): array
+    {
+        $log   = [];
+        $state = null;
+        $check = function () use ($dskOrderId, &$state, &$log): ?int {
+            try {
+                $status = $this->getStatus($dskOrderId);
+                $state  = isset($status['orderStatus']) ? (int)$status['orderStatus'] : null;
+                $log[]  = 'статус ' . self::stateLabel($state);
+            } catch (Throwable $e) {
+                $log[] = 'статус: ' . $e->getMessage();
+            }
+            return $state;
+        };
+        $try = function (string $what, callable $call) use (&$log): void {
+            try {
+                $call();
+                $log[] = $what . ': OK';
+            } catch (Throwable $e) {
+                $log[] = $what . ': ' . $e->getMessage();
+            }
+        };
+        $done = fn(?int $s): bool => $s === self::STATUS_REVERSED || $s === self::STATUS_REFUNDED;
+
+        $before = $check();
+        if (!$done($before)) {
+            if ($before === self::STATUS_APPROVED) {
+                $try('reverse', fn() => $this->reverse($dskOrderId));
+                $check();
+            } elseif ($before === self::STATUS_DEPOSITED) {
+                $try('refund', fn() => $this->refund($dskOrderId, $amountEur));
+                // Paid today and not settled yet: the bank only allows a reversal.
+                if ($check() === self::STATUS_DEPOSITED) {
+                    $try('reverse', fn() => $this->reverse($dskOrderId));
+                    $check();
+                }
+            }
+        }
+
+        return ['ok' => $done($state), 'state' => $state, 'detail' => implode('; ', $log)];
+    }
+
+    /** Plain-language name of a DSK orderStatus, for messages to the admin. */
+    public static function stateLabel(?int $state): string
+    {
+        return match ($state) {
+            self::STATUS_CREATED      => 'неплатено',
+            self::STATUS_APPROVED     => 'блокирана сума (неизтеглена)',
+            self::STATUS_DEPOSITED    => 'платено',
+            self::STATUS_REVERSED     => 'отменено (reversed)',
+            self::STATUS_REFUNDED     => 'върнато (refunded)',
+            self::STATUS_AUTH_STARTED => 'в процес на проверка',
+            self::STATUS_DECLINED     => 'отказано',
+            null                      => 'неизвестен',
+            default                   => 'непознат (' . $state . ')',
+        };
     }
 }
