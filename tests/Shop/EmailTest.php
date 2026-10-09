@@ -446,4 +446,30 @@ final class EmailTest extends TestCase
         // Econt tracking URL should be in the email
         $this->assertStringContainsString('econt.com', $html);
     }
+
+    // ── pre-order lines ──────────────────────────────────────────────────────
+
+    public function testPreorderLineInCustomerAndAdminEmails(): void
+    {
+        $items = [
+            ['product_id' => 1, 'name_bg' => 'Календар', 'name_en' => 'Calendar', 'quantity' => 2, 'subtotal_eur' => 20,
+             'preorder' => true, 'preorder_note' => 'Очаквана доставка: март'],
+            ['product_id' => 2, 'name_bg' => 'Чаша', 'name_en' => 'Mug', 'quantity' => 1, 'subtotal_eur' => 8],
+        ];
+        $order = array_merge(self::$mockOrder, ['items' => json_encode($items)]);
+
+        $bg = render_email('order-confirmation-customer', ['order' => $order]);
+        $this->assertStringContainsString('Предварителна поръчка — Изпращаме по-късно: Очаквана доставка: март', $bg);
+        $this->assertStringContainsString('ще ги изпратим по-късно', $bg);
+        $this->assertSame(1, substr_count($bg, 'Предварителна поръчка —'), 'only the pre-order line is marked');
+
+        $en = render_email('order-confirmation-customer', ['order' => array_merge($order, ['lang' => 'en'])]);
+        $this->assertStringContainsString('Pre-order — Ships later: Очаквана доставка: март', $en);
+
+        $admin = render_email('order-notification-admin', ['order' => $order]);
+        $this->assertStringContainsString('Предварителна поръчка — изпратете, щом пристигне (Очаквана доставка: март)', $admin);
+
+        $plain = render_email('order-confirmation-customer', ['order' => self::$mockOrder]);
+        $this->assertStringNotContainsString('Предварителна поръчка', $plain);
+    }
 }

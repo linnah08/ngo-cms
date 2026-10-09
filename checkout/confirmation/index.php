@@ -100,7 +100,16 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
         <tbody>
           <?php foreach ($items as $item): ?>
           <tr style="border-top:1px solid var(--border);">
-            <td style="padding:.65rem 1rem;"><?= h($item_name($item)) ?></td>
+            <td style="padding:.65rem 1rem;"><?= h($item_name($item)) ?>
+              <?php if (!empty($item['preorder'])): ?>
+                <div style="font-size:.8rem;color:#92400e;margin-top:.25rem;">
+                  <strong><span aria-hidden="true">⏳ </span><?= h(t_or('shop.preorder.label', 'Предварителна поръчка', 'Pre-order')) ?></strong> —
+                  <?= h(!empty($item['preorder_note'])
+                      ? t_or('shop.preorder.ships', 'Изпращаме по-късно: {note}', 'Ships later: {note}', vars: ['note' => $item['preorder_note']])
+                      : t_or('shop.preorder.ships_default', 'Изпращаме по-късно, щом пристигне.', 'Ships later, as soon as it arrives.')) ?>
+                </div>
+              <?php endif; ?>
+            </td>
             <td style="padding:.65rem 1rem;text-align:center;color:var(--text-muted);">× <?= (int)($item['quantity'] ?? 1) ?></td>
             <td style="padding:.65rem 1rem;text-align:right;"><?= number_format((float)($item['subtotal_eur'] ?? 0), 2) ?> €</td>
           </tr>

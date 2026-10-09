@@ -541,6 +541,11 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
               <?php if (!empty($item['variant_label'])): ?>
                 <div style="font-size:.8rem;color:var(--text-muted);margin-top:.2rem;"><?= h($item['variant_label']) ?></div>
               <?php endif; ?>
+              <?php if (!empty($item['preorder'])): ?>
+                <div style="font-size:.78rem;font-weight:700;color:#92400e;background:#fef3c7;border-radius:3px;display:inline-block;padding:.1rem .45rem;margin-top:.3rem;">
+                  ⏳ Предварителна поръчка<?php if (!empty($item['preorder_note'])): ?> — <?= h($item['preorder_note']) ?><?php endif; ?>
+                </div>
+              <?php endif; ?>
               <?php if (!empty($item['design_file']) && !empty($item['design_position'])): ?>
                 <?php
                   $pos_v    = $item['design_position'];

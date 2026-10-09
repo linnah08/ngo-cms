@@ -4,6 +4,8 @@
  * Expected variables:
  *   $prod_variants  array   the product's ACTIVE variant rows, in sort order (non-empty)
  *   $lang           string  'bg' | 'en'
+ *   $p_preorder_on  bool    optional — the product takes pre-orders, so sold-out
+ *                           variants stay choosable and say "Pre-order"
  *
  * Several variants → a "Choose variant" group of native radio buttons (a
  * fieldset + legend, so keyboards use Tab / arrow keys and screen readers
@@ -34,7 +36,8 @@ $_pv_describe = function (array $pv) use ($lang): array {
     ];
 };
 
-$_single_pv = product_single_variant($prod_variants);
+$_preorder_on = !empty($p_preorder_on);
+$_single_pv   = product_single_variant($prod_variants);
 ?>
 <?php if ($_single_pv): ?>
   <?php $d = $_pv_describe($_single_pv); ?>
@@ -56,11 +59,13 @@ $_single_pv = product_single_variant($prod_variants);
         <div style="font-size:.8rem;flex-shrink:0;color:var(--teal);">
           <?= (int)$_single_pv['stock'] . ($lang === 'bg' ? ' бр.' : ' left') ?>
         </div>
+      <?php elseif ($_preorder_on): ?>
+        <div style="font-size:.8rem;flex-shrink:0;color:#92400e;font-weight:600;">⏳ <?= h(product_preorder_label($lang)) ?></div>
       <?php endif; ?>
     </div>
   </div>
 <?php else: ?>
-  <?php $_default_pv = product_default_variant($prod_variants); ?>
+  <?php $_default_pv = product_default_variant($prod_variants, $_preorder_on); ?>
   <fieldset class="pv-choices">
     <legend><?= $lang === 'bg' ? 'Избери вариант' : 'Choose variant' ?></legend>
     <div style="display:flex;flex-direction:column;gap:.5rem;">
@@ -69,12 +74,13 @@ $_single_pv = product_single_variant($prod_variants);
           $d       = $_pv_describe($pv);
           $pv_id   = (int)$pv['id'];
           $checked = $_default_pv && (int)$_default_pv['id'] === $pv_id;
+          $pv_buy  = $d['in_stock'] || $_preorder_on;
         ?>
-        <label class="pv-option<?= $checked ? ' active' : '' ?><?= !$d['in_stock'] ? ' disabled' : '' ?>"
+        <label class="pv-option<?= $checked ? ' active' : '' ?><?= !$pv_buy ? ' disabled' : '' ?>"
                id="pvo-<?= $pv_id ?>" for="pvr-<?= $pv_id ?>">
           <input type="radio" class="pv-radio" name="pv_choice" id="pvr-<?= $pv_id ?>" value="<?= $pv_id ?>"
                  <?= $checked ? 'checked' : '' ?>
-                 <?= $d['in_stock'] ? 'onchange="selectVariant(' . $pv_id . ')"' : 'disabled' ?>>
+                 <?= $pv_buy ? 'onchange="selectVariant(' . $pv_id . ')"' : 'disabled' ?>>
           <?php if ($d['img']): ?>
             <img class="pv-thumb" src="<?= h($d['img']) ?>" alt="">
           <?php else: ?>
@@ -90,10 +96,10 @@ $_single_pv = product_single_variant($prod_variants);
               <span style="display:block;font-size:.78rem;color:var(--text-muted);"><?= $d['attrs'] ?></span>
             <?php endif; ?>
           </span>
-          <span style="font-size:.8rem;flex-shrink:0;<?= $d['in_stock'] ? 'color:var(--teal);' : 'color:#b03a2e;font-weight:600;' ?>">
+          <span style="font-size:.8rem;flex-shrink:0;<?= $d['in_stock'] ? 'color:var(--teal);' : ($_preorder_on ? 'color:#92400e;font-weight:600;' : 'color:#b03a2e;font-weight:600;') ?>">
             <?= $d['in_stock']
                 ? (int)$pv['stock'] . ($lang === 'bg' ? ' бр.' : ' left')
-                : ($lang === 'bg' ? 'Изчерпан' : 'Out of stock') ?>
+                : ($_preorder_on ? '⏳ ' . h(product_preorder_label($lang)) : ($lang === 'bg' ? 'Изчерпан' : 'Out of stock')) ?>
           </span>
         </label>
       <?php endforeach; ?>

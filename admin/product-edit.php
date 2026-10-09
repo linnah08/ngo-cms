@@ -4,6 +4,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/distribution.php';
 
 admin_require_shop();
 module_admin_guard('shop');
@@ -20,6 +21,7 @@ $product = [
     'description_bg' => '', 'description_en' => '',
     'price_eur' => '', 'stock' => 0, 'active' => 1, 'featured' => 0, 'image' => '',
     'type' => 'standard', 'variants' => null,
+    'preorder_enabled' => 0, 'preorder_note_bg' => '', 'preorder_note_en' => '',
 ];
 if (!$is_new) {
     $row = $pdo->prepare('SELECT * FROM products WHERE id = ?');
@@ -46,6 +48,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $active     = isset($_POST['active']) ? 1 : 0;
     $featured   = isset($_POST['featured']) ? 1 : 0;
     $slug_input = trim($_POST['slug']           ?? '');
+    $preorder_enabled = isset($_POST['preorder_enabled']) ? 1 : 0;
+    $preorder_note_bg = mb_substr(trim($_POST['preorder_note_bg'] ?? ''), 0, 255);
+    $preorder_note_en = mb_substr(trim($_POST['preorder_note_en'] ?? ''), 0, 255);
     // Image was uploaded separately via AJAX; filename arrives in a plain field
     $image_name = trim($_POST['image_filename'] ?? '') ?: $product['image'];
 
@@ -77,14 +82,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $products_dir = $_SERVER['DOCUMENT_ROOT'] . '/assets/images/products/';
         $submitted_variants = product_parse_variant_rows(
             $_POST,
-            static fn(string $f): bool => is_file($products_dir . $f)
+            static fn(string $f): bool => is_file($products_dir . $f),
+            (bool)$preorder_enabled
         );
     }
 
     // Validate
     if (!$name_bg) $errors[] = 'Наименованието на BG е задължително.';
     if ($price === '' || (float)$price <= 0) $errors[] = 'Цената трябва да е по-голяма от 0.';
-    if ($stock < 0) $errors[] = 'Наличността не може да е отрицателна.';
+    // Below zero is how many pre-ordered items are still owed — only meaningful while pre-orders are on.
+    if ($stock < 0 && !$preorder_enabled) $errors[] = 'Наличността не може да е отрицателна. (Под нула е възможна само при включена предварителна поръчка.)';
     if ($prod_type === 'print' && empty($sizes)) $errors[] = 'Изберете поне един размер за продукт от тип Печат.';
     if ($prod_type === 'print' && empty($size_guide_image)) $errors[] = 'Добавете таблица с размери за продукт от тип Печат.';
     if ($prod_type === 'variant' && empty($submitted_variants)) {
@@ -104,12 +111,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($is_new) {
             // New products go to the end of the shop ordering.
             $next_sort = (int)$pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM products')->fetchColumn();
-            $pdo->prepare('INSERT INTO products (slug,name_bg,name_en,description_bg,description_en,price_eur,stock,active,featured,image,`type`,variants,variant_attributes,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-                ->execute([$slug_val, $name_bg, $name_en, $desc_bg, $desc_en, (float)$price, $stock, $active, $featured, $image_name, $prod_type, $variants_json, $variant_attributes_json, $next_sort]);
+            $pdo->prepare('INSERT INTO products (slug,name_bg,name_en,description_bg,description_en,price_eur,stock,active,featured,image,`type`,variants,variant_attributes,sort_order,preorder_enabled,preorder_note_bg,preorder_note_en) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+                ->execute([$slug_val, $name_bg, $name_en, $desc_bg, $desc_en, (float)$price, $stock, $active, $featured, $image_name, $prod_type, $variants_json, $variant_attributes_json, $next_sort, $preorder_enabled, $preorder_note_bg, $preorder_note_en]);
             $saved_id = (int)$pdo->lastInsertId();
         } else {
-            $pdo->prepare('UPDATE products SET slug=?,name_bg=?,name_en=?,description_bg=?,description_en=?,price_eur=?,stock=?,active=?,featured=?,image=?,`type`=?,variants=?,variant_attributes=? WHERE id=?')
-                ->execute([$slug_val, $name_bg, $name_en, $desc_bg, $desc_en, (float)$price, $stock, $active, $featured, $image_name, $prod_type, $variants_json, $variant_attributes_json, $id]);
+            $pdo->prepare('UPDATE products SET slug=?,name_bg=?,name_en=?,description_bg=?,description_en=?,price_eur=?,stock=?,active=?,featured=?,image=?,`type`=?,variants=?,variant_attributes=?,preorder_enabled=?,preorder_note_bg=?,preorder_note_en=? WHERE id=?')
+                ->execute([$slug_val, $name_bg, $name_en, $desc_bg, $desc_en, (float)$price, $stock, $active, $featured, $image_name, $prod_type, $variants_json, $variant_attributes_json, $preorder_enabled, $preorder_note_bg, $preorder_note_en, $id]);
             $saved_id = $id;
         }
 
@@ -128,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         "SELECT COUNT(*) FROM orders WHERE JSON_SEARCH(items, 'one', ?, NULL, '\$[*].variant_id') IS NOT NULL"
                     );
                     $ord->execute([(string)$eid]);
-                    if ((int)$ord->fetchColumn() > 0) {
+                    if ((int)$ord->fetchColumn() > 0 || distribution_variant_has_records($pdo, $eid)) {
                         $pdo->prepare('UPDATE product_variants SET active = 0 WHERE id = ?')->execute([$eid]);
                     } else {
                         $pdo->prepare('DELETE FROM product_variants WHERE id = ?')->execute([$eid]);
@@ -166,6 +173,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'image' => $image_name,
         'type' => $prod_type, 'variants' => $variants_json,
         'variant_attributes' => $variant_attributes_json,
+        'preorder_enabled' => $preorder_enabled,
+        'preorder_note_bg' => $preorder_note_bg,
+        'preorder_note_en' => $preorder_note_en,
     ]);
 }
 
@@ -243,7 +253,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </label>
     <label id="stockField" style="font-size:.875rem;font-weight:600;<?= ($product['type'] ?? '') === 'variant' ? 'display:none;' : '' ?>">Наличност
       <input type="number" name="stock" value="<?= (int)$product['stock'] ?>"
-             min="0" step="1" style="padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;font-family:inherit;width:100%;box-sizing:border-box;">
+             <?= !empty($product['preorder_enabled']) ? '' : 'min="0"' ?> step="1" style="padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;font-family:inherit;width:100%;box-sizing:border-box;">
     </label>
     <label class="admin-checkbox" style="align-self:flex-end;padding-bottom:.5rem;">
       <input type="checkbox" name="active" value="1" <?= $product['active'] ? 'checked' : '' ?>>
@@ -257,6 +267,47 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       Показвай на началната страница
     </label>
   </div>
+
+
+  <fieldset id="preorderPanel" style="margin-top:1rem;padding:1rem 1.25rem;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--off-white);">
+    <legend style="font-weight:600;font-size:.9rem;padding:0 .35rem;">Предварителна поръчка</legend>
+    <label class="admin-checkbox" style="min-height:44px;">
+      <input type="checkbox" id="preorderEnabled" name="preorder_enabled" value="1"
+             aria-controls="preorderNotes" aria-describedby="preorderHelp"
+             <?= !empty($product['preorder_enabled']) ? 'checked' : '' ?>>
+      Позволи поръчка и когато наличността свърши
+    </label>
+    <p id="preorderHelp" style="font-size:.82rem;color:#4b5563;margin:.35rem 0 0;line-height:1.5;">
+      Клиентите ще могат да поръчат продукта и при нулева наличност — на страницата на продукта, в количката, при поръчката и в имейла ще пише, че се изпраща по-късно, заедно със съобщението ви по-долу.
+      Тогава наличността може да падне под нула: −3 означава три поръчани бройки, които още чакат да ги изпратите.
+    </p>
+    <div id="preorderNotes" class="admin-form-grid" style="margin-top:.75rem;<?= !empty($product['preorder_enabled']) ? '' : 'display:none;' ?>">
+      <label for="preorderNoteBg" style="font-size:.875rem;font-weight:600;">Кога ще изпратите <?= $lbl_bg_badge ?>
+        <input type="text" id="preorderNoteBg" name="preorder_note_bg" maxlength="255" placeholder="напр. Очаквана доставка: март 2027"
+               value="<?= h($product['preorder_note_bg'] ?? '') ?>"
+               style="padding:.5rem .75rem;border:1px solid #6b7280;border-radius:6px;font-size:.9rem;font-family:inherit;width:100%;box-sizing:border-box;">
+      </label>
+      <label for="preorderNoteEn" style="font-size:.875rem;font-weight:600;">When it ships <?= $lbl_en_badge ?>
+        <input type="text" id="preorderNoteEn" name="preorder_note_en" maxlength="255" placeholder="e.g. Expected delivery: March 2027"
+               data-translate-from="preorder_note_bg"
+               value="<?= h($product['preorder_note_en'] ?? '') ?>"
+               style="padding:.5rem .75rem;border:1px solid #6b7280;border-radius:6px;font-size:.9rem;font-family:inherit;width:100%;box-sizing:border-box;">
+      </label>
+    </div>
+  </fieldset>
+  <script>
+  (function () {
+    var box = document.getElementById('preorderEnabled');
+    if (!box) return;
+    box.addEventListener('change', function () {
+      document.getElementById('preorderNotes').style.display = box.checked ? '' : 'none';
+      // Stock may go below zero only while pre-orders are on (it counts what is owed).
+      document.querySelectorAll('input[name="stock"], input[name="pv_stock[]"]').forEach(function (i) {
+        if (box.checked) i.removeAttribute('min'); else i.setAttribute('min', '0');
+      });
+    });
+  })();
+  </script>
 
   <div class="admin-form-grid" style="margin-top:1.5rem;">
     <label style="display:flex;flex-direction:column;gap:.35rem;font-size:.875rem;font-weight:600;"><span>Описание <?= $lbl_bg_badge ?></span>
@@ -515,7 +566,7 @@ if (($product['type'] ?? '') === 'variant' && !$is_new) {
             </td>
             <!-- attr value cells injected by JS via rebuildAttrCols() -->
             <td style="padding:.4rem .5rem;vertical-align:middle;">
-              <input type="number" name="pv_stock[]" value="<?= (int)$pvr['stock'] ?>" min="0"
+              <input type="number" name="pv_stock[]" value="<?= (int)$pvr['stock'] ?>" <?= !empty($product['preorder_enabled']) ? '' : 'min="0"' ?>
                      style="width:70px;padding:.35rem .5rem;border:1px solid var(--border);border-radius:4px;font-size:.85rem;">
             </td>
             <td style="padding:.4rem .5rem;vertical-align:middle;text-align:center;">

@@ -1,6 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
 start_session();
 
 // Module switched off in Admin → Модули — the shop does not exist (site's 404).
@@ -41,15 +42,18 @@ if (!empty($cart)) {
         $pid = $item['product_id'];
         if (!isset($products_by_id[$pid])) continue;
         $p        = $products_by_id[$pid];
-        $qty      = $p['type'] === 'variant'
+        // Variant stock is only known below, once product_variants is read.
+        $preorder = $p['type'] !== 'variant' && product_is_preorder($p, (int)$p['stock']);
+        $qty      = ($p['type'] === 'variant' || $preorder)
             ? (int)$item['quantity']
-            : min((int)$item['quantity'], (int)$p['stock']);
+            : min((int)$item['quantity'], max(0, (int)$p['stock']));
         $line     = $qty * (float)$p['price_eur'];
         $subtotal += $line;
         $cart_data[] = [
             'product'         => $p,
             'quantity'        => $qty,
             'line_eur'        => $line,
+            'preorder'        => $preorder,
             'colour'          => $item['colour']          ?? null,
             'size'            => $item['size']            ?? null,
             'design_file'     => $item['design_file']     ?? null,
@@ -73,6 +77,7 @@ if ($variant_image_ids) {
         if ($cd['variant_id'] && isset($vi2_map[$cd['variant_id']])) {
             $cd['variant_image'] = $vi2_map[$cd['variant_id']]['image'];
             $cd['variant_stock'] = (int)$vi2_map[$cd['variant_id']]['stock'];
+            $cd['preorder']      = product_is_preorder($cd['product'], $cd['variant_stock']);
         }
     }
     unset($cd);
@@ -190,6 +195,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
                         <?= h($row['variant_label']) ?>
                       </div>
                     <?php endif; ?>
+                    <?php if (!empty($row['preorder'])) require $_SERVER['DOCUMENT_ROOT'] . '/templates/preorder-line.php'; ?>
                   </div>
                 </div>
               </td>
@@ -198,12 +204,14 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
                 <input type="number" name="quantity[<?= $ri ?>]"
                        value="<?= $row['quantity'] ?>"
                        min="1"
-                       data-max="<?= $stock_max ?>"
+                       data-max="<?= !empty($row['preorder']) ? 999999 : $stock_max ?>"
                        style="width:60px;text-align:center;padding:.35rem .5rem;border:1px solid var(--border);border-radius:4px;font-size:.9rem;"
                        oninput="cartQtyInput(this)">
+                <?php if (empty($row['preorder'])): ?>
                 <div class="cart-stock-msg" style="display:none;font-size:.75rem;color:#c0392b;font-weight:600;margin-top:.3rem;white-space:nowrap;">
                   <?= $lang === 'bg' ? "Налични: {$stock_max} бр." : "Only {$stock_max} available" ?>
                 </div>
+                <?php endif; ?>
               </td>
               <td style="padding:.75rem 1rem;text-align:right;vertical-align:middle;font-weight:600;">
                 <?= price_html($row['line_eur']) ?>
@@ -257,6 +265,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     }
     </script>
 
+    <?php if (array_filter(array_column($cart_data, 'preorder'))) require $_SERVER['DOCUMENT_ROOT'] . '/templates/preorder-notice.php'; ?>
     <div style="text-align:right;">
       <a href="<?= h(shop_path('checkout', $lang)) ?>" class="btn btn--primary" style="padding:.9rem 2rem;font-size:1rem;">
         <?= $lang === 'bg' ? 'Продължи към поръчка →' : 'Proceed to checkout →' ?>

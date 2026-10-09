@@ -46,6 +46,15 @@ echo $_tpl['intro'];
               $design_label = $_lang === 'en' ? 'Custom design' : 'Персонализиран дизайн';
               echo '<br><span style="font-size:12px;color:#6b6560;">' . $design_label . '</span>';
           }
+          if (!empty($item['preorder'])) {
+              // Note snapshot taken at checkout, in the order's language.
+              $po = !empty($item['preorder_note'])
+                  ? t_or('shop.preorder.ships', 'Изпращаме по-късно: {note}', 'Ships later: {note}', $_lang, ['note' => $item['preorder_note']])
+                  : t_or('shop.preorder.ships_default', 'Изпращаме по-късно, щом пристигне.', 'Ships later, as soon as it arrives.', $_lang);
+              echo '<br><span style="font-size:12px;color:#92400e;font-weight:600;">⏳ '
+                 . htmlspecialchars(t_or('shop.preorder.label', 'Предварителна поръчка', 'Pre-order', $_lang) . ' — ' . $po, ENT_QUOTES, 'UTF-8')
+                 . '</span>';
+          }
         ?>
       </td>
       <td style="text-align:right;"><?= (int)($item['quantity'] ?? 1) ?></td>
@@ -62,6 +71,14 @@ echo $_tpl['intro'];
     </tr>
   </tbody>
 </table>
+
+<?php if (array_filter(array_column($items, 'preorder'))): ?>
+<p style="padding:10px 14px;background:#fef3c7;border:1px solid #d97706;color:#78350f;border-radius:6px;">
+  <?= htmlspecialchars(t_or('shop.preorder.email_body',
+      'Някои продукти в поръчката са с предварителна поръчка — ще ги изпратим по-късно, в срока, написан до тях.',
+      'Some items in your order are pre-orders — we will send them later, at the time shown next to them.', $_lang), ENT_QUOTES, 'UTF-8') ?>
+</p>
+<?php endif; ?>
 
 <h3 style="color:#0387A5;"><?= $_lang === 'en' ? 'Delivery' : 'Доставка' ?></h3>
 <?php $type_labels = $_lang === 'en' ? $type_labels_en : $type_labels_bg; ?>
