@@ -212,33 +212,48 @@ final class ModulesRegistryTest extends TestCase
 
     public function test_wizard_writes_the_flags_into_site_config(): void
     {
+        require_once self::root() . '/install/wizard-lib.php';
+        $config = wizard_site_config([
+            'account' => ['admin_email' => 'a@example.org'],
+            'org'     => ['site_name_bg' => 'П', 'site_name_en' => '', 'site_url' => 'https://example.org', 'site_email' => 'a@example.org'],
+            'look'    => ['brand_theme' => 'classic', 'brand_primary' => '#000000', 'brand_accent' => '#111111'],
+            'modules' => ['modules' => ['campaign']],
+        ]);
+        $this->assertSame(modules_install_flags(['campaign']), array_intersect_key($config, modules_install_flags([])));
+        $run = (string) file_get_contents(self::root() . '/install/install-run.php');
+        $this->assertStringContainsString("write_config(\$ROOT . '/site.config.php', wizard_site_config(\$done)", $run);
         $src = (string) file_get_contents(self::root() . '/install/index.php');
-        $this->assertStringContainsString('$module_flags   = modules_install_flags($chosen_modules);', $src);
-        $this->assertMatchesRegularExpression("/write_config\(\\\$ROOT \. '\/site\.config\.php', array_merge\(\[.*?\], \\\$module_flags\)/s", $src);
-        $this->assertStringNotContainsString("'FEATURE_DONATIONS' => true", $src, 'no module is switched on by default');
         $this->assertStringContainsString('href="/admin/modules.php"', $src, 'the finish screen says where to change them');
     }
 
-    /** Render the wizard's empty form from a copy (the real checkout is already installed). */
+    /** Render the wizard's modules step from a copy (the real checkout is already installed). */
     public function test_wizard_offers_every_module_unticked(): void
     {
         $tmp = sys_get_temp_dir() . '/om-wizard-' . bin2hex(random_bytes(4));
         mkdir($tmp . '/install', 0777, true);
         mkdir($tmp . '/includes');
-        copy(self::root() . '/install/index.php', $tmp . '/install/index.php');
+        foreach (['index.php', 'wizard-lib.php'] as $f) copy(self::root() . '/install/' . $f, $tmp . '/install/' . $f);
         foreach (['themes.php', 'organisation.php', 'modules.php', 'url.php'] as $f) {
             copy(self::root() . '/includes/' . $f, $tmp . '/includes/' . $f);
         }
         foreach (glob(self::root() . '/includes/themes-*.php') ?: [] as $f) copy($f, $tmp . '/includes/' . basename($f));
-        exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($tmp . '/install/index.php') . ' 2>&1', $out, $rc);
+        // Arrive at step 5 with steps 1–4 done, as a person would.
+        file_put_contents($tmp . '/prepend.php', '<?php
+            session_save_path(' . var_export($tmp, true) . ');
+            session_name("ngo_install"); session_id("t' . bin2hex(random_bytes(6)) . '"); session_start();
+            $_SESSION["install"] = ["token" => "x", "done" => ["db" => [], "account" => [], "org" => [], "look" => []]];
+            session_write_close();
+            $_GET["step"] = "modules";');
+        exec(escapeshellarg(PHP_BINARY) . ' -d auto_prepend_file=' . escapeshellarg($tmp . '/prepend.php')
+            . ' -d session.save_path=' . escapeshellarg($tmp) . ' ' . escapeshellarg($tmp . '/install/index.php') . ' 2>&1', $out, $rc);
         exec('rm -rf ' . escapeshellarg($tmp));
         $html = implode("\n", $out);
         $this->assertSame(0, $rc, $html);
 
-        $this->assertStringContainsString('4. Какво ще ползвате?', $html);
+        $this->assertStringContainsString('Стъпка 5 от 6', $html);
         foreach (modules_registry() as $name => $m) {
             $this->assertMatchesRegularExpression(
-                '/<label class="module-card" for="module-' . $name . '">\s*<input type="checkbox" id="module-' . $name . '" name="modules\[\]" value="' . $name . '" >/',
+                '/<label class="choice"><input type="checkbox" name="modules\[\]" value="' . $name . '" >/',
                 $html,
                 "$name: a labelled, unticked checkbox"
             );
