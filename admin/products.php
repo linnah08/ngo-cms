@@ -5,6 +5,7 @@ $page_title_admin = 'Продукти';
 $active_nav       = 'products';
 
 admin_require_shop();
+module_admin_guard('shop');
 
 $pdo = get_pdo();
 
@@ -119,6 +120,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        // Products with distribution records keep their history too.
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/distribution.php';
+        $hasOrders = array_values(array_unique(array_merge($hasOrders, distribution_products_with_records($pdo, $ids))));
+
         $safe    = array_values(array_diff($ids, $hasOrders));
         $skipped = array_values(array_intersect($ids, $hasOrders));
 
@@ -132,9 +137,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($nSkipped === 0) {
             $msg = $nSafe . ($nSafe === 1 ? ' продукт изтрит' : ' продукта изтрити') . ' завинаги.';
         } elseif ($nSafe === 0) {
-            $msg = 'Нито един продукт не може да бъде изтрит — всички имат поръчки.';
+            $msg = 'Нито един продукт не може да бъде изтрит — всички имат поръчки или записи в „Разпространение“.';
         } else {
-            $msg = $nSafe . ' изтрити, ' . $nSkipped . ' пропуснати — имат поръчки.';
+            $msg = $nSafe . ' изтрити, ' . $nSkipped . ' пропуснати — имат поръчки или записи в „Разпространение“.';
         }
         flash_set('success', $msg);
         header('Location: /admin/products.php');
@@ -155,7 +160,8 @@ $products = $pdo->query(
 )->fetchAll();
 
 $review_stats = [];
-try {
+// Product reviews are part of „Коментари и отзиви“ (Admin → Модули).
+if (module_admin_page_visible('product-reviews.php')) try {
     $review_stats = $pdo->query(
         "SELECT product_id,
                 AVG(CASE WHEN status='approved' THEN rating END) AS avg_rating,
@@ -168,7 +174,12 @@ try {
 
 <div class="admin-page-header">
   <h1>Продукти</h1>
-  <a href="/admin/product-edit.php" class="btn btn--primary">+ Нов продукт</a>
+  <div style="display:flex;flex-wrap:wrap;gap:.5rem;">
+    <?php if (module_enabled_with_needs('distribution')): ?>
+    <a href="/admin/distribution.php" class="btn btn--outline">Разпространение</a>
+    <?php endif; ?>
+    <a href="/admin/product-edit.php" class="btn btn--primary">+ Нов продукт</a>
+  </div>
 </div>
 
 <?php foreach (flash_get() as $_flash): ?>
@@ -239,8 +250,18 @@ try {
         <td>
           <?php if ($p['effective_stock'] > 0): ?>
             <span style="color:#2d6a35;font-weight:500;"><?= (int)$p['effective_stock'] ?></span>
+          <?php elseif (!empty($p['preorder_enabled'])): ?>
+            <span style="color:#92400e;font-weight:500;">0</span>
+            <br><span class="badge" style="margin-top:.35rem;background:#fef3c7;color:#92400e;white-space:nowrap;"
+                      title="Изчерпан, но клиентите могат да го поръчат предварително">⏳ Предв. поръчка</span>
+            <?php if ($p['effective_stock'] < 0): ?>
+              <br><small style="color:#92400e;"><?= -(int)$p['effective_stock'] ?> бр. чакат изпращане</small>
+            <?php endif; ?>
           <?php else: ?>
             <span style="color:#c0392b;font-weight:500;">0</span>
+            <?php if ($p['effective_stock'] < 0): ?>
+              <br><small style="color:#c0392b;" title="Предварителната поръчка е изключена, но има неизпратени предварителни поръчки"><?= -(int)$p['effective_stock'] ?> бр. чакат изпращане</small>
+            <?php endif; ?>
           <?php endif; ?>
         </td>
         <td>

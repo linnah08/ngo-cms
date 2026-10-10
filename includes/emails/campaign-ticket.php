@@ -4,13 +4,23 @@ if (!function_exists('email_tpl_get')) {
     require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/email-templates.php';
 }
 $_lang     = $lang ?? $pledge['lang'] ?? 'bg';
-$ev_name   = setting_get('event_name', 'Събитие');
-$ev_date   = setting_get('event_date', '');
-$ev_time   = setting_get('event_time', '');
-$ev_place  = setting_get('event_place', '');
-
-$ev_date_fmt = $ev_date ? (new DateTimeImmutable($ev_date))->format('d.m.Y') : '';
-$ev_when     = $ev_date_fmt . ($ev_time ? ', ' . $ev_time . ($_lang === 'en' ? '' : ' ч.') : '');
+// $event: the events row (includes/events.php). Callers that still pass only
+// the pledge get its event looked up — or the old single-event settings.
+if (!isset($event) || !is_array($event)) {
+    require_once ($_SERVER['DOCUMENT_ROOT'] ?: dirname(__DIR__, 2)) . '/includes/events.php';
+    require_once ($_SERVER['DOCUMENT_ROOT'] ?: dirname(__DIR__, 2)) . '/admin/includes/db.php';
+    try {
+        $event = event_for_pledge(get_pdo(), $pledge);
+    } catch (Throwable $e) {
+        $event = ['title' => 'Събитие', 'event_date' => null, 'event_time' => '', 'place' => ''];
+    }
+}
+if (!function_exists('event_text')) {
+    require_once ($_SERVER['DOCUMENT_ROOT'] ?: dirname(__DIR__, 2)) . '/includes/events.php';
+}
+$ev_name  = event_text($event, 'title', $_lang) ?: ($_lang === 'en' ? 'Event' : 'Събитие');
+$ev_place = event_text($event, 'place', $_lang);
+$ev_when  = event_when($event, $_lang);
 
 $_vars = [
     'name'         => $pledge['name'],

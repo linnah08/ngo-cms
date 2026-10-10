@@ -122,7 +122,7 @@ if ($slug) {
   <div style="max-width:900px;margin:0 auto;text-align:center;">
     <p style="font-size:.8rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin:0 0 .6rem;font-weight:600;">Подкрепете ни</p>
     <h2 style="font-size:1.6rem;margin:0 0 .75rem;line-height:1.3;">Истории като тази са възможни с вашата помощ.</h2>
-    <p style="color:var(--text-muted);font-size:1rem;margin:0 0 2.5rem;max-width:560px;margin-left:auto;margin-right:auto;">Всеки принос — голям или малък — помага на деца с различия в развитието да получат подкрепата, от която се нуждаят.</p>
+    <p style="color:var(--text-muted);font-size:1rem;margin:0 0 2.5rem;max-width:560px;margin-left:auto;margin-right:auto;">Всеки принос — голям или малък — ни помага да продължим работата си.</p>
     <div style="display:flex;flex-wrap:wrap;gap:1.25rem;justify-content:center;align-items:stretch;">
 
       <?php if (feature_enabled('donations')): ?>
@@ -130,11 +130,12 @@ if ($slug) {
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem 1.75rem;flex:1;min-width:220px;max-width:280px;display:flex;flex-direction:column;align-items:center;gap:1rem;">
         <div style="font-size:2rem;">❤️</div>
         <h3 style="margin:0;font-size:1.05rem;">Направи дарение</h3>
-        <p style="margin:0;font-size:.88rem;color:var(--text-muted);text-align:center;">Подкрепете директно децата и програмите на фондацията.</p>
+        <p style="margin:0;font-size:.88rem;color:var(--text-muted);text-align:center;">Подкрепете пряко работата ни.</p>
         <a href="/donation/" class="btn btn--primary" style="margin-top:auto;width:100%;text-align:center;justify-content:center;">Дари сега</a>
       </div>
       <?php endif; ?>
 
+      <?php if (module_enabled_with_needs('shop')): ?>
       <!-- Shop -->
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem 1.75rem;flex:1;min-width:220px;max-width:280px;display:flex;flex-direction:column;align-items:center;gap:1rem;">
         <div style="font-size:2rem;">🛍️</div>
@@ -142,6 +143,7 @@ if ($slug) {
         <p style="margin:0;font-size:.88rem;color:var(--text-muted);text-align:center;">Купете продукт от нашия магазин и помогнете за финансирането на програмите ни.</p>
         <a href="/magazin/" class="btn btn--outline" style="margin-top:auto;width:100%;text-align:center;justify-content:center;">Към магазина</a>
       </div>
+      <?php endif; ?>
 
       <!-- Partner -->
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem 1.75rem;flex:1;min-width:220px;max-width:280px;display:flex;flex-direction:column;align-items:center;gap:1rem;">
@@ -156,7 +158,8 @@ if ($slug) {
 </section>
 
 <?php
-    require $_SERVER['DOCUMENT_ROOT'] . '/templates/comments.php';
+    // Comments are part of „Коментари и отзиви“ (Admin → Модули).
+    if (module_enabled_with_needs('comments_reviews')) require $_SERVER['DOCUMENT_ROOT'] . '/templates/comments.php';
     require $_SERVER['DOCUMENT_ROOT'] . '/templates/footer.php';
     exit;
 }
@@ -172,7 +175,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
   <div class="container">
     <span class="section-label">Новини</span>
     <h1>Новини и истории</h1>
-    <p class="lead" style="margin-top:1rem;">Следете работата ни и историите на децата, които подкрепяме.</p>
+    <p class="lead" style="margin-top:1rem;">Новини и истории от нашата работа.</p>
   </div>
 </section>
 

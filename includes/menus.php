@@ -28,6 +28,7 @@ function path_map_builtin(): array
         '/checkout'                  => '/en/checkout',
         '/donation'                  => '/en/donation',
         '/campaign'                  => '/en/campaign',
+        '/sabitiya'                  => '/en/events',
         '/politika-za-poveritelnost' => '/en/privacy-policy',
         '/politika-za-biskvitki'     => '/en/cookie-policy',
         '/pravna-informaciya'        => '/en/legal',
@@ -39,6 +40,9 @@ function path_map_builtin(): array
     // take part in longest-match path switching either.
     if (function_exists('feature_enabled') && !feature_enabled('campaign')) {
         unset($map['/campaign']);
+    }
+    if (function_exists('feature_enabled') && !feature_enabled('events')) {
+        unset($map['/sabitiya']);
     }
     uksort($map, fn($a, $b) => strlen($b) - strlen($a));
     return $map;

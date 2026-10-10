@@ -100,6 +100,15 @@ ErrorDocument 503 /errors/503.php
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^en/news/([^/]+)/?$ /en/news/index.php [L,QSA]
 
+  # Route event slugs to the events handler (module "events")
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^sabitiya/([^/]+)/?$ /sabitiya/index.php [L,QSA]
+
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^en/events/([^/]+)/?$ /en/events/index.php [L,QSA]
+
   # Route product slugs to shop index.php handler
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d

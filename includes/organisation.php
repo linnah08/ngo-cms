@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/url.php';
+require_once __DIR__ . '/modules.php';   // modules_registry(): the optional modules and their switches
 /**
  * Organisation identity that admins can change after installation
  * (admin/organisation.php): name, contacts, bank details, brand, social links.
@@ -24,6 +25,10 @@ function org_fields(): array
         'site_name_en'     => 'SITE_NAME_EN',
         'site_legal_name_bg' => 'SITE_LEGAL_NAME_BG',
         'site_legal_name_en' => 'SITE_LEGAL_NAME_EN',
+        'site_legal_same'  => 'SITE_LEGAL_SAME',   // '1': the name above is also the registered name
+        'site_eik'         => 'SITE_EIK',
+        'site_address'     => 'SITE_ADDRESS',
+        'site_mol'         => 'SITE_MOL',
         'site_email'       => 'SITE_EMAIL',
         'site_phone'       => 'SITE_PHONE',
         'site_iban'        => 'SITE_IBAN',
@@ -45,36 +50,74 @@ function org_fields(): array
         'newsletter_donate_heading_en' => 'NEWSLETTER_DONATE_HEADING_EN',
         'newsletter_donate_text_bg'    => 'NEWSLETTER_DONATE_TEXT_BG',
         'newsletter_donate_text_en'    => 'NEWSLETTER_DONATE_TEXT_EN',
-        'feature_donations' => 'FEATURE_DONATIONS',
-        'feature_campaign'  => 'FEATURE_CAMPAIGN',
-    ];
+        'site_launched'    => 'SITE_LAUNCHED',     // set by „Пусни сайта“ (admin/launch.php), not by the form
+    ] + org_module_fields();
+}
+
+/** Fields the Организация form never posts: module switches and the launch state. */
+function org_system_fields(): array
+{
+    return org_module_fields() + ['site_launched' => 'SITE_LAUNCHED'];
 }
 
 /**
- * Optional modules an admin can switch on and off in Admin → Организация →
- * Модули. Module name (as passed to feature_enabled()) => its org_fields() key
- * plus the copy shown next to the switch.
- *
- * The switch is saved like every other field here, so it wins over the
- * FEATURE_<NAME> constant in site.config.php; that constant is only the initial
- * value until the admin saves the page once.
+ * A Bulgarian ЕИК (9 digits) or БУЛСТАТ (13), with its check digits. Spaces and
+ * a "BG" VAT prefix are allowed and removed. Returns the clean number or null.
  */
-function org_modules(): array
+function org_eik_normalize(string $eik): ?string
 {
-    return [
-        'donations' => [
-            'field' => 'feature_donations',
-            'label' => 'Дарения',
-            'hint'  => 'Ако изключите даренията, от сайта изчезват страницата за дарение, формата за дарение в магазина и бутоните „Дари сега“ под новините.',
-            'off_warning' => 'Изключвате даренията. Страницата за дарение, формата за дарение и бутоните „Дари сега“ ще изчезнат от сайта и посетителите няма да могат да даряват онлайн.',
-        ],
-        'campaign' => [
-            'field' => 'feature_campaign',
-            'label' => 'Кампании',
-            'hint'  => 'Ако изключите кампаниите, от сайта изчезват страниците на кампанията за набиране на средства и връзките към тях.',
-            'off_warning' => 'Изключвате кампаниите. Страниците на кампанията ще изчезнат от сайта и посетителите няма да могат да ги отварят.',
-        ],
-    ];
+    $d = preg_replace('/\s+/', '', strtoupper($eik));
+    if (str_starts_with($d, 'BG')) $d = substr($d, 2);
+    if (!preg_match('/^(\d{9}|\d{13})$/', $d)) return null;
+    $check = static function (array $digits, array $w1, array $w2): int {
+        $sum = 0; foreach ($w1 as $i => $w) $sum += $digits[$i] * $w;
+        $r = $sum % 11;
+        if ($r !== 10) return $r;
+        $sum = 0; foreach ($w2 as $i => $w) $sum += $digits[$i] * $w;
+        $r = $sum % 11;
+        return $r === 10 ? 0 : $r;
+    };
+    $n = array_map('intval', str_split($d));
+    if ($check($n, [1, 2, 3, 4, 5, 6, 7, 8], [3, 4, 5, 6, 7, 8, 9, 10]) !== $n[8]) return null;
+    if (strlen($d) === 13) {
+        $tail = array_slice($n, 8, 4);
+        if ($check($tail, [2, 7, 3, 5], [4, 9, 5, 7]) !== $n[12]) return null;
+    }
+    return $d;
+}
+
+/**
+ * The module switches, feature_<name> => FEATURE_<NAME>, one per module in
+ * modules_registry() (includes/modules.php). Saved by Admin → Модули, not by
+ * the Организация form — org_validate() leaves them out and
+ * org_save_overrides() keeps whatever is saved for them.
+ */
+function org_module_fields(): array
+{
+    $out = [];
+    foreach (array_keys(modules_registry()) as $name) {
+        $out[module_field($name)] = 'FEATURE_' . strtoupper($name);
+    }
+    return $out;
+}
+
+// org_modules() — the old shape of the module list — now lives in includes/modules.php.
+
+/**
+ * Организация fields whose section is hidden because a module it serves is off
+ * (Админ → Модули): the newsletter band colour without Бюлетин, the newsletter
+ * donation box without Бюлетин or Дарения. Their saved values are kept.
+ */
+function org_hidden_fields(): array
+{
+    $hidden = [];
+    $newsletter = module_enabled_with_needs('newsletter');
+    if (!$newsletter) array_push($hidden, 'newsletter_band', 'newsletter_band_color');
+    if (!$newsletter || !module_enabled_with_needs('donations')) {
+        array_push($hidden, 'newsletter_donate_cta', 'newsletter_donate_heading_bg', 'newsletter_donate_heading_en',
+            'newsletter_donate_text_bg', 'newsletter_donate_text_en');
+    }
+    return $hidden;
 }
 
 /**
@@ -99,11 +142,11 @@ function org_legal_name(string $lang = 'bg'): string
  *
  * Reads the FEATURE_<NAME> constant. Its value comes, in order of precedence,
  * from:
- *   1. the switch in Admin → Организация → Модули, saved to
+ *   1. the switch in Admin → Модули (admin/modules.php), saved to
  *      content/organisation.json and defined before site.config.php is loaded
  *      (see includes/organisation.php) — stored as '1' / '0';
  *   2. FEATURE_<NAME> in site.config.php — the initial value until an admin
- *      saves that page;
+ *      saves that page (a new install's wizard writes one for every module);
  *   3. nothing set at all → on, so installs that predate a flag keep working.
  *
  * Costs nothing per call: the JSON file is read once per request by
@@ -119,7 +162,12 @@ function org_legal_name(string $lang = 'bg'): string
 if (!function_exists('feature_enabled')) {
 function feature_enabled(string $name): bool {
     $const = 'FEATURE_' . strtoupper($name);
-    if (!defined($const)) return true;
+    // Never set: on, so a site that updates keeps what it had — except a module
+    // that is new in a release (registry 'unset_default' => false), which a site
+    // gets only when someone switches it on.
+    if (!defined($const)) {
+        return function_exists('module_unset_default') ? module_unset_default($name) : true;
+    }
     $value = constant($const);
     // The admin switch saves '1' / '0'; a hand-edited "false" / "off" means off too.
     if (is_string($value)) return filter_var(trim($value), FILTER_VALIDATE_BOOLEAN);
@@ -244,7 +292,8 @@ function org_url_valid(string $url): bool
 function org_validate(array $in, array $themeKeys): array
 {
     $v = [];
-    foreach (array_keys(org_fields()) as $k) {
+    // Module switches are not part of this form (Admin → Модули saves them).
+    foreach (array_keys(array_diff_key(org_fields(), org_system_fields())) as $k) {
         $v[$k] = is_string($in[$k] ?? null) ? trim($in[$k]) : '';
     }
     $e = [];
@@ -268,6 +317,19 @@ function org_validate(array $in, array $themeKeys): array
             $e[$k] = 'Името е твърде дълго (най-много 150 знака).';
         }
     }
+
+    $v['site_legal_same'] = in_array($v['site_legal_same'], ['1', 'on', 'true'], true) ? '1' : '0';
+
+    if ($v['site_eik'] !== '') {
+        $eik = org_eik_normalize($v['site_eik']);
+        if ($eik === null) {
+            $e['site_eik'] = 'Този ЕИК не е правилен — трябва да е 9 цифри (13 за БУЛСТАТ) и вероятно има сгрешена цифра. Препишете го от регистрацията на организацията.';
+        } else {
+            $v['site_eik'] = $eik;
+        }
+    }
+    if (mb_strlen($v['site_address']) > 250) $e['site_address'] = 'Адресът е твърде дълъг (най-много 250 знака).';
+    if (mb_strlen($v['site_mol']) > 150)     $e['site_mol'] = 'Името е твърде дълго (най-много 150 знака).';
 
     if (filter_var($v['site_email'], FILTER_VALIDATE_EMAIL) === false) {
         $e['site_email'] = 'Моля, въведете правилен имейл адрес, например info@vashata-organizacia.bg';
@@ -336,22 +398,6 @@ function org_validate(array $in, array $themeKeys): array
     // Same for the newsletter donate box — off unless ticked.
     $v['newsletter_donate_cta'] = ($in['newsletter_donate_cta'] ?? '') === '1' ? '1' : '0';
 
-    // Module switches: same explicit '1' / '0' as the banner, so "off" is saved
-    // and wins over FEATURE_<NAME> in site.config.php. Anything other than the
-    // checkbox's own value is refused instead of being guessed at.
-    foreach (org_modules() as $mod) {
-        $k   = $mod['field'];
-        $raw = $in[$k] ?? null;
-        if ($raw === null) {
-            $v[$k] = '0';
-        } elseif ($raw === '1') {
-            $v[$k] = '1';
-        } else {
-            $v[$k] = '0';
-            $e[$k] = 'Невалидна стойност за „' . $mod['label'] . '“. Презаредете страницата и опитайте отново.';
-        }
-    }
-
     foreach (['launch_banner_bg' => 'на български', 'launch_banner_en' => 'на английски'] as $k => $lang) {
         if (mb_strlen($v[$k]) > 200) {
             $e[$k] = "Съобщението {$lang} е твърде дълго (най-много 200 знака).";
@@ -370,18 +416,32 @@ function org_validate(array $in, array $themeKeys): array
         }
     }
 
+    // Sections the page hides because their module is off are not posted:
+    // leave them out, so org_save_overrides() keeps what is saved for them.
+    foreach (org_hidden_fields() as $k) unset($v[$k], $e[$k]);
     return ['values' => $v, 'errors' => $e];
 }
 
 // ── Saving ─────────────────────────────────────────────────────────────────────
 
-/** Atomically write the overrides file (write temp + rename). */
+/**
+ * Atomically write the overrides file (write temp + rename).
+ *
+ * Fields missing from $values keep what is saved now, so the Организация form
+ * and Admin → Модули can each save their own part without wiping the other's.
+ */
 function org_save_overrides(array $values, ?string $file = null): bool
 {
     $file ??= org_overrides_path();
+    $saved = is_file($file) ? json_decode((string) @file_get_contents($file), true) : null;
+    if (!is_array($saved)) $saved = [];
     $out  = [];
     foreach (array_keys(org_fields()) as $k) {
-        if (isset($values[$k]) && is_string($values[$k])) $out[$k] = $values[$k];
+        if (isset($values[$k]) && is_string($values[$k])) {
+            $out[$k] = $values[$k];
+        } elseif (isset($saved[$k]) && is_string($saved[$k])) {
+            $out[$k] = $saved[$k];
+        }
     }
     $json = json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     if ($json === false) return false;

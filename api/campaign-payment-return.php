@@ -12,15 +12,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/process_payment.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DocumentGenerator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DonationCertGenerator.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/TicketGenerator.php';
 define('ICEBREAKER_VARIANT_ID', 8);
 start_session();
-
-// Campaign module switched off for this install — the page does not exist.
-if (!feature_enabled('campaign')) {
-    require $_SERVER['DOCUMENT_ROOT'] . '/errors/404.php';
-    exit;
-}
 
 $pdo           = get_pdo();
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_documents.php';
@@ -31,6 +24,19 @@ if (!preg_match('/^CP-\d{8}-[A-F0-9]{4}$/i', $pledge_number)) {
     header('Location: /');
     exit;
 }
+
+// Tickets belong to the events module now. A ticket bought through the
+// campaign before the update comes back here; its own return address takes it
+// from there (and answers for the events module being on or off).
+$is_ticket = $pdo->prepare("SELECT 1 FROM campaign_pledges WHERE pledge_number = ? AND pledge_type = 'ticket'");
+$is_ticket->execute([$pledge_number]);
+if ($is_ticket->fetchColumn()) {
+    header('Location: /api/event-payment-return.php?' . http_build_query(array_intersect_key($_GET, array_flip(['pledge', 'retry', 'mdOrder', 'orderId']))));
+    exit;
+}
+
+// Module switched off in Admin → Модули — the page does not exist (site's 404).
+module_public_guard('campaign');
 
 $stmt = $pdo->prepare('SELECT * FROM campaign_pledges WHERE pledge_number = ?');
 $stmt->execute([$pledge_number]);
@@ -130,18 +136,8 @@ function process_campaign_dsk_result(PDO $pdo, array $pledge, string $dskOrderId
 
             reduce_icebreaker_stock($pdo, $pledge);
 
-            $is_ticket = ($pledge['pledge_type'] ?? 'donation') === 'ticket';
-
-            if ($is_ticket) {
-                // Generate one ticket PDF per quantity
-                $qty = max(1, (int)($pledge['ticket_qty'] ?? 1));
-                for ($i = 0; $i < $qty; $i++) {
-                    generate_campaign_ticket($pdo, $pledge, $i + 1, $qty);
-                }
-            } else {
-                // Generate donation certificate
-                generate_campaign_cert($pdo, $pledge);
-            }
+            // Generate donation certificate
+            generate_campaign_cert($pdo, $pledge);
 
             // Reload pledge with generated doc data
             $updated = $pdo->prepare('SELECT * FROM campaign_pledges WHERE id=?');
@@ -149,47 +145,18 @@ function process_campaign_dsk_result(PDO $pdo, array $pledge, string $dskOrderId
             $pledge = $updated->fetch() ?: $pledge;
 
             $_pledge_lang = $pledge['lang'] ?? 'bg';
-            if ($is_ticket) {
-                // Attach all generated ticket PDFs (one per quantity)
-                $ticket_attachments = [];
-                $qty = max(1, (int)($pledge['ticket_qty'] ?? 1));
-                $ticket_paths = json_decode($pledge['ticket_path'] ?? '', true);
-                if (!is_array($ticket_paths)) {
-                    // Legacy single path
-                    $ticket_paths = $pledge['ticket_path'] ? [$pledge['ticket_path']] : [];
-                }
-                foreach ($ticket_paths as $i => $rel_path) {
-                    $ticket_file = $_SERVER['DOCUMENT_ROOT'] . $rel_path;
-                    if (file_exists($ticket_file)) {
-                        $n = $i + 1;
-                        $ticket_attachments[] = [
-                            'path' => $ticket_file,
-                            'name' => 'ticket-' . $pledge['pledge_number'] . ($qty > 1 ? "-{$n}" : '') . '.pdf',
-                        ];
-                    }
-                }
-                send_order_mail(
-                    pledge_ensure_order_row($pdo, $pledge),
-                    $pledge['email'],
-                    render_email_subject('campaign-ticket', $_pledge_lang, ['event_name' => setting_get('event_name', 'събитието'), 'pledge_number' => $pledge['pledge_number']]),
-                    render_email('campaign-ticket', ['pledge' => $pledge, 'lang' => $_pledge_lang]),
-                    ['template_key' => 'campaign-ticket', 'attachments' => $ticket_attachments]
-                );
-            } else {
-                // Send donation confirmation email
-                send_order_mail(
-                    pledge_ensure_order_row($pdo, $pledge),
-                    $pledge['email'],
-                    render_email_subject('campaign-confirmation', $_pledge_lang, ['name' => $pledge['name'], 'pledge_number' => $pledge['pledge_number']]),
-                    render_email('campaign-confirmation', ['pledge' => $pledge, 'lang' => $_pledge_lang]),
-                    ['template_key' => 'campaign-confirmation']
-                );
-            }
+            send_order_mail(
+                pledge_ensure_order_row($pdo, $pledge),
+                $pledge['email'],
+                render_email_subject('campaign-confirmation', $_pledge_lang, ['name' => $pledge['name'], 'pledge_number' => $pledge['pledge_number']]),
+                render_email('campaign-confirmation', ['pledge' => $pledge, 'lang' => $_pledge_lang]),
+                ['template_key' => 'campaign-confirmation']
+            );
 
             // Admin notification
             send_mail(
                 SITE_EMAIL,
-                ($is_ticket ? 'Нов билет' : 'Нов поддръжник') . ' на кампанията — ' . $pledge['pledge_number'],
+                'Нов поддръжник на кампанията — ' . $pledge['pledge_number'],
                 render_email('campaign-admin-notification', ['pledge' => $pledge])
             );
         }
@@ -197,105 +164,6 @@ function process_campaign_dsk_result(PDO $pdo, array $pledge, string $dskOrderId
         // Declined, or the hold was cancelled before the pledge was paid
         $pdo->prepare("UPDATE campaign_pledges SET payment_status='failed' WHERE id=? AND payment_status='pending'")
             ->execute([$pledge['id']]);
-    }
-}
-
-function generate_campaign_ticket(PDO $pdo, array $pledge, int $ticket_num = 1, int $total_qty = 1): void
-{
-    try {
-        // Unique ticket code per ticket: TKT-YYYYMMDD-XXXXXXXX
-        $ticket_code = 'TKT-' . date('Ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
-
-        $year = date('Y');
-        $dir  = $_SERVER['DOCUMENT_ROOT'] . "/documents/tickets/{$year}/";
-        if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
-            error_log("generate_campaign_ticket: cannot create dir {$dir}");
-            return;
-        }
-        $suffix   = $total_qty > 1 ? "-{$ticket_num}" : '';
-        $filename = $ticket_code . '_' . $pledge['pledge_number'] . $suffix . '.pdf';
-        $filepath = $dir . $filename;
-
-        // Per-ticket price (total divided evenly)
-        $price_per_ticket = $total_qty > 1
-            ? round((float)$pledge['amount_eur'] / $total_qty, 2)
-            : (float)$pledge['amount_eur'];
-
-        $order_row = [
-            'name'          => $pledge['name'],
-            'email'         => $pledge['email'],
-            'pledge_number' => $pledge['pledge_number'],
-            'amount_eur'    => $price_per_ticket,
-            'created_at'    => $pledge['created_at'],
-        ];
-        $doc_row = [
-            'ticket_code'  => $ticket_code,
-            'event_name'   => setting_get('event_name',  'Събитие'),
-            'event_date'   => setting_get('event_date',  ''),
-            'event_time'   => setting_get('event_time',  ''),
-            'event_place'  => setting_get('event_place', ''),
-        ];
-
-        $generator = new TicketGenerator();
-        $pdf_bytes = $generator->generate($order_row, [], $doc_row);
-
-        if (file_put_contents($filepath, $pdf_bytes) === false) {
-            error_log("generate_campaign_ticket: file_put_contents failed for {$filepath}");
-            return;
-        }
-
-        $rel_path = "/documents/tickets/{$year}/{$filename}";
-
-        // Append this path to the JSON array stored in ticket_path.
-        // Re-read from DB so concurrent/sequential calls don't overwrite each other.
-        $cur = $pdo->prepare('SELECT ticket_path FROM campaign_pledges WHERE id=?');
-        $cur->execute([$pledge['id']]);
-        $cur_path = (string)($cur->fetchColumn() ?: '');
-        $existing = json_decode($cur_path, true);
-        if (!is_array($existing)) {
-            $existing = $cur_path !== '' ? [$cur_path] : [];
-        }
-        $existing[] = $rel_path;
-        $paths_json = json_encode($existing);
-
-        // Store first ticket's code; append all paths as JSON array
-        $pdo->prepare("UPDATE campaign_pledges SET ticket_code=COALESCE(NULLIF(ticket_code,''),?), ticket_path=? WHERE id=?")
-            ->execute([$ticket_code, $paths_json, $pledge['id']]);
-        // Keep pledge array in sync for the orders insert on last ticket
-        $pledge['ticket_path'] = $paths_json;
-
-        // Insert into orders table on the first ticket only (represents the whole purchase)
-        if ($ticket_num === 1) {
-            $ev_name = setting_get('event_name', 'Билет');
-            $items = [];
-            for ($i = 0; $i < $total_qty; $i++) {
-                $items[] = [
-                    'type'          => 'ticket',
-                    'name'          => $ev_name . ($total_qty > 1 ? ' (' . ($i + 1) . '/' . $total_qty . ')' : ''),
-                    'ticket_code'   => $ticket_code, // will be updated as more generate
-                    'pledge_number' => $pledge['pledge_number'],
-                    'amount_eur'    => $price_per_ticket,
-                ];
-            }
-            $pdo->prepare("
-                INSERT IGNORE INTO orders
-                    (order_number, type, status, customer_name, customer_email,
-                     items, subtotal_eur, shipping_eur, total_eur,
-                     payment_method, payment_status, created_at)
-                VALUES (?, 'ticket', 'confirmed', ?, ?, ?, ?, 0, ?, 'card', 'paid', ?)
-            ")->execute([
-                $pledge['pledge_number'],
-                $pledge['name'],
-                $pledge['email'],
-                json_encode($items),
-                (float)$pledge['amount_eur'],
-                (float)$pledge['amount_eur'],
-                $pledge['created_at'],
-            ]);
-        }
-
-    } catch (Throwable $e) {
-        error_log('generate_campaign_ticket: ' . $e->getMessage());
     }
 }
 
@@ -381,9 +249,7 @@ function generate_campaign_cert(PDO $pdo, array $pledge): void
 
 function reduce_icebreaker_stock(PDO $pdo, array $pledge): void
 {
-    if ($pledge['pledge_type'] === 'ticket') {
-        $qty = max(1, (int)($pledge['ticket_qty'] ?? 1));
-    } elseif (!empty($pledge['reward_id'])) {
+    if (!empty($pledge['reward_id'])) {
         $row = $pdo->prepare('SELECT icebreaker_qty FROM campaign_rewards WHERE id = ?');
         $row->execute([$pledge['reward_id']]);
         $qty = (int)($row->fetchColumn() ?: 0);

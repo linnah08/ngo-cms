@@ -29,10 +29,10 @@ For a non-technical setup on shared cPanel hosting:
 2. In cPanel open **File Manager**, go to your domain's folder (e.g.
    `public_html`), click **Upload**, choose the ZIP, then **Extract** it there.
 3. **Open your website** in a browser. The setup wizard (in Bulgarian) launches automatically.
-4. Pick **“Създай нова база данни”** (create a new database), fill in your
-   organisation's name, contact details and an admin login, and click **Инсталирай**.
-5. When it finishes, delete the `install/` folder (File Manager → select →
-   Delete). Log in at `your-site.org/admin/`.
+4. Follow the six short steps. On cPanel the database is created for you; you
+   only choose an admin login and type the organisation's name.
+5. When it finishes, log in at `your-site.org/admin/`. The wizard locks itself
+   and deletes its own `install/` folder — nothing to remove by hand.
 6. To change the organisation's name, contacts, bank account, colours or logo
    later, open **Организация** in the admin menu — no files need editing.
 
@@ -70,8 +70,10 @@ Each config below is gitignored. Copy the matching `*.example` file and fill it 
 contact details, bank account, social links, Google Analytics/Ads IDs, and
 initial feature toggles (`FEATURE_DONATIONS`, `FEATURE_CAMPAIGN`). Leave any
 analytics ID empty (`''`) to disable that tag entirely. After install, the
-modules are switched on and off in Admin → Организация → Модули, which wins over
-the constants.
+modules are switched on and off in Admin → Модули, which wins over the
+constants. The install wizard asks which modules to use and writes a
+`FEATURE_*` line for every one of them (`modules_registry()` in
+`includes/modules.php` lists them).
 
 ### 3. Create and install the database
 

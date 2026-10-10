@@ -96,6 +96,7 @@ register_shutdown_function(function(): void {
 // and are defined first, so they win over site.config.php (see
 // includes/organisation.php).
 require_once __DIR__ . '/includes/organisation.php';
+require_once __DIR__ . '/includes/modules.php';   // also loaded by organisation.php; here too for a site that kept an older one
 $_org_predefined = org_define_overrides(org_load_overrides());
 if (file_exists(__DIR__ . '/site.config.php')) {
     org_require_config(__DIR__ . '/site.config.php', $_org_predefined);
@@ -107,8 +108,8 @@ unset($_org_predefined);
 // Visual theme presets (brand_themes() / current_theme()).
 require_once __DIR__ . '/includes/themes.php';
 
-// feature_enabled('<module>') lives in includes/organisation.php (loaded above),
-// next to the admin switch that sets it.
+// feature_enabled('<module>') lives in includes/organisation.php (loaded above);
+// the list of optional modules and their guards in includes/modules.php.
 
 /**
  * The phone number where it is shown by choice — header, footer, contact pages
@@ -608,10 +609,26 @@ function format_date(string $date, string $lang = ''): string {
 // ADMIN AUTH
 // ============================================
 
+/**
+ * Which installation an admin session belongs to: derived from this site's own
+ * secret, which a fresh install regenerates. A login left over from an earlier
+ * install on the same address (same session cookie, a new admin with the same
+ * id) is therefore not accepted.
+ */
+function admin_session_site(): string {
+    if (!defined('SETTINGS_ENCRYPTION_KEY') && is_file(__DIR__ . '/db.config.php')) require_once __DIR__ . '/db.config.php';
+    $secret = defined('SETTINGS_ENCRYPTION_KEY') ? (string) SETTINGS_ENCRYPTION_KEY : (defined('DB_NAME') ? (string) DB_NAME : '');
+    return substr(hash_hmac('sha256', 'admin-session', $secret), 0, 32);
+}
+
 function admin_logged_in(): bool {
     if (session_status() === PHP_SESSION_NONE) session_start();
     if (empty($_SESSION[ADMIN_SESSION_NAME])) return false;
     $sess = $_SESSION[ADMIN_SESSION_NAME];
+    if (!hash_equals(admin_session_site(), (string) ($sess['site'] ?? ''))) {
+        unset($_SESSION[ADMIN_SESSION_NAME]);
+        return false;
+    }
     // Check session expiry
     if (time() - ($sess['time'] ?? 0) > ADMIN_SESSION_HOURS * 3600) {
         unset($_SESSION[ADMIN_SESSION_NAME]);
@@ -789,3 +806,8 @@ function variant_gallery(array $pv): array {
 function admin_can_sign(): bool {
     return admin_logged_in() && (admin_user()['email'] ?? '') === SIGNING_ADMIN_EMAIL;
 }
+
+// Going live: a new site is closed to visitors (a "Скоро отваряме" page) until
+// the admin presses „Пусни сайта“ on the dashboard. See includes/launch.php.
+require_once __DIR__ . '/includes/launch.php';
+launch_holding_guard();

@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($section === 'doc_sequence_set') {
             $seq_type = $_POST['seq_type'] ?? '';
             $next_num = (int) ($_POST['next_number'] ?? 0);
-            $valid_types = ['invoice', 'receipt', 'donation_cert'];
+            $valid_types = module_certificates_enabled() ? ['invoice', 'receipt', 'donation_cert'] : ['invoice', 'receipt'];
             if (!in_array($seq_type, $valid_types, true)) {
                 $errors[] = 'Невалиден тип документ.';
             } elseif ($next_num < 1) {
@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // ── Document sequence: reset to 0 ─────────────────────────────────────
         if ($section === 'doc_sequence_reset') {
             $seq_type = $_POST['seq_type'] ?? '';
-            $valid_types = ['invoice', 'receipt', 'donation_cert'];
+            $valid_types = module_certificates_enabled() ? ['invoice', 'receipt', 'donation_cert'] : ['invoice', 'receipt'];
             if (in_array($seq_type, $valid_types, true)) {
                 $pdo->prepare('UPDATE document_sequences SET last_number = 0 WHERE type = ?')
                     ->execute([$seq_type]);
@@ -248,7 +248,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       <?php if (setting_is_set('dsk_merchant')): ?>
         <span class="badge badge--published">Конфигуриран</span>
       <?php else: ?>
-        <span class="badge badge--draft">Не е конфигуриран</span>
+        <span class="badge badge--draft">Не е нужен — ползва се безплатната версия</span>
       <?php endif; ?>
       <?php if (setting_get('dsk_enabled', '0') === '1'): ?>
         <span class="badge badge--published">Активен</span>
@@ -378,11 +378,11 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
 <!-- ── TinyMCE ─────────────────────────────────────────────────────────────────── -->
 <section class="admin-card" style="margin-bottom:2rem;">
-  <h2 class="admin-card__title">TinyMCE (редактор на статии)</h2>
+  <h2 class="admin-card__title">Редактор на текстове (TinyMCE) <span style="font-weight:400;font-size:.85rem;color:var(--text-muted);">— по желание</span></h2>
   <p class="admin-meta" style="margin-bottom:1.25rem;">
-    Използва се за rich-text редактиране на статии.<br>
-    Вземете безплатен API ключ от <a href="https://www.tiny.cloud/" target="_blank" rel="noopener">tiny.cloud</a>.
-    Регистрирайте домейна <strong><?= h((string) url_host(SITE_URL)) ?></strong> и домейна на вашата администрация в Tiny Cloud.
+    Редакторът работи и без ключ — нищо не е нужно да правите тук.<br>
+    Ако организацията ви има платен план в <a href="https://www.tiny.cloud/" target="_blank" rel="noopener">tiny.cloud</a> (например за допълнителни функции),
+    поставете ключа и регистрирайте домейна <strong><?= h((string) url_host(SITE_URL)) ?></strong> там.
   </p>
 
   <form method="post">
@@ -466,6 +466,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <?php endif; ?>
 </section>
 
+<?php // Only while „Социални мрежи“ is on (Admin → Модули); the key stays saved. ?>
+<?php if (module_enabled_with_needs('social')): ?>
 <!-- ── Buffer ─────────────────────────────────────────────────────────────────── -->
 <section class="admin-card" style="margin-bottom:2rem;">
   <h2 class="admin-card__title">Buffer (Социални мрежи)</h2>
@@ -523,6 +525,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <?php endif; ?>
   </div>
 </section>
+<?php endif; ?>
 
 <!-- ── Spam filter ────────────────────────────────────────────────────────────── -->
 <section class="admin-card" style="margin-bottom:2rem;">
@@ -587,6 +590,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   </form>
 </section>
 
+<?php if (module_enabled_with_needs('social')): ?>
 <script>
 document.getElementById('bufferConnectBtn').addEventListener('click', async function() {
   var btn     = this;
@@ -634,6 +638,7 @@ document.getElementById('bufferConnectBtn').addEventListener('click', async func
   spinner.style.display = 'none';
 });
 </script>
+<?php endif; ?>
 
 <style>
 .pwd-toggle {
@@ -661,6 +666,7 @@ $seq_labels = [
     'receipt'       => 'Електронни бележки',
     'donation_cert' => 'Сертификати за дарение',
 ];
+if (!module_certificates_enabled()) unset($seq_labels['donation_cert']);   // Админ → Модули
 $seq_formats = [
     'invoice'       => '0000000001 (10 цифри)',
     'receipt'       => '0000000001 (10 цифри)',

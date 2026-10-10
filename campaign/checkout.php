@@ -9,11 +9,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
 start_session();
 
-// Campaign module switched off for this install — the page does not exist.
-if (!feature_enabled('campaign')) {
-    require $_SERVER['DOCUMENT_ROOT'] . '/errors/404.php';
-    exit;
-}
+// Module switched off in Admin → Модули — the page does not exist (site's 404).
+module_public_guard('campaign');
 
 // Must be POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -35,32 +32,24 @@ if (setting_get('campaign_active', '0') !== '1') {
 $pdo    = get_pdo();
 $errors = [];
 
-// ── Detect pledge type ────────────────────────────────────────────────────────
-$pledge_type_raw = trim($_POST['pledge_type'] ?? 'donation');
-$pledge_type     = in_array($pledge_type_raw, ['donation', 'ticket'], true) ? $pledge_type_raw : 'donation';
-$is_ticket       = $pledge_type === 'ticket';
 $lang_raw        = trim($_POST['lang'] ?? 'bg');
 $pledge_lang     = in_array($lang_raw, ['bg', 'en'], true) ? $lang_raw : 'bg';
 
-// ── Validate inputs ───────────────────────────────────────────────────────────
-$name      = trim($_POST['name']      ?? '');
-$email     = trim($_POST['email']     ?? '');
-$reward_id = (int)($_POST['reward_id'] ?? 0);
-
-// For tickets, lock amount to configured price × qty; for donations, take POST value
-if ($is_ticket) {
-    $ev_price   = (float)(setting_get('event_ticket_price', '0') ?: '0');
-    $ticket_qty = max(1, min(10, (int)($_POST['ticket_qty'] ?? 1)));
-    $amount_eur = round($ev_price * $ticket_qty, 2);
-    if ($ev_price < 1) {
-        $_SESSION['campaign_error'] = 'Билетите не са конфигурирани. Моля, свържете се с нас.';
-        header('Location: /campaign/');
-        exit;
-    }
-} else {
-    $ticket_qty = 1;
-    $amount_eur = round((float)($_POST['amount_eur'] ?? 0), 2);
+// Tickets are sold by the events module now (/sabitiya/). A ticket form from a
+// page cached before the update lands on the events list instead.
+if (($_POST['pledge_type'] ?? '') === 'ticket') {
+    header('Location: ' . ($pledge_lang === 'en' ? '/en/events/' : '/sabitiya/'));
+    exit;
 }
+$pledge_type = 'donation';
+$is_ticket   = false;
+
+// ── Validate inputs ───────────────────────────────────────────────────────────
+$name       = trim($_POST['name']      ?? '');
+$email      = trim($_POST['email']     ?? '');
+$reward_id  = (int)($_POST['reward_id'] ?? 0);
+$ticket_qty = 1;
+$amount_eur = round((float)($_POST['amount_eur'] ?? 0), 2);
 
 if ($name === '')                      $errors[] = 'Моля, въведете вашето име.';
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Моля, въведете валиден имейл адрес.';
@@ -69,6 +58,9 @@ if ($amount_eur > 100000)              $errors[] = 'Сумата е твърде
 
 // Validate reward exists if one was selected (donations only)
 $reward = null;
+// Rewards go through the shop's checkout: with „Магазин“ off a reward_id is
+// ignored and the pledge is plain support, paid straight away.
+if (!module_enabled_with_needs('shop')) $reward_id = 0;
 if (!$is_ticket && $reward_id > 0) {
     $reward = $pdo->prepare("SELECT * FROM campaign_rewards WHERE id=? AND active=1");
     $reward->execute([$reward_id]);

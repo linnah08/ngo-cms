@@ -20,12 +20,12 @@ function _email_tpl_defaults(): array {
             'intro_bg'   => '<h2>Благодарим за твоята подкрепа!</h2>'
                           . '<p>Здравей, {{name}},</p>'
                           . '<p>Получихме успешно твоята подкрепа за кампанията. Ти си невероятен!</p>',
-            'outro_bg'   => '<p>Твоят принос директно помага на децата от програмата на нашата фондация.</p>',
+            'outro_bg'   => '<p>Твоят принос ни помага да продължим работата си.</p>',
             'subject_en' => 'Thank you! Your support for our campaign — {{pledge_number}}',
             'intro_en'   => '<h2>Thank you for your support!</h2>'
                           . '<p>Hello {{name}},</p>'
                           . '<p>We have successfully received your support for our campaign. You are amazing!</p>',
-            'outro_en'   => '<p>Your contribution directly helps the children in our foundation’s programme.</p>',
+            'outro_en'   => '<p>Your contribution helps us continue our work.</p>',
         ],
 
         'campaign-ticket' => [
@@ -33,12 +33,12 @@ function _email_tpl_defaults(): array {
             'intro_bg'   => '<h2>Твоят билет за {{event_name}}!</h2>'
                           . '<p>Здравей, {{name}},</p>'
                           . '<p>Твоята покупка е потвърдена. Намираш билета си в прикачения PDF файл. Моля, представи го (на хартия или на екран) при влизане на събитието.</p>',
-            'outro_bg'   => '<p>Ще се видим скоро! Благодарим, че подкрепяш децата от програмата на нашата фондация.</p>',
+            'outro_bg'   => '<p>Ще се видим скоро! Благодарим, че ни подкрепяш.</p>',
             'subject_en' => 'Your ticket for {{event_name}} — {{pledge_number}}',
             'intro_en'   => '<h2>Your ticket for {{event_name}}!</h2>'
                           . '<p>Hello {{name}},</p>'
                           . '<p>Your purchase is confirmed. Your ticket is attached as a PDF. Please present it (printed or on screen) when entering the event.</p>',
-            'outro_en'   => '<p>See you soon! Thank you for supporting the children in our foundation’s programme.</p>',
+            'outro_en'   => '<p>See you soon! Thank you for supporting us.</p>',
         ],
 
         'order-confirmation-customer' => [

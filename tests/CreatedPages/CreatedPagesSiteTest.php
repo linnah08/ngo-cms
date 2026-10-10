@@ -42,13 +42,13 @@ final class CreatedPagesSiteTest extends CreatedPagesTestCase
     public function testMenusHideOnlyLinksToDraftsAndDeletedPages(): void
     {
         $this->storyPage('draft');
-        $this->putPage(['id' => 'p_live0000', 'status' => 'published', 'slug_bg' => 'sabitiya', 'slug_en' => 'events']);
+        $this->putPage(['id' => 'p_live0000', 'status' => 'published', 'slug_bg' => 'nashi-sabitiya', 'slug_en' => 'our-events']);
         $gone = $this->putPage(['id' => 'p_gone0000', 'status' => 'published', 'slug_bg' => 'iztrita-stranitsa', 'slug_en' => 'deleted-page']);
         $this->assertTrue(cpage_delete($gone['id']));
         $items = [
             0 => ['label' => 'Draft',      'url' => '/nashata-istoriya/'],
             1 => ['label' => 'Draft EN',   'url' => '/en/our-story'],
-            2 => ['label' => 'Published',  'url' => '/sabitiya/'],
+            2 => ['label' => 'Published',  'url' => '/nashi-sabitiya/'],
             3 => ['label' => 'Deleted',    'url' => '/iztrita-stranitsa/'],
             4 => ['label' => 'Built-in',   'url' => '/za-nas/'],
             5 => ['label' => 'Shop',       'url' => '/magazin/'],
@@ -57,7 +57,7 @@ final class CreatedPagesSiteTest extends CreatedPagesTestCase
             8 => ['label' => 'Anchor',     'url' => '#donate'],
             9 => ['label' => 'Home',       'url' => '/'],
             10 => ['label' => 'EN home',   'url' => '/en/'],
-            11 => ['label' => 'Query',     'url' => '/sabitiya/?a=1#b'],
+            11 => ['label' => 'Query',     'url' => '/nashi-sabitiya/?a=1#b'],
             12 => ['label' => 'Redirected', 'url' => '/about/'],
             13 => 'not an item',
             14 => ['label' => 'Deleted EN', 'url' => '/en/deleted-page/'],
@@ -73,11 +73,11 @@ final class CreatedPagesSiteTest extends CreatedPagesTestCase
 
     public function testAnAddressOfADeletedPageWorksAgainForANewPage(): void
     {
-        $gone = $this->putPage(['id' => 'p_gone0000', 'status' => 'published', 'slug_bg' => 'sabitiya', 'slug_en' => 'events']);
+        $gone = $this->putPage(['id' => 'p_gone0000', 'status' => 'published', 'slug_bg' => 'nashi-sabitiya', 'slug_en' => 'our-events']);
         cpage_delete($gone['id']);
-        $this->assertSame([], menu_public_items([['label' => 'x', 'url' => '/sabitiya/']]));
-        $this->putPage(['id' => 'p_new00000', 'status' => 'published', 'slug_bg' => 'sabitiya', 'slug_en' => 'events']);
-        $this->assertCount(1, menu_public_items([['label' => 'x', 'url' => '/sabitiya/']]));
+        $this->assertSame([], menu_public_items([['label' => 'x', 'url' => '/nashi-sabitiya/']]));
+        $this->putPage(['id' => 'p_new00000', 'status' => 'published', 'slug_bg' => 'nashi-sabitiya', 'slug_en' => 'our-events']);
+        $this->assertCount(1, menu_public_items([['label' => 'x', 'url' => '/nashi-sabitiya/']]));
     }
 
     public function testPublishingAPageShowsItsMenuLink(): void

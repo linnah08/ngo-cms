@@ -12,6 +12,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DocumentGenerator.
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DonationCertGenerator.php';
 
 admin_require_shop();
+module_admin_guard('donations');
 
 $pdo    = get_pdo();
 $errors = [];
@@ -35,8 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $payment_method = in_array($_POST['payment_method'] ?? '', ['card', 'bank_transfer', 'cod'], true)
                          ? $_POST['payment_method'] : 'bank_transfer';
     $donation_date = trim($_POST['donation_date'] ?? date('Y-m-d'));
-    $recipient     = in_array($_POST['recipient'] ?? '', ['foundation', 'iris'], true)
-                         ? $_POST['recipient'] : 'foundation';
+    $recipient     = 'foundation';   // one purpose per site: DONATION_PURPOSE_BG/EN in site.config
 
     if ($donor_type === 'individual' && $donor_name === '') {
         $errors[] = 'Моля, въведете пълно име на дарителя.';
@@ -306,22 +306,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
           $methods = ['bank_transfer' => 'Банков превод', 'card' => 'Банкова карта', 'cod' => 'В брой'];
           foreach ($methods as $val => $label): ?>
             <option value="<?= $val ?>" <?= $pm === $val ? 'selected' : '' ?>><?= $label ?></option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-
-      <!-- Recipient/purpose -->
-      <div class="form-group" style="margin-bottom:1.5rem;">
-        <label class="form-label">Цел на дарението</label>
-        <select name="recipient" class="form-input">
-          <?php
-          $rec = $_POST['recipient'] ?? 'foundation';
-          $purposes = [
-              'foundation' => 'За дейността и програмите на ' . SITE_NAME_BG . ',',
-              'iris'       => 'За биофийдбек, невробийдбек и сензорни терапии — ЦСРИ Ирис',
-          ];
-          foreach ($purposes as $val => $label): ?>
-            <option value="<?= $val ?>" <?= $rec === $val ? 'selected' : '' ?>><?= $label ?></option>
           <?php endforeach; ?>
         </select>
       </div>

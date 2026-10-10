@@ -437,6 +437,26 @@ function home_file(): string {
 }
 
 /**
+ * Built-in sections a new front page starts with switched off.
+ *
+ * A site set up by the install wizard (HOME_START_MINIMAL in site.config.php)
+ * starts with just the banner and the blocks of the modules it uses — the shop
+ * and campaign blocks show only while their module is on, and the donation
+ * call-to-action only while Дарения is. The rest (numbers, centres, mission,
+ * news, partners) waits, switched off, in Admin → Начална страница.
+ * Older sites keep their full default page, minus what their theme lists.
+ */
+function home_start_hidden(?bool $minimal = null): array {
+    $minimal ??= defined('HOME_START_MINIMAL') && HOME_START_MINIMAL;
+    if ($minimal) {
+        $hidden = ['impact', 'centres', 'mission', 'news', 'partners'];
+        if (!module_enabled_with_needs('donations')) $hidden[] = 'cta';
+        return $hidden;
+    }
+    return function_exists('current_theme') ? (array) (current_theme()['home_start_hidden'] ?? []) : [];
+}
+
+/**
  * The default front page, built from what the site shows today: saved values in
  * pages.json['home'] first, then the strings.json defaults, then the old hard-coded text.
  * Every section starts visible, except the built-in types the active theme lists under
@@ -444,7 +464,7 @@ function home_file(): string {
  * @param ?array $start_hidden types to start hidden; defaults to the theme's list (tests pass their own).
  */
 function home_seed(array $home, array $sbg, array $sen, ?array $start_hidden = null): array {
-    $start_hidden ??= function_exists('current_theme') ? (array) (current_theme()['home_start_hidden'] ?? []) : [];
+    $start_hidden ??= home_start_hidden();
     $p = fn(string $key, string $skey = '', string $dbg = '', string $den = ''): array => [
         'bg' => (string) (($home[$key] ?? '') ?: ($skey !== '' ? ($sbg[$skey] ?? '') : '') ?: $dbg),
         'en' => (string) (($home[$key . '_en'] ?? '') ?: ($skey !== '' ? ($sen[$skey] ?? '') : '') ?: $den),
@@ -502,10 +522,10 @@ function home_seed(array $home, array $sbg, array $sen, ?array $start_hidden = n
         ]),
         $sec('partners', ['heading' => $p('section_partners', 'home.partners.title'), 'background' => 'grey']),
         $sec('cta', [
-            'heading'    => $p('cta_heading', '', 'Всяко дете заслужава шанс', 'Every child deserves a chance'),
+            'heading'    => $p('cta_heading', '', 'Подкрепете каузата ни', 'Support our cause'),
             'text'       => $p('cta_body', '',
-                'С вашата подкрепа можем да достигнем до повече деца, да финансираме повече терапии и да изградим по-добро бъдеще за всяко от тях.',
-                'With your support we can reach more children, fund more therapies, and build a better future for each of them.'),
+                'С вашата подкрепа можем да направим повече.',
+                'With your support we can do more.'),
             'btn1_label' => $p('cta_btn_donate', '', 'Дарете сега', 'Donate now'),
             'btn1_url'   => $pair('/donation/', '/en/donation/'),
             'btn2_label' => $p('cta_btn_help', '', 'Как да помогна', 'How to help'),

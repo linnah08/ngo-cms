@@ -281,6 +281,15 @@
 </script>
 
 <!-- ── BG→EN translate helpers (DeepL) — shared by all content edit screens ── -->
+<?php // Only while „Помощ от изкуствен интелект“ is on (Admin → Модули): switched
+      // off, no page gets a ✦ Translate button and nothing calls DeepL. The two
+      // helpers stay defined so a page's own inline handler never throws. ?>
+<?php if (!module_enabled_with_needs('ai_helpers')): ?>
+<script>
+function txEl() {}
+function txField() {}
+</script>
+<?php else: ?>
 <script>
 function _tmGet(el) {
   var ed = el && el.id && window.tinymce ? tinymce.get(el.id) : null;
@@ -396,6 +405,7 @@ document.querySelectorAll('.translate-legal-btn').forEach(function(btn) {
   }).observe(document.body, {childList: true, subtree: true});
 })();
 </script>
+<?php endif; ?>
 <script src="/admin/js/session-guard.js"></script>
 </body>
 </html>

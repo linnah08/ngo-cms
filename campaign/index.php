@@ -4,11 +4,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 start_session();
 
-// Campaign module switched off for this install — the page does not exist.
-if (!feature_enabled('campaign')) {
-    require $_SERVER['DOCUMENT_ROOT'] . '/errors/404.php';
-    exit;
-}
+// Module switched off in Admin → Модули — the page does not exist (site's 404).
+module_public_guard('campaign');
 
 // Redirect if campaign is not active
 if (setting_get('campaign_active', '0') !== '1') {
@@ -41,17 +38,6 @@ $target_eur = (float)(setting_get('campaign_target_eur', '5000') ?: '5000');
 $end_date   = setting_get('campaign_end_date', '');
 $photos     = json_decode(setting_get('campaign_photos', '[]'), true) ?: [];
 
-// Event / ticket settings
-$ev_active  = setting_get('event_active',       '0') === '1';
-$ev_name    = setting_get('event_name',         '');
-$ev_date    = setting_get('event_date',         '');
-$ev_time    = setting_get('event_time',         '');
-$ev_place   = setting_get('event_place',        '');
-$ev_fb_url  = setting_get('event_fb_url',       '');
-$ev_price   = (float)(setting_get('event_ticket_price', '0') ?: '0');
-$ev_desc    = setting_get('event_description',  '');
-$ev_date_fmt = $ev_date ? (new DateTimeImmutable($ev_date))->format($is_en ? 'F j, Y' : 'd.m.Y') : '';
-
 // Budget — pick label_en when available
 $budget_raw = json_decode(setting_get('campaign_budget', '[]'), true) ?: [];
 $budget = array_map(function ($row) use ($is_en) {
@@ -71,7 +57,12 @@ $faq = array_map(function ($row) use ($is_en) {
 }, $faq_raw);
 
 // Rewards — pick title_en/description_en when available
-$rewards_raw = $pdo->query("SELECT * FROM campaign_rewards WHERE active=1 ORDER BY position")->fetchAll();
+// A reward is posted to the backer through the shop's checkout, so rewards are
+// offered only while „Магазин“ is on (Admin → Модули). Plain support and tickets
+// work without it.
+$rewards_raw = module_enabled_with_needs('shop')
+    ? $pdo->query("SELECT * FROM campaign_rewards WHERE active=1 ORDER BY position")->fetchAll()
+    : [];
 $rewards = array_map(function ($r) use ($is_en) {
     $r['title']       = ($is_en && ($r['title_en'] ?? '') !== '') ? $r['title_en'] : $r['title'];
     $r['description'] = ($is_en && ($r['description_en'] ?? '') !== '') ? $r['description_en'] : $r['description'];
@@ -166,7 +157,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
   .reward-grid{grid-template-columns:1fr;}
   .form-card{padding:1.25rem;}
   .campaign-layout{grid-template-columns:1fr!important;}
-  .event-layout{grid-template-columns:1fr!important;}
 }
 </style>
 
@@ -408,127 +398,32 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
   </div><!-- /grid -->
 </div>
 
-<?php if ($ev_active && $ev_name): ?>
 <?php
-  $ev_when = $ev_date_fmt . ($ev_time ? ($is_en ? ', ' : ', ') . $ev_time . ($is_en ? '' : ' ч.') : '');
-  $ev_price_fmt = number_format($ev_price, 2, '.', ' ') . ' EUR';
+// Events with tickets on sale (module "Събития и билети") — shown here so a
+// campaign page keeps pointing visitors at its event. Tickets are bought on
+// the event's own page.
+$_campaign_events = [];
+if (module_enabled_with_needs('events')) {
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/events.php';
+    try { events_adopt_legacy($pdo); $_campaign_events = events_on_sale($pdo); } catch (Throwable $e) { $_campaign_events = []; }
+}
 ?>
-<section style="background:linear-gradient(135deg,#e4f0f5 0%,#f0f9f8 100%);border-top:1px solid #c8e0e8;border-bottom:1px solid #c8e0e8;padding:3.5rem 0;">
+<?php if ($_campaign_events): ?>
+<section aria-labelledby="campaign-events-title" style="background:linear-gradient(135deg,#e4f0f5 0%,#f0f9f8 100%);border-top:1px solid #c8e0e8;border-bottom:1px solid #c8e0e8;padding:2.5rem 0;">
   <div class="container">
-    <div style="display:grid;grid-template-columns:1fr 360px;gap:3rem;align-items:start;" class="event-layout">
-
-      <!-- Event info -->
-      <div>
-        <span style="display:inline-block;font-size:.73rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--teal,#0387A5);margin-bottom:.75rem;">
-          <?= $is_en ? 'Launch event' : 'Събитие по повод' ?>
-        </span>
-        <h2 style="font-size:1.7rem;margin:0 0 1.1rem;line-height:1.25;color:#1a2e2c;"><?= h($ev_name) ?></h2>
-
-        <?php if ($ev_when || $ev_place): ?>
-        <div style="display:flex;flex-direction:column;gap:.55rem;margin-bottom:1.5rem;">
-          <?php if ($ev_when): ?>
-          <div style="display:flex;align-items:center;gap:.6rem;font-size:.95rem;color:#2d5a60;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--teal,#0387A5);"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            <strong><?= h($ev_when) ?></strong>
-          </div>
-          <?php endif; ?>
-          <?php if ($ev_place): ?>
-          <div style="display:flex;align-items:center;gap:.6rem;font-size:.95rem;color:#2d5a60;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--teal,#0387A5);"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            <span><?= h($ev_place) ?></span>
-          </div>
-          <?php endif; ?>
-        </div>
-        <?php endif; ?>
-
-        <?php if ($ev_desc): ?>
-        <div style="font-size:.97rem;line-height:1.8;color:#3d4f50;margin-bottom:1.75rem;"><?= $ev_desc ?></div>
-        <?php endif; ?>
-
-        <?php if ($ev_fb_url): ?>
-        <a href="<?= h($ev_fb_url) ?>" target="_blank" rel="noopener noreferrer"
-           style="display:inline-flex;align-items:center;gap:.5rem;padding:.6rem 1.25rem;background:#1877f2;color:#fff;border-radius:7px;font-weight:600;font-size:.92rem;text-decoration:none;transition:opacity .15s;"
-           onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.313 0 2.686.236 2.686.236v2.97h-1.513c-1.491 0-1.956.93-1.956 1.886v2.267h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/></svg>
-          <?= $is_en ? 'Facebook event' : 'Facebook събитие' ?>
+    <h2 id="campaign-events-title" style="font-size:1.5rem;margin:0 0 1.25rem;"><?= h(t_or('campaign.events.title', 'Ела на събитието', 'Come to the event', $lang)) ?></h2>
+    <ul style="list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:1rem;">
+      <?php foreach ($_campaign_events as $_ev): ?>
+      <li style="background:#fff;border:1px solid #c8e0e8;border-radius:12px;padding:1.15rem 1.25rem;display:flex;flex-direction:column;gap:.4rem;min-width:0;">
+        <strong style="font-size:1.15rem;line-height:1.3;overflow-wrap:anywhere;"><?= h(event_text($_ev, 'title', $lang)) ?></strong>
+        <?php if ($_w = event_when($_ev, $lang)): ?><span><?= h($_w) ?></span><?php endif; ?>
+        <?php if ($_p = event_text($_ev, 'place', $lang)): ?><span style="overflow-wrap:anywhere;"><?= h($_p) ?></span><?php endif; ?>
+        <a href="<?= h(event_url($_ev, $lang)) ?>" class="btn btn--primary" style="margin-top:.5rem;display:inline-flex;align-items:center;justify-content:center;min-height:44px;">
+          <?= h(t_or('campaign.events.buy', 'Купи билет', 'Buy a ticket', $lang)) ?> · <?= h(number_format((float) $_ev['price_eur'], 2, '.', ' ')) ?> EUR
         </a>
-        <?php endif; ?>
-      </div>
-
-      <!-- Ticket purchase form -->
-      <div>
-        <div class="form-card" style="border-color:#b2dbd7;">
-          <div style="text-align:center;margin-bottom:1.25rem;">
-            <span style="font-size:2rem;font-weight:800;color:var(--teal,#0387A5);"><?= $ev_price_fmt ?></span>
-            <div style="font-size:.82rem;color:#6b6560;margin-top:.2rem;"><?= $is_en ? 'per ticket · digital delivery' : 'на билет · изпращане по имейл' ?></div>
-          </div>
-
-          <form method="POST" action="/campaign/checkout.php" id="ticketForm">
-            <?= csrf_field() ?>
-            <input type="hidden" name="pledge_type" value="ticket">
-            <input type="hidden" name="lang" value="<?= $lang ?>">
-
-            <div class="form-field">
-              <label><?= $is_en ? 'Your name' : 'Вашето име' ?></label>
-              <input type="text" name="name" required autocomplete="name"
-                     placeholder="<?= $is_en ? 'First and last name' : 'Собствено и фамилно' ?>">
-            </div>
-
-            <div class="form-field">
-              <label>Email</label>
-              <input type="email" name="email" required autocomplete="email"
-                     placeholder="<?= $is_en ? 'your@email.com' : 'вашият@email.com' ?>">
-            </div>
-
-            <div class="form-field" style="margin-bottom:.75rem;">
-              <label><?= $is_en ? 'Number of tickets' : 'Брой билети' ?></label>
-              <div style="display:flex;align-items:center;gap:.5rem;">
-                <button type="button" onclick="campaignQtyChange(-1)"
-                        style="width:2.2rem;height:2.2rem;border:1.5px solid #d1d5db;border-radius:6px;background:#f9fafb;font-size:1.2rem;line-height:1;cursor:pointer;font-family:inherit;">−</button>
-                <input type="number" id="campaignTicketQty" name="ticket_qty" value="1" min="1" max="10"
-                       style="width:3.5rem;text-align:center;padding:.45rem .5rem;border:1.5px solid #d1d5db;border-radius:6px;font-size:1rem;font-family:inherit;"
-                       oninput="campaignQtySync()">
-                <button type="button" onclick="campaignQtyChange(1)"
-                        style="width:2.2rem;height:2.2rem;border:1.5px solid #d1d5db;border-radius:6px;background:#f9fafb;font-size:1.2rem;line-height:1;cursor:pointer;font-family:inherit;">+</button>
-                <span style="margin-left:.5rem;font-size:.9rem;color:#6b6560;">
-                  <?= $is_en ? '× ' : '× ' ?><span style="font-weight:600;"><?= number_format($ev_price, 2, '.', ' ') ?> EUR</span>
-                </span>
-              </div>
-            </div>
-
-            <div style="display:flex;align-items:center;justify-content:space-between;background:#f0fafe;border:1.5px solid #bae6f7;border-radius:10px;padding:.7rem 1rem;margin-bottom:1rem;">
-              <span style="font-size:.88rem;color:#4a5568;"><?= $is_en ? 'Total' : 'Общо' ?></span>
-              <span style="font-size:1.25rem;font-weight:700;color:#0387A5;" id="campaignTicketTotal"><?= number_format($ev_price, 2, '.', ' ') ?> EUR</span>
-            </div>
-
-            <button type="submit" class="btn btn--primary" style="width:100%;padding:.8rem;font-size:1rem;margin-top:.25rem;">
-              <?= $is_en ? 'Buy ticket →' : 'Купи билет →' ?>
-            </button>
-            <p style="font-size:.75rem;color:#9b9590;text-align:center;margin:.65rem 0 0;">
-              <?= $is_en
-                ? 'Payment via DSK Bank. Your ticket will be emailed after payment.'
-                : 'Плащане през DSK Bank. Билетът се изпраща по имейл след плащане.' ?>
-            </p>
-          </form>
-          <script>
-          var _tkPrice = <?= (float)$ev_price ?>;
-          function campaignQtyChange(delta) {
-            var inp = document.getElementById('campaignTicketQty');
-            var v = Math.min(10, Math.max(1, (parseInt(inp.value) || 1) + delta));
-            inp.value = v;
-            campaignQtySync();
-          }
-          function campaignQtySync() {
-            var v = Math.min(10, Math.max(1, parseInt(document.getElementById('campaignTicketQty').value) || 1));
-            document.getElementById('campaignTicketQty').value = v;
-            var total = (_tkPrice * v).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-            document.getElementById('campaignTicketTotal').textContent = total + ' EUR';
-          }
-          </script>
-        </div>
-      </div>
-
-    </div>
+      </li>
+      <?php endforeach; ?>
+    </ul>
   </div>
 </section>
 <?php endif; ?>

@@ -8,19 +8,14 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/auth.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_documents.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DocumentGenerator.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/TicketGenerator.php';
 admin_require_admin();
 
-// Campaign module switched off for this install — the page does not exist.
+// Campaign module switched off in Admin → Модули — says so, with a way back.
 // Deliberately after the auth call: an anonymous request still gets the normal
 // login redirect, so this never becomes an oracle for which modules a site runs.
-if (!feature_enabled('campaign')) {
-    require $_SERVER['DOCUMENT_ROOT'] . '/errors/404.php';
-    exit;
-}
+module_admin_guard('campaign');
 
-$_tinymce_key    = setting_get('tinymce_api_key', 'no-api-key');
-$page_head_extra = '<script src="https://cdn.tiny.cloud/1/' . h($_tinymce_key) . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>';
+$page_head_extra = tinymce_script_tag();
 
 $pdo   = get_pdo();
 $flash = [];
@@ -58,67 +53,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ->execute(array_merge([$newShipped], $ids));
         }
         header('Location: /admin/campaign-backers.php?shipped_ok=1');
-        exit;
-    }
-
-    // Resend ticket email
-    if ($action === 'resend_ticket') {
-        $id = (int)($_POST['pledge_id'] ?? 0);
-        $pledge = $id ? $pdo->prepare('SELECT * FROM campaign_pledges WHERE id=? AND pledge_type=\'ticket\''): null;
-        if ($id) {
-            $stmt = $pdo->prepare("SELECT * FROM campaign_pledges WHERE id=? AND pledge_type='ticket'");
-            $stmt->execute([$id]);
-            $pledge = $stmt->fetch();
-        }
-        if ($pledge && $pledge['payment_status'] === 'paid') {
-            // Regenerate ticket PDF if missing
-            if (empty($pledge['ticket_code']) || empty($pledge['ticket_path']) || !file_exists($_SERVER['DOCUMENT_ROOT'] . ($pledge['ticket_path'] ?? ''))) {
-                $ticket_code = 'TKT-' . date('Ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
-                $year        = date('Y');
-                $dir         = $_SERVER['DOCUMENT_ROOT'] . "/documents/tickets/{$year}/";
-                if (!is_dir($dir)) mkdir($dir, 0755, true);
-                $filename = $ticket_code . '_' . $pledge['pledge_number'] . '.pdf';
-                $filepath = $dir . $filename;
-                $order_row = [
-                    'name'          => $pledge['name'],
-                    'email'         => $pledge['email'],
-                    'pledge_number' => $pledge['pledge_number'],
-                    'amount_eur'    => (float)$pledge['amount_eur'],
-                    'created_at'    => $pledge['created_at'],
-                ];
-                $doc_row = [
-                    'ticket_code'  => $ticket_code,
-                    'event_name'   => setting_get('event_name',  'Събитие'),
-                    'event_date'   => setting_get('event_date',  ''),
-                    'event_time'   => setting_get('event_time',  ''),
-                    'event_place'  => setting_get('event_place', ''),
-                ];
-                $pdf_bytes = (new TicketGenerator())->generate($order_row, [], $doc_row);
-                file_put_contents($filepath, $pdf_bytes);
-                $rel_path = "/documents/tickets/{$year}/{$filename}";
-                $pdo->prepare("UPDATE campaign_pledges SET ticket_code=?, ticket_path=? WHERE id=?")
-                    ->execute([$ticket_code, $rel_path, $pledge['id']]);
-                $pledge['ticket_code'] = $ticket_code;
-                $pledge['ticket_path'] = $rel_path;
-            }
-            // Send email
-            $attachments = [];
-            $ticket_file = $_SERVER['DOCUMENT_ROOT'] . $pledge['ticket_path'];
-            if (file_exists($ticket_file)) {
-                $attachments[] = ['path' => $ticket_file, 'name' => 'ticket-' . $pledge['pledge_number'] . '.pdf'];
-            }
-            $ok = send_order_mail(
-                pledge_ensure_order_row($pdo, $pledge),
-                $pledge['email'],
-                'Твоят билет за ' . setting_get('event_name', 'събитието') . ' — ' . $pledge['pledge_number'],
-                render_email('campaign-ticket', ['pledge' => $pledge]),
-                ['template_key' => 'campaign-ticket', 'attachments' => $attachments]
-            );
-            flash_set($ok ? 'success' : 'error', $ok ? 'Билетът е изпратен отново.' : 'Грешка при изпращане.');
-        } else {
-            flash_set('error', 'Билетът не е намерен или не е платен.');
-        }
-        header('Location: /admin/campaign-backers.php?tab=tickets');
         exit;
     }
 
@@ -186,7 +120,8 @@ if (($_GET['export'] ?? '') === 'csv') {
 }
 
 // ── Load backers ──────────────────────────────────────────────────────────────
-$tab    = in_array($_GET['tab'] ?? '', ['tickets'], true) ? $_GET['tab'] : 'donations';
+// Tickets moved to the events module (Admin → Събития); this page lists campaign donations.
+$tab    = 'donations';
 $filter = $_GET['status'] ?? 'paid';
 $valid_statuses = ['paid','pending','failed','all'];
 $filter = in_array($filter, $valid_statuses, true) ? $filter : 'paid';
@@ -205,11 +140,6 @@ $backers = $pdo->query("
     WHERE 1=1 {$pledge_type_clause} {$status_clause}
     ORDER BY p.created_at DESC
 ")->fetchAll();
-
-$ticket_stats = $pdo->query("
-    SELECT COUNT(*) AS n, COALESCE(SUM(amount_eur),0) AS total
-    FROM campaign_pledges WHERE pledge_type='ticket' AND payment_status='paid'
-")->fetch();
 
 $stats = $pdo->query("
     SELECT payment_status, COUNT(*) AS n, COALESCE(SUM(amount_eur),0) AS total
@@ -259,23 +189,13 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <?php endforeach; ?>
 </div>
 
-<!-- Ticket stats card -->
-<?php if ((int)($ticket_stats['n'] ?? 0) > 0): ?>
-<div style="display:flex;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap;">
-  <div style="background:#e4f0f5;border:1px solid #b2dbd7;border-radius:8px;padding:.85rem 1.1rem;min-width:200px;">
-    <div style="font-size:.72rem;text-transform:uppercase;color:#2d5a60;margin-bottom:.2rem;">Билети продадени</div>
-    <div style="font-size:1.25rem;font-weight:700;color:#0387A5;"><?= (int)$ticket_stats['n'] ?> бр.</div>
-    <div style="font-size:.82rem;color:#2d5a60;"><?= number_format((float)$ticket_stats['total'], 2, '.', ' ') ?> EUR</div>
-  </div>
-</div>
-<?php endif; ?>
-
 <!-- Type + status tabs -->
 <div style="display:flex;gap:.5rem;margin-bottom:.75rem;flex-wrap:wrap;">
   <a href="?tab=donations&status=<?= h($filter) ?>" style="padding:.4rem .9rem;border-radius:20px;font-size:.85rem;text-decoration:none;font-weight:600;
     <?= $tab === 'donations' ? 'background:#1b998b;color:#fff;' : 'background:#f0ede9;color:#444;' ?>">Дарения</a>
-  <a href="?tab=tickets&status=<?= h($filter) ?>" style="padding:.4rem .9rem;border-radius:20px;font-size:.85rem;text-decoration:none;font-weight:600;
-    <?= $tab === 'tickets' ? 'background:#0387A5;color:#fff;' : 'background:#f0ede9;color:#444;' ?>">Билети</a>
+  <?php if (module_admin_page_visible('events.php')): ?>
+  <a href="/admin/events.php" style="padding:.4rem .9rem;border-radius:20px;font-size:.85rem;text-decoration:none;font-weight:600;background:#f0ede9;color:#444;">Билети → „Събития“</a>
+  <?php endif; ?>
 </div>
 <div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1.25rem;">
   <?php foreach (['paid'=>'Платени','pending'=>'Чакащи','failed'=>'Неуспешни','all'=>'Всички'] as $s => $lbl): ?>

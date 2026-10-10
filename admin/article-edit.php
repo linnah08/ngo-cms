@@ -181,8 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $page_title_admin = $is_new ? 'Нова статия' : 'Редактиране: ' . h($article['title'] ?? '');
 $active_nav       = 'articles';
-$tinymce_key     = setting_get('tinymce_api_key', 'no-api-key');
-$page_head_extra  = '<script src="https://cdn.tiny.cloud/1/' . h($tinymce_key) . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>'
+$page_head_extra  = tinymce_script_tag()
                   . '<style>.admin-content{max-width:960px;}</style>';
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
@@ -192,7 +191,8 @@ $edit_date    = $article['date'] ?? date('Y-m-d');
 $edit_scheduled = !$is_new && article_is_scheduled($article, @filemtime(ARTICLES_PATH . '/bg/' . $slug_param . '.json') ?: null);
 $edit_tags    = implode(', ', $article['tags'] ?? []);
 $has_en_version = !empty($article_en);
-$deepl_ready    = deepl_is_configured();
+// Translate buttons only while „Помощ от изкуствен интелект“ is on (Admin → Модули).
+$deepl_ready    = module_enabled_with_needs('ai_helpers') && deepl_is_configured();
 $claude_ready   = claude_is_configured();
 
 $grid_bg   = article_photos_for_editor($article);   // missing files included — they show as such, never drop silently
@@ -202,7 +202,9 @@ $en_caps   = array_column($grid_en, 'caption', 'src');
 
 // ── Content / Social tabs — split so editing an article doesn't require
 // scrolling past FB/Instagram/LinkedIn panels you may not be touching today.
-$tab      = ($_GET['tab'] ?? 'content') === 'social' ? 'social' : 'content';
+// „Социални мрежи“ switched off in Admin → Модули: no Social tab, no badges.
+$social_on = module_enabled_with_needs('social');
+$tab      = $social_on && ($_GET['tab'] ?? 'content') === 'social' ? 'social' : 'content';
 $tab_base = $is_new ? '/admin/article-edit.php' : '/admin/article-edit.php?slug=' . urlencode($slug_param);
 $tab_sep  = $is_new ? '?' : '&';
 
@@ -213,7 +215,7 @@ $li_posted         = !empty($article['linkedin_posted_at']);
 $fb_sched          = !empty($article['fb_scheduled_at']);
 $insta_sched       = !empty($article['insta_scheduled_at']);
 $insta_story_sched = !empty($article['insta_story_scheduled_at']);
-$has_social_badge  = $fb_sched || $insta_sched || $insta_story_sched || $li_scheduled || $li_posted;
+$has_social_badge  = $social_on && ($fb_sched || $insta_sched || $insta_story_sched || $li_scheduled || $li_posted);
 $badge_style       = 'font-size:.75rem;font-weight:600;border-radius:3px;padding:.15rem .5rem;';
 ?>
 
@@ -252,12 +254,14 @@ $badge_style       = 'font-size:.75rem;font-weight:600;border-radius:3px;padding
   </ul>
 <?php endif; ?>
 
+<?php if ($social_on): ?>
 <nav aria-label="Части на статията" style="display:flex;gap:1.75rem;border-bottom:1px solid var(--border);margin-bottom:1.5rem;">
   <a href="<?= h($tab_base . $tab_sep . 'tab=content') ?>"<?= $tab === 'content' ? ' aria-current="page"' : '' ?>
      style="display:inline-flex;align-items:center;min-height:44px;font-size:.9rem;font-weight:600;text-decoration:none;border-bottom:3px solid <?= $tab === 'content' ? 'var(--teal)' : 'transparent' ?>;color:<?= $tab === 'content' ? 'var(--teal)' : 'var(--text-muted)' ?>;">Съдържание</a>
   <a href="<?= h($tab_base . $tab_sep . 'tab=social') ?>"<?= $tab === 'social' ? ' aria-current="page"' : '' ?>
      style="display:inline-flex;align-items:center;min-height:44px;font-size:.9rem;font-weight:600;text-decoration:none;border-bottom:3px solid <?= $tab === 'social' ? 'var(--teal)' : 'transparent' ?>;color:<?= $tab === 'social' ? 'var(--teal)' : 'var(--text-muted)' ?>;">Социални мрежи</a>
 </nav>
+<?php endif; ?>
 
 <?php if ($error): ?>
   <div class="admin-alert admin-alert--error" style="margin-bottom:1.5rem;"><?= h($error) ?></div>
@@ -325,7 +329,7 @@ $badge_style       = 'font-size:.75rem;font-weight:600;border-radius:3px;padding
       <div class="form-group">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.4rem;">
           <label for="tagsInput" style="margin-bottom:0;">Тагове / SEO ключови думи <small style="font-weight:normal;text-transform:none;">(разделени със запетая)</small></label>
-          <?php if ($claude_ready): ?>
+          <?php if ($claude_ready && module_enabled_with_needs('ai_helpers')): ?>
             <button type="button" id="suggestKeywordsBtn" class="btn btn--outline" style="font-size:.8rem;padding:.3rem .7rem;">✦ Предложи ключови думи</button>
           <?php endif; ?>
         </div>

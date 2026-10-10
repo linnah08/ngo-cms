@@ -1,4 +1,6 @@
 <?php
+// Not guarded by the newsletter module: links in emails already sent pass
+// through here, and must keep reaching their page after it is switched off.
 /**
  * Email tracking endpoint.
  *

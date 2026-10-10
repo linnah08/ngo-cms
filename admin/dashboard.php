@@ -9,7 +9,7 @@ admin_require_login();
 $page_title_admin = 'Начало';
 $active_nav       = 'dashboard';
 
-$can_sign      = admin_can_sign();
+$can_sign      = admin_can_sign() && module_certificates_enabled();
 $can_shop      = admin_can_manage_shop();
 $can_editorial = admin_can_editorial();
 $pdo           = get_pdo();
@@ -31,7 +31,7 @@ if (admin_is_admin()) {
 
 // ── Unified moderation inbox: pending comments, reviews & new contacts ──
 $inbox = [];
-if ($can_editorial) {
+if ($can_editorial && module_enabled_with_needs('comments_reviews')) {
     try {
         foreach ($pdo->query("SELECT author_name, content, created_at FROM comments WHERE status='pending' ORDER BY created_at DESC")->fetchAll() as $c) {
             $inbox[] = [
@@ -42,6 +42,8 @@ if ($can_editorial) {
             ];
         }
     } catch (Throwable $e) { /* table may not exist */ }
+}
+if ($can_editorial) {
     try {
         foreach ($pdo->query("SELECT name, message, created_at FROM contact_submissions WHERE status='new' ORDER BY created_at DESC")->fetchAll() as $m) {
             $inbox[] = [
@@ -53,7 +55,7 @@ if ($can_editorial) {
         }
     } catch (Throwable $e) { /* table may not exist */ }
 }
-if ($can_shop) {
+if ($can_shop && module_admin_page_visible('product-reviews.php')) {
     try {
         foreach ($pdo->query("SELECT r.author_name, r.content, r.created_at, r.product_id, p.name_bg AS product_name
                               FROM product_reviews r LEFT JOIN products p ON p.id = r.product_id
@@ -84,7 +86,7 @@ if ($can_sign) {
 
 // ── Paid donations without a cert ────────────────────────────────────────────
 $uncerted_donations = [];
-if ($can_shop) {
+if ($can_shop && module_certificates_enabled()) {
     // Dedicated donation orders AND product orders with a donation add-on line.
     $uncerted_donations = orders_paid_donations_without_cert($pdo);
 }
@@ -173,6 +175,9 @@ if (is_dir($articles_dir)) {
                 $calendar[$d][] = ['ch' => 'web', 'title' => $title, 'time' => 'публикуване', 'slug' => $slug];
             }
         }
+
+        // The rest is social posts — not shown while „Социални мрежи“ is off (Admin → Модули).
+        if (!module_enabled_with_needs('social')) continue;
 
         // Social channels via *_scheduled_at (Europe/Sofia datetime-local strings)
         foreach ([
@@ -264,6 +269,61 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 <div class="admin-page-header">
   <h1>Добре дошли, <?= h($current_user['name'] ?? 'Admin') ?></h1>
 </div>
+
+<?php foreach (flash_get() as $_f): ?>
+<div role="status" style="padding:.85rem 1.1rem;border-radius:8px;margin-bottom:.75rem;font-size:.92rem;<?= $_f['type'] === 'success' ? 'background:#e6f4ea;border:1px solid #a8d5b0;color:#1b5e2a;' : 'background:#fdf0ef;border:1px solid #f0c4c0;color:#7a2318;' ?>"><?= h($_f['message']) ?></div>
+<?php endforeach; ?>
+
+<?php
+// ── Go-live checklist (includes/launch.php) ───────────────────────────────────
+// Until every item is done: before launch it leads to „Пусни сайта“; after,
+// it keeps reminding of what is still missing.
+if (admin_is_admin()):
+    $_launched   = site_launched();
+    $_checklist  = launch_checklist();
+    $_open       = array_values(array_filter($_checklist, fn($i) => !$i['done']));
+    $_req_open   = count(array_filter($_open, fn($i) => $i['required']));
+    if (!$_launched || $_open):
+?>
+<section id="go-live" aria-labelledby="go-live-title" style="background:#fff;border:1px solid var(--border);border-left:4px solid <?= $_req_open ? '#b45309' : 'var(--teal)' ?>;border-radius:8px;padding:1.1rem 1.25rem;margin-bottom:1rem;">
+  <h2 id="go-live-title" style="font-size:1.1rem;margin:0 0 .3rem;">
+    <?= $_launched ? 'Какво още липсва' : 'Преди да пуснете сайта' ?>
+  </h2>
+  <p style="margin:0 0 .9rem;font-size:.9rem;line-height:1.5;color:var(--text-muted);">
+    <?php if (!$_launched): ?>
+      Сайтът още не е отворен за посетители — те виждат страница „Скоро отваряме“, а вие виждате истинския сайт.
+      <?= $_req_open ? 'Изпълнете задължителните задачи, после натиснете „Пусни сайта“.' : 'Всички задължителни задачи са готови — можете да пуснете сайта.' ?>
+    <?php else: ?>
+      <?= $_req_open ? 'Някои неща, които законът изисква, все още липсват.' : 'Сайтът работи. Тези неща не са задължителни, но силно препоръчваме да ги настроите.' ?>
+    <?php endif; ?>
+  </p>
+  <ul style="list-style:none;margin:0;padding:0;display:grid;gap:.4rem;">
+  <?php foreach ($_checklist as $_i): if ($_launched && $_i['done']) continue; ?>
+    <li style="display:flex;gap:.6rem;align-items:flex-start;padding:.55rem .7rem;border-radius:6px;background:<?= $_i['done'] ? '#f3f8f4' : 'var(--warm-grey,#f6f5f2)' ?>;">
+      <span aria-hidden="true" style="flex:0 0 1.3rem;font-weight:700;color:<?= $_i['done'] ? '#2d6a35' : ($_i['required'] ? '#b45309' : '#6b7280') ?>;"><?= $_i['done'] ? '✓' : ($_i['required'] ? '!' : '○') ?></span>
+      <span style="flex:1;min-width:0;font-size:.9rem;line-height:1.45;">
+        <strong><?= h($_i['label']) ?></strong>
+        <span style="font-size:.8rem;color:var(--text-muted);"> — <?= $_i['done'] ? 'готово' : ($_i['required'] ? 'задължително' : 'препоръчително') ?></span>
+        <?php if (!$_i['done']): ?><br><span style="color:var(--text-muted);"><?= h($_i['why']) ?></span><?php endif; ?>
+      </span>
+      <?php if (!$_i['done']): ?>
+      <a href="<?= h($_i['href']) ?>" style="flex:0 0 auto;align-self:center;font-weight:600;font-size:.85rem;color:var(--teal);white-space:nowrap;">Попълнете<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;"> — <?= h($_i['label']) ?></span></a>
+      <?php endif; ?>
+    </li>
+  <?php endforeach; ?>
+  </ul>
+  <?php if (!$_launched): ?>
+  <form method="POST" action="/admin/launch.php" style="margin:1rem 0 0;">
+    <?= csrf_field() ?>
+    <button type="submit" class="btn btn--primary" <?= $_req_open ? 'disabled aria-describedby="go-live-why"' : '' ?>
+            style="min-height:44px;<?= $_req_open ? 'background:#e5e7eb;border-color:#e5e7eb;color:#6b7280;cursor:not-allowed;box-shadow:none;' : '' ?>">Пусни сайта</button>
+    <?php if ($_req_open): ?>
+    <span id="go-live-why" style="margin-left:.6rem;font-size:.85rem;color:var(--text-muted);"><?= h(launch_tasks_left($_req_open)) ?></span>
+    <?php endif; ?>
+  </form>
+  <?php endif; ?>
+</section>
+<?php endif; endif; ?>
 
 <?php if ($mail_not_configured): ?>
 <div role="alert" style="display:flex;flex-wrap:wrap;align-items:center;gap:.75rem 1rem;background:#fdf0ef;border:1px solid #f0c4c0;border-left:4px solid #c0392b;border-radius:8px;padding:.9rem 1.1rem;margin-bottom:.75rem;color:#7a2318;">
@@ -368,6 +428,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <?php endif; ?>
 
   <?php if ($can_shop): ?>
+  <?php if (module_certificates_enabled()): ?>
   <!-- Paid donations without a cert -->
   <div style="flex:1;min-width:0;background:#fff;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;">
     <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.6rem;">
@@ -393,6 +454,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       </div>
     <?php endif; ?>
   </div>
+  <?php endif; ?>
 
   <!-- Physical orders + pledges awaiting shipping -->
   <div style="flex:1;min-width:0;background:#fff;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;">

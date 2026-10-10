@@ -12,13 +12,10 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_shipping.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_email_composer.php';
 admin_require_shop();
 
-// Campaign module switched off for this install — the page does not exist.
+// Campaign module switched off in Admin → Модули — says so, with a way back.
 // Deliberately after the auth call: an anonymous request still gets the normal
 // login redirect, so this never becomes an oracle for which modules a site runs.
-if (!feature_enabled('campaign')) {
-    require $_SERVER['DOCUMENT_ROOT'] . '/errors/404.php';
-    exit;
-}
+module_admin_guard('campaign');
 
 $pdo = get_pdo();
 $id  = (int)($_GET['id'] ?? 0);
@@ -221,8 +218,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$_tinymce_key    = setting_get('tinymce_api_key', 'no-api-key');
-$page_head_extra = '<script src="https://cdn.tiny.cloud/1/' . h($_tinymce_key) . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>';
+$page_head_extra = tinymce_script_tag();
 
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 

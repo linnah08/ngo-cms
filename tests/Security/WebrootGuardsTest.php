@@ -83,6 +83,7 @@ final class WebrootGuardsTest extends TestCase
         'login.php'        => 'the login form itself',
         'login-forgot.php' => 'password reset request, used when locked out',
         'login-reset.php'  => 'password reset form, reached from an emailed link',
+        'install-login.php' => 'one-time login from the install finish screen; needs a single-use 15-minute token',
         'logout.php'       => 'ends the session; nothing to protect',
         'index.php'        => 'redirects to the dashboard or the login form',
         'pin-docroot.php'  => 'auto_prepend helper, sets DOCUMENT_ROOT and stops',

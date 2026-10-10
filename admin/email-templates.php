@@ -9,9 +9,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/auth.php';
 admin_require_admin();
 
-$deepl_ready    = deepl_is_configured();
-$_tinymce_key   = setting_get('tinymce_api_key', 'no-api-key');
-$page_head_extra = '<script src="https://cdn.tiny.cloud/1/' . h($_tinymce_key) . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>';
+// Translate buttons only while „Помощ от изкуствен интелект“ is on (Admin → Модули).
+$deepl_ready    = module_enabled_with_needs('ai_helpers') && deepl_is_configured();
+$page_head_extra = tinymce_script_tag();
 
 // Template meta: key → human label + available {{vars}}
 $templates = [
@@ -72,6 +72,23 @@ $templates = [
 // Ready-made "Имейл до клиента" messages (the composer on the order/pledge page)
 foreach (admin_message_presets() as $_pk => $_pm) {
     $templates[$_pk] = ['label' => $_pm['label'], 'vars' => $_pm['vars']];
+}
+
+// Only the emails this site can send (Админ → Модули). Saved texts stay.
+$_tpl_modules = [
+    'campaign-confirmation' => ['campaign'],
+    'campaign-ticket'       => ['campaign', 'events'],
+    'donation-'             => ['donations'],
+    'order-'                => ['shop'],
+    'credit-note-'          => ['shop'],
+];
+foreach (array_keys($templates) as $_tk) {
+    foreach ($_tpl_modules as $_prefix => $_mods) {
+        if (str_starts_with($_tk, $_prefix) && !module_any_enabled(...$_mods)) unset($templates[$_tk]);
+    }
+}
+foreach (admin_message_presets() as $_pk => $_pm) {
+    if (!module_any_enabled('shop', 'campaign', 'donations')) unset($templates[$_pk]);
 }
 
 // ── POST: save one template ───────────────────────────────────────────────────

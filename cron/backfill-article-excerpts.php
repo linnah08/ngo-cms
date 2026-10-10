@@ -27,6 +27,12 @@ if (empty($_SERVER['DOCUMENT_ROOT'])) {
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/ai_excerpt.php';
 
+// „Помощ от изкуствен интелект“ switched off in Admin → Модули: nothing to do.
+if (!module_enabled_with_needs('ai_helpers')) {
+    echo "The AI helpers module is off (Admin → Модули) — nothing done.\n";
+    exit(0);
+}
+
 $apply   = in_array('--apply', $argv, true);
 $done    = 0;
 $skipped = 0;

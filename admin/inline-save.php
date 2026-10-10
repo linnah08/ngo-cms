@@ -211,6 +211,8 @@ $allowed = [
     ],
     'shop' => [
         'donation_text' => ['donation_text_bg', 'donation_text_en'],
+        'hero_title'    => ['hero_title_bg',    'hero_title_en'],
+        'hero_text'     => ['hero_text_bg',     'hero_text_en'],
     ],
     'donation' => [
         'title' => ['title', 'title_en'],

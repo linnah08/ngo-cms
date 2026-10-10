@@ -30,7 +30,7 @@ final class SessionPingTest extends TestCase
     public function testRefreshUpdatesSessionTime(): void
     {
         $old = time() - 3600;
-        $_SESSION[ADMIN_SESSION_NAME] = [
+        $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(),
             'logged_in' => true,
             'email'     => 'admin@example.org',
             'role'      => 'admin',
@@ -54,7 +54,7 @@ final class SessionPingTest extends TestCase
 
     public function testRefreshPreservesOtherSessionFields(): void
     {
-        $_SESSION[ADMIN_SESSION_NAME] = [
+        $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(),
             'logged_in' => true,
             'email'     => 'admin@example.org',
             'role'      => 'admin',

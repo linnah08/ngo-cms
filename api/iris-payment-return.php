@@ -44,6 +44,9 @@ $failed_url  = shop_path('payment-failed', $order['lang'] ?? 'bg') . '?order=' .
 
 // ── Retry: re-register the same order with IRIS ──────────────────────────────
 if (isset($_GET['retry'])) {
+    // No new payment for a shop order while the shop is switched off (Admin →
+    // Модули). A normal return below is still processed: the money may be taken.
+    if ($order['type'] === 'physical') module_public_guard('shop');
     if ($order['payment_status'] === 'paid') {
         header('Location: ' . $confirm_url);
         exit;

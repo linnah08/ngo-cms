@@ -26,6 +26,7 @@ $page_labels = [
     'legal_privacy' => 'Политика за поверителност',
     'legal_info'    => 'Правна информация',
     'legal_terms'   => 'Условия за ползване',
+    'legal_cookies' => 'Политика за бисквитки',
 ];
 
 $page_urls = [
@@ -40,6 +41,7 @@ $page_urls = [
     'legal_privacy' => '/politika-za-poveritelnost/',
     'legal_info'    => '/pravna-informaciya/',
     'legal_terms'   => '/usloviya/',
+    'legal_cookies' => '/politika-za-biskvitki/',
 ];
 
 $page_title_admin = $page && isset($page_labels[$page])
@@ -312,13 +314,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($section === 'legal') {
         $pages = load_json(CONTENT_PATH . '/pages.json');
         $key   = $_POST['legal_key'] ?? '';
-        if (in_array($key, ['privacy', 'legal_info', 'terms'], true)) {
+        if (in_array($key, ['privacy', 'legal_info', 'terms', 'cookies'], true)) {
             if (!isset($pages['legal'])) $pages['legal'] = [];
-            $pages['legal'][$key]          = $_POST['legal_content']    ?? '';
-            $pages['legal'][$key . '_en']  = $_POST['legal_content_en'] ?? '';
+            // The cookie policy pages read cookie_policy_bg / cookie_policy_en.
+            [$kbg, $ken] = $key === 'cookies' ? ['cookie_policy_bg', 'cookie_policy_en'] : [$key, $key . '_en'];
+            $pages['legal'][$kbg] = $_POST['legal_content']    ?? '';
+            $pages['legal'][$ken] = $_POST['legal_content_en'] ?? '';
             save_json(CONTENT_PATH . '/pages.json', $pages);
-            $legal_page_map = ['privacy' => 'legal_privacy', 'legal_info' => 'legal_info', 'terms' => 'legal_terms'];
-            $legal_as_map   = ['privacy' => 'legal-privacy', 'legal_info' => 'legal-info', 'terms' => 'legal-terms'];
+            $legal_page_map = ['privacy' => 'legal_privacy', 'legal_info' => 'legal_info', 'terms' => 'legal_terms', 'cookies' => 'legal_cookies'];
+            $legal_as_map   = ['privacy' => 'legal-privacy', 'legal_info' => 'legal-info', 'terms' => 'legal-terms', 'cookies' => 'legal-cookies'];
             header('Location: /admin/pages.php?page=' . $legal_page_map[$key] . '&saved=1&_asclear=page:' . $legal_as_map[$key]); exit;
         }
 
@@ -366,13 +370,39 @@ $shop      = $all_pages['shop']        ?? [];
 $donation  = $all_pages['donation']    ?? [];
 $legal     = $all_pages['legal']       ?? [];
 
+/**
+ * „Попълни с примерен текст“ above a legal page's editors: puts the starting
+ * text (includes/legal_templates.php) into both editors, to be read and saved.
+ */
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/legal_templates.php';
+$legal_template_box = function (string $key): string {
+    $tpl = ['bg' => legal_template($key, 'bg'), 'en' => legal_template($key, 'en')];
+    $json = json_encode($tpl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE);
+    return '<div style="background:#f4f9fa;border:1px solid var(--border);border-radius:8px;padding:.9rem 1rem;margin-bottom:1.5rem;font-size:.9rem;line-height:1.55;">'
+         . '<p style="margin:0 0 .6rem;">Нямате текст? Започнете от примерен — съставен е според данните на организацията (Организация) и модулите, които ползвате. '
+         . 'Прочетете го и го допълнете: местата <mark>[в жълто]</mark> трябва да попълните вие. Примерният текст не е правен съвет.</p>'
+         . '<button type="button" class="btn btn--outline" id="legalTemplateBtn" style="min-height:44px;">Попълни с примерен текст</button>'
+         . '<span id="legalTemplateMsg" role="status" style="margin-left:.75rem;color:var(--text-muted);"></span>'
+         . '</div>'
+         . '<script>(function () {'
+         . 'var T = ' . $json . ';'
+         . 'document.getElementById("legalTemplateBtn").addEventListener("click", async function () {'
+         . '  var bg = window.tinymce && tinymce.get("legalBg"), en = window.tinymce && tinymce.get("legalEn");'
+         . '  if (!bg || !en) return;'
+         . '  var has = bg.getContent({format: "text"}).trim() || en.getContent({format: "text"}).trim();'
+         . '  if (has && !(await window._adminConfirm("Сегашният текст на двата езика ще бъде заменен с примерния. Продължаване?", "Замени"))) return;'
+         . '  bg.setContent(T.bg); en.setContent(T.en); bg.focus();'
+         . '  document.getElementById("legalTemplateMsg").textContent = "Примерният текст е в редактора. Прегледайте го и натиснете „Запази“.";'
+         . '});'
+         . '})();</script>';
+};
+
 $saved        = isset($_GET['saved']);
 $deepl_ready  = deepl_is_configured();
 $lbl_bg_badge = '<span style="font-size:.68rem;font-weight:700;background:#dcfce7;color:#166534;border-radius:3px;padding:.05rem .35rem;margin-left:.4rem;vertical-align:middle;">BG</span>';
 $lbl_en_badge = '<span style="font-size:.68rem;font-weight:700;background:#dbeafe;color:#1d4ed8;border-radius:3px;padding:.05rem .35rem;margin-left:.4rem;vertical-align:middle;">EN</span>';
 
-$_tinymce_key   = setting_get('tinymce_api_key', 'no-api-key');
-$page_head_extra = '<script src="https://cdn.tiny.cloud/1/' . h($_tinymce_key) . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>';
+$page_head_extra = tinymce_script_tag();
 
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 ?>
@@ -511,8 +541,11 @@ $cp_list  = cpage_all();
           ['legal_privacy', 'Политика за поверителност',       '/politika-za-poveritelnost/'],
           ['legal_info',    'Правна информация',               '/pravna-informaciya/'],
           ['legal_terms',   'Условия за ползване',             '/usloviya/'],
+          ['legal_cookies', 'Политика за бисквитки',           '/politika-za-biskvitki/'],
           ['reports',       'Финансови отчети',                '/finansovi-otcheti/'],
       ];
+      // Pages of a switched-off module (Admin → Модули) are not listed.
+      $rows = array_filter($rows, static fn(array $r): bool => module_link_visible($r[2]));
       foreach ($rows as [$key, $label, $url]):
       ?>
       <tr>
@@ -534,6 +567,7 @@ $cp_list  = cpage_all();
   </table>
 </div>
 
+<?php if (module_enabled_with_needs('ai_helpers')): ?>
 <!-- ── DeepL settings card ──────────────────────────────────────────────────── -->
 <h2 style="margin:2rem 0 1rem;font-size:1rem;">Автоматичен превод (DeepL)</h2>
 <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;max-width:560px;">
@@ -631,6 +665,9 @@ $cp_list  = cpage_all();
     </div>
   </form>
 </div>
+<?php else: ?>
+<p style="margin:2rem 0 0;max-width:560px;font-size:.875rem;color:var(--text-muted);">Автоматичният превод е изключен заедно с модула „<?= h(module_label('ai_helpers')) ?>“. Ключът и речникът са запазени — ще се появят отново, когато го включите в <a href="/admin/modules.php">Модули</a>.</p>
+<?php endif; ?>
 
 <?php elseif ($page === 'home_campaign'): ?>
 <!-- ══ HOME — CAMPAIGN BLOCK ══ -->
@@ -665,7 +702,7 @@ $cp_list  = cpage_all();
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Title <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline" onclick="txField('campTitleBg','campTitleEn',this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline" onclick="txField('campTitleBg','campTitleEn',this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <input type="text" id="campTitleEn" name="campaign_title_en" value="<?= h($campaign['title_en'] ?? '') ?>">
     </div>
@@ -676,7 +713,7 @@ $cp_list  = cpage_all();
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Text <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline" onclick="txField('campTextBg','campTextEn',this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline" onclick="txField('campTextBg','campTextEn',this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <textarea id="campTextEn" name="campaign_text_en" rows="5"><?= h($campaign['text_en'] ?? '') ?></textarea>
     </div>
@@ -687,7 +724,7 @@ $cp_list  = cpage_all();
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Button text <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline" onclick="txField('campCtaBg','campCtaEn',this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline" onclick="txField('campCtaBg','campCtaEn',this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <input type="text" id="campCtaEn" name="campaign_cta_en" value="<?= h($campaign['cta_en'] ?? 'Support our campaign →') ?>">
     </div>
@@ -804,9 +841,9 @@ if ($edit_idx !== null):
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Label <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('impactLabelBg','impactLabelEn',this)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <input type="text" id="impactLabelEn" name="impact_label_en" value="<?= h($edit_item['label_en'] ?? '') ?>" placeholder="children">
     </div>
@@ -1026,7 +1063,7 @@ usort($impact, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
         <div class="form-group">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
             <label style="margin:0;">Name <?= $lbl_en_badge ?></label>
-            <button type="button" class="btn btn--outline" onclick="var c=this.closest('.centre-card');txEl(c.querySelector('.c-name-bg'),c.querySelector('.c-name-en'),this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+            <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline" onclick="var c=this.closest('.centre-card');txEl(c.querySelector('.c-name-bg'),c.querySelector('.c-name-en'),this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
           </div>
           <input type="text" name="centre_name_en[]" class="c-name-en" value="<?= h($centre['name_en'] ?? '') ?>">
         </div>
@@ -1037,7 +1074,7 @@ usort($impact, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
         <div class="form-group">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
             <label style="margin:0;">Description <?= $lbl_en_badge ?></label>
-            <button type="button" class="btn btn--outline" onclick="var c=this.closest('.centre-card');txEl(c.querySelector('.c-desc-bg'),c.querySelector('.c-desc-en'),this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+            <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline" onclick="var c=this.closest('.centre-card');txEl(c.querySelector('.c-desc-bg'),c.querySelector('.c-desc-en'),this)" style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
           </div>
           <textarea name="centre_desc_en[]" class="c-desc-en" rows="3"><?= h($centre['description_en'] ?? '') ?></textarea>
         </div>
@@ -1113,9 +1150,9 @@ if ($edit_team_idx !== null):
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Role <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('memberRoleBg','memberRoleEn',this)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <input type="text" id="memberRoleEn" name="member_role_en"
              value="<?= h($edit_member['role_en'] ?? '') ?>">
@@ -1127,9 +1164,9 @@ if ($edit_team_idx !== null):
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Bio <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('teamBioBg','teamBioEn',this,true)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <textarea id="teamBioEn" name="member_bio_en" rows="8"><?= h($edit_member['bio_en'] ?? '') ?></textarea>
     </div>
@@ -1185,9 +1222,9 @@ endif; // end $edit_team_idx !== null
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Title <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('aboutTitleBg','aboutTitleEn',this)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <input type="text" id="aboutTitleEn" name="about_title_en" value="<?= h($about['title_en'] ?? '') ?>">
     </div>
@@ -1199,9 +1236,9 @@ endif; // end $edit_team_idx !== null
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Intro <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('aboutIntroBg','aboutIntroEn',this)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <textarea id="aboutIntroEn" name="about_intro_en" rows="8"><?= h($about['intro_en'] ?? '') ?></textarea>
     </div>
@@ -1444,9 +1481,9 @@ if ($edit_idx !== null):
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Title <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('projTitleBg','projTitleEn',this)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <input type="text" id="projTitleEn" name="proj_title_en"
              value="<?= h($project['title_en'] ?? '') ?>">
@@ -1458,9 +1495,9 @@ if ($edit_idx !== null):
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Text <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('projTextBg','projTextEn',this,true)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <textarea id="projTextEn" name="proj_text_en" rows="8"><?= h($project['text_en'] ?? '') ?></textarea>
     </div>
@@ -1780,9 +1817,9 @@ if ($edit_way_idx !== null):
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Title <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('wayTitleBg','wayTitleEn',this)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <input type="text" id="wayTitleEn" name="way_title_en"
              value="<?= h($edit_way['title_en'] ?? '') ?>">
@@ -1794,9 +1831,9 @@ if ($edit_way_idx !== null):
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Text <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('wayTextBg','wayTextEn',this,true)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <textarea id="wayTextEn" name="way_text_en" rows="8"><?= h($edit_way['text_en'] ?? '') ?></textarea>
     </div>
@@ -1842,9 +1879,9 @@ endif; // end $edit_way_idx !== null
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Title <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('helpTitleBg','helpTitleEn',this)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <input type="text" id="helpTitleEn" name="help_title_en" value="<?= h($help['title_en'] ?? '') ?>">
     </div>
@@ -1855,9 +1892,9 @@ endif; // end $edit_way_idx !== null
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Intro <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline"
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
                 onclick="txField('helpIntroBg','helpIntroEn',this)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button>
+                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
       </div>
       <input type="text" id="helpIntroEn" name="help_intro_en" value="<?= h($help['intro_en'] ?? '') ?>">
     </div>
@@ -2074,7 +2111,7 @@ usort($ways_list, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
   <div class="form-group">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
       <label for="shopEn" style="margin:0;">Text <?= $lbl_en_badge ?></label>
-      <button type="button" class="btn btn--outline translate-legal-btn" data-src="shopBg" data-tgt="shopEn" style="font-size:.78rem;padding:.25rem .6rem;">✦ Translate from BG</button>
+      <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline translate-legal-btn" data-src="shopBg" data-tgt="shopEn" style="font-size:.78rem;padding:.25rem .6rem;">✦ Translate from BG</button><?php endif; ?>
     </div>
     <textarea id="shopEn" name="donation_text_en" rows="4"><?= h($shop['donation_text_en'] ?? '') ?></textarea>
   </div>
@@ -2095,7 +2132,7 @@ tinymce.init(Object.assign({}, window._tinyBase, { selector: '#shopBg, #shopEn',
   </div>
   <button type="submit" form="legalPrivacyForm" class="btn btn--primary">Запази</button>
 </div>
-<p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1.5rem;">Съдържанието се записва като HTML. Използвайте &lt;h2&gt;, &lt;p&gt;, &lt;ul&gt;/&lt;li&gt; и &lt;a&gt; тагове.</p>
+<?= $legal_template_box('privacy') ?>
 <form id="legalPrivacyForm" method="POST" action="/admin/pages.php?page=legal_privacy" class="admin-form">
   <?= csrf_field() ?>
   <input type="hidden" name="section" value="legal">
@@ -2108,7 +2145,7 @@ tinymce.init(Object.assign({}, window._tinyBase, { selector: '#shopBg, #shopEn',
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Content <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline translate-legal-btn" data-src="legalBg" data-tgt="legalEn" style="font-size:.78rem;padding:.25rem .6rem;">✦ Translate from BG</button>
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline translate-legal-btn" data-src="legalBg" data-tgt="legalEn" style="font-size:.78rem;padding:.25rem .6rem;">✦ Translate from BG</button><?php endif; ?>
       </div>
       <textarea id="legalEn" name="legal_content_en" rows="30" style="font-family:monospace;font-size:0.85rem;"><?= h($legal['privacy_en'] ?? '') ?></textarea>
     </div>
@@ -2130,7 +2167,7 @@ tinymce.init(Object.assign({}, window._tinyBase, { selector: '#legalBg, #legalEn
   </div>
   <button type="submit" form="legalInfoForm" class="btn btn--primary">Запази</button>
 </div>
-<p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1.5rem;">Съдържанието се записва като HTML.</p>
+<?= $legal_template_box('legal_info') ?>
 <form id="legalInfoForm" method="POST" action="/admin/pages.php?page=legal_info" class="admin-form">
   <?= csrf_field() ?>
   <input type="hidden" name="section" value="legal">
@@ -2143,7 +2180,7 @@ tinymce.init(Object.assign({}, window._tinyBase, { selector: '#legalBg, #legalEn
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Content <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline translate-legal-btn" data-src="legalBg" data-tgt="legalEn" style="font-size:.78rem;padding:.25rem .6rem;">✦ Translate from BG</button>
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline translate-legal-btn" data-src="legalBg" data-tgt="legalEn" style="font-size:.78rem;padding:.25rem .6rem;">✦ Translate from BG</button><?php endif; ?>
       </div>
       <textarea id="legalEn" name="legal_content_en" rows="30" style="font-family:monospace;font-size:0.85rem;"><?= h($legal['legal_info_en'] ?? '') ?></textarea>
     </div>
@@ -2165,7 +2202,7 @@ tinymce.init(Object.assign({}, window._tinyBase, { selector: '#legalBg, #legalEn
   </div>
   <button type="submit" form="legalTermsForm" class="btn btn--primary">Запази</button>
 </div>
-<p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1.5rem;">Съдържанието се записва като HTML.</p>
+<?= $legal_template_box('terms') ?>
 <form id="legalTermsForm" method="POST" action="/admin/pages.php?page=legal_terms" class="admin-form">
   <?= csrf_field() ?>
   <input type="hidden" name="section" value="legal">
@@ -2178,9 +2215,44 @@ tinymce.init(Object.assign({}, window._tinyBase, { selector: '#legalBg, #legalEn
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
         <label style="margin:0;">Content <?= $lbl_en_badge ?></label>
-        <button type="button" class="btn btn--outline translate-legal-btn" data-src="legalBg" data-tgt="legalEn" style="font-size:.78rem;padding:.25rem .6rem;">✦ Translate from BG</button>
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline translate-legal-btn" data-src="legalBg" data-tgt="legalEn" style="font-size:.78rem;padding:.25rem .6rem;">✦ Translate from BG</button><?php endif; ?>
       </div>
       <textarea id="legalEn" name="legal_content_en" rows="30" style="font-family:monospace;font-size:0.85rem;"><?= h($legal['terms_en'] ?? '') ?></textarea>
+    </div>
+  </div>
+  <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--border);">
+    <button type="submit" class="btn btn--primary">Запази</button>
+  </div>
+</form>
+<script>
+tinymce.init(Object.assign({}, window._tinyBase, { selector: '#legalBg, #legalEn', min_height: 400, menubar: true }));
+</script>
+
+<?php elseif ($page === 'legal_cookies'): ?>
+<!-- ══ COOKIES ══ -->
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;gap:1rem;">
+  <div>
+    <a href="/admin/pages.php" style="color:var(--text-muted);font-size:0.9rem;display:block;margin-bottom:.25rem;">← Назад</a>
+    <h1 style="margin:0;">Политика за бисквитки</h1>
+  </div>
+  <button type="submit" form="legalCookiesForm" class="btn btn--primary">Запази</button>
+</div>
+<?= $legal_template_box('cookies') ?>
+<form id="legalCookiesForm" method="POST" action="/admin/pages.php?page=legal_cookies" class="admin-form">
+  <?= csrf_field() ?>
+  <input type="hidden" name="section" value="legal">
+  <input type="hidden" name="legal_key" value="cookies">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+    <div class="form-group">
+      <label>Съдържание <?= $lbl_bg_badge ?></label>
+      <textarea id="legalBg" name="legal_content" rows="30" style="font-family:monospace;font-size:0.85rem;"><?= h($legal['cookie_policy_bg'] ?? '') ?></textarea>
+    </div>
+    <div class="form-group">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
+        <label style="margin:0;">Content <?= $lbl_en_badge ?></label>
+        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline translate-legal-btn" data-src="legalBg" data-tgt="legalEn" style="font-size:.78rem;padding:.25rem .6rem;">✦ Translate from BG</button><?php endif; ?>
+      </div>
+      <textarea id="legalEn" name="legal_content_en" rows="30" style="font-family:monospace;font-size:0.85rem;"><?= h($legal['cookie_policy_en'] ?? '') ?></textarea>
     </div>
   </div>
   <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--border);">
@@ -2240,6 +2312,9 @@ initAutosave({ key: 'page:legal-info', formId: 'legalInfoForm', tinyIds: ['legal
 <?php endif; ?>
 <?php if ($page === 'legal_terms'): ?>
 initAutosave({ key: 'page:legal-terms', formId: 'legalTermsForm', tinyIds: ['legalBg', 'legalEn'] });
+<?php endif; ?>
+<?php if ($page === 'legal_cookies'): ?>
+initAutosave({ key: 'page:legal-cookies', formId: 'legalCookiesForm', tinyIds: ['legalBg', 'legalEn'] });
 <?php endif; ?>
 </script>
 

@@ -5,6 +5,7 @@ ob_start(); // catch any stray output so the JSON response stays clean
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
 admin_require_shop();
+module_ajax_guard('shop');
 
 header('Content-Type: application/json');
 

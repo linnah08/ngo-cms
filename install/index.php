@@ -1,27 +1,38 @@
 <?php
 /**
- * Web installation wizard.
+ * Web installation wizard — one short step per screen:
+ *   1. Database — created automatically on cPanel hosts; otherwise the host's details.
+ *   2. Your login (the first admin).
+ *   3. Organisation — only its name, the site address and a contact email.
+ *   4. Look — theme, colours, logo (all optional).
+ *   5. Modules — which optional parts the organisation will use (includes/modules.php).
+ *   6. Check and install — install-run.php runs the migrations, writes the config files, creates the admin.
+ * Everything else (legal name, phone, bank account) is filled in later in Админ → Организация.
  *
- * One page that configures a fresh deployment:
- *   1. Database — use existing credentials, or create a new database on cPanel.
- *   2. Organisation — name, contact, bank details (writes site.config.php).
- *   3. Admin account.
- * It then runs all migrations and creates the first admin.
+ * Each step is checked by the server before the next one opens, so a wrong
+ * database password shows up at step 1, not after the whole form. Answers are
+ * kept in the session until the install finishes (the admin password only as
+ * a hash), then cleared. Works without JavaScript.
  *
- * SECURITY: refuses to run once site.config.php exists. Delete this install/
- * directory after a successful install.
+ * SECURITY: refuses to run once site.config.php and db.config.php exist (it
+ * sends people to the admin instead), and deletes itself after a successful
+ * install where the server allows it. Nobody is ever asked to remove it by hand.
  */
 
 $ROOT = dirname(__DIR__);
 
 // ── Guard: already installed? ────────────────────────────────────────────────
 $already = is_file($ROOT . '/site.config.php') && is_file($ROOT . '/db.config.php');
+if ($already) {
+    header('Location: /admin/', true, 303);
+    exit;
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function e(string $s): string { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
 
-require_once dirname(__DIR__) . '/includes/themes.php';        // brand_themes()
-require_once dirname(__DIR__) . '/includes/organisation.php';  // IBAN/BIC checks, org_save_logo()
+require_once __DIR__ . '/wizard-lib.php';
+require_once dirname(__DIR__) . '/includes/organisation.php';  // org_save_logo()
 
 function proc_enabled(): bool {
     if (!function_exists('proc_open')) return false;
@@ -40,15 +51,20 @@ function run_argv(array $argv): string {
     return (string) $out;
 }
 
-/** Is this a cPanel account where we can auto-create a database? */
+/** cPanel's command-line API. NGO_INSTALL_UAPI points elsewhere for local testing only. */
+function uapi_path(): string {
+    return (string) (getenv('NGO_INSTALL_UAPI') ?: '/usr/bin/uapi');
+}
+
+/** Is this a cPanel account where we can create the database ourselves? */
 function cpanel_available(): bool {
     // shell_exec/exec are often disabled on cPanel; proc_open usually is not.
-    return proc_enabled() && is_executable('/usr/bin/uapi');
+    return proc_enabled() && is_executable(uapi_path());
 }
 
 /** Call cPanel UAPI, return decoded ['ok'=>bool,'errors'=>[],'data'=>...]. */
 function uapi(string $module, string $func, array $args): array {
-    $argv = ['/usr/bin/uapi', '--output=json', $module, $func];
+    $argv = [uapi_path(), '--output=json', $module, $func];
     foreach ($args as $k => $v) $argv[] = $k . '=' . $v;
     $raw  = run_argv($argv);
     $json = json_decode($raw, true);
@@ -70,354 +86,474 @@ function write_config(string $path, array $defs, string $header): bool {
     return file_put_contents($path, $php) !== false;
 }
 
-$theme_labels_bg = ['classic' => 'Класически', 'friendly' => 'Приветлив', 'modern' => 'Модерен', 'editorial' => 'Списание'];
-
-$errors  = [];
-$success = false;
-$logo_error = null;
-$created_db_info = null;
-
-// Prefill site URL from the current request.
-$guess_scheme = (($_SERVER['HTTPS'] ?? '') === 'on' || ($_SERVER['SERVER_PORT'] ?? '') == 443) ? 'https' : 'http';
-$guess_url    = $guess_scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
-
-// ── Handle submit ────────────────────────────────────────────────────────────
-if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    $p = fn(string $k) => trim((string) ($_POST[$k] ?? ''));
-
-    // Organisation
-    $name_bg = $p('site_name_bg');
-    $name_en = $p('site_name_en');
-    $legal_bg = $p('site_legal_name_bg');   // optional: the registered entity, if the site is its brand/project
-    $legal_en = $p('site_legal_name_en');
-    $site_url = rtrim($p('site_url'), '/');
-    $email   = $p('site_email');
-    $phone   = $p('site_phone');
-    $iban    = $p('site_iban');
-    $bic     = $p('site_bic');
-    $bank    = $p('site_bank_name');
-
-    // Branding
-    $brand_theme   = array_key_exists($p('brand_theme'), brand_themes()) ? $p('brand_theme') : 'classic';
-    $brand_primary = preg_match('/^#[0-9a-fA-F]{6}$/', $p('brand_primary')) ? $p('brand_primary') : '#0387A5';
-    $brand_accent  = preg_match('/^#[0-9a-fA-F]{6}$/', $p('brand_accent'))  ? $p('brand_accent')  : '#04ADBF';
-
-    // Admin
-    $admin_name  = $p('admin_name') ?: 'Администратор';
-    $admin_email = $p('admin_email');
-    // Trim to match the login form, which trims the password before verifying.
-    $admin_pass  = trim((string) ($_POST['admin_password'] ?? ''));
-
-    // Database
-    $db_mode = $p('db_mode');
-    $db_host = $p('db_host') ?: 'localhost';
-    $db_name = $p('db_name');
-    $db_user = $p('db_user');
-    $db_pass = (string) ($_POST['db_pass'] ?? '');
-
-    // Validate org + admin
-    if ($name_bg === '')                                    $errors[] = 'Моля, въведете името на организацията на български.';
-    if ($name_en === '')                                    $errors[] = 'Моля, въведете името на организацията на английски.';
-    if (($legal_bg === '') !== ($legal_en === ''))          $errors[] = 'Моля, въведете юридическото име и на двата езика — или оставете и двете полета празни.';
-    if (mb_strlen($legal_bg) > 150 || mb_strlen($legal_en) > 150) $errors[] = 'Юридическото име е твърде дълго (най-много 150 знака).';
-    if (!filter_var($site_url, FILTER_VALIDATE_URL))        $errors[] = 'Моля, въведете правилен адрес на сайта, например https://vashata-organizacia.bg';
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL))         $errors[] = 'Моля, въведете правилен имейл за контакт.';
-    if (!filter_var($admin_email, FILTER_VALIDATE_EMAIL))   $errors[] = 'Моля, въведете правилен имейл за вход на администратора.';
-    if (strlen($admin_pass) < 8)                            $errors[] = 'Паролата за вход трябва да е поне 8 знака.';
-    if ($iban !== '') {
-        $iban = org_normalize_iban($iban);
-        if (!org_iban_valid($iban))                         $errors[] = 'Този IBAN не е правилен — вероятно има сгрешена или липсваща цифра. Препишете го внимателно от документ от банката.';
-    }
-    if ($bic !== '') {
-        $bic = strtoupper($bic);
-        if (!org_bic_valid($bic))                           $errors[] = 'BIC кодът трябва да е 8 или 11 латински букви и цифри, например STSABGSF.';
-    }
-
-    // Optionally create the database on cPanel.
-    if (!$errors && $db_mode === 'create' && cpanel_available()) {
-        $suffix = strtolower(preg_replace('/[^a-z0-9]/i', '', $p('db_suffix')));
-        if ($suffix === '' || strlen($suffix) > 12) {
-            $errors[] = 'Краткото име на базата данни трябва да е от 1 до 12 латински букви или цифри.';
-        } else {
-            $prefix  = get_current_user();              // cPanel account user
-            $db_name = $prefix . '_' . $suffix;
-            $db_user = $prefix . '_' . $suffix;
-            $db_pass = bin2hex(random_bytes(12));
-            $db_host = 'localhost';
-
-            $r1 = uapi('Mysql', 'create_database', ['name' => $db_name]);
-            if (!$r1['ok']) $errors[] = 'Не успяхме да създадем базата данни. Техническа информация: ' . implode('; ', (array) $r1['errors']);
-
-            if (!$errors) {
-                $r2 = uapi('Mysql', 'create_user', ['name' => $db_user, 'password' => $db_pass]);
-                if (!$r2['ok']) $errors[] = 'Не успяхме да създадем потребител за базата данни. Техническа информация: ' . implode('; ', (array) $r2['errors']);
-            }
-            if (!$errors) {
-                $r3 = uapi('Mysql', 'set_privileges_on_database',
-                    ['user' => $db_user, 'database' => $db_name, 'privileges' => 'ALL PRIVILEGES']);
-                if (!$r3['ok']) $errors[] = 'Не успяхме да дадем права на потребителя. Техническа информация: ' . implode('; ', (array) $r3['errors']);
-            }
-            if (!$errors) $created_db_info = ['name' => $db_name, 'user' => $db_user, 'pass' => $db_pass];
-        }
-    } elseif (!$errors && $db_mode !== 'create') {
-        if ($db_name === '' || $db_user === '') $errors[] = 'Моля, въведете име на базата данни и потребител.';
-    }
-
-    // Test the DB connection.
-    if (!$errors) {
-        try {
-            $pdo = new PDO(
-                'mysql:host=' . $db_host . ';dbname=' . $db_name . ';charset=utf8mb4',
-                $db_user, $db_pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-            );
-        } catch (PDOException $ex) {
-            $errors[] = 'Не успяхме да се свържем с базата данни. Проверете името, потребителя и паролата. Техническа информация: ' . $ex->getMessage();
-        }
-    }
-
-    // Write config files + run migrations + create admin.
-    if (!$errors) {
-        write_config($ROOT . '/db.config.php', [
-            'DB_HOST' => $db_host,
-            'DB_NAME' => $db_name,
-            'DB_USER' => $db_user,
-            'DB_PASS' => $db_pass,
-            'SETTINGS_ENCRYPTION_KEY' => bin2hex(random_bytes(32)),
-        ], 'Database connection — generated by the install wizard.');
-
-        write_config($ROOT . '/site.config.php', [
-            'SITE_NAME_BG' => $name_bg,
-            'SITE_NAME_EN' => $name_en,
-            'SITE_LEGAL_NAME_BG' => $legal_bg,
-            'SITE_LEGAL_NAME_EN' => $legal_en,
-            'SITE_URL'     => $site_url,
-            'SITE_EMAIL'   => $email,
-            'SITE_PHONE'   => $phone,
-            'SITE_IBAN'    => $iban,
-            'SITE_BIC'     => $bic,
-            'SITE_BANK_NAME' => $bank,
-            'BRAND_THEME'    => $brand_theme,
-            'BRAND_PRIMARY'  => $brand_primary,
-            'BRAND_ACCENT'   => $brand_accent,
-            'SIGNING_ADMIN_EMAIL' => $admin_email,
-            'DONATION_PURPOSE_BG' => 'За дейността и програмите на ' . $name_bg,
-            'DONATION_PURPOSE_EN' => 'For the activities and programmes of ' . $name_en,
-            'SOCIAL_FACEBOOK'  => '',
-            'SOCIAL_INSTAGRAM' => '',
-            'SOCIAL_LINKEDIN'  => '',
-            'GTM_ID' => '', 'GA4_ID' => '', 'GOOGLE_ADS_ID' => '', 'GOOGLE_ADS_PURCHASE_LABEL' => '',
-            // Initial module state; Admin → Организация → Модули overrides it.
-            'FEATURE_DONATIONS' => true,
-            'FEATURE_CAMPAIGN' => true,
-        ], 'Organisation configuration — generated by the install wizard. Edit freely. FEATURE_* are only initial values: the switches in Admin → Организация → Модули win over them.');
-
-        // Optional logo upload → assets/images/logo.png (templates reference that path).
-        if (($_FILES['logo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-            // A bad logo must not block the install — it can be re-uploaded
-            // from Admin → Организация. The error is shown on the success page.
-            $logo_error = org_save_logo($_FILES['logo'], $ROOT . '/assets/images');
-        }
-
-        // Run migrations (migrate.php reads the db.config.php we just wrote).
-        // migrate.php defines run_migrations() and only auto-runs itself when
-        // invoked directly via the CLI, so it must be called explicitly here.
-        require_once $ROOT . '/migrate.php';
-        ob_start();
-        $migration_result = run_migrations();
-        $migrate_output = ob_get_clean();
-
-        if (!$migration_result['success']) {
-            $errors[] = 'Не успяхме да създадем таблиците в базата данни. Техническа информация: ' . ($migration_result['error'] ?? 'неизвестна грешка');
-        } else {
-            // Create the first admin.
-            try {
-                $n = (int) $pdo->query('SELECT COUNT(*) FROM admin_users')->fetchColumn();
-                if ($n === 0) {
-                    $pdo->prepare('INSERT INTO admin_users (name, email, password_hash, role) VALUES (?,?,?,\'admin\')')
-                        ->execute([$admin_name, $admin_email, password_hash($admin_pass, PASSWORD_DEFAULT)]);
-                }
-                $success = true;
-            } catch (Throwable $ex) {
-                $errors[] = 'Таблиците са създадени, но администраторът не можа да бъде добавен. Техническа информация: ' . $ex->getMessage();
-            }
-        }
+/** null when the database answers, else the reason. */
+function db_connect_error(string $host, string $name, string $user, string $pass): ?string {
+    try {
+        new PDO('mysql:host=' . $host . ';dbname=' . $name . ';charset=utf8mb4', $user, $pass,
+            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]);
+        return null;
+    } catch (PDOException $ex) {
+        return $ex->getMessage();
     }
 }
 
-// Repopulate form values after a failed POST.
-$v = fn(string $k, string $d = '') => e((string) ($_POST[$k] ?? $d));
+/** Where a logo chosen at step 4 waits until the install (validated and re-encoded already). */
+function logo_staging_dir(): string {
+    if (empty($_SESSION['install']['logo_dir'])) {
+        $_SESSION['install']['logo_dir'] = sys_get_temp_dir() . '/ngo-install-' . bin2hex(random_bytes(8));
+    }
+    return $_SESSION['install']['logo_dir'];
+}
+
+function staged_logo(): ?string {
+    $dir = $_SESSION['install']['logo_dir'] ?? '';
+    return ($dir !== '' && is_file($dir . '/logo.png')) ? $dir . '/logo.png' : null;
+}
+
+function go(string $step): never {
+    header('Location: ?step=' . rawurlencode($step), true, 303);
+    exit;
+}
+
+$theme_labels_bg = ['classic' => 'Класически', 'friendly' => 'Приветлив', 'modern' => 'Модерен', 'editorial' => 'Списание'];
+$steps = wizard_steps();
+
+// ── Session ──────────────────────────────────────────────────────────────────
+$https = ($_SERVER['HTTPS'] ?? '') === 'on' || ($_SERVER['SERVER_PORT'] ?? '') == 443;
+if (!$already) {
+    session_name('ngo_install');
+    session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax', 'secure' => $https, 'path' => '/install/']);
+    session_start();
+    $_SESSION['install'] ??= ['done' => [], 'token' => bin2hex(random_bytes(16))];
+}
+$done   = $_SESSION['install']['done'] ?? [];
+$token  = $_SESSION['install']['token'] ?? '';
+$cpanel = !$already && cpanel_available();
+
+$step = (string) ($_GET['step'] ?? '');
+if (!isset($steps[$step])) $step = wizard_first_open_step($done);
+$return_review = ($_GET['return'] ?? $_POST['return'] ?? '') === 'review' && isset($done['modules']);
+
+$errors  = [];     // field => message
+$input   = null;   // the rejected form, to show again
+$success = false;
+$install_error = null;
+$logo_note = null;
+$done_final = null;
+$login_token = null;   // set by install-run.php: the finish screen's one-time login link
+
+// ── Handle a step ────────────────────────────────────────────────────────────
+if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!hash_equals($token, (string) ($_POST['token'] ?? ''))) {
+        go($step);   // an expired or foreign form: show the step again rather than trust it
+    }
+    if (!wizard_step_reachable($step, $done)) go(wizard_first_open_step($done));
+    $keys = array_keys($steps);
+    $next = $keys[array_search($step, $keys, true) + 1] ?? 'review';
+    $prev_step = $keys[array_search($step, $keys, true) - 1] ?? 'db';
+
+    // „Назад“: keep what was typed on this step (unchecked, never a password) and go back.
+    if (($_POST['nav'] ?? '') === 'back' && $step !== 'review') {
+        $draft = [];
+        foreach ($_POST as $k => $v) {
+            if (in_array($k, ['token', 'nav', 'return', 'admin_password', 'db_pass'], true)) continue;
+            if (is_string($v)) $draft[$k] = mb_substr($v, 0, 300);
+            elseif ($k === 'modules' && is_array($v)) $draft[$k] = array_values(array_filter($v, 'is_string'));
+        }
+        if ($step === 'modules' && !isset($draft['modules'])) $draft['modules'] = [];   // all unticked is a choice too
+        $_SESSION['install']['draft'][$step] = $draft;
+        go($return_review ? 'review' : $prev_step);
+    }
+
+    if ($step === 'review') {
+        require __DIR__ . '/install-run.php';   // sets $success, $install_error, $logo_note, $done_final
+    } else {
+        $result = match ($step) {
+            'db'      => wizard_validate_db($_POST, $cpanel, 'db_connect_error'),
+            'account' => wizard_validate_account($_POST, $done['account']['password_hash'] ?? null),
+            'org'     => wizard_validate_org($_POST),
+            'look'    => wizard_validate_look(isset($_POST['skip']) ? [] : $_POST),
+            'modules' => wizard_validate_modules($_POST),
+        };
+        if ($step === 'look') {
+            if ((isset($_POST['skip']) || isset($_POST['logo_remove'])) && ($l = staged_logo())) {
+                @unlink($l);
+                @unlink(dirname($l) . '/favicon.png');
+            }
+            if (!isset($_POST['skip']) && ($_FILES['logo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                $dir = logo_staging_dir();
+                if (!is_dir($dir)) @mkdir($dir, 0700, true);
+                $why = org_save_logo($_FILES['logo'], $dir);
+                if ($why !== null) $result['errors']['logo'] = $why;
+            }
+        }
+        if ($result['errors']) {
+            $errors = $result['errors'];
+            $input  = $_POST;
+        } else {
+            $_SESSION['install']['done'][$step] = $result['data'];
+            unset($_SESSION['install']['draft'][$step]);
+            go($return_review ? 'review' : $next);
+        }
+    }
+} elseif (!$already && !wizard_step_reachable($step, $done)) {
+    go(wizard_first_open_step($done));
+}
+
+// ── Values to show in a step's fields ────────────────────────────────────────
+$guess_url = ($https ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+$defaults = [
+    'db_host'       => 'localhost',
+    'site_url'      => $guess_url,
+    'site_email'    => $done['account']['admin_email'] ?? '',   // agreed: prefilled, visibly, from the login
+    'brand_theme'   => 'classic',
+    'brand_primary' => brand_themes()['classic']['primary'],
+    'brand_accent'  => brand_themes()['classic']['accent'],
+];
+$saved = [];
+foreach ($done as $d) if (is_array($d)) $saved += $d;
+$draft = $_SESSION['install']['draft'][$step] ?? null;   // typed here before going „Назад“
+/** The value a field shows: what was just typed, else the unsaved draft, else what was saved, else a sensible default. */
+$val = function (string $k) use ($input, $draft, $saved, $defaults): string {
+    if (is_array($input) && array_key_exists($k, $input) && !is_array($input[$k])) return (string) $input[$k];
+    if (is_array($draft) && array_key_exists($k, $draft) && is_string($draft[$k])) return $draft[$k];
+    if (array_key_exists($k, $saved) && is_scalar($saved[$k])) return (string) $saved[$k];
+    return (string) ($defaults[$k] ?? '');
+};
+
+/**
+ * One labelled text input. The label says in words whether it is required;
+ * hint and error are tied to the input with aria-describedby. $hint is HTML.
+ */
+$field = function (string $name, string $label, bool $required, string $type = 'text', string $hint = '', string $extra = '') use (&$errors, $val): string {
+    $ids  = [];
+    $html = '<div class="field' . (isset($errors[$name]) ? ' field-bad' : '') . '">';
+    $html .= '<label for="' . e($name) . '">' . e($label) . ' <span class="tag">' . ($required ? '(задължително)' : '(по желание)') . '</span></label>';
+    if ($hint !== '') { $html .= '<p class="hint" id="' . e($name) . '-hint">' . $hint . '</p>'; $ids[] = $name . '-hint'; }
+    if (isset($errors[$name])) {
+        $html .= '<p class="field-error" id="' . e($name) . '-error"><span class="vh">Грешка: </span>' . e($errors[$name]) . '</p>';
+        $ids[] = $name . '-error';
+    }
+    $value = $type === 'password' ? '' : $val($name);
+    $html .= '<input type="' . e($type) . '" id="' . e($name) . '" name="' . e($name) . '" value="' . e($value) . '"'
+          . ($required ? ' required aria-required="true"' : '')
+          . (isset($errors[$name]) ? ' aria-invalid="true"' : '')
+          . ($ids ? ' aria-describedby="' . e(implode(' ', $ids)) . '"' : '')
+          . ($extra !== '' ? ' ' . $extra : '') . '>';
+    return $html . '</div>';
+};
+
+$keys    = array_keys($steps);
+$step_no = array_search($step, $keys, true) + 1;
+$prev    = $step_no > 1 ? $keys[$step_no - 2] : null;
 ?>
 <!DOCTYPE html>
 <html lang="bg">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Инсталиране на сайта</title>
+<title><?= ($already || $success) ? 'Инсталиране на сайта' : e('Стъпка ' . $step_no . ' от ' . count($steps) . ': ' . $steps[$step] . ' — Инсталиране на сайта') ?></title>
 <style>
-  :root { --teal:#0387A5; --border:#e2e0db; --bg:#f8f6f2; --text:#1a1916; --muted:#6b6560; }
+  :root { --teal:#03758f; --border:#d9d6d0; --bg:#f8f6f2; --text:#1a1916; --muted:#5c5752; --bad:#b3261e; }
   * { box-sizing: border-box; }
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg);
-         color: var(--text); margin: 0; padding: 2rem 1rem; line-height: 1.5; }
-  .wrap { max-width: 680px; margin: 0 auto; }
-  .card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 2rem; }
-  h1 { margin: 0 0 .25rem; font-size: 1.5rem; }
-  p.sub { color: var(--muted); margin: 0 0 1.5rem; }
-  h2 { font-size: 1rem; margin: 1.75rem 0 .75rem; padding-bottom: .35rem; border-bottom: 1px solid var(--border); }
-  label { display: block; font-size: .85rem; font-weight: 600; margin: .85rem 0 .3rem; }
+         color: var(--text); margin: 0; padding: 1.5rem 1rem 3rem; line-height: 1.5; font-size: 1rem; }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  .card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem; }
+  @media (max-width: 520px) { .card { padding: 1.25rem 1rem; } body { padding-top: 1rem; } }
+  .site-title { margin: 0 0 .75rem; font-size: .95rem; font-weight: 600; color: var(--muted); }
+  h1 { margin: 0 0 .5rem; font-size: 1.45rem; line-height: 1.25; }
+  h1:focus { outline: none; }
+  .step-of { display: block; font-size: .9rem; font-weight: 600; color: var(--muted); margin-bottom: .2rem; }
+  p.intro { margin: 0 0 1.25rem; color: var(--muted); }
+  [hidden] { display: none !important; }
+  .vh { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .progress ol { list-style: none; display: flex; gap: .3rem; margin: 0 0 1.1rem; padding: 0; }
+  .progress li { flex: 1; height: 6px; border-radius: 3px; background: var(--border); }
+  .progress li.done { background: #7fb9c7; }
+  .progress li.current { background: var(--teal); }
+  .back { display: inline-flex; align-items: center; min-height: 44px; margin: 0 0 .25rem; color: var(--teal); font-weight: 600; }
+  .field { margin: 0 0 1.25rem; }
+  label, legend { display: block; font-weight: 600; margin: 0 0 .3rem; font-size: 1rem; padding: 0; }
+  .tag { font-weight: 400; color: var(--muted); font-size: .9rem; }
+  .hint { font-size: .92rem; color: var(--muted); margin: 0 0 .45rem; }
+  code { background: var(--bg); padding: 0 4px; border-radius: 4px; overflow-wrap: anywhere; }
   input[type=text], input[type=email], input[type=url], input[type=password] {
-    width: 100%; padding: .55rem .7rem; border: 1px solid #d1d5db; border-radius: 7px; font-size: .92rem; font-family: inherit; }
-  .row { display: flex; gap: 1rem; flex-wrap: wrap; }
-  .row > div { flex: 1; min-width: 200px; }
-  .hint { font-size: .78rem; color: var(--muted); margin-top: .25rem; }
-  button { margin-top: 1.75rem; background: var(--teal); color: #fff; border: 0; border-radius: 8px;
-           padding: .75rem 1.5rem; font-size: 1rem; font-weight: 600; cursor: pointer; }
-  .alert { padding: .85rem 1rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: .9rem; }
+    width: 100%; padding: .65rem .75rem; border: 1px solid #8a857f; border-radius: 7px; font-size: 1rem; font-family: inherit; min-height: 44px; }
+  input:focus-visible, button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px solid #f2b705; outline-offset: 2px; }
+  .field-bad input:not([type=checkbox]) { border: 2px solid var(--bad); }
+  .field-error { color: var(--bad); font-weight: 600; margin: 0 0 .35rem; font-size: .95rem; }
+  fieldset { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
+  .choice { display: flex; gap: .7rem; align-items: flex-start; padding: .8rem 1rem; border: 1px solid var(--border); border-radius: 10px;
+            margin: 0 0 .55rem; cursor: pointer; font-weight: 400; min-height: 44px; }
+  .choice input { width: 22px; height: 22px; margin: .1rem 0 0; flex-shrink: 0; accent-color: var(--teal); }
+  .choice strong { display: block; }
+  .choice .desc { display: block; color: var(--muted); font-size: .9rem; margin-top: .1rem; }
+  .choice:has(input:checked) { border-color: var(--teal); box-shadow: 0 0 0 1px var(--teal); }
+  .sw { width: 16px; height: 16px; border-radius: 50%; display: inline-block; vertical-align: -2px; margin-right: .4rem; }
+  .colours { display: flex; gap: 1rem; flex-wrap: wrap; }
+  .colours .field { flex: 1; min-width: 140px; }
+  input[type=color] { width: 100%; height: 44px; padding: 3px; border: 1px solid #8a857f; border-radius: 7px; background: #fff; }
+  details { margin: 0 0 1.25rem; }
+  summary { cursor: pointer; color: var(--teal); font-weight: 600; min-height: 44px; display: list-item; padding-top: .6rem; }
+  .box { background: var(--bg); border-radius: 10px; padding: 1rem; margin: 0 0 1.25rem; }
+  .box p { margin: 0 0 .5rem; } .box p:last-child { margin: 0; }
+  .quote { border-left: 3px solid var(--teal); padding-left: .75rem; font-style: italic; }
+  .actions { display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; margin-top: 1.5rem; }
+  button { background: var(--teal); color: #fff; border: 0; border-radius: 8px; min-height: 48px;
+           padding: .75rem 1.5rem; font-size: 1rem; font-weight: 600; cursor: pointer; font-family: inherit; }
+  button.secondary { background: #fff; color: var(--teal); border: 2px solid var(--teal); }
+  @media (max-width: 520px) { .actions button { width: 100%; } }
+  .error-summary { border: 3px solid var(--bad); border-radius: 10px; padding: 1rem 1.1rem; margin: 0 0 1.25rem; }
+  .error-summary:focus { outline: 3px solid #f2b705; outline-offset: 2px; }
+  .error-summary h2 { margin: 0 0 .5rem; font-size: 1.1rem; }
+  .error-summary ul { margin: 0; padding-left: 1.2rem; }
+  .error-summary a { color: var(--bad); font-weight: 600; }
+  .review section { border-top: 1px solid var(--border); padding: .9rem 0; }
+  .review h2 { font-size: 1.05rem; margin: 0 0 .4rem; display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; }
+  .review h2 a { font-size: .95rem; color: var(--teal); }
+  .review dl { margin: 0; display: grid; grid-template-columns: minmax(110px, 38%) 1fr; gap: .25rem .75rem; font-size: .95rem; }
+  .review dt { color: var(--muted); } .review dd { margin: 0; overflow-wrap: anywhere; }
+  @media (max-width: 520px) { .review dl { grid-template-columns: 1fr; gap: 0; } .review dd { margin-bottom: .45rem; } }
+  .alert { padding: 1rem 1.1rem; border-radius: 10px; margin-bottom: 1.25rem; }
+  .alert-ok { background: #e6f4ea; border: 1px solid #b5dcc0; }
   .alert-error { background: #fdecea; border: 1px solid #f5c6c2; color: #8a1c12; }
-  .alert-ok { background: #e6f4ea; border: 1px solid #b5dcc0; color: #1b5e2a; }
-  .alert-ok code { background: #fff; padding: 1px 5px; border-radius: 4px; }
-  .radio { display: flex; gap: 1.25rem; margin: .4rem 0 .25rem; }
-  .radio label { font-weight: 500; display: flex; align-items: center; gap: .4rem; margin: 0; }
-  .themes { display: flex; gap: .55rem; flex-wrap: wrap; margin: .4rem 0 .35rem; }
-  .theme-card { display: flex; align-items: center; gap: .45rem; border: 1px solid var(--border); border-radius: 8px; padding: .45rem .7rem; cursor: pointer; font-size: .9rem; }
-  .theme-card input { accent-color: var(--teal); }
-  .theme-card .sw { width: 15px; height: 15px; border-radius: 50%; display: inline-block; }
-  .theme-card:has(input:checked) { border-color: var(--teal); box-shadow: 0 0 0 1px var(--teal); }
-  fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin: 0; }
-  .muted-box { background: var(--bg); border-radius: 8px; padding: 1rem; font-size: .85rem; }
+  .card h2 { font-size: 1.1rem; }
+  .next-list { padding-left: 1.2rem; }
+  .next-list li { margin-bottom: .5rem; }
+  .next-list a, .alert a { color: var(--teal); font-weight: 600; }
+  .btn-link { display: inline-flex; align-items: center; min-height: 48px; padding: .75rem 1.5rem; border-radius: 8px; background: var(--teal); color: #fff; font-weight: 600; text-decoration: none; }
 </style>
 </head>
 <body>
 <div class="wrap">
+  <p class="site-title">Инсталиране на сайта</p>
   <div class="card">
-    <h1>Инсталиране на сайта</h1>
-    <p class="sub">Попълнете формата веднъж. Тя записва настройките на сайта, създава базата данни и вашия профил за вход в администраторския панел.</p>
-
-<?php if ($already): ?>
-    <div class="alert alert-error">
-      Сайтът вече е инсталиран. От съображения за сигурност изтрийте папката <code>install</code>
-      от File Manager в cPanel. Администраторският панел е на адрес <a href="/admin/">/admin/</a>.
-    </div>
-<?php elseif ($success): ?>
+<?php if ($success): ?>
+    <h1 tabindex="-1" id="focus-target">Готово — сайтът е инсталиран</h1>
     <div class="alert alert-ok">
-      <strong>Инсталирането завърши успешно.</strong><br>
-      Сайтът ви работи на адрес <a href="<?= e($_POST['site_url'] ?? '/') ?>"><?= e($_POST['site_url'] ?? '/') ?></a>.
-      Влезте в администраторския панел на <a href="/admin/">/admin/</a>.
-<?php if ($created_db_info): ?>
-      <br><br>Създадена е база данни:<br>
-      име <code><?= e($created_db_info['name']) ?></code>,
-      потребител <code><?= e($created_db_info['user']) ?></code>,
-      парола <code><?= e($created_db_info['pass']) ?></code><br>
-      Те вече са запазени в настройките на сайта — не е нужно да ги пазите отделно.
-<?php endif; ?>
-      <br><br><strong>Сега изтрийте папката <code>install</code> от File Manager в cPanel.</strong>
+      Сайтът е инсталиран на адрес <a href="<?= e($done_final['org']['site_url']) ?>"><?= e($done_final['org']['site_url']) ?></a>.
+      Входът ви е с имейла <strong><?= e($done_final['account']['admin_email']) ?></strong> и паролата, която избрахте.
     </div>
-<?php if ($logo_error): ?>
-    <div class="alert alert-error">
-      <strong>Логото не беше качено:</strong> <?= e($logo_error) ?><br>
-      Сайтът работи с неутрално лого. Можете да качите вашето от администрацията → „Организация“.
+<?php if (!empty($login_token)): ?>
+    <p><a class="btn-link" href="/admin/install-login.php?t=<?= e($login_token) ?>">Влезте в администраторския панел</a></p>
+    <p class="hint">Бутонът ви вписва направо и работи само веднъж, в следващите 15 минути. После влизате с имейла и паролата си.</p>
+<?php else: ?>
+    <p><a class="btn-link" href="/admin/">Към администраторския панел</a></p>
+<?php endif; ?>
+<?php if ($logo_note): ?>
+    <div class="alert alert-error"><?= e($logo_note) ?></div>
+<?php endif; ?>
+    <h2>Преди да пуснете сайта</h2>
+    <p>Сайтът още не е отворен за посетители — те виждат страница „Скоро отваряме“, а вие виждате истинския сайт.</p>
+    <p>В <a href="/admin/">администраторския панел</a> ви чака списък с това, което законът изисква преди отваряне —
+       юридическите данни на организацията и правните страници. Всяко нещо има бутон, който води точно където се попълва.
+       Когато са готови, натиснете „Пусни сайта“.</p>
+    <p>Допълнителните части на сайта включвате и изключвате по всяко време от <a href="/admin/modules.php">„Модули“</a>. Нищо не се губи, когато изключите модул.</p>
+
+<?php else: ?>
+    <nav class="progress" aria-label="Напредък">
+      <ol>
+<?php foreach ($keys as $i => $k): ?>
+        <li class="<?= $i + 1 < $step_no ? 'done' : ($i + 1 === $step_no ? 'current' : '') ?>"<?= $i + 1 === $step_no ? ' aria-current="step"' : '' ?>><span class="vh"><?= e(($i + 1) . '. ' . $steps[$k]) ?><?= $i + 1 < $step_no ? ' — готово' : '' ?></span></li>
+<?php endforeach; ?>
+      </ol>
+    </nav>
+<?php if ($return_review): ?>
+    <a class="back" href="?step=review" data-review="1">← Обратно към проверката</a>
+<?php elseif ($prev): ?>
+    <a class="back" href="?step=<?= e($prev) ?>">← Назад</a>
+<?php endif; ?>
+
+<?php if ($errors || $install_error): ?>
+    <div class="error-summary" id="error-summary" tabindex="-1" aria-labelledby="error-summary-title">
+      <h2 id="error-summary-title">Нещо трябва да се поправи</h2>
+      <ul>
+<?php foreach ($errors as $f => $msg): ?>
+        <li><a href="#<?= e($f === 'modules' ? 'modules-group' : $f) ?>"><?= e($msg) ?></a></li>
+<?php endforeach; ?>
+<?php if ($install_error): ?>
+        <li><?= e($install_error) ?></li>
+<?php endif; ?>
+      </ul>
     </div>
 <?php endif; ?>
-<?php else: ?>
-<?php if ($errors): ?>
-    <div class="alert alert-error"><?= implode('<br>', array_map('e', $errors)) ?></div>
+
+    <h1 tabindex="-1" id="focus-target"><span class="step-of">Стъпка <?= $step_no ?> от <?= count($steps) ?></span><?= e($steps[$step]) ?></h1>
+
+    <form method="post" action="?step=<?= e($step) ?>" enctype="multipart/form-data" novalidate>
+      <input type="hidden" name="token" value="<?= e($token) ?>">
+<?php if ($return_review): ?>
+      <input type="hidden" name="return" value="review">
 <?php endif; ?>
-    <form method="post" enctype="multipart/form-data">
-      <h2>1. База данни</h2>
-<?php if (cpanel_available()): ?>
-      <div class="radio">
-        <label><input type="radio" name="db_mode" value="create" <?= ($v('db_mode','create')==='create')?'checked':'' ?> onclick="dbMode('create')"> Създай нова база данни (препоръчително)</label>
-        <label><input type="radio" name="db_mode" value="existing" <?= ($v('db_mode')==='existing')?'checked':'' ?> onclick="dbMode('existing')"> Имам вече създадена база данни</label>
+
+<?php if ($step === 'db'): ?>
+<?php   $mode = (!$cpanel || $val('db_mode') === 'existing') ? 'existing' : 'create'; ?>
+<?php   if ($cpanel): ?>
+      <p class="intro">Сайтът пази съдържанието си в база данни. Ще я създадем вместо вас — не е нужно да въвеждате нищо.</p>
+      <fieldset>
+        <legend class="vh">База данни</legend>
+        <label class="choice"><input type="radio" name="db_mode" value="create" <?= $mode === 'create' ? 'checked' : '' ?>>
+          <span><strong>Създайте я автоматично</strong><span class="desc">Препоръчително. Създаваме база данни и потребител с надеждна парола и ги запазваме в настройките на сайта.</span></span></label>
+        <label class="choice"><input type="radio" name="db_mode" value="existing" <?= $mode === 'existing' ? 'checked' : '' ?> aria-controls="db-existing">
+          <span><strong>Вече имам база данни</strong><span class="desc">Изберете това само ако хостингът или ваш помощник вече я е създал за този сайт.</span></span></label>
+      </fieldset>
+<?php   else: ?>
+      <p class="intro">Сайтът пази съдържанието си в база данни. Създава я хостинг доставчикът — на този сървър не можем да го направим вместо вас.</p>
+      <div class="box">
+        <p><strong>Нямате тези данни?</strong> Пишете на поддръжката на хостинга, например:</p>
+        <p class="quote">„Здравейте, моля създайте MySQL база данни и потребител с пълни права за нея и ми изпратете името на базата, потребителя и паролата.“</p>
+        <p>Отговорът им съдържа всичко, което трябва да попълните по-долу.</p>
       </div>
-      <div id="db-create">
-        <label>Кратко име на базата данни</label>
-        <input type="text" name="db_suffix" value="<?= $v('db_suffix') ?>" placeholder="напр. site" maxlength="12">
-        <div class="hint">Само латински букви и цифри, до 12 знака. Ще бъдат създадени база данни и потребител с име <code><?= e(get_current_user()) ?>_…</code> и автоматично генерирана парола.</div>
+<?php   endif; ?>
+      <div id="db-existing"<?= ($cpanel && $mode === 'create') ? ' hidden' : '' ?>>
+        <?= $field('db_name', 'Име на базата данни', true, 'text', 'Често започва с името на акаунта ви и долна черта, например <code>akaunt_site</code>.', 'autocomplete="off" spellcheck="false" autocapitalize="off"') ?>
+        <?= $field('db_user', 'Потребител', true, 'text', '', 'autocomplete="off" spellcheck="false" autocapitalize="off"') ?>
+        <?= $field('db_pass', 'Парола на базата данни', false, 'password', 'Оставете празно само ако хостингът изрично ви е казал, че няма парола.', 'autocomplete="off"') ?>
+        <details<?= $val('db_host') !== 'localhost' ? ' open' : '' ?>>
+          <summary>Хостингът ми е дал и адрес на сървъра</summary>
+          <?= $field('db_host', 'Сървър на базата данни', false, 'text', 'Почти винаги е <code>localhost</code> — сменете го само ако хостингът ви е дал друг.', 'autocomplete="off" spellcheck="false" autocapitalize="off"') ?>
+        </details>
       </div>
-<?php else: ?>
-      <input type="hidden" name="db_mode" value="existing">
+      <div class="actions"><button type="submit">Напред</button></div>
+
+<?php elseif ($step === 'account'): ?>
+<?php   $has_pass = !empty($done['account']['password_hash']); ?>
+      <p class="intro">С тези данни ще влизате в администраторския панел, откъдето управлявате сайта.</p>
+      <?= $field('admin_email', 'Имейл', true, 'email', '', 'autocomplete="email"') ?>
+      <?= $field('admin_password', 'Парола', !$has_pass, 'password',
+            $has_pass ? 'Вече сте избрали парола. Оставете полето празно, за да я запазите.' : 'Поне 8 знака. Запишете я на сигурно място.',
+            'autocomplete="new-password"') ?>
+      <label class="choice" id="show-pass-row" hidden style="margin-top:-.6rem;"><input type="checkbox" id="show-pass"> <span>Покажи паролата</span></label>
+      <?= $field('admin_name', 'Вашето име', false, 'text', 'Показва се в администраторския панел.', 'autocomplete="name"') ?>
+      <div class="actions"><button type="submit">Напред</button></div>
+
+<?php elseif ($step === 'org'): ?>
+      <p class="intro">Само най-необходимото. Юридическо име, телефон и банкова сметка добавяте после от администраторския панел → „Организация“.</p>
+      <?= $field('site_name_bg', 'Име на организацията', true, 'text', 'Както искате да се показва на сайта, например „Фондация Пример“.', 'autocomplete="organization"') ?>
+      <?= $field('site_name_en', 'Име на английски', false, 'text', 'За английската версия на сайта. Ако го оставите празно, ще се ползва българското.', 'lang="en"') ?>
+      <?= $field('site_email', 'Имейл за връзка', true, 'email', 'Показва се публично на сайта и в имейлите до дарители и купувачи. Попълнихме имейла ви за вход — сменете го, ако предпочитате общ адрес като info@….', 'autocomplete="email"') ?>
+      <?= $field('site_url', 'Адрес на сайта', true, 'url', 'Попълнен е автоматично и обикновено е правилен. Ползва се в имейлите и плащанията.', 'spellcheck="false" autocapitalize="off"') ?>
+      <div class="actions"><button type="submit">Напред</button></div>
+
+<?php elseif ($step === 'look'): ?>
+      <p class="intro">Всичко тук е по желание и се сменя по всяко време от администраторския панел → „Организация“.</p>
+      <fieldset>
+        <legend>Стил <span class="tag">(по желание)</span></legend>
+        <p class="hint" id="theme-hint">Шрифт и форма на бутоните. Цветовете по-долу се сменят според стила.</p>
+<?php   foreach (brand_themes() as $tk => $tv): ?>
+        <label class="choice"><input type="radio" name="brand_theme" value="<?= e($tk) ?>" <?= $val('brand_theme') === $tk ? 'checked' : '' ?> data-p="<?= e($tv['primary']) ?>" data-a="<?= e($tv['accent']) ?>" aria-describedby="theme-hint">
+          <span style="font-family:'<?= e($tv['font']) ?>',sans-serif;"><span class="sw" style="background:<?= e($tv['primary']) ?>" aria-hidden="true"></span><?= e($theme_labels_bg[$tk] ?? $tv['label']) ?></span></label>
+<?php   endforeach; ?>
+      </fieldset>
+      <div class="colours">
+        <div class="field"><label for="brand_primary">Основен цвят <span class="tag">(по желание)</span></label><input type="color" id="brand_primary" name="brand_primary" value="<?= e($val('brand_primary')) ?>"></div>
+        <div class="field"><label for="brand_accent">Допълнителен цвят <span class="tag">(по желание)</span></label><input type="color" id="brand_accent" name="brand_accent" value="<?= e($val('brand_accent')) ?>"></div>
+      </div>
+      <div class="field<?= isset($errors['logo']) ? ' field-bad' : '' ?>">
+        <label for="logo">Лого <span class="tag">(по желание)</span></label>
+        <p class="hint" id="logo-hint">PNG, JPG или WebP, до 2 MB. Без лого сайтът показва неутрален знак.<?= staged_logo() ? ' Вече сте качили лого — изберете нов файл, за да го смените.' : '' ?></p>
+<?php   if (isset($errors['logo'])): ?>
+        <p class="field-error" id="logo-error"><span class="vh">Грешка: </span><?= e($errors['logo']) ?></p>
+<?php   endif; ?>
+        <input type="file" id="logo" name="logo" accept="image/png,image/jpeg,image/webp" aria-describedby="logo-hint<?= isset($errors['logo']) ? ' logo-error' : '' ?>"<?= isset($errors['logo']) ? ' aria-invalid="true"' : '' ?>>
+<?php   if (staged_logo()): ?>
+        <label class="choice" style="margin-top:.6rem;"><input type="checkbox" name="logo_remove" value="1"> <span>Махни каченото лого</span></label>
+<?php   endif; ?>
+      </div>
+      <div class="actions">
+        <button type="submit">Напред</button>
+        <button type="submit" name="skip" value="1" class="secondary">Пропусни — стандартна визия</button>
+      </div>
+
+<?php elseif ($step === 'modules'): ?>
+<?php   $picked = array_flip(is_array($input) ? array_filter((array) ($input['modules'] ?? []), 'is_string')
+                                 : (is_array($draft['modules'] ?? null) ? $draft['modules'] : ($done['modules']['modules'] ?? []))); ?>
+      <p class="intro">Страниците и новините са винаги включени. Отбележете допълнителните части, които организацията ви ще ползва.
+        Не сте сигурни? Оставете ги — включвате ги по всяко време от администраторския панел → „Модули“.</p>
+      <fieldset id="modules-group" tabindex="-1"<?= isset($errors['modules']) ? ' aria-describedby="modules-error"' : '' ?>>
+        <legend>Допълнителни части <span class="tag">(по желание)</span></legend>
+<?php   if (isset($errors['modules'])): ?>
+        <p class="field-error" id="modules-error"><span class="vh">Грешка: </span><?= e($errors['modules']) ?></p>
+<?php   endif; ?>
+<?php   foreach (modules_registry() as $mname => $mod): ?>
+        <label class="choice"><input type="checkbox" name="modules[]" value="<?= e($mname) ?>" <?= isset($picked[$mname]) ? 'checked' : '' ?>>
+          <span><strong><?= e($mod['label']) ?></strong><span class="desc"><?= e($mod['description']) ?></span>
+<?php     if ($mod['needs']): ?>
+            <span class="desc">Нуждае се от: <?= e(implode(', ', array_map(fn($n) => '„' . module_label($n) . '“', $mod['needs']))) ?>.</span>
+<?php     endif; ?>
+          </span></label>
+<?php   endforeach; ?>
+      </fieldset>
+      <div class="actions"><button type="submit">Напред</button></div>
+
+<?php elseif ($step === 'review'): ?>
+<?php
+        $d = $done;
+        $mod_labels = array_map('module_label', $d['modules']['modules'] ?? []);
+        $sections = [
+            'db' => ($d['db']['db_mode'] ?? '') === 'create'
+                ? ['База данни' => 'ще бъде създадена автоматично']
+                : ['База данни' => $d['db']['db_name'] ?? '', 'Потребител' => $d['db']['db_user'] ?? '', 'Сървър' => $d['db']['db_host'] ?? ''],
+            'account' => ['Имейл' => $d['account']['admin_email'] ?? '', 'Парола' => 'избрана', 'Име' => ($d['account']['admin_name'] ?? '') ?: '—'],
+            'org' => ['Име' => $d['org']['site_name_bg'] ?? '',
+                      'На английски' => ($d['org']['site_name_en'] ?? '') ?: (($d['org']['site_name_bg'] ?? '') . ' (същото)'),
+                      'Имейл за връзка' => $d['org']['site_email'] ?? '', 'Адрес' => $d['org']['site_url'] ?? ''],
+            'look' => ['Стил' => $theme_labels_bg[$d['look']['brand_theme'] ?? 'classic'] ?? '', 'Лого' => staged_logo() ? 'качено' : 'неутрален знак'],
+            'modules' => ['Включени' => $mod_labels ? implode(', ', $mod_labels) : 'само страници и новини'],
+        ];
+?>
+      <p class="intro">Проверете отговорите си. Когато натиснете „Инсталирай“, създаваме таблиците и вашия профил. Отнема няколко секунди.</p>
+      <div class="review">
+<?php   foreach ($sections as $sk => $rows): ?>
+        <section aria-labelledby="rv-<?= e($sk) ?>">
+          <h2 id="rv-<?= e($sk) ?>"><?= e($steps[$sk]) ?> <a href="?step=<?= e($sk) ?>&amp;return=review">Промени<span class="vh"> — <?= e($steps[$sk]) ?></span></a></h2>
+          <dl>
+<?php     foreach ($rows as $label => $value): ?>
+            <dt><?= e($label) ?></dt><dd><?= e((string) $value) ?></dd>
+<?php     endforeach; ?>
+          </dl>
+        </section>
+<?php   endforeach; ?>
+      </div>
+      <div class="actions"><button type="submit">Инсталирай</button></div>
 <?php endif; ?>
-      <div id="db-existing">
-        <div class="row">
-          <div><label>Сървър на базата данни</label><input type="text" name="db_host" value="<?= $v('db_host','localhost') ?>"></div>
-          <div><label>Име на базата данни</label><input type="text" name="db_name" value="<?= $v('db_name') ?>"></div>
-        </div>
-        <div class="row">
-          <div><label>Потребител</label><input type="text" name="db_user" value="<?= $v('db_user') ?>"></div>
-          <div><label>Парола</label><input type="password" name="db_pass"></div>
-        </div>
-        <div class="hint">Сървърът обикновено е <code>localhost</code>. Името на базата и потребителят включват префикса, който cPanel добавя — например <code>akaunt_site</code>.</div>
-      </div>
-
-      <h2>2. Организация</h2>
-      <div class="row">
-        <div><label>Име на организацията (на български)</label><input type="text" name="site_name_bg" value="<?= $v('site_name_bg') ?>" required></div>
-        <div><label>Име на организацията (на английски)</label><input type="text" name="site_name_en" value="<?= $v('site_name_en') ?>" required></div>
-      </div>
-      <div class="row">
-        <div><label for="legalBg">Юридическо име (на български)</label><input type="text" id="legalBg" name="site_legal_name_bg" maxlength="150" value="<?= $v('site_legal_name_bg') ?>" aria-describedby="legalHint"></div>
-        <div><label for="legalEn">Юридическо име (на английски)</label><input type="text" id="legalEn" name="site_legal_name_en" maxlength="150" value="<?= $v('site_legal_name_en') ?>" aria-describedby="legalHint"></div>
-      </div>
-      <div class="hint" id="legalHint">Не е задължително. Попълнете, ако сайтът е марка или проект на друго юридическо лице — например „Фондация Пример“. Това име се печата на сертификатите за дарение, фактурите и разписките. Празно — използва се името на организацията.</div>
-      <label>Адрес на сайта</label>
-      <input type="url" name="site_url" value="<?= $v('site_url', $guess_url) ?>" required>
-      <div class="hint">Пълният адрес с <code>https://</code>, без наклонена черта накрая. Използва се във всички имейли и плащания.</div>
-      <div class="row">
-        <div><label>Имейл за контакт</label><input type="email" name="site_email" value="<?= $v('site_email') ?>" required></div>
-        <div><label>Телефон за контакт</label><input type="text" name="site_phone" value="<?= $v('site_phone') ?>"></div>
-      </div>
-      <div class="row">
-        <div><label>IBAN (за дарения)</label><input type="text" name="site_iban" value="<?= $v('site_iban') ?>"></div>
-        <div><label>BIC</label><input type="text" name="site_bic" value="<?= $v('site_bic') ?>"></div>
-      </div>
-      <label>Име на банката</label>
-      <input type="text" name="site_bank_name" value="<?= $v('site_bank_name') ?>">
-      <div class="hint">Банковата сметка се показва на дарителите. Попълнете я сега, ако я имате под ръка.</div>
-
-      <h2>3. Визия</h2>
-      <label>Стил</label>
-      <div class="themes">
-        <?php foreach (brand_themes() as $tk => $tv): ?>
-        <label class="theme-card">
-          <input type="radio" name="brand_theme" value="<?= e($tk) ?>" <?= ($v('brand_theme','classic')===$tk)?'checked':'' ?> onchange="pickTheme('<?= e($tk) ?>')">
-          <span class="sw" style="background:<?= e($tv['primary']) ?>"></span>
-          <span style="font-family:'<?= e($tv['font']) ?>',sans-serif;"><?= e($theme_labels_bg[$tk] ?? $tv['label']) ?></span>
-        </label>
-        <?php endforeach; ?>
-      </div>
-      <div class="hint">Изберете визия (шрифт и форма). Цветовете по-долу се попълват според стила — можете да ги промените.</div>
-      <div class="row">
-        <div><label>Основен цвят</label><input type="color" name="brand_primary" value="<?= $v('brand_primary','#0387A5') ?>" style="height:44px;padding:3px;"></div>
-        <div><label>Допълнителен цвят</label><input type="color" name="brand_accent" value="<?= $v('brand_accent','#04ADBF') ?>" style="height:44px;padding:3px;"></div>
-      </div>
-      <label>Лого <span style="font-weight:400;color:var(--muted);">(по желание — PNG, JPG или WebP)</span></label>
-      <input type="file" name="logo" accept="image/png,image/jpeg,image/webp">
-      <div class="hint">Ако го оставите празно, ще се покаже неутрално лого. Можете да го смените по всяко време от администрацията → „Организация“.</div>
-
-      <h2>4. Администратор</h2>
-      <div class="row">
-        <div><label>Вашето име</label><input type="text" name="admin_name" value="<?= $v('admin_name') ?>"></div>
-        <div><label>Имейл за вход</label><input type="email" name="admin_email" value="<?= $v('admin_email') ?>" required></div>
-      </div>
-      <label>Парола за вход</label>
-      <input type="password" name="admin_password" required>
-      <div class="hint">Поне 8 знака. Запишете я на сигурно място.</div>
-
-      <button type="submit">Инсталирай</button>
     </form>
-    <script>
-      function dbMode(m){
-        var c = document.getElementById('db-create'), x = document.getElementById('db-existing');
-        if (c) c.style.display = (m==='create')   ? '' : 'none';
-        if (x) x.style.display = (m==='existing') ? '' : 'none';
-      }
-      dbMode(document.querySelector('input[name=db_mode]:checked')?.value || 'existing');
-      var THEMES = <?= json_encode(array_map(fn($t) => ['p' => $t['primary'], 'a' => $t['accent']], brand_themes())) ?>;
-      function pickTheme(k){ var t = THEMES[k]; if(!t) return;
-        document.querySelector('input[name=brand_primary]').value = t.p;
-        document.querySelector('input[name=brand_accent]').value  = t.a; }
-    </script>
 <?php endif; ?>
   </div>
 </div>
+<script>
+  // Move focus to what changed: the error summary, or the newly opened step's heading.
+  (function () {
+    var t = document.getElementById('error-summary') || (location.search ? document.getElementById('focus-target') : null);
+    if (t) t.focus();
+    // „Назад“ takes what you typed on this step with it (without JavaScript it is a plain link).
+    var back = document.querySelector('a.back'), form = document.querySelector('form[method=post]');
+    if (back && form && form.querySelector('input[name=token]') && !back.dataset.review) {
+      back.addEventListener('click', function (e) {
+        e.preventDefault();
+        var nav = document.createElement('input');
+        nav.type = 'hidden'; nav.name = 'nav'; nav.value = 'back';
+        form.appendChild(nav);
+        form.submit();
+      });
+    }
+    var box = document.getElementById('db-existing');
+    document.querySelectorAll('input[name=db_mode]').forEach(function (r) {
+      r.addEventListener('change', function () { if (r.checked) box.hidden = r.value === 'create'; });
+    });
+    var show = document.getElementById('show-pass'), pass = document.getElementById('admin_password');
+    if (show && pass) {
+      document.getElementById('show-pass-row').hidden = false;
+      show.addEventListener('change', function () { pass.type = show.checked ? 'text' : 'password'; });
+    }
+    document.querySelectorAll('input[name=brand_theme]').forEach(function (r) {
+      r.addEventListener('change', function () {
+        document.getElementById('brand_primary').value = r.dataset.p;
+        document.getElementById('brand_accent').value  = r.dataset.a;
+      });
+    });
+  })();
+</script>
 </body>
 </html>

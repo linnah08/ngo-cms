@@ -16,8 +16,9 @@ function _switch_lang(string $path, string $current_lang): string {
 }
 
 $_menus    = load_json(CONTENT_PATH . '/menus.json');
-// Links to a draft or a missing page are left out (keys kept for the on-page editor).
-$nav       = menu_public_items(is_array($_menus['header'][$lang] ?? null) ? $_menus['header'][$lang] : []);
+// Links to a draft or a missing page, or to a switched-off module (Admin → Модули),
+// are left out (keys kept for the on-page editor).
+$nav       = module_filter_links(menu_public_items(is_array($_menus['header'][$lang] ?? null) ? $_menus['header'][$lang] : []));
 $_nav_bg   = $_menus['header']['bg'] ?? [];
 $_nav_en   = $_menus['header']['en'] ?? [];
 $shop_url  = shop_path('shop', $lang);
@@ -143,6 +144,13 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
   <div class="om-bar-spacer"></div>
   <a href="<?= $_admin_base ?>/" class="om-exit-link">← Admin</a>
 </div>
+<?php if (!site_launched()): ?>
+<?php /* Part of the admin bar, so it can't be taken for the public "Съобщение в началото на сайта" (Организация). */ ?>
+<div role="status" style="background:#1a1a2e;color:#f3f4f6;border-top:1px solid rgba(255,255,255,.15);padding:.5rem 1rem;font-size:.85rem;text-align:center;font-family:system-ui,sans-serif;">
+  <strong style="color:#fcd34d;">Само вие виждате това:</strong> сайтът още не е отворен, посетителите виждат страница „Скоро отваряме“.
+  <a href="<?= $_admin_base ?>/#go-live" style="color:#fcd34d;font-weight:600;">Какво остава</a>
+</div>
+<?php endif; ?>
 <button id="om-save-btn" onclick="OmCMS.save()">💾 Save changes</button>
 <div id="om-add-modal">
   <div class="om-modal-box">
@@ -241,6 +249,8 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
               </a>
             </li>
           <?php endforeach; ?>
+          <?php // Shop link and cart only while „Магазин“ is on (Admin → Модули). ?>
+          <?php if (module_enabled_with_needs('shop')): ?>
           <li class="nav-cta">
             <a href="<?= $shop_url ?>"><?= t('nav.shop') ?></a>
           </li>
@@ -252,6 +262,7 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
               <?php endif; ?>
             </a>
           </li>
+          <?php endif; ?>
           <li class="nav-lang-item">
             <?php require __DIR__ . '/lang-switcher.php'; ?>
           </li>

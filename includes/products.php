@@ -119,12 +119,68 @@ function product_single_variant(array $active_variants): ?array {
  * The variant the product page starts on: the first (in sort order) that is in
  * stock, or null when every variant is sold out. Starting on a sold-out variant
  * would make "Add to cart" fail for a buyer who didn't change the choice.
+ *
+ * With $preorder (the product takes pre-orders) a sold-out product still starts
+ * on its first variant, which can then be pre-ordered.
  */
-function product_default_variant(array $active_variants): ?array {
+function product_default_variant(array $active_variants, bool $preorder = false): ?array {
     foreach ($active_variants as $pv) {
         if ((int)($pv['stock'] ?? 0) > 0) return $pv;
     }
-    return null;
+    return $preorder && $active_variants ? reset($active_variants) : null;
+}
+
+// ── Pre-orders ────────────────────────────────────────────────────────────────
+// A product with preorder_enabled stays buyable once it runs out. Its stock then
+// goes below zero: -3 means three pre-ordered items still waiting to be sent.
+
+/** Whether a line sells as a pre-order: nothing left, and the product takes pre-orders. */
+function product_is_preorder(array $product, int $available_stock): bool {
+    return $available_stock <= 0 && !empty($product['preorder_enabled']);
+}
+
+/** The admin's delivery estimate in $lang ('' when none was written). */
+function product_preorder_note(array $product, string $lang): string {
+    $note = $lang === 'en' ? ($product['preorder_note_en'] ?? '') : ($product['preorder_note_bg'] ?? '');
+    if ($lang === 'en' && trim((string)$note) === '') $note = $product['preorder_note_bg'] ?? '';
+    return trim((string)$note);
+}
+
+/**
+ * The sentence the buyer sees next to a pre-order line: the admin's delivery
+ * estimate, or a plain "we send it later" when there is none.
+ */
+function product_preorder_text(array $product, string $lang): string {
+    $note = product_preorder_note($product, $lang);
+    return $note !== ''
+        ? t_or('shop.preorder.ships', 'Изпращаме по-късно: {note}', 'Ships later: {note}', $lang, ['note' => $note])
+        : t_or('shop.preorder.ships_default', 'Изпращаме по-късно, щом пристигне.', 'Ships later, as soon as it arrives.', $lang);
+}
+
+/** "Предварителна поръчка" / "Pre-order". */
+function product_preorder_label(string $lang): string {
+    return t_or('shop.preorder.label', 'Предварителна поръчка', 'Pre-order', $lang);
+}
+
+/**
+ * Live stock of one cart line: the variant's for a variant product, else the
+ * product's own.
+ */
+function product_line_stock(PDO $pdo, array $product, ?int $variant_id): int {
+    if (($product['type'] ?? '') === 'variant' && $variant_id) {
+        $stmt = $pdo->prepare('SELECT stock FROM product_variants WHERE id = ? AND product_id = ?');
+        $stmt->execute([$variant_id, $product['id']]);
+        return (int)($stmt->fetchColumn() ?: 0);
+    }
+    return (int)($product['stock'] ?? 0);
+}
+
+/**
+ * How many of a line the cart may hold: unlimited for a pre-order, else what is
+ * in stock (never below 0).
+ */
+function product_line_limit(array $product, int $available_stock): int {
+    return product_is_preorder($product, $available_stock) ? PHP_INT_MAX : max(0, $available_stock);
 }
 
 /**
@@ -137,6 +193,13 @@ function product_is_in_stock(array $product, array $active_variants = []): bool 
         return product_default_variant($active_variants) !== null;
     }
     return (int)($product['stock'] ?? 0) > 0;
+}
+
+/** Whether the buy button shows: in stock, or out of stock but taking pre-orders. */
+function product_can_buy(array $product, array $active_variants = []): bool {
+    if (product_is_in_stock($product, $active_variants)) return true;
+    if (empty($product['preorder_enabled'])) return false;
+    return ($product['type'] ?? '') !== 'variant' || $active_variants !== [];
 }
 
 /**
@@ -213,11 +276,12 @@ function product_clean_variant_attributes(array $raw): array {
  * Parse + sanitise 'variant' product rows from POST.
  *
  * Each kept row: id, label_bg, label_en, image (primary), images (gallery, max 8,
- * deduped, filename-validated), stock, attrs. Rows with an empty BG label are
+ * deduped, filename-validated), stock (clamped at 0 unless $allow_negative_stock),
+ * attrs. Rows with an empty BG label are
  * skipped. $image_ok(string $filename): bool keeps only real gallery files and is
  * injected so this function does no filesystem I/O itself.
  */
-function product_parse_variant_rows(array $post, callable $image_ok): array {
+function product_parse_variant_rows(array $post, callable $image_ok, bool $allow_negative_stock = false): array {
     $vr_ids       = $post['pv_id']       ?? [];
     $vr_labels    = $post['pv_label_bg'] ?? [];
     $vr_labels_en = $post['pv_label_en'] ?? [];
@@ -258,7 +322,8 @@ function product_parse_variant_rows(array $post, callable $image_ok): array {
             'label_en' => trim((string)($vr_labels_en[$i] ?? '')),
             'image'    => $primary,
             'images'   => $images,
-            'stock'    => max(0, (int)($vr_stocks[$i] ?? 0)),
+            // Below zero only for a pre-order product, where it counts items still owed.
+            'stock'    => $allow_negative_stock ? (int)($vr_stocks[$i] ?? 0) : max(0, (int)($vr_stocks[$i] ?? 0)),
             'attrs'    => $row_attrs,
         ];
     }

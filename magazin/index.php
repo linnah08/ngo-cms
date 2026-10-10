@@ -4,6 +4,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
 start_session();
 
+// Module switched off in Admin → Модули — the shop does not exist (site's 404).
+module_public_guard('shop');
+
 $lang = get_lang();
 $pdo  = get_pdo();
 
@@ -48,8 +51,10 @@ if ($slug) {
         $pv_stmt->execute([$p['id']]);
         $prod_variants = $pv_stmt->fetchAll();
     }
-    // The variant the page starts on: the first in-stock one (null if all sold out).
-    $default_pv = product_default_variant($prod_variants);
+    // The variant the page starts on: the first in-stock one (null if all sold
+    // out — unless the product takes pre-orders, then its first variant).
+    $p_preorder_on = $p && !empty($p['preorder_enabled']);
+    $default_pv = product_default_variant($prod_variants, $p_preorder_on);
 
     if (!$p) {
         http_response_code(404);
@@ -85,13 +90,17 @@ if ($slug) {
             '@type'         => 'Offer',
             'price'         => number_format((float)$p['price_eur'], 2, '.', ''),
             'priceCurrency' => 'EUR',
-            'availability'  => product_is_in_stock($p, $prod_variants) ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+            'availability'  => product_is_in_stock($p, $prod_variants)
+                ? 'https://schema.org/InStock'
+                : (product_can_buy($p, $prod_variants) ? 'https://schema.org/PreOrder' : 'https://schema.org/OutOfStock'),
             'url'           => rtrim(SITE_URL, '/') . ($lang === 'bg' ? '/magazin/' : '/en/shop/') . rawurlencode($p['slug']) . '/',
         ];
     }
     // ── Reviews: real aggregateRating + review (only when ≥1 approved) ──
     require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/product_reviews.php';
-    $approved_reviews = product_reviews_fetch_approved($pdo, (int)$p['id']);
+    // Reviews are part of „Коментари и отзиви“ (Admin → Модули): off = no reviews, no rating.
+    $reviews_on       = module_enabled_with_needs('comments_reviews');
+    $approved_reviews = $reviews_on ? product_reviews_fetch_approved($pdo, (int)$p['id']) : [];
     $review_schema = product_reviews_schema($approved_reviews);
     if ($review_schema) {
         $_prod_schema = array_merge($_prod_schema, $review_schema);
@@ -217,9 +226,21 @@ if ($slug) {
         <?php endif; ?>
 
         <?php
-          $show_cart_form = product_is_in_stock($p, $prod_variants);
+          $show_cart_form = product_can_buy($p, $prod_variants);
+          // Does the line the buyer starts on sell as a pre-order?
+          $start_preorder = $show_cart_form && product_is_preorder(
+              $p, $is_variant ? (int)($default_pv['stock'] ?? 0) : (int)$p['stock']
+          );
         ?>
         <?php if ($show_cart_form): ?>
+          <?php if ($p_preorder_on): ?>
+          <div id="preorderNotice" role="status"
+               style="<?= $start_preorder ? '' : 'display:none;' ?>padding:.8rem 1.1rem;background:#fef3c7;border:1px solid #d97706;color:#78350f;border-radius:var(--radius);line-height:1.5;">
+            <strong><span aria-hidden="true">⏳ </span><?= h(product_preorder_label($lang)) ?></strong>
+            <span style="display:block;font-size:.92rem;"><?= h(t_or('shop.preorder.page_body', 'В момента е изчерпан, но можете да го поръчате сега.', 'Sold out right now, but you can order it today.', $lang)) ?>
+              <?= h(product_preorder_text($p, $lang)) ?></span>
+          </div>
+          <?php endif; ?>
           <form method="POST" action="/cart/add.php"
                 <?= $is_custom ? 'enctype="multipart/form-data"' : '' ?>
                 id="addToCartForm">
@@ -499,6 +520,9 @@ var _pvData = <?= json_encode(
     'image'  => $pv['image'] ? '/assets/images/products/' . $pv['image'] : '',
     'images' => array_map(fn($f) => '/assets/images/products/' . $f, variant_gallery($pv)),
     'stock'  => (int)$pv['stock'],
+    // In stock, or sold out on a product that takes pre-orders.
+    'buyable'  => (int)$pv['stock'] > 0 || $p_preorder_on,
+    'preorder' => (int)$pv['stock'] <= 0 && $p_preorder_on,
   ], $prod_variants)
 , JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
 
@@ -537,7 +561,10 @@ function renderGallery(vid) {
 
 function selectVariant(vid) {
   var pv = _pvData.find(function(v){ return v.id === vid; });
-  if (!pv || pv.stock === 0) return;
+  if (!pv || !pv.buyable) return;
+
+  var notice = document.getElementById('preorderNotice');
+  if (notice) notice.style.display = pv.preorder ? '' : 'none';
 
   var inp = document.getElementById('variantIdInput');
   if (inp) inp.value = vid;
@@ -579,7 +606,7 @@ renderGallery(<?= (int)($default_pv ?? $prod_variants[0])['id'] ?>);
 <?php
     $slug    = $p['slug'];
     $reviews = $approved_reviews;   // already fetched above for the schema
-    require $_SERVER['DOCUMENT_ROOT'] . '/templates/product-reviews.php';
+    if ($reviews_on) require $_SERVER['DOCUMENT_ROOT'] . '/templates/product-reviews.php';
     require $_SERVER['DOCUMENT_ROOT'] . '/templates/footer.php';
     exit;
 }
@@ -617,12 +644,25 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 <section class="section section--grey" style="padding-bottom:2rem;">
   <div class="container">
     <span class="section-label"><?= $lang === 'bg' ? 'Магазин' : 'Shop' ?></span>
-    <h1><?= $lang === 'bg' ? 'Дари и подкрепи' : 'Shop & Support' ?></h1>
-    <p class="lead" style="margin-top:1rem;max-width:640px;">
-      <?= $lang === 'bg'
-        ? 'Всяка покупка директно финансира работата ни с децата.'
-        : 'Every purchase directly funds our work with children.' ?>
-    </p>
+<?php
+    // Editable on the page (inline CMS). The defaults don't mention donating
+    // unless the site takes donations (Админ → Модули).
+    $_shop_hero = [
+        'title' => ($pages['shop']['hero_title_' . $lang] ?? '') ?: ($_donations_on
+            ? ($lang === 'bg' ? 'Пазарувай и подкрепи' : 'Shop & Support')
+            : ($lang === 'bg' ? 'Магазин' : 'Shop')),
+        'text'  => ($pages['shop']['hero_text_' . $lang] ?? '') ?: ($lang === 'bg'
+            ? 'Всяка покупка подкрепя каузата ни.'
+            : 'Every purchase supports our cause.'),
+    ];
+?>
+    <h1 data-cms-field="hero_title" data-cms-section="shop" data-cms-type="text"
+        data-cms-bg="<?= h($pages['shop']['hero_title_bg'] ?? '') ?>"
+        data-cms-en="<?= h($pages['shop']['hero_title_en'] ?? '') ?>"><?= h($_shop_hero['title']) ?></h1>
+    <p class="lead" style="margin-top:1rem;max-width:640px;"
+       data-cms-field="hero_text" data-cms-section="shop" data-cms-type="text"
+       data-cms-bg="<?= h($pages['shop']['hero_text_bg'] ?? '') ?>"
+       data-cms-en="<?= h($pages['shop']['hero_text_en'] ?? '') ?>"><?= h($_shop_hero['text']) ?></p>
   </div>
 </section>
 

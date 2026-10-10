@@ -127,10 +127,21 @@ final class DocumentIssuerNameTest extends TestCase
     {
         $this->assertArrayHasKey('site_legal_name_bg', org_fields());
         $this->assertArrayHasKey('site_legal_name_en', org_fields());
-        $wizard = (string) file_get_contents(self::root() . '/install/index.php');
-        $this->assertStringContainsString('name="site_legal_name_bg"', $wizard);
-        $this->assertStringContainsString('name="site_legal_name_en"', $wizard);
-        $this->assertStringContainsString("'SITE_LEGAL_NAME_BG' => \$legal_bg", $wizard);
-        $this->assertStringContainsString("'SITE_LEGAL_NAME_EN' => \$legal_en", $wizard);
+        // The wizard leaves it out (only what a site can't start without) but
+        // writes the constants and sends the admin straight to the field.
+        require_once self::root() . '/install/wizard-lib.php';
+        $config = wizard_site_config([
+            'account' => ['admin_email' => 'a@example.org'],
+            'org'     => ['site_name_bg' => 'Пример', 'site_name_en' => '', 'site_url' => 'https://example.org', 'site_email' => 'a@example.org'],
+            'look'    => ['brand_theme' => 'classic', 'brand_primary' => '#000000', 'brand_accent' => '#111111'],
+            'modules' => ['modules' => []],
+        ]);
+        $this->assertSame('', $config['SITE_LEGAL_NAME_BG']);
+        $this->assertSame('', $config['SITE_LEGAL_NAME_EN']);
+        // …and the go-live checklist sends the admin straight to the field.
+        require_once self::root() . '/includes/launch.php';
+        $item = array_values(array_filter(launch_checklist([], true), fn($i) => $i['key'] === 'legal_name'))[0];
+        $this->assertSame('/admin/organisation.php#f-site_legal_name_bg', $item['href']);
+        $this->assertTrue($item['required']);
     }
 }

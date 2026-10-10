@@ -54,9 +54,6 @@ $active_theme = $themes[$current['brand_theme']];
 if (!org_color_valid($current['brand_primary'])) $current['brand_primary'] = $active_theme['primary'];
 if (!org_color_valid($current['brand_accent']))  $current['brand_accent']  = $active_theme['accent'];
 $nl_choices = newsletter_band_choices();
-// A module with no saved switch and no FEATURE_* constant is on.
-$modules = org_modules();
-foreach ($modules as $mname => $mod) $current[$mod['field']] = feature_enabled($mname) ? '1' : '0';
 
 $val = static fn(string $k): string => (string) (($form ?? $current)[$k] ?? '');
 
@@ -144,6 +141,29 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <?= $ferr('site_legal_name_en') ?>
       </label>
     </div>
+    <label class="admin-checkbox" style="margin-top:.75rem;">
+      <input type="checkbox" name="site_legal_same" value="1" <?= $val('site_legal_same') === '1' ? 'checked' : '' ?>>
+      Организацията е регистрирана с името по-горе — няма отделно юридическо име
+    </label>
+
+    <h3 style="margin:1.5rem 0 .25rem;font-size:.95rem;">Регистрация</h3>
+    <p style="<?= $hint ?>margin:0 0 .75rem;">
+      От документите за регистрация на организацията (Търговски регистър или БУЛСТАТ). Законът изисква сайтът да посочва кой стои зад него, а фактурите — ЕИК и адрес.
+    </p>
+    <div class="admin-form-grid">
+      <label id="f-site_eik">ЕИК / БУЛСТАТ
+        <input type="text" name="site_eik" value="<?= h($val('site_eik')) ?>" maxlength="20" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="123456789"<?= $fattr('site_eik') ?>>
+        <?= $ferr('site_eik') ?>
+      </label>
+      <label id="f-site_mol">Представляващ (МОЛ)
+        <input type="text" name="site_mol" value="<?= h($val('site_mol')) ?>" maxlength="150" placeholder="Иван Иванов"<?= $fattr('site_mol') ?>>
+        <?= $ferr('site_mol') ?>
+      </label>
+      <label id="f-site_address" style="grid-column:1/-1;">Адрес на управление
+        <input type="text" name="site_address" value="<?= h($val('site_address')) ?>" maxlength="250" placeholder="гр. София 1000, ул. Примерна 1"<?= $fattr('site_address') ?>>
+        <?= $ferr('site_address') ?>
+      </label>
+    </div>
   </section>
 
   <!-- ── Contacts ──────────────────────────────────────────────────────────── -->
@@ -165,9 +185,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
   <!-- ── Bank ──────────────────────────────────────────────────────────────── -->
   <section class="admin-card" style="<?= $card ?>">
-    <h2 class="admin-card__title">Банкова сметка за дарения</h2>
+    <h2 class="admin-card__title">Банкова сметка</h2>
     <p class="admin-meta" style="margin:0 0 1rem;line-height:1.6;">
-      Показва се на дарителите и във фактурите. Проверяваме IBAN-а автоматично, така че сгрешена цифра няма да мине.
+      Показва се в „Контакти“ и във фактурите<?= module_enabled_with_needs('donations') ? ', и на дарителите' : '' ?>. Проверяваме IBAN-а автоматично, така че сгрешена цифра няма да мине.
       Оставете полетата празни, ако не искате да показвате сметка.
     </p>
     <div class="admin-form-grid">
@@ -236,6 +256,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     $nl_read   = 'Текстът се чете добре.';
     $nl_hard   = 'Текстът се чете трудно — изберете по-тъмен или по-светъл цвят.';
     ?>
+    <?php if (module_enabled_with_needs('newsletter')): ?>
     <fieldset id="f-newsletter_band" style="border:none;margin:1.5rem 0 0;padding:0;min-width:0;">
       <legend style="font-weight:600;margin-bottom:.25rem;padding:0;">Цвят на лентата за бюлетина</legend>
       <small id="nlHint" style="<?= $hint ?>margin:0 0 .6rem;">Цветната лента над долната част на всяка страница, в която посетителите се записват за бюлетина. Цветът на текста се избира сам, така че да се чете.</small>
@@ -272,6 +293,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         </p>
       </div>
     </fieldset>
+    <?php endif; ?>
 
     <div id="f-logo" style="margin-top:1.5rem;">
       <div style="font-weight:600;margin-bottom:.5rem;">Лого</div>
@@ -339,13 +361,13 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </div>
   </section>
 
+  <?php if (module_enabled_with_needs('newsletter') && module_enabled_with_needs('donations')): ?>
   <!-- ── Newsletter donate box ──────────────────────────────────────────────── -->
   <section class="admin-card" style="<?= $card ?>" aria-labelledby="nl-donate-title">
     <h2 class="admin-card__title" id="nl-donate-title">Покана за дарение в бюлетина</h2>
     <p class="admin-meta" style="margin:0 0 1rem;line-height:1.6;">
       Добавя кутийка с бутон „Дарете сега“ най-долу във всеки бюлетин, който изпращате на абонатите —
-      над връзката за отписване. Изключена е, докато не я включите. Работи само ако модулът „Дарения“
-      по-долу е включен. Как изглежда, виждате в „Преглед“ на всяка кампания.
+      над връзката за отписване. Изключена е, докато не я включите. Как изглежда, виждате в „Преглед“ на всяка кампания.
     </p>
     <label class="admin-checkbox" style="margin-bottom:1rem;">
       <input type="checkbox" name="newsletter_donate_cta" value="1" <?= in_array($val('newsletter_donate_cta'), ['1', 'true'], true) ? 'checked' : '' ?>>
@@ -376,37 +398,11 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       </label>
     </div>
   </section>
+  <?php endif; ?>
 
-  <!-- ── Optional modules ──────────────────────────────────────────────────── -->
-  <section class="admin-card" style="<?= $card ?>" aria-labelledby="modules-title">
-    <h2 class="admin-card__title" id="modules-title">Модули</h2>
-    <p class="admin-meta" style="margin:0 0 1rem;line-height:1.6;">
-      Включете само частите от сайта, които организацията ви използва. Изключеният модул
-      изчезва от сайта за посетителите, но нищо не се изтрива — можете да го включите отново по всяко време.
-    </p>
-    <?php foreach ($modules as $mname => $mod):
-        $mk     = $mod['field'];
-        $on_now = feature_enabled($mname);
-        $on_val = $val($mk) === '1'; ?>
-      <div id="f-<?= h($mk) ?>" style="padding:.85rem 1rem;border:1px solid var(--border,#ddd);border-radius:8px;margin-bottom:.75rem;">
-        <label for="mod-<?= h($mname) ?>" style="display:flex;align-items:center;gap:.75rem;min-height:44px;margin:0;cursor:pointer;font-weight:600;text-transform:none;letter-spacing:normal;">
-          <input type="checkbox" id="mod-<?= h($mname) ?>" name="<?= h($mk) ?>" value="1" <?= $on_val ? 'checked' : '' ?>
-                 data-module-switch data-was-on="<?= $on_now ? '1' : '0' ?>"
-                 data-off-warning="<?= h($mod['off_warning']) ?>"
-                 aria-describedby="hint-<?= h($mname) ?> state-<?= h($mname) ?><?= isset($errors[$mk]) ? ' err-' . h($mk) : '' ?>"
-                 style="width:22px;height:22px;margin:0;flex-shrink:0;cursor:pointer;">
-          <span><?= h($mod['label']) ?></span>
-        </label>
-        <small id="hint-<?= h($mname) ?>" style="<?= $hint ?>"><?= h($mod['hint']) ?></small>
-        <p id="state-<?= h($mname) ?>" style="margin:.4rem 0 0;font-size:.85rem;line-height:1.5;">
-          Сега на сайта: <strong><?= $on_now ? '✓ включено' : '✕ изключено' ?></strong>
-          <span data-module-pending style="color:#92400e;"></span>
-        </p>
-        <?= $ferr($mk) ?>
-      </div>
-    <?php endforeach; ?>
-    <p id="modules-live" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;"></p>
-  </section>
+  <p class="admin-meta" style="margin:0 0 1.5rem;line-height:1.6;">
+    Кои части от сайта ползвате (дарения, кампании и др.) се избира на страница <a href="/admin/modules.php">„Модули“</a>.
+  </p>
 
   <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;margin-bottom:2rem;">
     <button type="submit" class="btn btn--primary">Запази</button>
@@ -475,34 +471,6 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     });
     [primary, accent, nlColor].forEach(function (el) {
         if (el) el.addEventListener('input', function () { nlUpdate(); });
-    });
-    // Module switches: say in words what will change, and confirm before a
-    // module is switched off (it disappears for visitors).
-    var form = document.getElementById('orgForm'), live = document.getElementById('modules-live');
-    var switches = Array.prototype.slice.call(document.querySelectorAll('[data-module-switch]'));
-    switches.forEach(function (cb) {
-        cb.addEventListener('change', function () {
-            var pending = cb.closest('[id^="f-"]').querySelector('[data-module-pending]');
-            var wasOn = cb.dataset.wasOn === '1', msg = '';
-            if (wasOn && !cb.checked) msg = '— ще се изключи, когато натиснете „Запази“.';
-            if (!wasOn && cb.checked) msg = '— ще се включи, когато натиснете „Запази“.';
-            if (pending) pending.textContent = msg;
-            if (live) live.textContent = msg ? cb.closest('label').textContent.trim() + ' ' + msg : '';
-        });
-    });
-    var confirmed = false;
-    if (form) form.addEventListener('submit', function (e) {
-        if (confirmed) return;
-        var turningOff = switches.filter(function (cb) { return cb.dataset.wasOn === '1' && !cb.checked; });
-        if (!turningOff.length || !window._adminConfirm) return;
-        e.preventDefault();
-        var msg = turningOff.map(function (cb) { return cb.dataset.offWarning; }).join(' ')
-                + ' Нищо не се изтрива — можете да ги включите отново по всяко време. Да запазим ли?';
-        window._adminConfirm(msg, 'Да, изключи').then(function (ok) {
-            if (!ok) return;
-            confirmed = true;
-            if (form.requestSubmit) form.requestSubmit(); else form.submit();
-        });
     });
     // Preview the chosen logo before saving.
     var input = document.getElementById('logoInput'), preview = document.getElementById('logoPreview');

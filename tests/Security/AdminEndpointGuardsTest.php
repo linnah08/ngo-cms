@@ -25,6 +25,7 @@ final class AdminEndpointGuardsTest extends TestCase
         'admin/login.php'          => 'the login form itself',
         'admin/login-forgot.php'   => 'password reset request, rate limited',
         'admin/login-reset.php'    => 'password reset, authorised by the emailed token',
+        'admin/install-login.php'  => 'one-time login from the install finish screen, authorised by a single-use 15-minute token',
         'admin/logout.php'         => 'only ends the session',
         'admin/translate.php'      => 'only redirects to articles.php',
         'admin/pin-docroot.php'    => 'auto_prepend_file, not an endpoint',

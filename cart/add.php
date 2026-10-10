@@ -3,7 +3,11 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/print_helpers.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
 start_session();
+
+// Module switched off in Admin → Модули — the shop does not exist (site's 404).
+module_public_guard('shop');
 
 $lang     = post_lang();
 $shop_url = shop_path('shop', $lang);
@@ -32,7 +36,7 @@ if (!$product_id) {
 }
 
 $pdo  = get_pdo();
-$stmt = $pdo->prepare('SELECT id, slug, name_bg, name_en, stock, active, `type`, variants FROM products WHERE id = ? AND active = 1');
+$stmt = $pdo->prepare('SELECT id, slug, name_bg, name_en, stock, active, `type`, variants, preorder_enabled FROM products WHERE id = ? AND active = 1');
 $stmt->execute([$product_id]);
 $product = $stmt->fetch();
 
@@ -63,7 +67,7 @@ if ($product['type'] === 'variant') {
         header('Location: ' . $redirect);
         exit;
     }
-    if ((int)$pv['stock'] <= 0) {
+    if ((int)$pv['stock'] <= 0 && !product_is_preorder($product, (int)$pv['stock'])) {
         $_label = $lang === 'en' ? (($pv['label_en'] ?? '') ?: $pv['label_bg']) : $pv['label_bg'];
         flash_set('error', t_or('cart.err.sold_out', '{name} е изчерпан.', '{name} is sold out.', $lang, ['name' => $_label]));
         header('Location: ' . $redirect . '?out=1');
@@ -73,7 +77,7 @@ if ($product['type'] === 'variant') {
 }
 
 // For standard/print products, check product-level stock
-if ($product['type'] !== 'variant' && (int)$product['stock'] <= 0) {
+if ($product['type'] !== 'variant' && (int)$product['stock'] <= 0 && !product_is_preorder($product, (int)$product['stock'])) {
     $_name = $lang === 'en' ? (($product['name_en'] ?? '') ?: $product['name_bg']) : $product['name_bg'];
     flash_set('error', t_or('cart.err.sold_out', '{name} е изчерпан.', '{name} is sold out.', $lang, ['name' => $_name]));
     header('Location: ' . $redirect . '?out=1');
@@ -149,7 +153,8 @@ if ($product['type'] === 'print') {
 $cart        = $_SESSION['cart'] ?? [];
 $found       = false;
 $actually_added = true; // flipped to false if stock limit prevents any addition
-$stock_limit = $product['type'] === 'variant' ? (int)$pv['stock'] : (int)$product['stock'];
+// A pre-order line has no stock cap (product_line_limit returns PHP_INT_MAX).
+$stock_limit = product_line_limit($product, $product['type'] === 'variant' ? (int)$pv['stock'] : (int)$product['stock']);
 foreach ($cart as &$item) {
     $match = $item['product_id'] === $product_id;
     if ($product['type'] === 'variant') $match = $match && (int)($item['variant_id'] ?? 0) === $variant_id;

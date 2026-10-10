@@ -5,9 +5,11 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\Group;
 
 /**
- * The module switches in Admin → Организация over real HTTP: who may see and
- * save them, CSRF, and that only the two module names with a boolean value are
- * written to content/organisation.json.
+ * The module switches in Admin → Модули over real HTTP: who may see and save
+ * them, CSRF, that only registered module names with a boolean value are
+ * written to content/organisation.json, and what switching a module off does —
+ * menu item gone, admin page says so, public page 404s. Also the Организация
+ * page's own fields (newsletter band), which share that file.
  *
  * Boots its own `php -S` server (like ProductEditNullFieldsHttpTest). The live
  * content/organisation.json of this checkout is backed up and restored.
@@ -158,6 +160,14 @@ final class ModuleSwitchesHttpTest extends TestCase
         ], $over);
     }
 
+    /** Switch modules on/off directly in organisation.json (restored after the class). */
+    private function setModules(array $on): void
+    {
+        $data = $this->saved();
+        foreach ($on as $name => $state) $data['feature_' . $name] = $state ? '1' : '0';
+        file_put_contents(self::$orgFile, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    }
+
     private function saved(): array
     {
         clearstatcache();
@@ -165,10 +175,15 @@ final class ModuleSwitchesHttpTest extends TestCase
         return json_decode((string) file_get_contents(self::$orgFile), true) ?: [];
     }
 
+    private function modulesForm(string $csrf, array $over = []): array
+    {
+        return array_merge(['csrf_token' => $csrf], $over);
+    }
+
     public function test_anonymous_visitor_is_sent_to_login_and_cannot_save(): void
     {
         $before = $this->saved();
-        [$code, , $loc] = $this->http('/admin/organisation.php', null, $this->validForm('x', ['feature_donations' => '1']));
+        [$code, , $loc] = $this->http('/admin/modules.php', null, $this->modulesForm('x', ['feature_donations' => '1']));
         $this->assertContains($code, [302, 303]);
         $this->assertStringContainsString('login', $loc);
         $this->assertSame($before, $this->saved());
@@ -177,29 +192,31 @@ final class ModuleSwitchesHttpTest extends TestCase
     public function test_author_is_refused(): void
     {
         $jar = $this->login(self::$authorEmail);
-        [$code] = $this->http('/admin/organisation.php', $jar);
+        [$code] = $this->http('/admin/modules.php', $jar);
         $this->assertSame(403, $code);
         $before = $this->saved();
-        [$code] = $this->http('/admin/organisation.php', $jar, $this->validForm('x'));
+        [$code] = $this->http('/admin/modules.php', $jar, $this->modulesForm('x'));
         $this->assertSame(403, $code);
         $this->assertSame($before, $this->saved());
+        [, $dash] = $this->http('/admin/dashboard.php', $jar);
+        $this->assertStringNotContainsString('href="/admin/modules.php"', $dash, 'the menu item is for admins only');
         @unlink($jar);
     }
 
-    public function test_admin_sees_both_labelled_switches_with_state_in_words(): void
+    public function test_admin_sees_a_labelled_switch_per_module_with_state_in_words(): void
     {
         $jar = $this->login(self::$adminEmail);
-        [$code, $body] = $this->http('/admin/organisation.php', $jar);
+        [$code, $body] = $this->http('/admin/modules.php', $jar);
         @unlink($jar);
         $this->assertSame(200, $code);
-        $this->assertStringContainsString('>Модули</h2>', $body);
-        foreach (['donations' => 'Дарения', 'campaign' => 'Кампании'] as $name => $label) {
+        $this->assertStringContainsString('href="/admin/modules.php"', $body, 'Модули is in the admin menu');
+        foreach (modules_registry() as $name => $m) {
             $this->assertMatchesRegularExpression(
-                '/<label for="mod-' . $name . '"[^>]*>\s*<input type="checkbox" id="mod-' . $name . '" name="feature_' . $name . '" value="1"/',
+                '/<label for="mod-' . $name . '"[^>]*>\s*<input type="checkbox" role="switch" id="mod-' . $name . '" name="feature_' . $name . '" value="1"/',
                 $body
             );
-            $this->assertStringContainsString('<span>' . $label . '</span>', $body);
-            $this->assertMatchesRegularExpression('/id="state-' . $name . '"[^>]*>\s*Сега на сайта: <strong>[✓✕] (включено|изключено)<\/strong>/u', $body);
+            $this->assertStringContainsString('>' . $m['label'] . '</h2>', $body);
+            $this->assertMatchesRegularExpression('/id="state-' . $name . '"[^>]*>\s*[✓✕] (Включен|Изключен)/u', $body);
         }
     }
 
@@ -207,50 +224,72 @@ final class ModuleSwitchesHttpTest extends TestCase
     {
         $jar = $this->login(self::$adminEmail);
         $before = $this->saved();
-        [$code, $body] = $this->http('/admin/organisation.php', $jar, $this->validForm('deadbeef'));
+        [$code, $body] = $this->http('/admin/modules.php', $jar, $this->modulesForm('deadbeef'));
         @unlink($jar);
         $this->assertSame(200, $code);
         $this->assertStringContainsString('Промените не бяха запазени.', $body);
         $this->assertSame($before, $this->saved());
     }
 
-    public function test_admin_saves_switches_and_sees_a_persistent_message(): void
+    public function test_switching_a_module_off_hides_it_everywhere_and_on_brings_it_back(): void
     {
         $jar = $this->login(self::$adminEmail);
-        [, $page] = $this->http('/admin/organisation.php', $jar);
-        $csrf = $this->csrf($page);
+        [, $page] = $this->http('/admin/modules.php', $jar);
 
-        // Donations unticked (absent), campaign ticked; an unknown module is ignored.
-        [$code, , $loc] = $this->http('/admin/organisation.php', $jar,
-            $this->validForm($csrf, ['feature_campaign' => '1', 'feature_evil' => '1']));
+        // Donations ticked, campaign unticked (absent); an unknown module is ignored.
+        [$code, , $loc] = $this->http('/admin/modules.php', $jar,
+            $this->modulesForm($this->csrf($page), ['feature_donations' => '1', 'feature_evil' => '1']));
         $this->assertSame(302, $code);
-        $this->assertStringEndsWith('/admin/organisation.php', $loc);
+        $this->assertStringEndsWith('/admin/modules.php', $loc);
 
         $saved = $this->saved();
-        $this->assertSame('0', $saved['feature_donations'] ?? null);
-        $this->assertSame('1', $saved['feature_campaign'] ?? null);
+        $this->assertSame('1', $saved['feature_donations'] ?? null);
+        $this->assertSame('0', $saved['feature_campaign'] ?? null);
         $this->assertArrayNotHasKey('feature_evil', $saved);
 
-        [, $after] = $this->http('/admin/organisation.php', $jar);
-        $this->assertStringContainsString('Промените бяха запазени', $after);
-        $this->assertMatchesRegularExpression('/id="state-donations"[^>]*>\s*Сега на сайта: <strong>✕ изключено/u', $after);
-        $this->assertMatchesRegularExpression('/id="state-campaign"[^>]*>\s*Сега на сайта: <strong>✓ включено/u', $after);
+        [, $after] = $this->http('/admin/modules.php', $jar);
+        $this->assertStringContainsString('Промените са запазени', $after, 'persistent success message after the redirect');
+        $this->assertMatchesRegularExpression('/id="state-campaign"[^>]*>\s*✕ Изключен/u', $after);
+        $this->assertMatchesRegularExpression('/id="state-donations"[^>]*>\s*✓ Включен/u', $after);
+        $this->assertStringNotContainsString('href="/admin/campaign.php"', $after, 'menu item hidden');
 
-        // Switching donations back on.
-        $csrf = $this->csrf($after);
-        $this->http('/admin/organisation.php', $jar,
-            $this->validForm($csrf, ['feature_donations' => '1', 'feature_campaign' => '1']));
-        $this->assertSame('1', $this->saved()['feature_donations'] ?? null);
+        // The campaign's admin page says the module is off, inside the admin, with a way back.
+        [$code, $off] = $this->http('/admin/campaign.php', $jar);
+        $this->assertSame(404, $code);
+        $this->assertStringContainsString('Този модул е изключен', $off);
+        $this->assertStringContainsString('„Кампании“', $off);
+        $this->assertStringContainsString('<a href="/admin/modules.php" class="btn btn--primary"', $off);
+
+        // The public page does not exist.
+        [$code, $pub] = $this->http('/campaign/');
+        $this->assertSame(404, $code);
+        $this->assertStringContainsString('Страницата не е намерена', $pub);
+
+        // Saving Организация does not touch the switches.
+        [, $org] = $this->http('/admin/organisation.php', $jar);
+        [$code] = $this->http('/admin/organisation.php', $jar, $this->validForm($this->csrf($org)));
+        $this->assertSame(302, $code);
+        $this->assertSame('0', $this->saved()['feature_campaign'] ?? null);
+
+        // On again: everything is back.
+        [, $page] = $this->http('/admin/modules.php', $jar);
+        $this->http('/admin/modules.php', $jar,
+            $this->modulesForm($this->csrf($page), ['feature_donations' => '1', 'feature_campaign' => '1']));
+        $this->assertSame('1', $this->saved()['feature_campaign'] ?? null);
+        [, $dash] = $this->http('/admin/dashboard.php', $jar);
+        $this->assertStringContainsString('href="/admin/campaign.php"', $dash);
+        [, $back] = $this->http('/admin/campaign.php', $jar);
+        $this->assertStringNotContainsString('Този модул е изключен', $back);
         @unlink($jar);
     }
 
     public function test_non_boolean_value_is_refused_and_nothing_is_saved(): void
     {
         $jar = $this->login(self::$adminEmail);
-        [, $page] = $this->http('/admin/organisation.php', $jar);
+        [, $page] = $this->http('/admin/modules.php', $jar);
         $before = $this->saved();
-        [$code, $body] = $this->http('/admin/organisation.php', $jar,
-            $this->validForm($this->csrf($page), ['feature_donations' => 'yes']));
+        [$code, $body] = $this->http('/admin/modules.php', $jar,
+            $this->modulesForm($this->csrf($page), ['feature_donations' => 'yes']));
         @unlink($jar);
         $this->assertSame(200, $code);
         $this->assertStringContainsString('Невалидна стойност за „Дарения“', $body);
@@ -261,6 +300,7 @@ final class ModuleSwitchesHttpTest extends TestCase
 
     public function test_admin_sees_the_newsletter_band_choice_as_labelled_radios_with_a_preview(): void
     {
+        $this->setModules(['newsletter' => true]);   // the band belongs to Бюлетин
         $jar = $this->login(self::$adminEmail);
         [$code, $body] = $this->http('/admin/organisation.php', $jar);
         @unlink($jar);
@@ -279,10 +319,10 @@ final class ModuleSwitchesHttpTest extends TestCase
 
     public function test_a_saved_band_colour_reaches_the_public_page_with_contrasting_text(): void
     {
+        $this->setModules(['newsletter' => true]);   // the band belongs to Бюлетин
         $jar = $this->login(self::$adminEmail);
         [, $page] = $this->http('/admin/organisation.php', $jar);
         [$code] = $this->http('/admin/organisation.php', $jar, $this->validForm($this->csrf($page), [
-            'feature_donations' => '1', 'feature_campaign' => '1',
             'newsletter_band' => 'custom', 'newsletter_band_color' => '#fbb04a',
         ]));
         $this->assertSame(302, $code);
@@ -303,5 +343,37 @@ final class ModuleSwitchesHttpTest extends TestCase
         $this->assertSame(200, $code);
         $this->assertStringContainsString('Моля, изберете цвят за лентата за бюлетина от палитрата.', $body);
         $this->assertSame('#FBB04A', $this->saved()['newsletter_band_color'] ?? null);
+    }
+
+    public function test_settings_of_switched_off_modules_are_hidden_and_kept(): void
+    {
+        $this->setModules(['newsletter' => true, 'donations' => true]);
+        $jar = $this->login(self::$adminEmail);
+        [, $page] = $this->http('/admin/organisation.php', $jar);
+        $this->assertStringContainsString('Покана за дарение в бюлетина', $page);
+        $this->http('/admin/organisation.php', $jar, $this->validForm($this->csrf($page), [
+            'newsletter_band' => 'accent', 'newsletter_donate_heading_bg' => 'Помогнете ни',
+        ]));
+        $this->assertSame('accent', $this->saved()['newsletter_band'] ?? null);
+
+        $this->setModules(['newsletter' => false, 'donations' => false]);
+        [, $page] = $this->http('/admin/organisation.php', $jar);
+        $this->assertStringNotContainsString('Цвят на лентата за бюлетина', $page);
+        $this->assertStringNotContainsString('Покана за дарение в бюлетина', $page);
+        $this->assertStringContainsString('<h2 class="admin-card__title">Банкова сметка</h2>', $page);
+        [$code] = $this->http('/admin/organisation.php', $jar, $this->validForm($this->csrf($page)));
+        $this->assertSame(302, $code);
+        $this->assertSame('accent', $this->saved()['newsletter_band'] ?? null, 'saving the page does not wipe a hidden setting');
+        $this->assertSame('Помогнете ни', $this->saved()['newsletter_donate_heading_bg'] ?? null);
+
+        // The signature and manual certificates exist only for donations and campaigns.
+        $this->setModules(['donations' => false, 'campaign' => false]);
+        [$code] = $this->http('/admin/manual-cert.php', $jar);
+        $this->assertSame(404, $code);
+        [, $orders] = $this->http('/admin/orders.php', $jar);
+        $this->assertStringNotContainsString('/admin/manual-cert.php', $orders);
+        [, $templates] = $this->http('/admin/email-templates.php', $jar);
+        $this->assertStringNotContainsString('Неуспешно плащане на дарение', $templates);
+        @unlink($jar);
     }
 }

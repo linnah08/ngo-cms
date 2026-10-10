@@ -26,6 +26,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/social_images.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/buffer.php';
 admin_require_login();
+module_ajax_guard('social');
 
 header('Content-Type: application/json; charset=UTF-8');
 

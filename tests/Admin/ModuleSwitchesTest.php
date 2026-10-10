@@ -5,7 +5,7 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
- * Admin → Организация → Модули: the on/off switches for the optional modules.
+ * Admin → Модули: the on/off switches for the optional modules.
  *
  * Precedence of feature_enabled(): the saved switch (content/organisation.json)
  * beats FEATURE_<NAME> in site.config.php; with nothing saved the constant
@@ -128,29 +128,20 @@ final class ModuleSwitchesTest extends TestCase
             "define('FEATURE_DONATIONS', 'false');\ndefine('FEATURE_CAMPAIGN', '0');"));
     }
 
-    // ── Validation of the POSTed switches ────────────────────────────────────────
+    // ── Validation of the POSTed switches (Admin → Модули) ───────────────────────
 
-    private function orgInput(array $over = []): array
+    private function validate(array $in, array $current = ['donations' => true, 'campaign' => true, 'events' => true]): array
     {
-        return array_merge([
-            'site_name_bg'  => 'Фондация Тест',
-            'site_name_en'  => 'Test Foundation',
-            'site_email'    => 'info@example.org',
-            'brand_theme'   => array_key_first(brand_themes()),
-            'brand_primary' => '#2D3A8C',
-            'brand_accent'  => '#5B6FD6',
-        ], $over);
-    }
-
-    private function validate(array $over = []): array
-    {
-        return org_validate($this->orgInput($over), array_keys(brand_themes()));
+        return modules_validate_switches($in, $current);
     }
 
     public function test_every_module_has_a_field_label_and_warning(): void
     {
-        $mods = org_modules();
-        $this->assertSame(['donations', 'campaign'], array_keys($mods));
+        $mods = org_modules();   // the compatibility shape still answers
+        $this->assertSame(array_keys(modules_registry()), array_keys($mods));
+        $this->assertContains('donations', array_keys($mods));
+        $this->assertContains('campaign', array_keys($mods));
+        $this->assertContains('events', array_keys($mods));
         foreach ($mods as $name => $m) {
             $this->assertArrayHasKey($m['field'], org_fields());
             $this->assertSame('FEATURE_' . strtoupper($name), org_fields()[$m['field']]);
@@ -162,18 +153,19 @@ final class ModuleSwitchesTest extends TestCase
 
     public function test_unticked_switch_saves_an_explicit_off(): void
     {
-        $r = $this->validate();
+        $r = $this->validate([]);
         $this->assertSame([], $r['errors']);
-        $this->assertSame('0', $r['values']['feature_donations']);
-        $this->assertSame('0', $r['values']['feature_campaign']);
+        $this->assertSame(array_map('module_field', array_keys(modules_registry())), array_keys($r['values']), 'every module gets a value');
+        $this->assertSame(['0'], array_values(array_unique($r['values'])), 'nothing ticked = everything off');
     }
 
     public function test_ticked_switch_saves_on(): void
     {
-        $r = $this->validate(['feature_donations' => '1', 'feature_campaign' => '1']);
+        $r = $this->validate(['feature_donations' => '1', 'feature_campaign' => '1', 'feature_events' => '1'], ['donations' => false, 'campaign' => false, 'events' => false]);
         $this->assertSame([], $r['errors']);
         $this->assertSame('1', $r['values']['feature_donations']);
         $this->assertSame('1', $r['values']['feature_campaign']);
+        $this->assertSame('1', $r['values']['feature_events']);
     }
 
     public static function notABoolean(): array
@@ -212,20 +204,60 @@ final class ModuleSwitchesTest extends TestCase
         $this->assertSame('1', $loaded['FEATURE_CAMPAIGN']);
     }
 
-    // ── Admin page (static) ──────────────────────────────────────────────────────
+    /** The two pages share one file: saving one part must not wipe the other. */
+    public function test_saving_modules_keeps_the_organisation_fields_and_vice_versa(): void
+    {
+        $file = $this->tmp . '/organisation.json';
+        $org  = org_validate($this->orgInput(['site_phone' => '+359 2 000 0000']), array_keys(brand_themes()));
+        $this->assertSame([], $org['errors']);
+        $this->assertArrayNotHasKey('feature_donations', $org['values'], 'the Организация form no longer carries module switches');
+        $this->assertTrue(org_save_overrides($org['values'], $file));
 
-    public function test_admin_page_renders_a_labelled_switch_per_module_and_confirms_off(): void
+        $this->assertTrue(org_save_overrides($this->validate(['feature_campaign' => '1'])['values'], $file));
+        $loaded = org_load_overrides($file);
+        $this->assertSame('+359 2 000 0000', $loaded['SITE_PHONE']);
+        $this->assertSame('0', $loaded['FEATURE_DONATIONS']);
+
+        $this->assertTrue(org_save_overrides($org['values'], $file));
+        $loaded = org_load_overrides($file);
+        $this->assertSame('0', $loaded['FEATURE_DONATIONS'], 'saving Организация leaves the switches alone');
+        $this->assertSame('1', $loaded['FEATURE_CAMPAIGN']);
+    }
+
+    private function orgInput(array $over = []): array
+    {
+        return array_merge([
+            'site_name_bg'  => 'Фондация Тест',
+            'site_name_en'  => 'Test Foundation',
+            'site_email'    => 'info@example.org',
+            'brand_theme'   => array_key_first(brand_themes()),
+            'brand_primary' => '#2D3A8C',
+            'brand_accent'  => '#5B6FD6',
+        ], $over);
+    }
+
+    // ── Admin pages (static) ─────────────────────────────────────────────────────
+
+    public function test_modules_page_renders_a_labelled_switch_per_module_and_confirms_off(): void
+    {
+        $src = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/admin/modules.php');
+        $this->assertStringContainsString('admin_require_admin();', $src);
+        $this->assertLessThan(strpos($src, 'org_save_overrides($result'), strpos($src, 'csrf_verify()'));
+        $this->assertStringContainsString('foreach ($registry as $name => $m)', $src);
+        $this->assertMatchesRegularExpression('/<label for="mod-<\?= h\(\$name\) \?>"/', $src);
+        $this->assertMatchesRegularExpression('/<input type="checkbox" role="switch" id="mod-<\?= h\(\$name\) \?>"/', $src);
+        $this->assertStringContainsString('✓ Включен', $src, 'state in words, not colour only');
+        $this->assertStringContainsString('_adminConfirm(', $src);
+        $this->assertStringContainsString('dataset.pending', $src, 'unfinished work is part of the confirmation');
+        $this->assertStringNotContainsString('window.confirm', $src);
+    }
+
+    public function test_organisation_page_points_to_the_modules_page_instead(): void
     {
         $src = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/admin/organisation.php');
-        $this->assertStringContainsString('>Модули</h2>', $src);
-        $this->assertStringContainsString('foreach ($modules as $mname => $mod)', $src);
-        $this->assertMatchesRegularExpression('/<label for="mod-<\?= h\(\$mname\) \?>"/', $src);
-        $this->assertMatchesRegularExpression('/<input type="checkbox" id="mod-<\?= h\(\$mname\) \?>"/', $src);
-        $this->assertStringContainsString('Сега на сайта:', $src, 'state in words, not colour only');
-        $this->assertStringContainsString('_adminConfirm(', $src);
-        $this->assertStringNotContainsString('window.confirm', $src);
-        // The switch is never hidden behind an environment / feature check.
-        $this->assertDoesNotMatchRegularExpression('/<\?php if \([^)]*(feature_enabled|defined\(.FEATURE_)[^)]*\)\): \?>\s*<!-- ── Optional modules/', $src);
+        $this->assertStringNotContainsString('>Модули</h2>', $src);
+        $this->assertStringNotContainsString('data-module-switch', $src);
+        $this->assertStringContainsString('href="/admin/modules.php"', $src);
     }
 
     // ── Donations entry points follow the switch ─────────────────────────────────
@@ -233,7 +265,7 @@ final class ModuleSwitchesTest extends TestCase
     public function test_donation_checkout_is_gated(): void
     {
         $src = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/donation/checkout.php');
-        $gate = strpos($src, "if (!feature_enabled('donations')) {");
+        $gate = strpos($src, "module_public_guard('donations');");
         $this->assertNotFalse($gate);
         $this->assertLessThan(strpos($src, 'csrf_verify()'), $gate, 'gate before any processing');
     }

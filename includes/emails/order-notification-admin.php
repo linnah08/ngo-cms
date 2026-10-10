@@ -20,7 +20,14 @@ $type_labels    = ['office' => 'Офис', 'address' => 'До адрес', 'lock
   <tbody>
     <?php foreach ($items as $item): ?>
     <tr>
-      <td><?= htmlspecialchars($item['name_bg'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
+      <td><?= htmlspecialchars($item['name_bg'] ?? '', ENT_QUOTES, 'UTF-8') ?><?php
+        if (!empty($item['variant_label'])) echo '<br><span style="font-size:12px;color:#6b6560;">' . htmlspecialchars($item['variant_label'], ENT_QUOTES, 'UTF-8') . '</span>';
+        if (!empty($item['preorder'])) {
+            echo '<br><span style="font-size:12px;color:#92400e;font-weight:600;">⏳ Предварителна поръчка — изпратете, щом пристигне'
+               . (!empty($item['preorder_note']) ? ' (' . htmlspecialchars($item['preorder_note'], ENT_QUOTES, 'UTF-8') . ')' : '')
+               . '</span>';
+        }
+      ?></td>
       <td><?= (int)($item['quantity'] ?? 1) ?></td>
       <td><?= number_format((float)($item['subtotal_eur'] ?? 0), 2) ?> €</td>
     </tr>
