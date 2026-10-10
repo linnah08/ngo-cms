@@ -88,7 +88,7 @@ abstract class CreatedPagesTestCase extends TestCase
             . '$GLOBALS["_om_pages_dir"] = %3$s;'
             . 'register_shutdown_function(function () { echo "\n@@CODE=" . (int) (http_response_code() ?: 200); });'
             . 'if (%4$s !== null) { require_once %1$s . "/config.php"; session_start();'
-            . ' $_SESSION[ADMIN_SESSION_NAME] = ["role" => %4$s, "time" => time(), "id" => 1, "username" => "t"]; }'
+            . ' $_SESSION[ADMIN_SESSION_NAME] = ["site" => admin_session_site(), "role" => %4$s, "time" => time(), "id" => 1, "username" => "t"]; }'
             . 'require %5$s;',
             var_export($root, true), var_export($uri, true), var_export($this->dir, true),
             var_export($role, true), var_export($root . '/' . $script, true), var_export($server, true)

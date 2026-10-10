@@ -140,6 +140,7 @@ $success = false;
 $install_error = null;
 $logo_note = null;
 $done_final = null;
+$login_token = null;   // set by install-run.php: the finish screen's one-time login link
 
 // ── Handle a step ────────────────────────────────────────────────────────────
 if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -149,6 +150,20 @@ if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!wizard_step_reachable($step, $done)) go(wizard_first_open_step($done));
     $keys = array_keys($steps);
     $next = $keys[array_search($step, $keys, true) + 1] ?? 'review';
+    $prev_step = $keys[array_search($step, $keys, true) - 1] ?? 'db';
+
+    // „Назад“: keep what was typed on this step (unchecked, never a password) and go back.
+    if (($_POST['nav'] ?? '') === 'back' && $step !== 'review') {
+        $draft = [];
+        foreach ($_POST as $k => $v) {
+            if (in_array($k, ['token', 'nav', 'return', 'admin_password', 'db_pass'], true)) continue;
+            if (is_string($v)) $draft[$k] = mb_substr($v, 0, 300);
+            elseif ($k === 'modules' && is_array($v)) $draft[$k] = array_values(array_filter($v, 'is_string'));
+        }
+        if ($step === 'modules' && !isset($draft['modules'])) $draft['modules'] = [];   // all unticked is a choice too
+        $_SESSION['install']['draft'][$step] = $draft;
+        go($return_review ? 'review' : $prev_step);
+    }
 
     if ($step === 'review') {
         require __DIR__ . '/install-run.php';   // sets $success, $install_error, $logo_note, $done_final
@@ -177,6 +192,7 @@ if (!$already && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $input  = $_POST;
         } else {
             $_SESSION['install']['done'][$step] = $result['data'];
+            unset($_SESSION['install']['draft'][$step]);
             go($return_review ? 'review' : $next);
         }
     }
@@ -196,9 +212,11 @@ $defaults = [
 ];
 $saved = [];
 foreach ($done as $d) if (is_array($d)) $saved += $d;
-/** The value a field shows: what was just typed, else what was saved, else a sensible default. */
-$val = function (string $k) use ($input, $saved, $defaults): string {
+$draft = $_SESSION['install']['draft'][$step] ?? null;   // typed here before going „Назад“
+/** The value a field shows: what was just typed, else the unsaved draft, else what was saved, else a sensible default. */
+$val = function (string $k) use ($input, $draft, $saved, $defaults): string {
     if (is_array($input) && array_key_exists($k, $input) && !is_array($input[$k])) return (string) $input[$k];
+    if (is_array($draft) && array_key_exists($k, $draft) && is_string($draft[$k])) return $draft[$k];
     if (array_key_exists($k, $saved) && is_scalar($saved[$k])) return (string) $saved[$k];
     return (string) ($defaults[$k] ?? '');
 };
@@ -248,6 +266,7 @@ $prev    = $step_no > 1 ? $keys[$step_no - 2] : null;
   h1:focus { outline: none; }
   .step-of { display: block; font-size: .9rem; font-weight: 600; color: var(--muted); margin-bottom: .2rem; }
   p.intro { margin: 0 0 1.25rem; color: var(--muted); }
+  [hidden] { display: none !important; }
   .vh { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .progress ol { list-style: none; display: flex; gap: .3rem; margin: 0 0 1.1rem; padding: 0; }
   .progress li { flex: 1; height: 6px; border-radius: 3px; background: var(--border); }
@@ -303,6 +322,7 @@ $prev    = $step_no > 1 ? $keys[$step_no - 2] : null;
   .next-list { padding-left: 1.2rem; }
   .next-list li { margin-bottom: .5rem; }
   .next-list a, .alert a { color: var(--teal); font-weight: 600; }
+  .btn-link { display: inline-flex; align-items: center; min-height: 48px; padding: .75rem 1.5rem; border-radius: 8px; background: var(--teal); color: #fff; font-weight: 600; text-decoration: none; }
 </style>
 </head>
 <body>
@@ -313,8 +333,14 @@ $prev    = $step_no > 1 ? $keys[$step_no - 2] : null;
     <h1 tabindex="-1" id="focus-target">Готово — сайтът е инсталиран</h1>
     <div class="alert alert-ok">
       Сайтът е инсталиран на адрес <a href="<?= e($done_final['org']['site_url']) ?>"><?= e($done_final['org']['site_url']) ?></a>.
-      Влезте в <a href="/admin/">администраторския панел</a> с имейла <strong><?= e($done_final['account']['admin_email']) ?></strong> и паролата, която избрахте.
+      Входът ви е с имейла <strong><?= e($done_final['account']['admin_email']) ?></strong> и паролата, която избрахте.
     </div>
+<?php if (!empty($login_token)): ?>
+    <p><a class="btn-link" href="/admin/install-login.php?t=<?= e($login_token) ?>">Влезте в администраторския панел</a></p>
+    <p class="hint">Бутонът ви вписва направо и работи само веднъж, в следващите 15 минути. После влизате с имейла и паролата си.</p>
+<?php else: ?>
+    <p><a class="btn-link" href="/admin/">Към администраторския панел</a></p>
+<?php endif; ?>
 <?php if ($logo_note): ?>
     <div class="alert alert-error"><?= e($logo_note) ?></div>
 <?php endif; ?>
@@ -334,7 +360,7 @@ $prev    = $step_no > 1 ? $keys[$step_no - 2] : null;
       </ol>
     </nav>
 <?php if ($return_review): ?>
-    <a class="back" href="?step=review">← Обратно към проверката</a>
+    <a class="back" href="?step=review" data-review="1">← Обратно към проверката</a>
 <?php elseif ($prev): ?>
     <a class="back" href="?step=<?= e($prev) ?>">← Назад</a>
 <?php endif; ?>
@@ -441,7 +467,8 @@ $prev    = $step_no > 1 ? $keys[$step_no - 2] : null;
       </div>
 
 <?php elseif ($step === 'modules'): ?>
-<?php   $picked = array_flip(is_array($input) ? array_filter((array) ($input['modules'] ?? []), 'is_string') : ($done['modules']['modules'] ?? [])); ?>
+<?php   $picked = array_flip(is_array($input) ? array_filter((array) ($input['modules'] ?? []), 'is_string')
+                                 : (is_array($draft['modules'] ?? null) ? $draft['modules'] : ($done['modules']['modules'] ?? []))); ?>
       <p class="intro">Страниците и новините са винаги включени. Отбележете допълнителните части, които организацията ви ще ползва.
         Не сте сигурни? Оставете ги — включвате ги по всяко време от администраторския панел → „Модули“.</p>
       <fieldset id="modules-group" tabindex="-1"<?= isset($errors['modules']) ? ' aria-describedby="modules-error"' : '' ?>>
@@ -500,6 +527,17 @@ $prev    = $step_no > 1 ? $keys[$step_no - 2] : null;
   (function () {
     var t = document.getElementById('error-summary') || (location.search ? document.getElementById('focus-target') : null);
     if (t) t.focus();
+    // „Назад“ takes what you typed on this step with it (without JavaScript it is a plain link).
+    var back = document.querySelector('a.back'), form = document.querySelector('form[method=post]');
+    if (back && form && form.querySelector('input[name=token]') && !back.dataset.review) {
+      back.addEventListener('click', function (e) {
+        e.preventDefault();
+        var nav = document.createElement('input');
+        nav.type = 'hidden'; nav.name = 'nav'; nav.value = 'back';
+        form.appendChild(nav);
+        form.submit();
+      });
+    }
     var box = document.getElementById('db-existing');
     document.querySelectorAll('input[name=db_mode]').forEach(function (r) {
       r.addEventListener('change', function () { if (r.checked) box.hidden = r.value === 'create'; });

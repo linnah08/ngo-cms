@@ -32,7 +32,7 @@ final class AdminAuthTest extends TestCase
     public function testAdminLoggedInReturnsFalseWhenExpired(): void
     {
         // Session was set more than 8 hours ago (ADMIN_SESSION_HOURS = 8)
-        $_SESSION[ADMIN_SESSION_NAME] = [
+        $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(), 
             'logged_in' => true,
             'email'     => 'author@example.org',
             'role'      => 'author',
@@ -50,7 +50,7 @@ final class AdminAuthTest extends TestCase
 
     public function testAdminLoggedInReturnsTrueWhenValidSession(): void
     {
-        $_SESSION[ADMIN_SESSION_NAME] = [
+        $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(), 
             'logged_in' => true,
             'email'     => 'admin@example.org',
             'role'      => 'admin',
@@ -64,7 +64,7 @@ final class AdminAuthTest extends TestCase
 
     public function testAdminIsAdminReturnsFalseForAuthorRole(): void
     {
-        $_SESSION[ADMIN_SESSION_NAME] = [
+        $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(), 
             'logged_in' => true,
             'email'     => 'author@example.org',
             'role'      => 'author',
@@ -76,7 +76,7 @@ final class AdminAuthTest extends TestCase
 
     public function testAdminIsAdminReturnsTrueForAdminRole(): void
     {
-        $_SESSION[ADMIN_SESSION_NAME] = [
+        $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(), 
             'logged_in' => true,
             'email'     => 'admin@example.org',
             'role'      => 'admin',
@@ -90,7 +90,7 @@ final class AdminAuthTest extends TestCase
 
     public function testAdminCanEditorialReturnsTrueForAuthor(): void
     {
-        $_SESSION[ADMIN_SESSION_NAME] = [
+        $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(), 
             'logged_in' => true,
             'email'     => 'author@example.org',
             'role'      => 'author',
@@ -105,7 +105,7 @@ final class AdminAuthTest extends TestCase
 
     public function testAdminCanEditorialReturnsTrueForAdmin(): void
     {
-        $_SESSION[ADMIN_SESSION_NAME] = [
+        $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(), 
             'logged_in' => true,
             'email'     => 'admin@example.org',
             'role'      => 'admin',
@@ -120,7 +120,7 @@ final class AdminAuthTest extends TestCase
 
     public function testAdminCanEditorialReturnsFalseForShopAdmin(): void
     {
-        $_SESSION[ADMIN_SESSION_NAME] = [
+        $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(), 
             'logged_in' => true,
             'email'     => 'shop@example.org',
             'role'      => 'shop_admin',

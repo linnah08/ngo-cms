@@ -19,7 +19,7 @@ if (site_launched()) {
 
 $open = launch_required_open();
 if ($open > 0) {
-    flash_set('error', 'Сайтът още не може да бъде пуснат: остават ' . $open . ' задължителни неща от списъка.');
+    flash_set('error', 'Сайтът още не може да бъде пуснат. ' . launch_tasks_left($open));
 } elseif (org_save_overrides(['site_launched' => '1'])) {
     flash_set('success', 'Сайтът е отворен за посетители.');
 } else {

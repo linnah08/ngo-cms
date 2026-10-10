@@ -328,7 +328,7 @@ $current_user = admin_user();
       <div role="status" style="display:flex;flex-wrap:wrap;gap:.4rem 1rem;align-items:center;background:#fff8eb;border:1px solid #f3d9a4;border-radius:8px;padding:.6rem .9rem;margin-bottom:1rem;font-size:.88rem;line-height:1.4;color:#5c3d06;">
         <span style="flex:1 1 260px;min-width:0;">
           <?= !site_launched() ? 'Сайтът още не е отворен за посетители.' : 'Липсват неща, които законът изисква.' ?>
-          <?= $_lr_open > 0 ? 'Остават ' . $_lr_open . ' задължителни.' : 'Всичко задължително е готово.' ?>
+          <?= $_lr_open > 0 ? launch_tasks_left($_lr_open) : 'Всички задължителни задачи са готови.' ?>
         </span>
         <a href="/admin/#go-live" style="font-weight:600;color:#7a4e00;white-space:nowrap;">Към списъка</a>
       </div>

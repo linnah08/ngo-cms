@@ -115,6 +115,12 @@ function launch_checklist(?array $pages = null, bool $only_required = false): ar
     return $items;
 }
 
+/** "Остава 1 задължителна задача." / "Остават 3 задължителни задачи." */
+function launch_tasks_left(int $n): string
+{
+    return $n === 1 ? 'Остава 1 задължителна задача.' : 'Остават ' . $n . ' задължителни задачи.';
+}
+
 /** How many required items are still open (cheap: no database). */
 function launch_required_open(?array $pages = null): int
 {

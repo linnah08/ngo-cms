@@ -292,7 +292,7 @@ if (admin_is_admin()):
   <p style="margin:0 0 .9rem;font-size:.9rem;line-height:1.5;color:var(--text-muted);">
     <?php if (!$_launched): ?>
       Сайтът още не е отворен за посетители — те виждат страница „Скоро отваряме“, а вие виждате истинския сайт.
-      <?= $_req_open ? 'Попълнете задължителните неща, после натиснете „Пусни сайта“.' : 'Всичко задължително е готово — можете да пуснете сайта.' ?>
+      <?= $_req_open ? 'Изпълнете задължителните задачи, после натиснете „Пусни сайта“.' : 'Всички задължителни задачи са готови — можете да пуснете сайта.' ?>
     <?php else: ?>
       <?= $_req_open ? 'Някои неща, които законът изисква, все още липсват.' : 'Сайтът работи. Тези неща не са задължителни, но силно препоръчваме да ги настроите.' ?>
     <?php endif; ?>
@@ -315,9 +315,10 @@ if (admin_is_admin()):
   <?php if (!$_launched): ?>
   <form method="POST" action="/admin/launch.php" style="margin:1rem 0 0;">
     <?= csrf_field() ?>
-    <button type="submit" class="btn btn--primary" <?= $_req_open ? 'disabled aria-describedby="go-live-why"' : '' ?> style="min-height:44px;">Пусни сайта</button>
+    <button type="submit" class="btn btn--primary" <?= $_req_open ? 'disabled aria-describedby="go-live-why"' : '' ?>
+            style="min-height:44px;<?= $_req_open ? 'background:#e5e7eb;border-color:#e5e7eb;color:#6b7280;cursor:not-allowed;box-shadow:none;' : '' ?>">Пусни сайта</button>
     <?php if ($_req_open): ?>
-    <span id="go-live-why" style="margin-left:.6rem;font-size:.85rem;color:var(--text-muted);">Остават <?= $_req_open ?> задължителни.</span>
+    <span id="go-live-why" style="margin-left:.6rem;font-size:.85rem;color:var(--text-muted);"><?= h(launch_tasks_left($_req_open)) ?></span>
     <?php endif; ?>
   </form>
   <?php endif; ?>

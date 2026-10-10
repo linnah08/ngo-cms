@@ -58,20 +58,45 @@ function admin_login(string $email, string $password): bool
         if (!$user || !password_verify($password, $user['password_hash'])) {
             return false;
         }
-        session_regenerate_id(true);
-        $_SESSION[ADMIN_SESSION_NAME] = [
-            'id'   => $user['id'],
-            'name' => $user['name'],
-            'email'=> $user['email'],
-            'role' => $user['role'],
-            'time' => time(),
-        ];
-        admin_bar_token_set();
+        admin_start_session($user);
         return true;
     } catch (Exception $e) {
         error_log('admin_login error: ' . $e->getMessage());
         return false;
     }
+}
+
+/** Log this admin_users row in (a fresh session id, bound to this installation). */
+function admin_start_session(array $user): void
+{
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    session_regenerate_id(true);
+    $_SESSION[ADMIN_SESSION_NAME] = [
+        'id'   => $user['id'],
+        'name' => $user['name'],
+        'email'=> $user['email'],
+        'role' => $user['role'],
+        'time' => time(),
+        'site' => admin_session_site(),
+    ];
+    admin_bar_token_set();
+}
+
+/**
+ * The install wizard's one-time "log me in" link (admin/install-login.php):
+ * a random token whose hash and expiry wait in settings.install_login. Returns
+ * the first admin when the token matches and has not expired, else null. The
+ * token is spent on the first try either way.
+ */
+function admin_redeem_install_login(PDO $pdo, string $token): ?array
+{
+    $row = $pdo->query("SELECT `value` FROM settings WHERE `key` = 'install_login'")->fetchColumn();
+    $pdo->exec("DELETE FROM settings WHERE `key` = 'install_login'");
+    if (!is_string($row) || $token === '' || !str_contains($row, '|')) return null;
+    [$hash, $exp] = explode('|', $row, 2);
+    if ((int) $exp < time() || !hash_equals($hash, hash('sha256', $token))) return null;
+    $user = $pdo->query("SELECT * FROM admin_users WHERE role = 'admin' ORDER BY id LIMIT 1")->fetch();
+    return $user ?: null;
 }
 
 function admin_logout(): void

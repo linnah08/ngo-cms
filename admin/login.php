@@ -8,6 +8,7 @@ if (admin_logged_in()) {
 }
 
 $error = '';
+foreach (flash_get() as $_f) if ($_f['type'] === 'error') $error = $_f['message'];   // e.g. a spent install link
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (rate_limit_exceeded('admin_login', 10, 900)) {
         $error = 'Твърде много неуспешни опити. Моля изчакайте 15 минути.';

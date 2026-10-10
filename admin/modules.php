@@ -102,7 +102,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       <?php if ($m['needs']): ?>
         <p id="needs-<?= h($name) ?>" style="margin:0;font-size:.88rem;line-height:1.5;color:#4b5563;">
           Нуждае се от модул <?= h($quote($m['needs'])) ?>.
-          <span data-needs-missing <?= $missing ? '' : 'hidden' ?> style="display:block;color:#92400e;font-weight:600;">
+          <span data-needs-missing <?= $missing ? '' : 'hidden' ?> style="color:#92400e;font-weight:600;">
             Сега не може да се включи, защото <?= h($quote($m['needs'])) ?> е изключен. Включете първо него.
           </span>
         </p>

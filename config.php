@@ -609,10 +609,26 @@ function format_date(string $date, string $lang = ''): string {
 // ADMIN AUTH
 // ============================================
 
+/**
+ * Which installation an admin session belongs to: derived from this site's own
+ * secret, which a fresh install regenerates. A login left over from an earlier
+ * install on the same address (same session cookie, a new admin with the same
+ * id) is therefore not accepted.
+ */
+function admin_session_site(): string {
+    if (!defined('SETTINGS_ENCRYPTION_KEY') && is_file(__DIR__ . '/db.config.php')) require_once __DIR__ . '/db.config.php';
+    $secret = defined('SETTINGS_ENCRYPTION_KEY') ? (string) SETTINGS_ENCRYPTION_KEY : (defined('DB_NAME') ? (string) DB_NAME : '');
+    return substr(hash_hmac('sha256', 'admin-session', $secret), 0, 32);
+}
+
 function admin_logged_in(): bool {
     if (session_status() === PHP_SESSION_NONE) session_start();
     if (empty($_SESSION[ADMIN_SESSION_NAME])) return false;
     $sess = $_SESSION[ADMIN_SESSION_NAME];
+    if (!hash_equals(admin_session_site(), (string) ($sess['site'] ?? ''))) {
+        unset($_SESSION[ADMIN_SESSION_NAME]);
+        return false;
+    }
     // Check session expiry
     if (time() - ($sess['time'] ?? 0) > ADMIN_SESSION_HOURS * 3600) {
         unset($_SESSION[ADMIN_SESSION_NAME]);

@@ -199,7 +199,7 @@ session_id('phpunit' . bin2hex(random_bytes(8)));
 require $s['root'] . '/config.php';
 start_session();
 if ($s['role'] !== null) {
-    $_SESSION[ADMIN_SESSION_NAME] = ['logged_in' => true, 'id' => 0, 'name' => 'PHPUnit',
+    $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(), 'logged_in' => true, 'id' => 0, 'name' => 'PHPUnit',
         'email' => 'phpunit@test.local', 'role' => $s['role'], 'time' => time()];
 }
 $token = csrf_token();
