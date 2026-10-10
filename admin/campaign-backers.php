@@ -15,8 +15,7 @@ admin_require_admin();
 // login redirect, so this never becomes an oracle for which modules a site runs.
 module_admin_guard('campaign');
 
-$_tinymce_key    = setting_get('tinymce_api_key', 'no-api-key');
-$page_head_extra = '<script src="https://cdn.tiny.cloud/1/' . h($_tinymce_key) . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>';
+$page_head_extra = tinymce_script_tag();
 
 $pdo   = get_pdo();
 $flash = [];

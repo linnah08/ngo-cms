@@ -248,7 +248,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       <?php if (setting_is_set('dsk_merchant')): ?>
         <span class="badge badge--published">Конфигуриран</span>
       <?php else: ?>
-        <span class="badge badge--draft">Не е конфигуриран</span>
+        <span class="badge badge--draft">Не е нужен — ползва се безплатната версия</span>
       <?php endif; ?>
       <?php if (setting_get('dsk_enabled', '0') === '1'): ?>
         <span class="badge badge--published">Активен</span>
@@ -378,11 +378,11 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
 <!-- ── TinyMCE ─────────────────────────────────────────────────────────────────── -->
 <section class="admin-card" style="margin-bottom:2rem;">
-  <h2 class="admin-card__title">TinyMCE (редактор на статии)</h2>
+  <h2 class="admin-card__title">Редактор на текстове (TinyMCE) <span style="font-weight:400;font-size:.85rem;color:var(--text-muted);">— по желание</span></h2>
   <p class="admin-meta" style="margin-bottom:1.25rem;">
-    Използва се за rich-text редактиране на статии.<br>
-    Вземете безплатен API ключ от <a href="https://www.tiny.cloud/" target="_blank" rel="noopener">tiny.cloud</a>.
-    Регистрирайте домейна <strong><?= h((string) url_host(SITE_URL)) ?></strong> и домейна на вашата администрация в Tiny Cloud.
+    Редакторът работи и без ключ — нищо не е нужно да правите тук.<br>
+    Ако организацията ви има платен план в <a href="https://www.tiny.cloud/" target="_blank" rel="noopener">tiny.cloud</a> (например за допълнителни функции),
+    поставете ключа и регистрирайте домейна <strong><?= h((string) url_host(SITE_URL)) ?></strong> там.
   </p>
 
   <form method="post">

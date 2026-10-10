@@ -63,6 +63,25 @@ function settings_decrypt(string $stored): string
 
 // ── Public API ─────────────────────────────────────────────────────────────────
 
+/** The open-source editor build (GPL-2.0-or-later), used when no Tiny Cloud key is set. */
+const TINYMCE_OSS_URL = 'https://cdn.jsdelivr.net/npm/tinymce@7.9.3/tinymce.min.js';
+
+/**
+ * The <script> that loads the rich-text editor (TinyMCE 7) on an admin page.
+ * With a Tiny Cloud key (Админ → Плащания) it comes from Tiny's cloud. Without
+ * one — the default for a new site — it is the open-source build, which needs
+ * no key or sign-up; before this, a new site's editors were read-only.
+ */
+function tinymce_script_tag(): string
+{
+    $key = trim(setting_get('tinymce_api_key', ''));
+    if ($key !== '' && $key !== 'no-api-key') {
+        return '<script src="https://cdn.tiny.cloud/1/' . htmlspecialchars($key, ENT_QUOTES, 'UTF-8') . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>';
+    }
+    return '<script src="' . TINYMCE_OSS_URL . '" referrerpolicy="origin"></script>'
+         . '<script>tinymce.overrideDefaults({license_key: "gpl"});</script>';
+}
+
 function setting_get(string $key, string $default = ''): string
 {
     try {

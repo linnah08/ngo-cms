@@ -12,8 +12,7 @@ module_admin_guard('newsletter');
 $deepl_ready = module_enabled_with_needs('ai_helpers') && deepl_is_configured();
 $lbl_bg_badge = '<span style="font-size:.68rem;font-weight:700;background:#dcfce7;color:#166534;border-radius:3px;padding:.05rem .35rem;margin-left:.4rem;vertical-align:middle;">BG</span>';
 $lbl_en_badge = '<span style="font-size:.68rem;font-weight:700;background:#dbeafe;color:#1d4ed8;border-radius:3px;padding:.05rem .35rem;margin-left:.4rem;vertical-align:middle;">EN</span>';
-$_tinymce_key = setting_get('tinymce_api_key', 'no-api-key');
-$page_head_extra = '<script src="https://cdn.tiny.cloud/1/' . h($_tinymce_key) . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>';
+$page_head_extra = tinymce_script_tag();
 
 $pdo = get_pdo();
 $id  = (int)($_GET['id'] ?? 0);

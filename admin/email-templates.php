@@ -11,8 +11,7 @@ admin_require_admin();
 
 // Translate buttons only while „Помощ от изкуствен интелект“ is on (Admin → Модули).
 $deepl_ready    = module_enabled_with_needs('ai_helpers') && deepl_is_configured();
-$_tinymce_key   = setting_get('tinymce_api_key', 'no-api-key');
-$page_head_extra = '<script src="https://cdn.tiny.cloud/1/' . h($_tinymce_key) . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>';
+$page_head_extra = tinymce_script_tag();
 
 // Template meta: key → human label + available {{vars}}
 $templates = [

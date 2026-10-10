@@ -248,6 +248,31 @@ final class DistributionTest extends TestCase
         $this->assertStringContainsString('само 1', $r['error']);
     }
 
+    public function testDistributorHandoverTakesPacksFromTheShopWhenTicked(): void
+    {
+        $pid = $this->product(40);   // shop stock kept by hand, nothing recorded as sent to the shop
+        $d   = $this->distributor();
+        $this->batch($pid, 50);
+
+        $this->assertTrue($this->alloc($pid, 'distributor', 5, ['distributor' => $d, 'shop' => true])['ok']);
+        $this->assertSame(35, distribution_online_stock(self::$pdo, $pid, null), 'the shop has 5 fewer');
+        $this->assertSame(45, distribution_available(self::$pdo, $pid, null), 'not covered by shop records, so the pool pays');
+
+        // Packs recorded as sent to the shop are taken from those records, not the pool.
+        $this->assertTrue($this->alloc($pid, 'online', 10)['ok']);
+        $this->assertTrue($this->alloc($pid, 'distributor', 4, ['distributor' => $d, 'shop' => true])['ok']);
+        $this->assertSame(31, distribution_online_stock(self::$pdo, $pid, null));
+        $this->assertSame(6, distribution_total_allocated(self::$pdo, $pid, null, 'online'));
+        $this->assertSame(35, distribution_available(self::$pdo, $pid, null), 'pool unchanged by the second handover');
+
+        $r = $this->alloc($pid, 'distributor', 32, ['distributor' => $d, 'shop' => true]);
+        $this->assertFalse($r['ok'], 'more than the shop holds');
+        $this->assertStringContainsString('само 31', $r['error']);
+
+        $this->assertTrue($this->alloc($pid, 'distributor', 2, ['distributor' => $d])['ok'], 'unticked: pool only');
+        $this->assertSame(31, distribution_online_stock(self::$pdo, $pid, null));
+    }
+
     public function testSampleUsesPoolFirstThenShop(): void
     {
         $pid = $this->product();

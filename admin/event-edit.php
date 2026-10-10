@@ -66,8 +66,7 @@ if ($event) {
 $sold    = $event ? event_tickets_sold($pdo, (int) $event['id']) : 0;
 $flashes = flash_get();
 $page_title_admin = $event ? 'Събитие: ' . $event['title'] : 'Ново събитие';
-$_tinymce_key     = setting_get('tinymce_api_key', 'no-api-key');
-$page_head_extra  = '<script src="https://cdn.tiny.cloud/1/' . h($_tinymce_key) . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>';
+$page_head_extra  = tinymce_script_tag();
 
 $inp = 'width:100%;box-sizing:border-box;min-height:44px;padding:.55rem .75rem;border:1.5px solid #8a8f98;border-radius:6px;font-size:1rem;font-family:inherit;';
 $lbl = 'display:block;font-weight:600;margin-bottom:.3rem;text-transform:none;letter-spacing:normal;font-size:.95rem;';

@@ -181,8 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $page_title_admin = $is_new ? 'Нова статия' : 'Редактиране: ' . h($article['title'] ?? '');
 $active_nav       = 'articles';
-$tinymce_key     = setting_get('tinymce_api_key', 'no-api-key');
-$page_head_extra  = '<script src="https://cdn.tiny.cloud/1/' . h($tinymce_key) . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>'
+$page_head_extra  = tinymce_script_tag()
                   . '<style>.admin-content{max-width:960px;}</style>';
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 

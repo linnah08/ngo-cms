@@ -918,11 +918,12 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
     show(sampleW, isSample);  sampleIn.required = isSample;
     show(priceW, !isSample);  priceIn.required  = !isSample;
     show(distHint, dest === 'distributor');
-    show(shopWrap, dest === 'online' || dest === 'personal');
+    show(shopWrap, dest === 'online' || dest === 'personal' || dest === 'distributor');
     var shopNow = n ? ' (сега там: ' + n.shop + ' бр.)' : '';
     if (dest === 'online') shopText.textContent = 'Добави ги и към наличността в онлайн магазина' + shopNow;
     if (dest === 'personal') shopText.textContent = 'Бройките са взети от онлайн магазина — извади ги от наличността там' + shopNow;
-    if (dest !== lastDest) { shopBox.checked = dest === 'online'; lastDest = dest; }
+    if (dest === 'distributor') shopText.textContent = 'Извади ги и от наличността в онлайн магазина' + shopNow;
+    if (dest !== lastDest) { shopBox.checked = dest === 'online' || dest === 'distributor'; lastDest = dest; }
   }
   if (recipient) {
     recipient.addEventListener('change', refreshAlloc);

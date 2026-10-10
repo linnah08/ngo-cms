@@ -466,8 +466,7 @@ $is_unpaid = order_is_unpaid($order, (int)$_age_stmt->fetchColumn());
 
 $page_title_admin = 'Поръчка #' . $order['order_number'];
 $active_nav       = 'orders';
-$_tinymce_key     = setting_get('tinymce_api_key', 'no-api-key');
-$page_head_extra  = '<script src="https://cdn.tiny.cloud/1/' . h($_tinymce_key) . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>';
+$page_head_extra  = tinymce_script_tag();
 
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 ?>

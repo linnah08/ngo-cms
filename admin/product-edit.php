@@ -181,8 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $lbl_bg_badge = '<span style="font-size:.68rem;font-weight:700;background:#dcfce7;color:#166534;border-radius:3px;padding:.05rem .35rem;margin-left:.4rem;vertical-align:middle;">BG</span>';
 $lbl_en_badge = '<span style="font-size:.68rem;font-weight:700;background:#dbeafe;color:#1d4ed8;border-radius:3px;padding:.05rem .35rem;margin-left:.4rem;vertical-align:middle;">EN</span>';
-$_tinymce_key = setting_get('tinymce_api_key', 'no-api-key');
-$page_head_extra = '<script src="https://cdn.tiny.cloud/1/' . h($_tinymce_key) . '/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>';
+$page_head_extra = tinymce_script_tag();
 
 $review_counts = ['approved' => 0, 'pending' => 0];
 $reviews_on    = module_admin_page_visible('product-reviews.php');   // „Коментари и отзиви“ on
