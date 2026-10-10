@@ -196,7 +196,7 @@ PHP;
         $r = run_admin_page('admin/event-edit.php', [], ['method' => 'GET', 'get' => ['id' => $e['id']]]);
         $this->assertStringContainsString('data-translate-from="title"', $r['body']);
         $this->assertStringContainsString("selector: '#ev-desc, #ev-desc-en'", $r['body']);
-        $this->assertStringContainsString('/tinymce/7/tinymce.min.js', $r['body'], 'the editor script itself is loaded');
+        $this->assertMatchesRegularExpression('#tinymce(@7[.0-9]*|/7)/tinymce\.min\.js#', $r['body'], 'the editor script itself is loaded (Tiny Cloud or the open-source build)');
         $this->assertSame(403, run_admin_page('admin/event-edit.php', [], ['method' => 'GET', 'role' => 'author'])['status']);
     }
 
