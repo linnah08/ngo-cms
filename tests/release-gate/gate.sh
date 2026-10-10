@@ -64,7 +64,7 @@ if [[ -z "$NEW_ZIP" ]]; then
   # A version above anything published, unless one was given: the updater
   # only applies a release that is newer than the site.
   VERSION="${VERSION:-99.0.0}"
-  echo "Building the release ZIP from the working tree as $VERSION…"
+  echo "Building the release ZIP from the working tree as ${VERSION}…"
   mkdir -p "$WORK/build"
   # Tracked files only, as they are on disk — never this checkout's own
   # config files, logs or dev vendor/.

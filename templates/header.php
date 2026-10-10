@@ -144,7 +144,7 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
   <div class="om-bar-spacer"></div>
   <a href="<?= $_admin_base ?>/" class="om-exit-link">← Admin</a>
 </div>
-<?php if (!site_launched()): ?>
+<?php require_once ROOT_PATH . '/includes/launch.php'; if (!site_launched()): ?>
 <?php /* Part of the admin bar, so it can't be taken for the public "Съобщение в началото на сайта" (Организация). */ ?>
 <div role="status" style="background:#1a1a2e;color:#f3f4f6;border-top:1px solid rgba(255,255,255,.15);padding:.5rem 1rem;font-size:.85rem;text-align:center;font-family:system-ui,sans-serif;">
   <strong style="color:#fcd34d;">Само вие виждате това:</strong> сайтът още не е отворен, посетителите виждат страница „Скоро отваряме“.

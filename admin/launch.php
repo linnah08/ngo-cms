@@ -4,6 +4,7 @@
  * the go-live checklist on the dashboard; refused while a required item is open.
  */
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/launch.php';   // also for a site that kept an older config.php
 
 admin_require_admin();
 

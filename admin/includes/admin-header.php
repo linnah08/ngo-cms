@@ -321,7 +321,8 @@ $current_user = admin_user();
     <div class="admin-content">
 <?php
     // Go-live reminder on every page but the dashboard, which has the full list.
-    if (($active_nav ?? '') !== 'dashboard' && function_exists('site_launched') && admin_is_admin()):
+    require_once dirname(__DIR__, 2) . '/includes/launch.php';   // also for a site that kept an older config.php
+    if (($active_nav ?? '') !== 'dashboard' && admin_is_admin()):
         $_lr_open = launch_required_open();
         if (!site_launched() || $_lr_open > 0):
 ?>
