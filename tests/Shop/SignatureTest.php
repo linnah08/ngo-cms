@@ -31,7 +31,7 @@ final class SignatureTest extends TestCase
 
     public function testAdminCanSignReturnsFalseForWrongEmail(): void
     {
-        $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(), 
+        $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(),
             'id'    => 99,
             'name'  => 'Other Admin',
             'email' => 'other@example.com',
@@ -45,7 +45,7 @@ final class SignatureTest extends TestCase
     {
         // Explicitly verify that a different email cannot sign,
         // even if the account has admin role.
-        $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(), 
+        $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(),
             'id'    => 2,
             'name'  => 'Other Admin',
             'email' => 'other-admin@example.com',
@@ -65,7 +65,7 @@ final class SignatureTest extends TestCase
 
     public function testAdminCanSignReturnsTrueForSigningEmail(): void
     {
-        $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(), 
+        $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(),
             'id'    => 1,
             'name'  => 'Signing Admin',
             'email' => SIGNING_ADMIN_EMAIL,
@@ -77,7 +77,7 @@ final class SignatureTest extends TestCase
 
     public function testAdminCanSignReturnsFalseWhenSessionExpired(): void
     {
-        $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(), 
+        $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(),
             'id'    => 1,
             'name'  => 'Signing Admin',
             'email' => SIGNING_ADMIN_EMAIL,
