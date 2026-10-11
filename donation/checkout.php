@@ -7,6 +7,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/IRISPayment.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/donation.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/site_extensions.php';   // donation recipients
 start_session();
 
 // Module switched off in Admin → Модули — the page does not exist (site's 404).
@@ -31,6 +32,7 @@ $amount    = (float) ($_POST['amount']            ?? 0);
 $name      = trim($_POST['donor_name']           ?? '');
 $email     = trim($_POST['donor_email']          ?? '');
 $message   = trim($_POST['donation_message']     ?? '');
+$recipient = donation_recipient_clean($_POST['donation_recipient'] ?? null);   // only asked when the site has several
 $donor_type = in_array($_POST['donor_type'] ?? '', ['individual', 'company'], true)
     ? $_POST['donor_type']
     : 'individual';
@@ -74,7 +76,7 @@ $pdo          = get_pdo();
 $order_number = generate_order_number();
 
 $items_json = json_encode([
-    ['type' => 'donation', 'amount_eur' => $amount]
+    ['type' => 'donation', 'amount_eur' => $amount, 'recipient' => $recipient]
 ], JSON_UNESCAPED_UNICODE);
 
 $pdo->prepare("

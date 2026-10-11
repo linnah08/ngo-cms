@@ -81,9 +81,10 @@ class DonationCertGenerator extends DocumentGenerator {
         // Purpose — a single configurable line (all donations fund the org).
         // The fallback names the site (the brand or project the donor gave to);
         // the intro above already names the legal entity that received it.
-        $purpose = self::h($en
-            ? (defined('DONATION_PURPOSE_EN') ? DONATION_PURPOSE_EN : 'For the activities and programmes of ' . (defined('SITE_NAME_EN') ? SITE_NAME_EN : ''))
-            : (defined('DONATION_PURPOSE_BG') ? DONATION_PURPOSE_BG : 'За дейността и програмите на ' . (defined('SITE_NAME_BG') ? SITE_NAME_BG : '')));
+        // The donation line's recipient decides the purpose: DONATION_PURPOSE_BG/EN
+        // for the organisation itself, or a site recipient's own wording.
+        require_once dirname(__DIR__) . '/site_extensions.php';
+        $purpose = self::h(donation_recipient_purpose($recipient ?: null, $en ? 'en' : 'bg'));
 
         $sig_html = $signature_b64
             ? '<img src="data:image/png;base64,' . htmlspecialchars($signature_b64, ENT_QUOTES, 'UTF-8') . '" style="height:52px;display:block;margin:4px 0 4px auto;max-width:220px;">'

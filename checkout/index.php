@@ -5,6 +5,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/site_extensions.php';   // donation recipients
 start_session();
 
 // Module switched off in Admin → Модули — the shop does not exist (site's 404).
@@ -373,12 +374,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $donation_amount = round(max(0.0, (float)($_POST['donation_amount'] ?? 0)), 2);
         if ($donation_amount < 1.0) { $donation_amount = 0.0; }
         if ($donation_amount > 0) {
+            // Only asked when the site lists more than one recipient.
+            $donation_recipient = donation_recipient_clean($_POST['donation_recipient'] ?? null);
             $items_json[] = [
                 'type'         => 'donation',
-                'name_bg'      => 'Дарение за ' . SITE_NAME_BG,
-                'name_en'      => 'Donation to ' . SITE_NAME_EN,
+                'name_bg'      => 'Дарение за ' . donation_recipient_label($donation_recipient, 'bg'),
+                'name_en'      => 'Donation to ' . donation_recipient_label($donation_recipient, 'en'),
                 'amount_eur'   => $donation_amount,
                 'subtotal_eur' => $donation_amount,
+                'recipient'    => $donation_recipient,
             ];
             $total += $donation_amount;
         }
@@ -1006,7 +1010,10 @@ $subtotal  = $cart_info['subtotal'];
             <label for="donationAmountInput" style="display:block;font-size:.875rem;font-weight:600;margin-bottom:.5rem;"><?= h(t_or('checkout.donation.amount', 'Сума', 'Amount')) ?></label>
             <input type="number" id="donationAmountInput" min="1" step="1" placeholder="<?= h(t_or('checkout.donation.ph', 'Въведете сума (€)', 'Enter an amount (€)')) ?>"
                    oninput="updateDonationSummary()"
-                   style="width:220px;padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;font-family:inherit;">
+                   style="width:220px;max-width:100%;padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;font-family:inherit;">
+          </div>
+          <div style="margin-top:1rem;">
+            <?php $_dr_id = 'coRecipient'; $_dr_selected = null; require $_SERVER['DOCUMENT_ROOT'] . '/templates/donation-recipients.php'; ?>
           </div>
         </div>
       </div>

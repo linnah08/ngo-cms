@@ -87,7 +87,7 @@ function donation_validate(float $amount, string $name, string $email, string $d
 /** Form fields kept after a failed submission, so the donor doesn't type them again. */
 const DONATION_FORM_FIELDS = [
     'amount', 'donor_name', 'donor_email', 'donation_message', 'donor_type',
-    'invoice_company', 'invoice_eik', 'invoice_vat', 'payment_method',
+    'invoice_company', 'invoice_eik', 'invoice_vat', 'payment_method', 'donation_recipient',
 ];
 
 /**

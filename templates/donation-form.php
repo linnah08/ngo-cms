@@ -8,8 +8,9 @@
  * donation_path('form'); the reasons are shown inside the form (announced and
  * focused) and what they typed is filled back in.
  *
- * One general donation: there is no purpose to choose — the money supports
- * the organisation's work as a whole.
+ * Normally one general donation: the money supports the organisation's work
+ * as a whole. A site that lists more than one recipient in its own extensions
+ * file gets a choice (templates/donation-recipients.php).
  */
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
@@ -56,6 +57,8 @@ $_donation_pay_default = isset($_donation_pay_methods[$_don_old['payment_method'
   </div>
   <script>document.getElementById('donationErrors').focus();</script>
   <?php endif; ?>
+
+  <?php $_dr_selected = $_don_old['donation_recipient'] ?? null; require $_SERVER['DOCUMENT_ROOT'] . '/templates/donation-recipients.php'; ?>
 
   <div class="form-group">
     <label for="donAmount" style="font-weight:600;font-size:.875rem;">

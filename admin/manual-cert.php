@@ -10,6 +10,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DocumentGenerator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DonationCertGenerator.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/site_extensions.php';   // donation recipients
 
 admin_require_shop();
 module_admin_guard('donations');
@@ -36,7 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $payment_method = in_array($_POST['payment_method'] ?? '', ['card', 'bank_transfer', 'cod'], true)
                          ? $_POST['payment_method'] : 'bank_transfer';
     $donation_date = trim($_POST['donation_date'] ?? date('Y-m-d'));
-    $recipient     = 'foundation';   // one purpose per site: DONATION_PURPOSE_BG/EN in site.config
+    // Asked only when the site lists more than one donation recipient (includes/site_extensions.php).
+    $recipient     = donation_recipient_clean($_POST['recipient'] ?? null);
 
     if ($donor_type === 'individual' && $donor_name === '') {
         $errors[] = 'Моля, въведете пълно име на дарителя.';
@@ -309,6 +311,18 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
           <?php endforeach; ?>
         </select>
       </div>
+
+      <?php if (donation_recipients_choosable()): ?>
+      <div class="form-group" style="margin-bottom:1.5rem;">
+        <label class="form-label" for="mcRecipient">За кого е дарението</label>
+        <select name="recipient" id="mcRecipient" class="form-input">
+          <?php $rec = donation_recipient_clean($_POST['recipient'] ?? null); ?>
+          <?php foreach (donation_recipients() as $rk => $rv): ?>
+            <option value="<?= h($rk) ?>" <?= $rec === $rk ? 'selected' : '' ?>><?= h($rv['label_bg']) ?> — <?= h($rv['purpose_bg']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <?php endif; ?>
 
       <button type="submit" class="btn btn--primary" style="width:100%;justify-content:center;padding:.75rem;">
         Генерирай сертификат
