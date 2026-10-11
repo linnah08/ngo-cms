@@ -299,6 +299,11 @@ $current_user = admin_user();
         <div class="admin-user__name"><?= h($current_user['name'] ?? '') ?></div>
         <div class="admin-user__role"><?= h($current_user['role'] ?? '') ?></div>
       </div>
+      <a href="/admin/account.php"
+         class="admin-nav__link <?= ($active_nav ?? '') === 'account' ? 'active' : '' ?>"
+         <?= ($active_nav ?? '') === 'account' ? 'aria-current="page"' : '' ?>>
+        Моят профил и парола
+      </a>
       <a href="/" target="_blank" class="admin-nav__link" style="font-size:.8rem;opacity:.7;">↗ Към сайта</a>
       <a href="/admin/logout.php" class="admin-nav__link admin-nav__link--logout">Изход</a>
     </div>

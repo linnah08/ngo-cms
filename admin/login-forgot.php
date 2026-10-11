@@ -1,22 +1,13 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/auth.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 
 $done  = false;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!rate_limit_exceeded('admin_forgot', 3, 3600)) {
         $email = trim($_POST['email'] ?? '');
         if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $token = admin_generate_reset_token($email);
-            if ($token) {
-                $link    = SITE_URL . '/admin/login-reset.php?token=' . urlencode($token);
-                $subject = 'Нулиране на парола — ' . SITE_NAME_BG . ' Admin';
-                $body    = '<p>Получихме заявка за нулиране на вашата парола.</p>'
-                         . '<p><a href="' . h($link) . '">' . h($link) . '</a></p>'
-                         . '<p>Линкът е валиден 1 час. Ако не сте правили тази заявка, игнорирайте имейла.</p>';
-                send_mail($email, $subject, $body);
-            }
+            admin_send_password_link($email, 'forgot');
             // Always show the same message to avoid revealing whether email exists
         }
     }

@@ -1,6 +1,5 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 $page_title_admin = 'Потребители';
 $active_nav       = 'users';
 
@@ -21,37 +20,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'add') {
         $name  = trim($_POST['name']     ?? '');
         $email = trim($_POST['email']    ?? '');
-        $pass  = trim($_POST['password'] ?? '');
         $role  = in_array($_POST['role'] ?? '', ['admin','author','shop_admin']) ? $_POST['role'] : 'author';
-        if (!$name || !$email || !$pass) {
-            $error = 'Моля попълнете всички полета.';
-        } elseif (strlen($pass) < 8) {
-            $error = 'Паролата трябва да е поне 8 символа.';
+        if (!$name || !$email) {
+            $error = 'Моля попълнете име и имейл.';
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $error = 'Невалиден имейл.';
         } else {
             try {
-                $hash = password_hash($pass, PASSWORD_BCRYPT);
+                // Nobody knows this password: the new user picks their own from the welcome email's link.
+                $hash = password_hash(bin2hex(random_bytes(32)), PASSWORD_BCRYPT);
                 $pdo->prepare('INSERT INTO admin_users (name, email, password_hash, role) VALUES (?,?,?,?)')
                     ->execute([$name, $email, $hash, $role]);
 
-                send_mail(
-                    $email,
-                    'Добре дошли в ' . SITE_NAME_BG . ' Admin',
-                    '<p>Здравейте, ' . h($name) . ',</p>'
-                    . '<p>Акаунтът Ви за администрацията на <strong>' . SITE_NAME_BG . '</strong> е създаден.</p>'
-                    . '<p><strong>Имейл:</strong> ' . h($email) . '<br>'
-                    . '<strong>Временна парола:</strong> ' . h($pass) . '</p>'
-                    . '<p><a href="' . SITE_URL . '/admin/login.php">Влезте в системата</a> и сменете паролата си.</p>'
-                    . '<p>— Екипът на ' . h(SITE_NAME_BG) . '</p>'
-                );
-
-                $success = 'Потребителят е добавен и е изпратен имейл с достъп.';
+                if (admin_send_password_link($email, 'welcome')) {
+                    $success = 'Потребителят е добавен. Изпратихме му имейл с линк, от който да избере парола (валиден 7 дни).';
+                } else {
+                    $error = 'Потребителят е добавен, но имейлът с линка не можа да бъде изпратен. '
+                           . 'Проверете настройките в „Имейл“ и натиснете „Изпрати линк за парола“ до името му.';
+                }
             } catch (Exception $e) {
                 if (str_contains($e->getMessage(), 'Duplicate') || str_contains($e->getMessage(), 'UNIQUE')) {
                     $error = 'Имейлът вече съществува.';
                 } else {
-                    $error = 'Грешка при създаване на потребител: ' . h($e->getMessage());
+                    error_log('users.php add user error: ' . $e->getMessage());
+                    $error = 'Потребителят не беше създаден поради техническа грешка. Опитайте отново.';
                 }
             }
         }
@@ -104,15 +96,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-    } elseif ($action === 'reset_password') {
-        $id      = (int) ($_POST['id'] ?? 0);
-        $newpass = trim($_POST['new_password'] ?? '');
-        if (strlen($newpass) < 8) {
-            $error = 'Паролата трябва да е поне 8 символа.';
+    } elseif ($action === 'send_password_link') {
+        $id  = (int) ($_POST['id'] ?? 0);
+        $row = $pdo->prepare('SELECT email FROM admin_users WHERE id=?');
+        $row->execute([$id]);
+        $to  = $row->fetchColumn();
+        if (!is_string($to)) {
+            $error = 'Потребителят не беше намерен.';
+        } elseif (admin_send_password_link($to, 'admin')) {
+            $success = 'Изпратихме линк за нова парола на ' . $to . '. Линкът е валиден 24 часа. Сегашната парола работи, докато не бъде сменена.';
         } else {
-            $hash = password_hash($newpass, PASSWORD_BCRYPT);
-            $pdo->prepare('UPDATE admin_users SET password_hash=? WHERE id=?')->execute([$hash, $id]);
-            $success = 'Паролата е сменена.';
+            $error = 'Имейлът до ' . $to . ' не можа да бъде изпратен. Проверете настройките в „Имейл“ и опитайте отново.';
         }
     }
 }
@@ -127,25 +121,27 @@ $users = $pdo->query('SELECT id, name, email, role, created_at FROM admin_users 
 </div>
 
 <?php
-$_flash = flash_get();
-if ($_flash || $success || $error):
+// flash_get() returns a list of messages.
+$_msgs = flash_get();
+if ($success) $_msgs[] = ['type' => 'success', 'message' => $success];
+if ($error)   $_msgs[] = ['type' => 'error',   'message' => $error];
 ?>
-<?php if ($success || ($_flash && $_flash['type'] === 'success')): ?>
-  <div class="admin-alert admin-alert--success" style="margin-bottom:1.5rem;"><?= h($success ?: $_flash['message']) ?></div>
-<?php endif; ?>
-<?php if ($error || ($_flash && $_flash['type'] === 'error')): ?>
-  <div class="admin-alert admin-alert--error" style="margin-bottom:1.5rem;"><?= h($error ?: $_flash['message']) ?></div>
-<?php endif; ?>
-<?php endif; ?>
+<div role="status">
+<?php foreach ($_msgs as $_m): $_ok = ($_m['type'] ?? '') === 'success'; ?>
+  <div class="admin-alert admin-alert--<?= $_ok ? 'success' : 'error' ?>" style="margin-bottom:1.5rem;">
+    <?= $_ok ? '✔' : '✖' ?> <?= h((string) ($_m['message'] ?? '')) ?>
+  </div>
+<?php endforeach; ?>
+</div>
 
 <div class="admin-table-wrap" style="margin-bottom:2.5rem;overflow-x:hidden;">
   <table class="admin-table" style="table-layout:fixed;width:100%;">
     <colgroup>
-      <col style="width:22%;">
-      <col style="width:32%;">
-      <col style="width:14%;">
-      <col style="width:18%;">
-      <col style="width:14%;">
+      <col style="width:19%;">
+      <col style="width:27%;">
+      <col style="width:12%;">
+      <col style="width:16%;">
+      <col style="width:26%;">
     </colgroup>
     <thead>
       <tr>
@@ -187,20 +183,19 @@ if ($_flash || $success || $error):
               </select>
             </form>
 
-            <!-- Reset password (inline toggle) -->
-            <button type="button" class="btn-link"
-                    onclick="document.getElementById('reset-<?= $user['id'] ?>').classList.toggle('hidden')">
-              Парола
-            </button>
-            <div id="reset-<?= $user['id'] ?>" class="hidden" style="margin-top:0.5rem;">
-              <form method="POST" action="/admin/users.php" style="display:flex;gap:0.5rem;align-items:center;">
+            <?php if ((int)$user['id'] === (int)($current['id'] ?? 0)): ?>
+              <!-- Own password: changed on „Моят профил“, which asks for the current one -->
+              <a href="/admin/account.php" class="btn-link">Смени паролата</a>
+            <?php else: ?>
+              <!-- Email the user a link to choose a new password; the admin never sees it -->
+              <form method="POST" action="/admin/users.php" style="display:inline;">
                 <?= csrf_field() ?>
-                <input type="hidden" name="action" value="reset_password">
+                <input type="hidden" name="action" value="send_password_link">
                 <input type="hidden" name="id" value="<?= (int)$user['id'] ?>">
-                <input type="password" name="new_password" placeholder="Нова парола" minlength="8" style="font-size:0.85rem;padding:0.35rem 0.6rem;width:160px;">
-                <button type="submit" class="btn btn--primary" style="padding:0.35rem 0.75rem;font-size:0.8rem;">OK</button>
+                <button type="submit" class="btn-link"
+                        aria-label="Изпрати линк за нова парола на <?= h($user['email']) ?>">Изпрати линк за парола</button>
               </form>
-            </div>
+            <?php endif; ?>
 
             <?php if ((int)$user['id'] !== (int)($current['id'] ?? 0)): ?>
               <!-- Delete -->
@@ -221,24 +216,23 @@ if ($_flash || $success || $error):
 
 <!-- Add user -->
 <h2 style="margin-bottom:1.5rem;">Добавяне на потребител</h2>
+<p style="max-width:480px;margin:-1rem 0 1.25rem;color:#4b5563;">
+  Новият потребител ще получи имейл с линк, от който сам да избере парола.
+</p>
 <form method="POST" action="/admin/users.php" class="admin-form" style="max-width:480px;">
   <?= csrf_field() ?>
   <input type="hidden" name="action" value="add">
   <div class="form-group">
-    <label>Имена</label>
-    <input type="text" name="name" required>
+    <label for="new-user-name">Имена</label>
+    <input type="text" id="new-user-name" name="name" required autocomplete="off">
   </div>
   <div class="form-group">
-    <label>Имейл</label>
-    <input type="email" name="email" required>
+    <label for="new-user-email">Имейл</label>
+    <input type="email" id="new-user-email" name="email" required autocomplete="off">
   </div>
   <div class="form-group">
-    <label>Временна парола</label>
-    <input type="password" name="password" minlength="8" required>
-  </div>
-  <div class="form-group">
-    <label>Роля</label>
-    <select name="role">
+    <label for="new-user-role">Роля</label>
+    <select id="new-user-role" name="role">
       <option value="author">author</option>
       <option value="shop_admin">shop_admin</option>
       <option value="admin">admin</option>
@@ -246,7 +240,5 @@ if ($_flash || $success || $error):
   </div>
   <button type="submit" class="btn btn--primary">Добавяне</button>
 </form>
-
-<style>.hidden { display:none; }</style>
 
 <?php require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-footer.php'; ?>

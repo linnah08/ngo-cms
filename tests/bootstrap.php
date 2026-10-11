@@ -172,7 +172,9 @@ function with_setting(string $key, string $value, callable $fn): mixed {
  * $opts: role ('admin' | 'author' | 'shop_admin' | null = logged out),
  *        csrf (true = valid token, false = none, string = that token),
  *        get (query params), method ('POST'), ip (REMOTE_ADDR),
- *        json (array: sent as the raw JSON body, with the CSRF token inside it).
+ *        json (array: sent as the raw JSON body, with the CSRF token inside it),
+ *        user (array: overrides the session's id/name/email, for pages that act
+ *              on the signed-in user's own admin_users row).
  */
 function run_admin_page(string $rel, array $post = [], array $opts = []): array {
     $spec = [
@@ -185,6 +187,7 @@ function run_admin_page(string $rel, array $post = [], array $opts = []): array 
         'csrf'   => $opts['csrf'] ?? true,
         'ip'     => $opts['ip'] ?? '127.0.0.1',
         'json'   => $opts['json'] ?? null,
+        'user'   => $opts['user'] ?? [],
     ];
     $code = <<<'PHP'
 $s = json_decode($argv[1], true);
@@ -199,8 +202,8 @@ session_id('phpunit' . bin2hex(random_bytes(8)));
 require $s['root'] . '/config.php';
 start_session();
 if ($s['role'] !== null) {
-    $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(), 'logged_in' => true, 'id' => 0, 'name' => 'PHPUnit',
-        'email' => 'phpunit@test.local', 'role' => $s['role'], 'time' => time()];
+    $_SESSION[ADMIN_SESSION_NAME] = array_merge(['site' => admin_session_site(), 'logged_in' => true, 'id' => 0, 'name' => 'PHPUnit',
+        'email' => 'phpunit@test.local', 'role' => $s['role'], 'time' => time()], $s['user']);
 }
 $token = csrf_token();
 if ($s['csrf'] === true) $_POST['csrf_token'] = $token;
