@@ -91,7 +91,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$name_bg) $errors[] = 'Наименованието на BG е задължително.';
     if ($price === '' || (float)$price <= 0) $errors[] = 'Цената трябва да е по-голяма от 0.';
     // Below zero is how many pre-ordered items are still owed — only meaningful while pre-orders are on.
-    if ($stock < 0 && !$preorder_enabled) $errors[] = 'Наличността не може да е отрицателна. (Под нула е възможна само при включена предварителна поръчка.)';
+    // A variant product keeps its stock per variant; its own stock field is only
+    // hidden (still posted), and a stale negative value there must not silently
+    // block every save (oddminds 8958622).
+    if ($prod_type !== 'variant' && $stock < 0 && !$preorder_enabled) $errors[] = 'Наличността не може да е отрицателна. (Под нула е възможна само при включена предварителна поръчка.)';
     if ($prod_type === 'print' && empty($sizes)) $errors[] = 'Изберете поне един размер за продукт от тип Печат.';
     if ($prod_type === 'print' && empty($size_guide_image)) $errors[] = 'Добавете таблица с размери за продукт от тип Печат.';
     if ($prod_type === 'variant' && empty($submitted_variants)) {
