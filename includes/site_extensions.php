@@ -217,3 +217,39 @@ function admin_require_site_role(string $role, string $login = '/admin/login.php
     $mine = (string) (admin_user()['role'] ?? '');
     if ($mine !== $role && $mine !== 'admin') { http_response_code(403); exit('Нямате достъп до тази страница.'); }
 }
+
+// ── Order list filters ───────────────────────────────────────────────────────
+
+/**
+ * A site's own filter buttons on Админ → Поръчки: key => [label, where, params].
+ * `where` is an SQL condition on the orders table written by the site itself
+ * (never built from visitor input), e.g. a product the site follows closely.
+ */
+function site_order_filters(): array
+{
+    $out = [];
+    foreach (site_extension_section('order_filters') as $key => $f) {
+        $label = trim((string) ($f['label'] ?? ''));
+        $where = trim((string) ($f['where'] ?? ''));
+        if (!site_extension_key_ok($key) || $label === '' || $where === '' || str_contains($where, ';')) {
+            error_log("site_extensions: order filter '$key' needs a label and a where condition — skipped");
+            continue;
+        }
+        $out[$key] = ['label' => $label, 'where' => $where, 'params' => array_values(array_filter((array) ($f['params'] ?? []), 'is_scalar'))];
+    }
+    return $out;
+}
+
+/**
+ * SQL for "has a donation line for $recipient". Old lines without a recipient
+ * belong to the default one, so the default matches every donation that names
+ * none of the other recipients. Returns [condition, params].
+ */
+function donation_recipient_sql(string $recipient): array
+{
+    $search = "JSON_SEARCH(items, 'one', ?, NULL, '$[*].recipient') IS NOT NULL";
+    if ($recipient !== donation_recipient_default()) return [$search, [$recipient]];
+    $others = array_values(array_diff(array_keys(donation_recipients()), [$recipient]));
+    if (!$others) return ['1=1', []];
+    return ['NOT (' . implode(' OR ', array_fill(0, count($others), $search)) . ')', $others];
+}

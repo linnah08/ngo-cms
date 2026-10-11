@@ -140,15 +140,26 @@ const ORDERS_LIST_STATUSES = ['all', 'new', 'confirmed', 'shipped', 'delivered',
  */
 function orders_list_filter(array $query): array {
     require_once __DIR__ . '/payment/unpaid_orders.php';
+    require_once __DIR__ . '/site_extensions.php';
 
     $type   = is_string($query['type'] ?? null) && in_array($query['type'], ORDERS_LIST_TYPES, true) ? $query['type'] : 'all';
     $status = is_string($query['status'] ?? null) && in_array($query['status'], ORDERS_LIST_STATUSES, true) ? $query['status'] : 'all';
     $q      = is_string($query['q'] ?? null) ? mb_substr(trim(preg_replace('/\s+/u', ' ', $query['q']) ?? ''), 0, 100) : '';
 
+    // Recipient (only when the site has several) and the site's own filters.
+    $rec = is_string($query['rec'] ?? null) && donation_recipients_choosable() && isset(donation_recipients()[$query['rec']]) ? $query['rec'] : '';
+    $x   = is_string($query['x'] ?? null) && isset(site_order_filters()[$query['x']]) ? $query['x'] : '';
+    if ($rec !== '') $type = 'donation';
+
     $where  = ['1=1'];
     $params = [];
     if ($type === 'donation') {
         $where[] = order_has_donation_sql();
+        if ($rec !== '') {
+            [$cond, $p] = donation_recipient_sql($rec);
+            $where[] = $cond;
+            array_push($params, ...$p);
+        }
     } elseif ($type !== 'all') {
         $where[]  = 'type = ?';
         $params[] = $type;
@@ -177,8 +188,13 @@ function orders_list_filter(array $query): array {
         }
         $where[] = '(' . implode(' OR ', $match) . ')';
     }
+    if ($x !== '') {
+        $f = site_order_filters()[$x];
+        $where[] = '(' . $f['where'] . ')';
+        array_push($params, ...$f['params']);
+    }
 
-    return ['type' => $type, 'status' => $status, 'q' => $q, 'where' => implode(' AND ', $where), 'params' => $params];
+    return ['type' => $type, 'status' => $status, 'q' => $q, 'rec' => $rec, 'x' => $x, 'where' => implode(' AND ', $where), 'params' => $params];
 }
 
 /**
@@ -186,7 +202,9 @@ function orders_list_filter(array $query): array {
  * ($change), leaving out the defaults. E.g. orders_list_url($f, ['status' => 'new']).
  */
 function orders_list_url(array $filter, array $change = []): string {
-    $f  = array_merge(['type' => $filter['type'], 'status' => $filter['status'], 'q' => $filter['q']], $change);
+    $f  = array_merge(['type' => $filter['type'], 'status' => $filter['status'], 'q' => $filter['q'],
+                       'rec' => $filter['rec'] ?? '', 'x' => $filter['x'] ?? ''], $change);
+    if (($f['type'] ?? '') !== 'donation') $f['rec'] = '';   // a recipient only narrows donations
     $qs = http_build_query(array_filter($f, fn($v) => $v !== '' && $v !== 'all'));
     return '/admin/orders.php' . ($qs !== '' ? '?' . $qs : '');
 }

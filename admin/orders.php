@@ -1,6 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/site_extensions.php';   // recipients and site filters
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/unpaid_orders.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_view.php';
 $page_title_admin = 'Поръчки';
@@ -53,6 +54,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $back = orders_list_filter([
         'type'   => $_POST['filter_type']   ?? '',
         'status' => $_POST['filter_status'] ?? '',
+        'rec'    => $_POST['filter_rec']    ?? '',
+        'x'      => $_POST['filter_x']      ?? '',
         'q'      => $_POST['filter_q']      ?? '',
     ]);
     header('Location: ' . orders_list_url($back));
@@ -103,6 +106,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 <form method="GET" action="/admin/orders.php" role="search" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem;max-width:640px;margin-bottom:1rem;">
   <?php if ($filter_type !== 'all'): ?><input type="hidden" name="type" value="<?= h($filter_type) ?>"><?php endif; ?>
   <?php if ($filter_status !== 'all'): ?><input type="hidden" name="status" value="<?= h($filter_status) ?>"><?php endif; ?>
+  <?php if ($filter['rec'] !== ''): ?><input type="hidden" name="rec" value="<?= h($filter['rec']) ?>"><?php endif; ?>
+  <?php if ($filter['x'] !== ''): ?><input type="hidden" name="x" value="<?= h($filter['x']) ?>"><?php endif; ?>
   <div style="flex:1 1 16rem;min-width:0;">
     <label for="ordersSearch" style="display:block;font-size:.85rem;font-weight:600;margin-bottom:.3rem;">Търсене</label>
     <input type="search" id="ordersSearch" name="q" value="<?= h($search) ?>" maxlength="100"
@@ -142,6 +147,30 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <?php endforeach; ?>
 </div>
 
+<?php // Who the donations were for — only when the site has several recipients (includes/site_extensions.php). ?>
+<?php if ($filter_type === 'donation' && donation_recipients_choosable()): ?>
+<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin:-.75rem 0 1.5rem;" aria-label="Дарения за">
+  <?php foreach (['' => 'Всички дарения'] + array_map(fn($r) => $r['label_bg'], donation_recipients()) as $rk => $rl): ?>
+    <a href="<?= h(orders_list_url($filter, ['rec' => $rk])) ?>"<?= $filter['rec'] === $rk ? ' aria-current="true"' : '' ?>
+       style="padding:.35rem .9rem;border-radius:20px;font-size:.85rem;text-decoration:none;
+         <?= $filter['rec'] === $rk ? 'background:var(--teal);color:#fff;' : 'background:var(--warm-grey);color:var(--text);' ?>">
+      <?= h($rl) ?>
+    </a>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>
+<?php if (site_order_filters()): ?>
+<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin:-.75rem 0 1.5rem;" aria-label="Още филтри">
+  <?php foreach (['' => 'Без допълнителен филтър'] + array_map(fn($f) => $f['label'], site_order_filters()) as $xk => $xl): ?>
+    <a href="<?= h(orders_list_url($filter, ['x' => $xk])) ?>"<?= $filter['x'] === $xk ? ' aria-current="true"' : '' ?>
+       style="padding:.35rem .9rem;border-radius:20px;font-size:.85rem;text-decoration:none;
+         <?= $filter['x'] === $xk ? 'background:var(--teal);color:#fff;' : 'background:var(--warm-grey);color:var(--text);' ?>">
+      <?= h($xl) ?>
+    </a>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>
+
 <?php if (empty($orders)): ?>
   <p role="status" style="color:var(--text-muted);"><?= $search !== ''
       ? 'Няма поръчки, които отговарят на „' . h($search) . '“' . ($filter_type !== 'all' || $filter_status !== 'all' ? ' при избраните тип и статус' : '') . '.'
@@ -157,6 +186,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 <form method="POST" id="bulkForm">
   <?= csrf_field() ?>
   <input type="hidden" name="filter_type"   value="<?= h($filter_type) ?>">
+  <input type="hidden" name="filter_rec"    value="<?= h($filter['rec']) ?>">
+  <input type="hidden" name="filter_x"      value="<?= h($filter['x']) ?>">
   <input type="hidden" name="filter_status" value="<?= h($filter_status) ?>">
   <input type="hidden" name="filter_q"      value="<?= h($search) ?>">
 
@@ -216,6 +247,14 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
           </td>
           <td style="cursor:pointer;" onclick="location='/admin/order-view.php?id=<?= (int)$o['id'] ?>'">
             <?= h($type_labels[$o['type']] ?? $o['type']) ?>
+            <?php if (donation_recipients_choosable()):
+                  $_recips = [];
+                  foreach ((array) json_decode((string) $o['items'], true) as $_it) {
+                      if (is_array($_it) && ($_it['type'] ?? '') === 'donation') $_recips[donation_line_recipient($_it)] = true;
+                  }
+                  foreach (array_keys($_recips) as $_rk): ?>
+              <small style="display:block;color:var(--text-muted);"><?= h(donation_recipient_label($_rk)) ?></small>
+            <?php endforeach; endif; ?>
           </td>
           <td style="cursor:pointer;" onclick="location='/admin/order-view.php?id=<?= (int)$o['id'] ?>'">
             <?= $o['courier'] ? h(ucfirst($o['courier'])) : '—' ?>
