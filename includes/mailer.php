@@ -438,6 +438,13 @@ function send_mail(string $to, string $subject, string $body_html, string $reply
 {
     _mail_set_last_error('');
 
+    // Set by the test runner (run_admin_page) so a page under test never mails
+    // a real address, whatever transport this machine has configured.
+    if (defined('MAIL_DISABLED') && MAIL_DISABLED) {
+        _mail_set_last_error('Mail disabled (MAIL_DISABLED)');
+        return false;
+    }
+
     $smtp = mail_smtp_config();
     $transport = mail_select_transport(mail_smtp_config_is_complete($smtp), mail_graph_is_configured());
 

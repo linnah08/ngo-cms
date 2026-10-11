@@ -196,6 +196,7 @@ $_SERVER['REQUEST_METHOD'] = $s['method'];
 $_SERVER['REQUEST_URI']    = '/' . $s['rel'];
 $_SERVER['HTTP_HOST']      = 'localhost';
 $_SERVER['REMOTE_ADDR']    = $s['ip'];
+define('MAIL_DISABLED', true);   // a page under test must never mail anyone
 $_GET  = $s['get'];
 $_POST = $s['post'];
 session_id('phpunit' . bin2hex(random_bytes(8)));
