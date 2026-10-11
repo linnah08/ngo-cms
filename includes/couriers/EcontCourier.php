@@ -8,6 +8,8 @@
  *   1. Encrypted DB settings (admin panel)
  *   2. Constants from courier.config.php (CLI / tests)
  */
+require_once __DIR__ . '/courier_phone.php';
+
 class EcontCourier
 {
     private string $base;
@@ -218,7 +220,7 @@ class EcontCourier
             ],
             'receiverClient'  => [
                 'name'   => $order['receiver_name'] ?? '',
-                'phones' => [['phone' => $order['receiver_phone'] ?? '']],
+                'phones' => [['phone' => courier_normalize_phone($order['receiver_phone'] ?? '')]],
             ],
         ];
 

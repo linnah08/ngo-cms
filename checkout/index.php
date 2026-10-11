@@ -1532,15 +1532,21 @@ if (savedBoxnowName) {
     });
     input.addEventListener('input', clearError);
 
-    // Block form submission if number is invalid
+    // Block an invalid number, and write the full international number back
+    // into the field before it posts: with separateDialCode the dial code
+    // (e.g. +359) is not part of input.value, and couriers reject a number
+    // without it ("Невалидна стойност").
     const form = input.closest('form');
     if (form) {
         form.addEventListener('submit', function (e) {
-            if (input.value.trim() !== '' && !iti.isValidNumber()) {
+            if (input.value.trim() === '') return;
+            if (!iti.isValidNumber()) {
                 e.preventDefault();
                 showError();
                 input.focus();
+                return;
             }
+            input.value = iti.getNumber(); // E.164, e.g. +359888123456
         });
     }
 })();

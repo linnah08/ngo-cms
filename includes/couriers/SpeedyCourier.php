@@ -7,6 +7,8 @@
  * Requires courier.config.php to define:
  *   SPEEDY_USER, SPEEDY_PASS, SPEEDY_CLIENT_ID, SPEEDY_TEST_MODE
  */
+require_once __DIR__ . '/courier_phone.php';
+
 class SpeedyCourier
 {
     private string $base;
@@ -356,7 +358,7 @@ class SpeedyCourier
             'pack_count'       => $packCount,
             'description'      => $description,
             'receiver_name'    => $order['customer_name']  ?? '',
-            'receiver_phone'   => $order['customer_phone'] ?? '',
+            'receiver_phone'   => courier_normalize_phone($order['customer_phone'] ?? ''),
             'receiver_city'    => $order['delivery_city']    ?? '',
             'receiver_address' => $order['delivery_address'] ?? '',
             'receiver_office'  => $isPickup ? (int)($order['courier_office_code'] ?? 0) : null,
@@ -390,7 +392,9 @@ class SpeedyCourier
         $recipient = [
             'privatePerson' => true,
             'clientName'    => $order['receiver_name'] ?? '',
-            'phone1'        => ['number' => $order['receiver_phone'] ?? ''],
+            // Normalised at the API boundary too: pledge shipments call this directly,
+            // and a phone without +359 makes Speedy reject the recipient.
+            'phone1'        => ['number' => courier_normalize_phone($order['receiver_phone'] ?? '')],
         ];
 
         if ($deliveryType === 'door') {

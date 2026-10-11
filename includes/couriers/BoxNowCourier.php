@@ -9,6 +9,8 @@
  *   BOXNOW_PARTNER_ID, BOXNOW_WAREHOUSE_ID,
  *   BOXNOW_TEST_MODE
  */
+require_once __DIR__ . '/courier_phone.php';
+
 class BoxNowCourier
 {
     private string $base;
@@ -131,15 +133,7 @@ class BoxNowCourier
      */
     private function normalizePhone(string $phone): string
     {
-        $hasPlus = str_starts_with(ltrim($phone), '+');
-        $digits  = preg_replace('/\D+/', '', $phone);            // keep digits only
-
-        if ($digits === '')                     return '';
-        if ($hasPlus)                           return '+' . $digits;       // already international
-        if (str_starts_with($digits, '00'))     return '+' . substr($digits, 2);
-        if (str_starts_with($digits, '359'))    return '+' . $digits;       // 359… without +
-        if (str_starts_with($digits, '0'))      return '+359' . substr($digits, 1);
-        return '+359' . $digits;
+        return courier_normalize_phone($phone);
     }
 
     // ── Public API ─────────────────────────────────────────────────────────────

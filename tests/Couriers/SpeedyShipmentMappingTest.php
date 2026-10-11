@@ -76,6 +76,37 @@ final class SpeedyShipmentMappingTest extends TestCase
         $this->assertSame(4, $in['pack_count']);
         $this->assertSame('My contents', $in['description']);
         $this->assertSame('X', $in['receiver_name']);
-        $this->assertSame('0888', $in['receiver_phone']);
+        $this->assertSame('+359888', $in['receiver_phone'], 'normalised to E.164 (Speedy rejects a number without +359)');
+    }
+
+    /**
+     * Regression (oddminds 0d22c17): the checkout stored phones without +359, and
+     * Speedy rejected them ("Получател Телефон 1: Невалидна стойност"). The
+     * mapping normalises to E.164, so already-stored orders still ship.
+     */
+    public function testReceiverPhoneNormalizedToE164(): void
+    {
+        $cases = [
+            '0888123456'     => '+359888123456',
+            '888123456'      => '+359888123456',
+            '+359888123456'  => '+359888123456',
+            '00359888123456' => '+359888123456',
+            '359888123456'   => '+359888123456',
+            '0888 123 456'   => '+359888123456',
+            ''               => '',
+        ];
+        foreach ($cases as $stored => $expected) {
+            $in = SpeedyCourier::shipmentInputFromOrder(['delivery_type' => 'door', 'customer_phone' => $stored], 1.0, 1, 'd');
+            $this->assertSame($expected, $in['receiver_phone'], "phone '$stored'");
+        }
+    }
+
+    public function testCheckoutPostsTheFullInternationalNumber(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 2) . '/checkout/index.php');
+        $this->assertStringContainsString('input.value = iti.getNumber();', $src, 'separateDialCode keeps +359 out of the field unless written back');
+        foreach (['SpeedyCourier', 'EcontCourier', 'BoxNowCourier'] as $c) {
+            $this->assertStringContainsString('courier_normalize_phone(', (string) file_get_contents(dirname(__DIR__, 2) . "/includes/couriers/$c.php"), $c);
+        }
     }
 }
