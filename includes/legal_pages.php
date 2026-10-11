@@ -37,3 +37,16 @@ function legal_en_org_name(): string
 {
     return legal_const('SITE_LEGAL_NAME_EN') !== '' ? legal_const('SITE_LEGAL_NAME_EN') : legal_const('SITE_NAME_EN');
 }
+
+/**
+ * Address, company number and representative for the built-in text, as HTML
+ * lines ending in <br>, from Админ → Организация (only what is filled in).
+ */
+function legal_en_identity_lines(bool $with_representative = false): string
+{
+    $lines = '';
+    if (legal_const('SITE_ADDRESS') !== '') $lines .= 'Address: ' . h(legal_const('SITE_ADDRESS')) . "<br>\n";
+    if (legal_const('SITE_EIK') !== '')     $lines .= 'UIC: ' . h(legal_const('SITE_EIK')) . "<br>\n";
+    if ($with_representative && legal_const('SITE_MOL') !== '') $lines .= 'Representative: ' . h(legal_const('SITE_MOL')) . "<br>\n";
+    return $lines;
+}

@@ -62,4 +62,17 @@ final class LegalPagesTest extends TestCase
             $this->assertDoesNotMatchRegularExpression('/\bul\.\s|Street\b|village\b/i', $src, "$file has a street address");
         }
     }
+
+    public function test_the_fallback_names_the_registered_details_when_set(): void
+    {
+        $lines = legal_en_identity_lines(true);
+        foreach (['SITE_ADDRESS' => 'Address: ', 'SITE_EIK' => 'UIC: ', 'SITE_MOL' => 'Representative: '] as $c => $label) {
+            $set = defined($c) && trim((string) constant($c)) !== '';
+            $this->assertSame($set, str_contains($lines, $label), "$label only when $c is filled in");
+        }
+        $this->assertStringNotContainsString('Representative: ', legal_en_identity_lines(false));
+        foreach (['en/privacy-policy/index.php', 'en/legal/index.php'] as $f) {
+            $this->assertStringContainsString('legal_en_identity_lines(', (string) file_get_contents(dirname(__DIR__) . '/' . $f));
+        }
+    }
 }

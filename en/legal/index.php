@@ -27,6 +27,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     <h2>1. Publisher information</h2>
     <p>
       <?= h(legal_en_org_name()) ?><br>
+      <?= legal_en_identity_lines(true) ?>
 <?php if (legal_const('SITE_PHONE') !== ''): ?>
       Phone: <?= h(legal_const('SITE_PHONE')) ?><br>
 <?php endif; ?>

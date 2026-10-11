@@ -30,6 +30,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     <h2>2. Data Controller</h2>
     <p>
       <?= h(legal_en_org_name()) ?><br>
+      <?= legal_en_identity_lines(false) ?>
 <?php if (legal_const('SITE_PHONE') !== ''): ?>
       Phone: <?= h(legal_const('SITE_PHONE')) ?><br>
 <?php endif; ?>
