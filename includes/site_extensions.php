@@ -253,3 +253,58 @@ function donation_recipient_sql(string $recipient): array
     if (!$others) return ['1=1', []];
     return ['NOT (' . implode(' OR ', array_fill(0, count($others), $search)) . ')', $others];
 }
+
+// ── Monthly reports ──────────────────────────────────────────────────────────
+
+/**
+ * A site's own monthly report files: key => [label, filename, csv, summary].
+ * `csv` is a function (int $year, int $month): string returning the CSV text;
+ * `summary` optionally returns one plain-text line for the monthly email
+ * (e.g. an amount owed to a partner). `filename` is a sprintf pattern given
+ * year and month, e.g. "partner-%04d-%02d.csv". Offered on Админ → Месечен
+ * отчет and attached to the monthly report email.
+ */
+function site_reports(): array
+{
+    $out = [];
+    foreach (site_extension_section('reports') as $key => $r) {
+        $label = trim((string) ($r['label'] ?? ''));
+        $file  = (string) ($r['filename'] ?? '');
+        if (!site_extension_key_ok($key) || $label === '' || !is_callable($r['csv'] ?? null)
+            || !preg_match('/^[A-Za-z0-9_%.-]+\.csv$/', $file)) {
+            error_log("site_extensions: report '$key' needs a label, a filename ending in .csv and a csv function — skipped");
+            continue;
+        }
+        $out[$key] = ['label' => $label, 'filename' => $file, 'csv' => $r['csv'],
+                      'summary' => is_callable($r['summary'] ?? null) ? $r['summary'] : null];
+    }
+    return $out;
+}
+
+/** One site report for a month: ['name' => file name, 'csv' => text], or null when it fails (logged). */
+function site_report_build(string $key, int $year, int $month): ?array
+{
+    $r = site_reports()[$key] ?? null;
+    if ($r === null) return null;
+    try {
+        $csv = ($r['csv'])($year, $month);
+        if (!is_string($csv)) throw new UnexpectedValueException('did not return text');
+        return ['name' => sprintf($r['filename'], $year, $month), 'csv' => $csv];
+    } catch (Throwable $e) {
+        error_log("site_extensions: report '$key' failed — " . $e->getMessage());
+        return null;
+    }
+}
+
+/** A site report's line for the monthly email, or '' (none, or it failed). */
+function site_report_summary(string $key, int $year, int $month): string
+{
+    $fn = site_reports()[$key]['summary'] ?? null;
+    if ($fn === null) return '';
+    try {
+        return trim((string) $fn($year, $month));
+    } catch (Throwable $e) {
+        error_log("site_extensions: report '$key' summary failed — " . $e->getMessage());
+        return '';
+    }
+}

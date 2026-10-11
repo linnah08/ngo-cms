@@ -2,6 +2,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/reports/monthly-orders.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/site_extensions.php';   // the site's own report files
 
 $page_title_admin = 'Месечен отчет';
 $active_nav       = 'monthly-report';
@@ -23,8 +24,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit('Invalid date.');
     }
 
-    $csv      = generate_monthly_orders_csv($year, $month);
-    $filename = sprintf('report-%04d-%02d.csv', $year, $month);
+    $report = (string) ($_POST['report'] ?? '');
+    if ($report !== '' && isset(site_reports()[$report])) {
+        $built = site_report_build($report, $year, $month);
+        if ($built === null) {
+            http_response_code(500);
+            exit('Отчетът не можа да бъде създаден. Опитайте отново или се свържете с поддръжката.');
+        }
+        [$csv, $filename] = [$built['csv'], $built['name']];
+    } else {
+        $csv      = generate_monthly_orders_csv($year, $month);
+        $filename = sprintf('report-%04d-%02d.csv', $year, $month);
+    }
 
     header('Content-Type: text/csv; charset=UTF-8');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
@@ -79,6 +90,14 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
           Изтегли CSV
         </button>
       </div>
+      <?php foreach (site_reports() as $rk => $rv): ?>
+      <div>
+        <button type="submit" name="report" value="<?= h($rk) ?>"
+                style="padding:8px 20px;background:#fff;color:#1a56db;border:2px solid #1a56db;border-radius:6px;font-size:14px;cursor:pointer;font-weight:600;">
+          <?= h($rv['label']) ?>
+        </button>
+      </div>
+      <?php endforeach; ?>
     </div>
   </form>
 </div>

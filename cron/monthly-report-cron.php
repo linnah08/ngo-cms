@@ -54,6 +54,21 @@ $doc_attachments = get_monthly_document_attachments($year, $month, $site_root);
 $cert_count      = count(array_filter($doc_attachments, fn($a) => str_contains($a['name'], 'DC-') || str_contains($a['path'], 'donation_cert')));
 $invoice_count   = count($doc_attachments) - $cert_count;
 
+// The site's own report files (includes/site-extensions.php) go along; one that
+// fails is left out, and the main report is still sent.
+require_once $site_root . '/includes/site_extensions.php';
+$site_files = [];
+$site_lines = '';
+foreach (array_keys(site_reports()) as $rk) {
+    $built = site_report_build($rk, $year, $month);
+    if ($built !== null) {
+        $path = sys_get_temp_dir() . '/' . $built['name'];
+        if (file_put_contents($path, $built['csv']) !== false) $site_files[] = ['path' => $path, 'name' => $built['name']];
+    }
+    $line = site_report_summary($rk, $year, $month);
+    if ($line !== '') $site_lines .= '<li>' . htmlspecialchars($line, ENT_QUOTES, 'UTF-8') . '</li>';
+}
+
 $subject = "Месечен отчет — {$label}";
 $body    = "<p>Здравей,</p>
 <p>Прилагаме месечния отчет за <strong>{$label}</strong>.</p>
@@ -61,11 +76,12 @@ $body    = "<p>Здравей,</p>
 <li>Поръчки (платени / върнати): <strong>{$row_count}</strong></li>
 <li>Дарителски удостоверения: <strong>{$cert_count}</strong></li>
 <li>Фактури: <strong>{$invoice_count}</strong></li>
-</ul>
+{$site_lines}</ul>
 <p>Поздрави,<br>" . SITE_NAME_BG . "</p>";
 
 $attachments = array_merge(
     [['path' => $tmp, 'name' => $filename]],
+    $site_files,
     $doc_attachments
 );
 
@@ -78,6 +94,7 @@ $ok = send_mail(
 );
 
 unlink($tmp);
+foreach ($site_files as $f) @unlink($f['path']);
 
 if ($ok) {
     echo "[monthly-report-cron] Report for {$label} sent ({$row_count} orders, {$cert_count} certs, {$invoice_count} invoices).\n";
