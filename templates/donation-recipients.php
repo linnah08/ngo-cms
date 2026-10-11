@@ -23,7 +23,7 @@ $_dr_id       = $_dr_id ?? 'donRecipient';
       <span>
         <strong style="display:block;font-size:.92rem;"><?= h($lang === 'en' ? $_dr['label_en'] : $_dr['label_bg']) ?></strong>
 <?php   if ($_dr_hint !== ''): ?>
-        <span style="display:block;font-size:.85rem;color:var(--text-muted);"><?= h($_dr_hint) ?>
+        <span style="display:block;font-size:.85rem;color:var(--text-muted);text-transform:none;letter-spacing:normal;font-weight:400;margin-top:.15rem;"><?= h($_dr_hint) ?>
 <?php     if ($_dr['hint_url'] !== ''): ?>
           <a href="<?= h($_dr['hint_url']) ?>" target="_blank" rel="noopener"><?= h(t_or('donation.recipient_more', 'Научете повече', 'Learn more', $lang)) ?></a>
 <?php     endif; ?>

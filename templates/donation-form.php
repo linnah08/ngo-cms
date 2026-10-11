@@ -38,8 +38,9 @@ $_donation_pay_default = isset($_donation_pay_methods[$_don_old['payment_method'
     : array_key_first($_donation_pay_methods);
 ?>
 <style>@media(max-width:640px){.company-fields-grid{grid-template-columns:1fr!important;}}</style>
+<?php /* color: the form sits in a teal section whose white text would otherwise make its headings invisible. */ ?>
 <form method="POST" action="/donation/checkout.php" id="donationForm"
-      style="max-width:520px;margin:0 auto;background:#fff;padding:2rem;border-radius:var(--radius-lg);">
+      style="max-width:520px;margin:0 auto;background:#fff;color:var(--text,#1a1916);padding:2rem;border-radius:var(--radius-lg);">
   <?= csrf_field() ?>
   <input type="hidden" name="_lang" value="<?= h($lang) ?>">
 
