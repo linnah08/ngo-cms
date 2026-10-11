@@ -206,5 +206,8 @@ function cookieConsent(choice) {
 }
 </script>
 <?php endif; ?>
+<?php // Jobs the server's schedule isn't running are started after the page is sent (includes/scheduled_jobs.php).
+try { require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/scheduled_jobs.php'; scheduled_jobs_run_on_visit(); }
+catch (Throwable $e) { error_log('scheduled_jobs_run_on_visit: ' . $e->getMessage()); } ?>
 </body>
 </html>

@@ -70,3 +70,6 @@ scripts/
 /backups/
 /.maintenance
 /logs/update-check-cache.json
+/logs/.jobs-visit-checked
+/logs/.jobs-visit.lock
+/logs/crontab-backup-*.txt
