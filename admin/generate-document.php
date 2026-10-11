@@ -77,28 +77,35 @@ $existing = $existing_stmt->fetch();
 // credit_note shares the invoice sequence (Bulgarian accounting rules)
 $sequence_type = ($doc_type === 'credit_note') ? 'invoice' : $doc_type;
 
-// Always atomically assign the next number from the counter
-$pdo->beginTransaction();
-try {
-    $lock = $pdo->prepare('SELECT last_number FROM document_sequences WHERE type = ? FOR UPDATE');
-    $lock->execute([$sequence_type]);
-    $last = $lock->fetchColumn();
-    if ($last === false) {
-        throw new \RuntimeException("No sequence row found for type '{$sequence_type}'");
-    }
-    $doc_number = (int) $last + 1;
-    $pdo->prepare('UPDATE document_sequences SET last_number = ? WHERE type = ?')
-        ->execute([$doc_number, $sequence_type]);
-    $pdo->commit();
-} catch (Throwable $e) {
-    $pdo->rollBack();
-    _om_log('ERROR', 'generate-document: sequence error: ' . $e->getMessage());
-    header('Location: /admin/order-view.php?id=' . $order_id . '&doc_error=' . urlencode('Грешка при генериране на номер на документ.'));
-    exit;
-}
+$pad = ($doc_type === 'donation_cert') ? 5 : 10;
 
-$pad           = ($doc_type === 'donation_cert') ? 5 : 10;
-$doc_formatted = str_pad((string) $doc_number, $pad, '0', STR_PAD_LEFT);
+if ($existing && (int) $existing['number'] > 0) {
+    // Regenerating an issued document (e.g. after correcting the recipient):
+    // keep its number — a new one would leave a gap in the legal sequence.
+    $doc_number    = (int) $existing['number'];
+    $doc_formatted = (string) ($existing['formatted_number'] ?: str_pad((string) $doc_number, $pad, '0', STR_PAD_LEFT));
+} else {
+    // Atomically assign the next number from the counter
+    $pdo->beginTransaction();
+    try {
+        $lock = $pdo->prepare('SELECT last_number FROM document_sequences WHERE type = ? FOR UPDATE');
+        $lock->execute([$sequence_type]);
+        $last = $lock->fetchColumn();
+        if ($last === false) {
+            throw new \RuntimeException("No sequence row found for type '{$sequence_type}'");
+        }
+        $doc_number = (int) $last + 1;
+        $pdo->prepare('UPDATE document_sequences SET last_number = ? WHERE type = ?')
+            ->execute([$doc_number, $sequence_type]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        _om_log('ERROR', 'generate-document: sequence error: ' . $e->getMessage());
+        header('Location: /admin/order-view.php?id=' . $order_id . '&doc_error=' . urlencode('Грешка при генериране на номер на документ.'));
+        exit;
+    }
+    $doc_formatted = str_pad((string) $doc_number, $pad, '0', STR_PAD_LEFT);
+}
 
 // Determine output directory and file path
 $type_dirs = [
