@@ -7,6 +7,7 @@ admin_require_login();
 admin_require_admin();
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/auth.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/site_extensions.php';   // admin_roles(): a site may add its own
 
 $success = '';
 $error   = '';
@@ -20,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'add') {
         $name  = trim($_POST['name']     ?? '');
         $email = trim($_POST['email']    ?? '');
-        $role  = in_array($_POST['role'] ?? '', ['admin','author','shop_admin']) ? $_POST['role'] : 'author';
+        $role  = isset(admin_roles()[$_POST['role'] ?? '']) ? $_POST['role'] : 'author';
         if (!$name || !$email) {
             $error = 'Моля попълнете име и имейл.';
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -50,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } elseif ($action === 'change_role') {
         $id   = (int) ($_POST['id'] ?? 0);
-        $role = in_array($_POST['role'] ?? '', ['admin','author','shop_admin']) ? $_POST['role'] : 'author';
+        $role = isset(admin_roles()[$_POST['role'] ?? '']) ? $_POST['role'] : 'author';
         if ($id === (int)($current['id'] ?? 0)) {
             $error = 'Не може да промените собствената си роля.';
         } else {
@@ -166,7 +167,7 @@ if ($error)   $_msgs[] = ['type' => 'error',   'message' => $error];
               };
             ?>
             <span class="badge <?= $badge_class ?>">
-              <?= h($user['role']) ?>
+              <?= h(admin_roles()[$user['role']] ?? $user['role']) ?>
             </span>
           </td>
           <td><?= h(substr($user['created_at'], 0, 10)) ?></td>
@@ -177,9 +178,9 @@ if ($error)   $_msgs[] = ['type' => 'error',   'message' => $error];
               <input type="hidden" name="action" value="change_role">
               <input type="hidden" name="id" value="<?= (int)$user['id'] ?>">
               <select name="role" onchange="this.form.submit()" style="font-size:0.8rem;padding:2px 6px;">
-                <option value="author"     <?= $user['role']==='author'     ?'selected':'' ?>>author</option>
-                <option value="shop_admin" <?= $user['role']==='shop_admin' ?'selected':'' ?>>shop_admin</option>
-                <option value="admin"      <?= $user['role']==='admin'      ?'selected':'' ?>>admin</option>
+                <?php foreach (admin_roles() as $rk => $rl): ?>
+                <option value="<?= h($rk) ?>" <?= $user['role'] === $rk ? 'selected' : '' ?>><?= h($rl) ?></option>
+                <?php endforeach; ?>
               </select>
             </form>
 
@@ -233,9 +234,9 @@ if ($error)   $_msgs[] = ['type' => 'error',   'message' => $error];
   <div class="form-group">
     <label for="new-user-role">Роля</label>
     <select id="new-user-role" name="role">
-      <option value="author">author</option>
-      <option value="shop_admin">shop_admin</option>
-      <option value="admin">admin</option>
+      <?php foreach (admin_roles() as $rk => $rl): ?>
+      <option value="<?= h($rk) ?>"<?= $rk === 'author' ? ' selected' : '' ?>><?= h($rl) ?></option>
+      <?php endforeach; ?>
     </select>
   </div>
   <button type="submit" class="btn btn--primary">Добавяне</button>

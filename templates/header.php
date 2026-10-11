@@ -102,7 +102,8 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
   <?php endif; ?>
   <?php endif; ?>
   <?php endif; ?>
-  <?php $_show_admin_bar = admin_logged_in() || admin_bar_token_verify(); ?>
+  <?php require_once ROOT_PATH . '/includes/site_extensions.php';
+        $_show_admin_bar = (admin_logged_in() && !admin_role_is_site_role((string) (admin_user()['role'] ?? ''))) || admin_bar_token_verify(); ?>
   <?php if ($_show_admin_bar): ?>
   <link rel="stylesheet" href="<?= SITE_URL ?>/assets/css/inline-cms.css">
   <?php endif; ?>

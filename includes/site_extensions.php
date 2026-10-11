@@ -158,3 +158,62 @@ function donation_line_recipient(array $line): string
 {
     return donation_recipient_clean($line['recipient'] ?? null);
 }
+
+// ── Admin roles ──────────────────────────────────────────────────────────────
+
+/** The roles ngo-cms itself knows: key => label shown in Админ → Потребители. */
+const ADMIN_BUILTIN_ROLES = ['admin' => 'Администратор', 'author' => 'Автор', 'shop_admin' => 'Магазин'];
+
+/**
+ * A site's own admin roles: key => [label, home, admin_pages]. Someone with such
+ * a role logs in through the normal admin login but works only in the site's own
+ * pages: every admin page sends them to `home` (a path on this site), except the
+ * admin/*.php files listed in `admin_pages`. They never get the public site's
+ * edit bar. A site's own page checks the role with admin_require_site_role().
+ */
+function site_admin_roles(): array
+{
+    $out = [];
+    foreach (site_extension_section('roles') as $key => $r) {
+        if (!site_extension_key_ok($key) || isset(ADMIN_BUILTIN_ROLES[$key])) { error_log("site_extensions: role '$key' is not allowed — skipped"); continue; }
+        $home = (string) ($r['home'] ?? '');
+        if (!preg_match('#^/[A-Za-z0-9/_.-]*$#', $home) || str_starts_with($home, '/admin')) { error_log("site_extensions: role '$key' needs a home outside /admin — skipped"); continue; }
+        $out[$key] = [
+            'label'       => trim((string) ($r['label'] ?? '')) ?: $key,
+            'home'        => $home,
+            'admin_pages' => array_values(array_filter((array) ($r['admin_pages'] ?? []), static fn($p) => is_string($p) && preg_match('/^[a-z0-9_-]+\.php$/', $p))),
+        ];
+    }
+    return $out;
+}
+
+/** Every role a user can have: key => label (ngo-cms's own first). */
+function admin_roles(): array
+{
+    return ADMIN_BUILTIN_ROLES + array_map(static fn($r) => $r['label'], site_admin_roles());
+}
+
+/** Is this one of the site's own roles (not admin, author or shop manager)? */
+function admin_role_is_site_role(string $role): bool
+{
+    return isset(site_admin_roles()[$role]);
+}
+
+/**
+ * Where a site-role user goes instead of $script (an admin/*.php basename), or
+ * null when they may stay (or aren't a site-role user).
+ */
+function site_role_redirect(string $role, string $script): ?string
+{
+    $r = site_admin_roles()[$role] ?? null;
+    if ($r === null || in_array($script, $r['admin_pages'], true)) return null;
+    return $r['home'];
+}
+
+/** For a site's own page: only someone with $role (or an administrator) gets in. */
+function admin_require_site_role(string $role, string $login = '/admin/login.php'): void
+{
+    if (!admin_logged_in()) { header('Location: ' . $login); exit; }
+    $mine = (string) (admin_user()['role'] ?? '');
+    if ($mine !== $role && $mine !== 'admin') { http_response_code(403); exit('Нямате достъп до тази страница.'); }
+}

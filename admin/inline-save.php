@@ -28,7 +28,8 @@ header('Content-Type: application/json');
 function save_json_response(array $data): never { echo json_encode($data); exit; }
 
 // Auth: session (main site) or signed admin-bar token (subdomain visitors)
-$_session_auth = admin_logged_in();
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/site_extensions.php';
+$_session_auth = admin_logged_in() && !admin_role_is_site_role((string) (admin_user()['role'] ?? ''));   // a site's own role can't edit pages
 $_token_auth   = !$_session_auth && admin_bar_token_verify();
 if (!$_session_auth && !$_token_auth) {
     save_json_response(['ok' => false, 'error' => 'unauthorized']);

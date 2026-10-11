@@ -632,6 +632,13 @@ function admin_require_login(): void {
         header('Location: /admin/login.php');
         exit;
     }
+    // A site's own role (includes/site-extensions.php) works in its own pages, not the admin.
+    require_once __DIR__ . '/includes/site_extensions.php';
+    $to = site_role_redirect((string) (admin_user()['role'] ?? ''), basename((string) ($_SERVER['SCRIPT_NAME'] ?? '')));
+    if ($to !== null) {
+        header('Location: ' . $to);
+        exit;
+    }
 }
 
 function admin_user(): array {
