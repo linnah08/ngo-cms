@@ -308,3 +308,50 @@ function site_report_summary(string $key, int $year, int $month): string
         return '';
     }
 }
+
+// ── Document types ───────────────────────────────────────────────────────────
+
+/**
+ * A site's own document kinds (e.g. a certificate its own pages issue):
+ * key => [label, plural, digits]. The site's pages create and number them
+ * (document_sequence_next()); ngo-cms lists their counter on Админ → Плащания
+ * and names their files when an admin downloads them. documents.type and
+ * document_sequences.type take the key as it is.
+ */
+function site_document_types(): array
+{
+    $builtin = ['invoice', 'receipt', 'donation_cert', 'credit_note', 'storno_receipt', 'distribution_protocol'];
+    $out = [];
+    foreach (site_extension_section('document_types') as $key => $d) {
+        $label = trim((string) ($d['label'] ?? ''));
+        if (!site_extension_key_ok($key) || strlen($key) > 30 || in_array($key, $builtin, true) || $label === '') {
+            error_log("site_extensions: document type '$key' needs a label and a new key of up to 30 characters — skipped");
+            continue;
+        }
+        $digits = (int) ($d['digits'] ?? 5);
+        $out[$key] = ['label' => $label, 'plural' => trim((string) ($d['plural'] ?? '')) ?: $label, 'digits' => max(1, min(12, $digits))];
+    }
+    return $out;
+}
+
+/** What a document of $type is called in the admin ("Фактура", or a site's own label). */
+function document_type_label(string $type): string
+{
+    $builtin = ['invoice' => 'Фактура', 'receipt' => 'Бележка', 'donation_cert' => 'Сертификат',
+                'credit_note' => 'Кредитно известие', 'storno_receipt' => 'Сторно бележка'];
+    return $builtin[$type] ?? (site_document_types()[$type]['label'] ?? 'Документ');
+}
+
+/**
+ * Claim the next number of $type atomically (creating its counter on first use)
+ * and return it. Call inside the caller's transaction.
+ */
+function document_sequence_next(PDO $pdo, string $type): int
+{
+    $pdo->prepare('INSERT IGNORE INTO document_sequences (type, last_number) VALUES (?, 0)')->execute([$type]);
+    $lock = $pdo->prepare('SELECT last_number FROM document_sequences WHERE type = ? FOR UPDATE');
+    $lock->execute([$type]);
+    $next = (int) $lock->fetchColumn() + 1;
+    $pdo->prepare('UPDATE document_sequences SET last_number = ? WHERE type = ?')->execute([$next, $type]);
+    return $next;
+}

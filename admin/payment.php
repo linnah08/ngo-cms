@@ -5,6 +5,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/auth.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/site_extensions.php';   // a site's own document kinds
 admin_require_admin();
 
 $saved       = false;
@@ -33,14 +34,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($section === 'doc_sequence_set') {
             $seq_type = $_POST['seq_type'] ?? '';
             $next_num = (int) ($_POST['next_number'] ?? 0);
-            $valid_types = module_certificates_enabled() ? ['invoice', 'receipt', 'donation_cert'] : ['invoice', 'receipt'];
+            $valid_types = array_merge(module_certificates_enabled() ? ['invoice', 'receipt', 'donation_cert'] : ['invoice', 'receipt'], array_keys(site_document_types()));
             if (!in_array($seq_type, $valid_types, true)) {
                 $errors[] = 'Невалиден тип документ.';
             } elseif ($next_num < 1) {
                 $errors[] = 'Номерът трябва да е поне 1.';
             } else {
-                $pdo->prepare('UPDATE document_sequences SET last_number = ? WHERE type = ?')
-                    ->execute([$next_num - 1, $seq_type]);
+                // A site's own kind may not have a counter yet.
+                $pdo->prepare('INSERT INTO document_sequences (type, last_number) VALUES (?, ?) ON DUPLICATE KEY UPDATE last_number = VALUES(last_number)')
+                    ->execute([$seq_type, $next_num - 1]);
                 $saved = true;
             }
         }
@@ -48,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // ── Document sequence: reset to 0 ─────────────────────────────────────
         if ($section === 'doc_sequence_reset') {
             $seq_type = $_POST['seq_type'] ?? '';
-            $valid_types = module_certificates_enabled() ? ['invoice', 'receipt', 'donation_cert'] : ['invoice', 'receipt'];
+            $valid_types = array_merge(module_certificates_enabled() ? ['invoice', 'receipt', 'donation_cert'] : ['invoice', 'receipt'], array_keys(site_document_types()));
             if (in_array($seq_type, $valid_types, true)) {
                 $pdo->prepare('UPDATE document_sequences SET last_number = 0 WHERE type = ?')
                     ->execute([$seq_type]);
@@ -672,6 +674,13 @@ $seq_formats = [
     'receipt'       => '0000000001 (10 цифри)',
     'donation_cert' => '00001 (5 цифри)',
 ];
+$seq_digits = ['invoice' => 10, 'receipt' => 10, 'donation_cert' => 5];
+// A site's own document kinds (includes/site-extensions.php).
+foreach (site_document_types() as $_dt => $_dv) {
+    $seq_labels[$_dt]  = $_dv['plural'];
+    $seq_digits[$_dt]  = $_dv['digits'];
+    $seq_formats[$_dt] = str_pad('1', $_dv['digits'], '0', STR_PAD_LEFT) . ' (' . $_dv['digits'] . ' цифри)';
+}
 ?>
 
 <!-- ── Document counters ──────────────────────────────────────────────────────── -->
@@ -685,7 +694,7 @@ $seq_formats = [
   <?php
     $last = (int) ($sequences[$type] ?? 0);
     $next = $last + 1;
-    $pad  = ($type === 'donation_cert') ? 5 : 10;
+    $pad  = $seq_digits[$type] ?? 10;
     $next_formatted = str_pad((string) $next, $pad, '0', STR_PAD_LEFT);
   ?>
   <div style="border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1rem;">

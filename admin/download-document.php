@@ -1,6 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/site_extensions.php';   // document_type_label()
 
 admin_require_shop();
 
@@ -26,12 +27,7 @@ if (!file_exists($filepath)) {
     exit('Файлът не е намерен на сървъра. Генерирайте документа отново.');
 }
 
-$type_names = [
-    'invoice'       => 'Фактура',
-    'receipt'       => 'Бележка',
-    'donation_cert' => 'Сертификат',
-];
-$label    = $type_names[$doc['type']] ?? 'Документ';
+$label    = document_type_label((string) $doc['type']);   // includes a site's own document kinds
 $filename = $label . '_' . $doc['formatted_number'] . '.pdf';
 
 header('Content-Type: application/pdf');

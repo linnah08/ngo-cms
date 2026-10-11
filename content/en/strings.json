@@ -284,5 +284,7 @@
   "events.done.back": "Back to the event",
   "events.err.session": "The page was open for too long. Please try again.",
   "events.err.payments": "We cannot take card payments right now. Please try again later or write to us.",
-  "events.err.technical": "Something went wrong on our side. Please try again."
+  "events.err.technical": "Something went wrong on our side. Please try again.",
+  "donation.recipient": "Who is the donation for",
+  "donation.recipient_more": "Learn more"
 }
