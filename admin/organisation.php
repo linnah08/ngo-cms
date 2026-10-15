@@ -522,6 +522,23 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </div>
   </section>
 
+  <!-- ── Article addresses ─────────────────────────────────────────────────── -->
+  <section class="admin-card" style="<?= $card ?>" aria-labelledby="slugs-title">
+    <h2 class="admin-card__title" id="slugs-title">Адреси на статиите</h2>
+    <p class="admin-meta" style="margin:0 0 1rem;line-height:1.6;">
+      Адресът на всяка статия се прави от заглавието ѝ. На кирилица той изглежда добре
+      в браузъра, но когато се копира във Facebook, имейл или съобщение, става дълъг
+      низ от знаци като %D0%BF%D0%BE… С отметката новите статии получават адрес на
+      латиница — например <em>/novini/pomosht-za-semeystva/</em>. Вече публикуваните
+      статии запазват адреса си. Ако някога смените адреса на статия, старият
+      продължава да води към нея.
+    </p>
+    <label class="admin-checkbox">
+      <input type="checkbox" name="article_slugs_latin" value="1" <?= in_array($val('article_slugs_latin'), ['1', 'true'], true) ? 'checked' : '' ?>>
+      Пиши адресите на новите статии на латиница
+    </label>
+  </section>
+
   <?php if (module_enabled_with_needs('newsletter') && module_enabled_with_needs('donations')): ?>
   <!-- ── Newsletter donate box ──────────────────────────────────────────────── -->
   <section class="admin-card" style="<?= $card ?>" aria-labelledby="nl-donate-title">

@@ -12,10 +12,22 @@ if ($slug) {
     $article_en = get_article($slug, 'en');
     $article_bg = get_article($slug, 'bg');
 
-    // No EN version — redirect to the BG article if it exists, else 404
+    // No EN version at this address — first an old EN address of a renamed
+    // article (301 to its current one), then the BG article (302), else 404.
     if (!$article_en) {
+        $new_slug = article_legacy_slug_target($slug, 'en');
+        if ($new_slug !== null) {
+            header('Location: /en/news/' . rawurlencode($new_slug) . '/', true, 301);
+            exit;
+        }
         if ($article_bg) {
             header('Location: /novini/' . rawurlencode($slug) . '/', true, 302);
+            exit;
+        }
+        // An English-less article linked by its old BG address.
+        $new_bg = article_legacy_slug_target($slug, 'bg');
+        if ($new_bg !== null) {
+            header('Location: /novini/' . rawurlencode($new_bg) . '/', true, 301);
             exit;
         }
         http_response_code(404);

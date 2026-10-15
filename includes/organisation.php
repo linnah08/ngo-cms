@@ -60,6 +60,7 @@ function org_fields(): array
         'google_ads_id'             => 'GOOGLE_ADS_ID',
         'google_ads_purchase_label' => 'GOOGLE_ADS_PURCHASE_LABEL',
         'site_noindex'     => 'SITE_NOINDEX',      // '1': ask search engines not to list the site (includes/seo.php)
+        'article_slugs_latin' => 'ARTICLE_SLUGS_LATIN',   // '1': new article addresses in Latin letters
         'site_launched'    => 'SITE_LAUNCHED',     // set by „Пусни сайта“ (admin/launch.php), not by the form
     ] + org_module_fields();
 }
@@ -425,6 +426,8 @@ function org_validate(array $in, array $themeKeys): array
     $v['launch_banner'] = ($in['launch_banner'] ?? '') === '1' ? '1' : '0';
     // Same for the newsletter donate box — off unless ticked.
     $v['newsletter_donate_cta'] = ($in['newsletter_donate_cta'] ?? '') === '1' ? '1' : '0';
+    // And for Latin article addresses — off (Cyrillic, as before) unless ticked.
+    $v['article_slugs_latin'] = ($in['article_slugs_latin'] ?? '') === '1' ? '1' : '0';
 
     foreach (['launch_banner_bg' => 'на български', 'launch_banner_en' => 'на английски'] as $k => $lang) {
         if (mb_strlen($v[$k]) > 200) {

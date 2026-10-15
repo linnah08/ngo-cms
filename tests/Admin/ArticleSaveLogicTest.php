@@ -9,8 +9,8 @@ use PHPUnit\Framework\Attributes\Group;
  * into includes/articles.php — slug derivation and the save-record assembly that
  * must preserve social metadata. Previously fused into the page and untestable.
  *
- * Note: this (generic) build keeps the source language in BG slugs (slug() allows
- * Cyrillic), unlike the oddminds build which transliterates BG slugs to ASCII.
+ * Note: by default BG slugs keep the source language (slug() allows Cyrillic); the
+ * optional Latin mode is covered in ArticleSlugsLatinTest.
  */
 #[Group('admin')]
 final class ArticleSaveLogicTest extends TestCase

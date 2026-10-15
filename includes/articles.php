@@ -52,8 +52,12 @@ function html_to_social_text(string $html): string {
 /**
  * Derive the BG and EN slugs from the submitted slug/title fields.
  *
- * BG keeps the source language (slug() allows Cyrillic; only path-unsafe chars are
- * stripped). EN prefers an explicit override, then a slug of the EN title, then an
+ * BG keeps the source language by default (slug() allows Cyrillic; only path-unsafe
+ * chars are stripped). With $latin (the „Адреси на статиите на латиница“ setting,
+ * article_slugs_latin()) a new or changed BG address is transliterated to ASCII
+ * instead — but an existing address submitted unchanged ($current_bg) is kept as
+ * it is, so switching the setting on never moves an article by itself.
+ * EN prefers an explicit override, then a slug of the EN title, then an
  * ASCII slug of the BG title, and finally falls back to the BG slug. Returns
  * ['bg' => string, 'en' => string].
  *
@@ -62,12 +66,16 @@ function html_to_social_text(string $html): string {
  * @param string $title      BG title (fallback source for BG slug).
  * @param string $title_en   EN title (fallback source for EN slug).
  * @param string $now_suffix Deterministic suffix for the empty-title fallback (testability).
+ * @param bool   $latin      Transliterate a new/changed BG address to Latin letters.
+ * @param string $current_bg The article's current BG address ('' for a new article).
  */
-function article_compute_slugs(string $slug_in, string $slug_en_in, string $title, string $title_en, string $now_suffix = ''): array {
+function article_compute_slugs(string $slug_in, string $slug_en_in, string $title, string $title_en, string $now_suffix = '', bool $latin = false, string $current_bg = ''): array {
     $clean = fn(string $s): string => str_replace(['..', "\0", '/'], '', trim($s));
 
-    $bg = slug($clean($slug_in))
-        ?: slug($title)
+    $kept = $latin && $current_bg !== '' && slug($clean($slug_in)) === $current_bg;
+    $make = ($latin && !$kept) ? 'ascii_slug' : 'slug';
+    $bg = $make($clean($slug_in))
+        ?: $make($title)
         ?: 'article-' . ($now_suffix !== '' ? $now_suffix : date('YmdHis'));
 
     $slug_en_input = slug($clean($slug_en_in));
@@ -113,6 +121,9 @@ function article_build_bg_data(array $f, array $existing = []): array {
     foreach ($carry as $k) {
         $data[$k] = $existing[$k] ?? '';
     }
+    // Addresses the article had before — the news pages 301 them to the current one.
+    $legacy = $f['slug_legacy'] ?? ($existing['slug_legacy'] ?? '');
+    if ($legacy !== '' && $legacy !== []) $data['slug_legacy'] = $legacy;
     // The author's Instagram crops (admin/social-ajax.php save_crop), kept for the photos
     // the post still has — a removed or replaced photo simply loses its crop.
     $srcs  = array_merge(array_column($data['photos'], 'src'), [$data['image']]);
@@ -178,7 +189,7 @@ function article_build_en_data(array $f): array {
         'tags'    => $f['tags'],
         'content' => $f['content'],
         'scheduled' => article_scheduled_flag($f),
-    ];
+    ] + ((!empty($f['slug_legacy'])) ? ['slug_legacy' => $f['slug_legacy']] : []);
 }
 
 /** The stored `scheduled` flag: only a draft can be scheduled. */
@@ -255,6 +266,64 @@ function article_publish_with_social(string $slug, int $social_ts, string $label
         ? "Статията също е публикувана на сайта, за да работи линкът в {$label}."
         : 'Статията на сайта ще се публикува автоматично на ' . date('d.m', strtotime($r['when']))
           . " сутринта, преди публикацията в {$label}.";
+}
+
+// ── Old article addresses ───────────────────────────────────────────────────────
+
+/**
+ * Whether new Bulgarian article addresses are written in Latin letters
+ * (/novini/pomosht-za-semeystva/ rather than /novini/помощ-за-семейства/, which
+ * turns into %D0%BF%D0%BE… when pasted into a post or an email). Switched in
+ * Админ → Организация; off by default, so existing sites keep Cyrillic addresses.
+ */
+function article_slugs_latin(): bool {
+    if (!defined('ARTICLE_SLUGS_LATIN')) return false;
+    $v = constant('ARTICLE_SLUGS_LATIN');
+    return is_string($v) ? $v === '1' || strtolower($v) === 'true' : (bool) $v;
+}
+
+/**
+ * The article's earlier addresses, as a list. `slug_legacy` is a single string in
+ * older files (and in content migrated from oddminds) and a list once an article
+ * has been renamed more than once.
+ */
+function article_retired_slugs(array $article): array {
+    $raw  = $article['slug_legacy'] ?? '';
+    $list = is_array($raw) ? $raw : [$raw];
+    return array_values(array_unique(array_filter($list, static fn($s): bool => is_string($s) && $s !== '')));
+}
+
+/**
+ * The `slug_legacy` value to store after an article moves from $old to $new: the
+ * earlier addresses plus $old, without $new (renaming back to an old address makes
+ * it current again). One address is stored as a string, several as a list; ''
+ * means none.
+ */
+function article_retire_slug(array $existing, string $old, string $new): string|array {
+    $list = article_retired_slugs($existing);
+    if ($old !== '' && $old !== $new) $list[] = $old;
+    $list = array_values(array_unique(array_filter($list, static fn(string $s): bool => $s !== $new)));
+    if (!$list) return '';
+    return count($list) === 1 ? $list[0] : $list;
+}
+
+/**
+ * The current address of the article that used to live at $slug, or null. Used by
+ * the BG and EN news pages to 301 an old link (an article renamed in the editor,
+ * or a Cyrillic address replaced by a Latin one) instead of showing "not found".
+ */
+function article_legacy_slug_target(string $slug, string $lang = '', ?string $dir = null): ?string {
+    if ($slug === '') return null;
+    if (!$lang) $lang = get_lang();
+    $dir ??= ARTICLES_PATH . '/' . $lang;
+    if (!is_dir($dir)) return null;
+    foreach (glob($dir . '/*.json') ?: [] as $file) {
+        $current = basename($file, '.json');
+        if ($current === $slug) continue;
+        $data = load_json($file);
+        if (is_array($data) && in_array($slug, article_retired_slugs($data), true)) return $current;
+    }
+    return null;
 }
 
 /** Most photos a post can have — Instagram's carousel limit, so nothing is dropped on the way there. */

@@ -48,9 +48,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $excerpt_en = trim($article_en['excerpt'] ?? '');
     $has_en     = $title_en !== '' || $content_en !== '';
 
-    // Derive both slugs (BG keeps its language; EN prefers override/EN title).
-    // See includes/articles.php::article_compute_slugs for the rules + unit tests.
-    $slugs       = article_compute_slugs($_POST['slug'] ?? '', $_POST['slug_en'] ?? '', $title, $title_en);
+    // Derive both slugs (BG keeps its language unless „латиница“ is on in
+    // Админ → Организация; EN prefers override/EN title). See
+    // includes/articles.php::article_compute_slugs for the rules + unit tests.
+    $slugs       = article_compute_slugs(
+        is_string($_POST['slug'] ?? null) ? $_POST['slug'] : '',
+        is_string($_POST['slug_en'] ?? null) ? $_POST['slug_en'] : '',
+        $title, $title_en, '', article_slugs_latin(), $is_new ? '' : $slug_param
+    );
     $new_slug    = $slugs['bg'];
     $new_slug_en = $slugs['en'];
     // Where the EN file currently lives (may differ from BG slug after migration)
@@ -148,6 +153,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'excerpt' => $excerpt, 'image'   => $image,    'tags'    => $tags,
             'photos'  => $photos_bg,
             'content' => $content, 'scheduled' => $scheduled,
+            // A renamed article keeps its old address working (301 from the news page).
+            'slug_legacy' => $is_new ? '' : article_retire_slug($article, $slug_param, $new_slug),
         ], $article);
         $dir_bg = ARTICLES_PATH . '/bg';
         if (!is_dir($dir_bg)) mkdir($dir_bg, 0755, true);
@@ -161,6 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'excerpt' => $excerpt_en, 'image' => $image,   'tags'    => $tags,
                 'photos'  => $photos_en,
                 'content' => $content_en, 'scheduled' => $scheduled,
+                'slug_legacy' => ($is_new || !$article_en) ? '' : article_retire_slug($article_en, (string) $slug_en_current, $new_slug_en),
             ]);
             $dir_en = ARTICLES_PATH . '/en';
             if (!is_dir($dir_en)) mkdir($dir_en, 0755, true);
@@ -289,7 +297,7 @@ $badge_style       = 'font-size:.75rem;font-weight:600;border-radius:3px;padding
       <label for="slug">Slug (URL)</label>
       <input type="text" id="slug" name="slug"
              value="<?= h($edit_slug) ?>">
-      <small style="color:var(--text-muted);">Оставете празно — генерира се автоматично от заглавието при запазване.</small>
+      <small style="color:var(--text-muted);">Оставете празно — генерира се автоматично от заглавието при запазване.<?php if (article_slugs_latin()): ?> Новите адреси се изписват на латиница.<?php endif; ?><?php if (!$is_new): ?> Ако смените адреса, старият продължава да води към статията.<?php endif; ?></small>
     </div>
 
     <div class="form-group">

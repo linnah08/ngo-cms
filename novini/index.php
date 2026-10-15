@@ -12,6 +12,13 @@ if ($slug) {
     $article = get_article($slug, 'bg');
 
     if (!$article) {
+        // An old address (the article was renamed, e.g. Cyrillic → Latin)? 301 to
+        // its current one, so shared links and search results keep working.
+        $new_slug = article_legacy_slug_target($slug, 'bg');
+        if ($new_slug !== null) {
+            header('Location: /novini/' . rawurlencode($new_slug) . '/', true, 301);
+            exit;
+        }
         http_response_code(404);
         $page_title = 'Страницата не е намерена';
         require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';

@@ -113,6 +113,13 @@ define('SITE_LAUNCH_BANNER',    false);
 define('SITE_LAUNCH_BANNER_BG', '');
 define('SITE_LAUNCH_BANNER_EN', '');
 
+// Write the addresses of new Bulgarian articles in Latin letters
+// (/novini/pomosht-za-semeystva/ instead of /novini/помощ-за-семейства/, which
+// turns into %D0%BF… when pasted into a post or an email). Existing articles keep
+// their address; a renamed article's old address keeps redirecting to it.
+// Also switched in Admin → Организация, which wins over this line.
+define('ARTICLE_SLUGS_LATIN', false);
+
 // Keep every public page out of search results (a robots "noindex, nofollow"
 // tag) while the site is publicly reachable but not finished. Remove on launch,
 // or untick „Скрий сайта от търсачките“ in Admin → Организация → Google.
