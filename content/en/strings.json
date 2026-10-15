@@ -227,6 +227,7 @@
   "donation.name": "Your name",
   "donation.email": "Email",
   "donation.message": "Message or dedication (optional)",
+  "donation.newsletter_optin": "Send me news from {name}.",
   "donation.donor_type": "Donor type",
   "donation.individual": "Individual",
   "donation.company": "Legal entity (company)",

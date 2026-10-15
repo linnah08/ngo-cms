@@ -787,11 +787,14 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     <div style="background:var(--warm-grey);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.5rem;">
       <strong style="font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);">Съгласия</strong>
       <div style="margin-top:.6rem;font-size:.875rem;line-height:1.7;">
+        <?php // A donation records only the newsletter choice — no terms were shown to accept. ?>
+        <?php if (!empty($consents['terms_version']) || !empty($consents['documents'])): ?>
         ✅ Приел Условията и Политиката за поверителност
         <?php if (!empty($consents['terms_version'])): ?>
           &nbsp;·&nbsp; версия <?= h($consents['terms_version']) ?>
         <?php endif; ?>
         <br>
+        <?php endif; ?>
         <span style="color:var(--text-muted);">
           <?= h(date('d.m.Y H:i', strtotime($consents['accepted_at']))) ?>
         </span><br>

@@ -47,6 +47,14 @@ function notify_order_paid(array $order): void
                 'payment_method'   => $order['payment_method'] ?? '',
             ])
         );
+        // "Send me news" ticked in the donation form: sign up now that it is paid.
+        // A newsletter hiccup must never get in the way of a confirmed payment.
+        try {
+            require_once dirname(__DIR__) . '/newsletter.php';
+            newsletter_subscribe_paid_donation($order);
+        } catch (Throwable $e) {
+            error_log('Donation newsletter opt-in failed: ' . $e->getMessage());
+        }
     } else {
         send_order_mail(
             (int)$order['id'],

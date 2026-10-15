@@ -94,6 +94,7 @@ function donation_validate(float $amount, string $name, string $email, string $d
 const DONATION_FORM_FIELDS = [
     'amount', 'donor_name', 'donor_email', 'donation_message', 'donor_type',
     'invoice_company', 'invoice_eik', 'invoice_vat', 'payment_method', 'donation_recipient',
+    'nl_topics', 'nl_optin',
 ];
 
 /**
@@ -105,6 +106,10 @@ function donation_form_fail(array $errors, array $post): void {
     $old = [];
     foreach (DONATION_FORM_FIELDS as $f) {
         $v = $post[$f] ?? '';
+        if ($f === 'nl_topics') {   // the ticked newsletter topics: a list of ids
+            $old[$f] = array_values(array_map('intval', array_filter((array) $v, 'is_scalar')));
+            continue;
+        }
         $old[$f] = is_string($v) ? mb_substr(trim($v), 0, 2000) : '';
     }
     $_SESSION['donation_form'] = ['errors' => array_values($errors), 'old' => $old];

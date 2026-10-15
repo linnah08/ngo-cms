@@ -77,6 +77,11 @@ if ($donor_type === 'company') {   // store them the way the certificate prints 
     if ($vat !== '') $invoice_data['vat_number'] = form_vat_normalize($vat);
 }
 
+// "Send me news" ticked in the form: recorded with the donation, and the donor
+// is signed up only once the payment goes through (notify_order_paid()).
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
+$consents = newsletter_donation_consent($_POST);
+
 $pdo          = get_pdo();
 $order_number = generate_order_number();
 
@@ -88,8 +93,8 @@ $pdo->prepare("
     INSERT INTO orders
       (order_number,type,status,lang,customer_name,customer_email,items,
        subtotal_eur,shipping_eur,total_eur,donation_message,
-       payment_method,payment_status,invoice_data)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       payment_method,payment_status,invoice_data,consents)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 ")->execute([
     $order_number, 'donation', 'new', $order_lang,
     $name, $email, $items_json,
@@ -97,6 +102,7 @@ $pdo->prepare("
     $message ?: null,
     $payment_method, 'pending',
     json_encode($invoice_data, JSON_UNESCAPED_UNICODE),
+    json_encode($consents, JSON_UNESCAPED_UNICODE),
 ]);
 $order_id = $pdo->lastInsertId();
 

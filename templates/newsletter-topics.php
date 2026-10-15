@@ -19,6 +19,8 @@
  *   $nl_heading  plain text to use as the heading instead of the editable
  *                topics heading (the checkout words its own opt-in); it also
  *                labels the single opt-in box
+ *   $nl_heading_html  the same, already as HTML — a te() call, so the heading
+ *                can be reworded from Edit mode (the donation form)
  *   $nl_optin    set (to whether the box is ticked) on a form where ticking is
  *                the consent, so a site with fewer than two topics still gets
  *                a box to tick
@@ -44,7 +46,7 @@ $_nlt_manage = admin_logged_in() && admin_is_admin();
 ?>
 <?php if (count($_nlt_topics) >= 2): ?>
 <fieldset class="nl-topics" style="border:none;padding:0;margin:1rem 0;min-width:0;color:<?= $_nlt_color ?>;">
-  <legend style="padding:0;font-size:.95rem;font-weight:600;margin-bottom:.5rem;color:<?= $_nlt_color ?>;"><?php if (isset($nl_heading) && $nl_heading !== ''): ?><?= h($nl_heading) ?><?php else: ?><span data-cms-field="topics_heading" data-cms-section="newsletter" data-cms-type="text" data-cms-bg="<?= h((string) ($_nlt_saved['topics_heading'] ?? '')) ?>" data-cms-en="<?= h((string) ($_nlt_saved['topics_heading_en'] ?? '')) ?>"><?= h(newsletter_topics_heading($_nlt_lang)) ?></span><?php endif; ?></legend>
+  <legend style="padding:0;font-size:.95rem;font-weight:600;margin-bottom:.5rem;color:<?= $_nlt_color ?>;"><?php if (isset($nl_heading_html) && $nl_heading_html !== ''): ?><?= $nl_heading_html ?><?php elseif (isset($nl_heading) && $nl_heading !== ''): ?><?= h($nl_heading) ?><?php else: ?><span data-cms-field="topics_heading" data-cms-section="newsletter" data-cms-type="text" data-cms-bg="<?= h((string) ($_nlt_saved['topics_heading'] ?? '')) ?>" data-cms-en="<?= h((string) ($_nlt_saved['topics_heading_en'] ?? '')) ?>"><?= h(newsletter_topics_heading($_nlt_lang)) ?></span><?php endif; ?></legend>
   <?php foreach ($_nlt_topics as $_nlt_t): $_nlt_id = (int) $_nlt_t['id']; ?>
   <label style="<?= $_nlt_label_style ?>">
     <input type="checkbox" name="nl_topics[]" value="<?= $_nlt_id ?>"<?= in_array($_nlt_id, $_nlt_ticked, true) ? ' checked' : '' ?>
@@ -58,7 +60,7 @@ $_nlt_manage = admin_logged_in() && admin_is_admin();
 <div class="nl-topics" style="margin:1rem 0;">
   <label style="<?= $_nlt_label_style ?>">
     <input type="checkbox" name="nl_optin" value="1"<?= $nl_optin ? ' checked' : '' ?> style="<?= $_nlt_box_style ?>">
-    <span><?= h(isset($nl_heading) && $nl_heading !== '' ? $nl_heading : newsletter_topics_heading($_nlt_lang)) ?></span>
+    <span><?= isset($nl_heading_html) && $nl_heading_html !== '' ? $nl_heading_html : h(isset($nl_heading) && $nl_heading !== '' ? $nl_heading : newsletter_topics_heading($_nlt_lang)) ?></span>
   </label>
 </div>
 <?php endif; ?>
@@ -69,4 +71,4 @@ $_nlt_manage = admin_logged_in() && admin_is_admin();
 <a href="/admin/newsletter-topics.php" class="nl-topics-manage"
    style="align-items:center;min-height:44px;box-sizing:border-box;margin:.5rem 0;padding:.5rem 1rem;border:2px dashed currentColor;border-radius:8px;color:<?= $_nlt_color ?>;font-size:.9rem;text-decoration:none;">⚙ Управление на темите на бюлетина</a>
 <?php endif; ?>
-<?php unset($nl_on_dark, $nl_checked, $nl_heading, $nl_optin); ?>
+<?php unset($nl_on_dark, $nl_checked, $nl_heading, $nl_heading_html, $nl_optin); ?>

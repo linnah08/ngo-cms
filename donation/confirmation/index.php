@@ -43,6 +43,15 @@ $amount = (float)$order['total_eur'];
 $paid   = $order['payment_status'] === 'paid';
 $_amt   = '<strong>' . h(number_format($amount, 2)) . ' €</strong>';
 
+// The donor ticked "send me news" in the form and the payment went through, so
+// they are already signed up: don't ask again here or in the footer band.
+$_don_consents = json_decode((string) ($order['consents'] ?? ''), true);
+if ($owner && $paid && !empty($_don_consents['newsletter']) && module_enabled_with_needs('newsletter')) {
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
+    newsletter_set_subscribed_cookie();
+    $_COOKIE['om_nl_sub'] = '1';
+}
+
 $page_title = t_or('donation.confirm.title', 'Благодарим за дарението!', 'Thank you for your donation!');
 
 // Counted once, by the donor's own browser — never by someone reopening the link.

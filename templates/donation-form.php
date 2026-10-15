@@ -146,6 +146,21 @@ $_donation_pay_default = isset($_donation_pay_methods[$_don_old['payment_method'
     </div>
   </div>
 
+  <?php if (module_enabled_with_needs('newsletter')): ?>
+  <!-- Newsletter opt-in: ticking signs the donor up once the payment goes through -->
+  <div style="margin:0 0 1.25rem;">
+    <?php
+      // Editable in Edit mode, like every other text on the donation page.
+      $nl_heading_html = te('donation.newsletter_optin', 'Искам да получавам новини от {name}.', 'Send me news from {name}.',
+                            $lang, ['name' => $lang === 'en' ? SITE_NAME_EN : SITE_NAME_BG]);
+      require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
+      $nl_checked = newsletter_topics_from_post($_don_old);
+      $nl_optin   = !empty($_don_old['nl_optin']);   // the one box when the site has fewer than two topics
+      require $_SERVER['DOCUMENT_ROOT'] . '/templates/newsletter-topics.php';
+    ?>
+  </div>
+  <?php endif; ?>
+
   <!-- Payment method -->
   <fieldset style="border:none;padding:0;margin:0 0 1.5rem;">
     <legend style="font-weight:600;font-size:.875rem;display:block;margin-bottom:.5rem;padding:0;">

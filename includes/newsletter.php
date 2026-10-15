@@ -397,6 +397,47 @@ function newsletter_subscribe_order(\PDO $pdo, string $order_number, ?array $top
     )['status'];
 }
 
+// ── "Send me news" ticked in the donation form ───────────────────────────────
+
+/**
+ * The newsletter part of a donation's consents (stored in orders.consents):
+ * whether the donor asked for news, the ids of the topics they chose, and when.
+ * As at the checkout, ticking a topic (or the one opt-in box when the site has
+ * fewer than two topics) is the opt-in; nothing counts while „Бюлетин“ is off
+ * (Admin → Модули).
+ */
+function newsletter_donation_consent(array $post): array
+{
+    $on = module_enabled_with_needs('newsletter') && newsletter_post_opted_in($post);
+    return [
+        'newsletter'        => $on,
+        'newsletter_topics' => $on ? (newsletter_signup_topics($post) ?? []) : [],
+        'accepted_at'       => date('c'),
+    ];
+}
+
+/**
+ * Sign up the donor of a just-paid donation who ticked "send me news" in the
+ * form. Runs only once the payment went through, so a donation that was never
+ * paid never subscribes anyone. The email comes from the order row.
+ *
+ * @return string  subscribed | merged | resurrect_blocked | skipped
+ */
+function newsletter_subscribe_paid_donation(array $order): string
+{
+    if (($order['type'] ?? '') !== 'donation' || !module_enabled_with_needs('newsletter')) return 'skipped';
+    $c = json_decode((string) ($order['consents'] ?? ''), true);
+    if (!is_array($c) || empty($c['newsletter'])) return 'skipped';
+    if (!filter_var($order['customer_email'] ?? '', FILTER_VALIDATE_EMAIL)) return 'skipped';
+    // Only topics that still exist: one may have been removed since the donation.
+    $live = array_map(static fn(array $t): int => (int) $t['id'], newsletter_topic_list());
+    $ids  = array_values(array_intersect(array_map('intval', (array) ($c['newsletter_topics'] ?? [])), $live));
+    return newsletter_subscribe(
+        (string) $order['customer_email'], (string) ($order['customer_name'] ?? ''),
+        (string) ($order['lang'] ?? 'bg'), 'donation', $ids
+    )['status'];
+}
+
 /**
  * Unsubscribe by token. Returns false if token not found.
  * Idempotent — clicking twice is harmless.

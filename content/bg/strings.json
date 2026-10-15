@@ -227,6 +227,7 @@
   "donation.name": "Вашите имена",
   "donation.email": "Имейл",
   "donation.message": "Съобщение или посвещение (по желание)",
+  "donation.newsletter_optin": "Искам да получавам новини от {name}.",
   "donation.donor_type": "Вид дарител",
   "donation.individual": "Физическо лице",
   "donation.company": "Юридическо лице (фирма)",
