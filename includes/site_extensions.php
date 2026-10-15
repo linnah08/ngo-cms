@@ -15,6 +15,7 @@
  *   'admin_nav'      => its own links in the admin menu (site_admin_nav())
  *   'footer_partial' => its own PHP file(s) shown above the footer (site_footer_partials())
  *   'sitemap_urls'   => extra addresses for /sitemap.xml (site_sitemap_paths())
+ *   'shop_header'    => its own PHP file in place of the shop's header (site_shop_header_file())
  *
  * The file returns an array with any of those keys. Each entry is checked; a
  * broken one is logged and skipped — a mistake in that file must never take the
@@ -158,6 +159,24 @@ function site_sitemap_paths(): array
         }
     }
     return array_keys($out);
+}
+
+// ── Shop header ──────────────────────────────────────────────────────────────
+
+/**
+ * The site's own PHP file that replaces the plain header of the shop page
+ * (/magazin/, /en/shop/), or null for the built-in one. 'shop_header' in
+ * includes/site-extensions.php wins; else the active theme preset's
+ * 'shop_header' (includes/themes-site.php). A path from the site root.
+ */
+function site_shop_header_file(): ?string
+{
+    $rel = site_extensions()['shop_header'] ?? null;
+    if ($rel === null && function_exists('current_theme')) $rel = current_theme()['shop_header'] ?? null;
+    if ($rel === null || $rel === '') return null;
+    $file = site_extension_php_file($rel);
+    if ($file === null) error_log('site_extensions: shop_header ' . (is_string($rel) ? "'$rel'" : '') . ' is not a .php file inside the site — the built-in header is shown');
+    return $file;
 }
 
 // ── Admin menu ───────────────────────────────────────────────────────────────

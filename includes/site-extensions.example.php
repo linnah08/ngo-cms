@@ -84,4 +84,11 @@ return [
         ['bg' => '/test/', 'en' => '/en/quiz/'],
         '/kampaniya-2026/',
     ],
+
+    // A designed header for the shop page (/magazin/, /en/shop/) in place of the
+    // plain title and sentence. A PHP file from the site root; it gets $lang,
+    // $pages, $donations_on and $shop_hero (['title' => …, 'text' => …], the
+    // texts edited on the page). If it fails, the plain header shows. A theme
+    // preset in includes/themes-site.php may name it instead ('shop_header').
+    'shop_header' => 'templates/site/shop-header.php',
 ];

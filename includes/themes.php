@@ -31,6 +31,9 @@
  *   home_types                a PHP file of the site's own front-page sections
  *                             (see home_site_types() in includes/home.php).
  *   home_start_hidden         built-in front-page sections that start switched off.
+ *   shop_header               a PHP file (a path from the site root) shown in place
+ *                             of the shop page's plain header; see
+ *                             site_shop_header_file() in includes/site_extensions.php.
  */
 function brand_themes(): array {
     return [

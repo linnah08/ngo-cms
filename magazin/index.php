@@ -640,21 +640,29 @@ $flash    = flash_get();
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
 
+<?php
+// Editable on the page (inline CMS). The defaults don't mention donating
+// unless the site takes donations (Админ → Модули).
+$_shop_hero = [
+    'title' => ($pages['shop']['hero_title_' . $lang] ?? '') ?: ($_donations_on
+        ? ($lang === 'bg' ? 'Пазарувай и подкрепи' : 'Shop & Support')
+        : ($lang === 'bg' ? 'Магазин' : 'Shop')),
+    'text'  => ($pages['shop']['hero_text_' . $lang] ?? '') ?: ($lang === 'bg'
+        ? 'Всяка покупка подкрепя каузата ни.'
+        : 'Every purchase supports our cause.'),
+];
+// A site may bring its own designed header (includes/site-extensions.php or its
+// theme: 'shop_header'). If that file is missing or fails, the plain one shows.
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/site_extensions.php';   // also for a site that kept an older config.php
+$_shop_header_file = site_shop_header_file();
+$_shop_header_done = $_shop_header_file !== null && site_extension_render($_shop_header_file, [
+    'lang' => $lang, 'pages' => $pages, 'shop_hero' => $_shop_hero, 'donations_on' => $_donations_on,
+]);
+?>
+<?php if (!$_shop_header_done): ?>
 <!-- Hero -->
 <section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
-<?php
-    // Editable on the page (inline CMS). The defaults don't mention donating
-    // unless the site takes donations (Админ → Модули).
-    $_shop_hero = [
-        'title' => ($pages['shop']['hero_title_' . $lang] ?? '') ?: ($_donations_on
-            ? ($lang === 'bg' ? 'Пазарувай и подкрепи' : 'Shop & Support')
-            : ($lang === 'bg' ? 'Магазин' : 'Shop')),
-        'text'  => ($pages['shop']['hero_text_' . $lang] ?? '') ?: ($lang === 'bg'
-            ? 'Всяка покупка подкрепя каузата ни.'
-            : 'Every purchase supports our cause.'),
-    ];
-?>
     <h1 style="margin:0;" data-cms-field="hero_title" data-cms-section="shop" data-cms-type="text"
         data-cms-bg="<?= h($pages['shop']['hero_title_bg'] ?? '') ?>"
         data-cms-en="<?= h($pages['shop']['hero_title_en'] ?? '') ?>"><?= h($_shop_hero['title']) ?></h1>
@@ -664,6 +672,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
        data-cms-en="<?= h($pages['shop']['hero_text_en'] ?? '') ?>"><?= h($_shop_hero['text']) ?></p>
   </div>
 </section>
+<?php endif; ?>
 
 <?php foreach ($flash as $f): ?>
 <div class="container" style="margin-top:1.5rem;">
