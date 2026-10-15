@@ -1,6 +1,6 @@
 <?php
 /**
- * Translates a full BG article to EN and saves it to content/articles/en/{slug}.json.
+ * Translates a full BG article to EN and saves it to content/articles/en/{slug_en}.json.
  *
  * POST JSON body:
  *   { "slug": "article-slug", "csrf_token": "..." }
@@ -45,6 +45,11 @@ if (!file_exists($bg_file)) {
 }
 
 $article = load_json($bg_file);
+// The English version lives at the article's own English address (slug_en) —
+// the editor gives most articles one that differs from the Bulgarian address,
+// and the articles list, the EN page and the BG page's language link all look
+// for it there. Older articles without slug_en share the Bulgarian address.
+$slug_en = basename(str_replace(['..', "\0"], '', is_string($article['slug_en'] ?? null) ? $article['slug_en'] : '')) ?: $slug;
 
 // Translate fields — content may contain HTML, the rest is plain text
 $err     = null;
@@ -63,7 +68,7 @@ $photos_en = article_photos_translated(article_photos($article), static function
 
 $en_data = [
     'title'   => $title   ?: $article['title'],
-    'slug'    => $slug,
+    'slug'    => $slug_en,
     'date'    => $article['date']   ?? date('Y-m-d'),
     'author'  => $article['author'] ?? '',
     'status'  => $article['status'] ?? 'draft',
@@ -78,7 +83,7 @@ $en_data = [
 $en_dir = ARTICLES_PATH . '/en';
 if (!is_dir($en_dir)) mkdir($en_dir, 0755, true);
 
-if (!save_json($en_dir . '/' . $slug . '.json', $en_data)) {
+if (!save_json($en_dir . '/' . $slug_en . '.json', $en_data)) {
     echo json_encode(['ok' => false, 'error' => 'Failed to save EN article file']); exit;
 }
 

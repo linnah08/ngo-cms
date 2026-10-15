@@ -100,7 +100,10 @@ if (is_dir($articles_dir)) {
         if (!empty($data)) {
             $slug         = basename($file, '.json');
             $data['slug'] = $slug;
-            $data['has_en'] = file_exists($en_dir . '/' . $slug . '.json');
+            // The EN version normally lives at slug_en (a manual translation has its
+            // own English address); older automatic translations used the BG address.
+            $data['has_en'] = file_exists($en_dir . '/' . ($data['slug_en'] ?? $slug) . '.json')
+                || file_exists($en_dir . '/' . $slug . '.json');
             $data['is_scheduled'] = article_is_scheduled($data, @filemtime($file) ?: null);
             $articles[] = $data;
         }
