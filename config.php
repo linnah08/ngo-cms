@@ -173,10 +173,39 @@ define('LEGAL_VERSION', '2026-09-20');
 
 // Start session early — must happen before any output so the cookie can be set.
 // CSRF and cart both depend on $_SESSION being available before HTML is rendered.
-// A host-only session cookie is used (no parent-domain override), so the site
-// works on any hostname — including multi-label hosts that sit under a public
-// suffix (e.g. *.cpanel.site, *.github.io), where a parent-domain cookie would
-// be rejected by the browser and silently break login.
+// By default the session cookie is host-only (no parent-domain override), so the
+// site works on any hostname — including multi-label hosts that sit under a
+// public suffix (e.g. *.cpanel.site, *.github.io), where a parent-domain cookie
+// would be rejected by the browser and silently break login.
+//
+// SESSION_SHARE_SUBDOMAINS (site.config.php) shares it with the site's own
+// subdomains instead — for a campaign page on e.g. kampaniya.example.org whose
+// forms post to the main site with a CSRF token. See session_cookie_domain().
+
+/**
+ * The Domain for the session (and admin-bar) cookie, or '' for host-only.
+ * With $share on it is SITE_URL's host — without a leading "www." — which
+ * covers that host and its subdomains and never anything above it, so a site
+ * on a public-suffix host keeps working. '' whenever the browser would refuse
+ * it: an IP address, a one-label host like localhost, or a request arriving on
+ * a host outside that domain (a hosting preview address, say).
+ */
+function session_cookie_domain(string $siteUrl, string $requestHost, bool $share): string {
+    if (!$share) return '';
+    $site = strtolower((string) parse_url($siteUrl, PHP_URL_HOST));
+    if (str_starts_with($site, 'www.') && substr_count($site, '.') >= 2) $site = substr($site, 4);
+    if ($site === '' || !str_contains($site, '.') || filter_var(trim($site, '[]'), FILTER_VALIDATE_IP) !== false) return '';
+    $host = strtolower(preg_replace('/:\d+$/', '', trim($requestHost)) ?? '');
+    if ($host !== $site && !str_ends_with($host, '.' . $site)) return '';
+    return $site;
+}
+
+/** session_cookie_domain() for this request and this site's setting. */
+function site_session_cookie_domain(): string {
+    return session_cookie_domain(SITE_URL, (string) ($_SERVER['HTTP_HOST'] ?? ''),
+        defined('SESSION_SHARE_SUBDOMAINS') && SESSION_SHARE_SUBDOMAINS === true);
+}
+
 if (session_status() === PHP_SESSION_NONE) {
     // Custom cookie name (not the default PHPSESSID) to avoid collisions with a
     // stale PHPSESSID a browser may have cached from another app on the host.
@@ -185,7 +214,24 @@ if (session_status() === PHP_SESSION_NONE) {
         // Local/HTTP: disable the Secure flag set by .user.ini.
         ini_set('session.cookie_secure', '0');
     }
+    $_om_cookie_domain = PHP_SAPI === 'cli' ? '' : site_session_cookie_domain();
+    if ($_om_cookie_domain !== '') ini_set('session.cookie_domain', $_om_cookie_domain);
     session_start();
+    // The setting changed since this visitor's cookie was made: move the cookie
+    // over once, or a host-only and a shared cookie of the same name would
+    // fight (the browser sends the older one first, logging people out).
+    // (A brand-new session already got the right cookie from session_start().)
+    if (PHP_SAPI !== 'cli' && !isset($_COOKIE[session_name()])) {
+        if ($_om_cookie_domain !== '') $_SESSION['_om_cookie_domain'] = $_om_cookie_domain;
+    } elseif (PHP_SAPI !== 'cli' && !headers_sent() && ($_SESSION['_om_cookie_domain'] ?? '') !== $_om_cookie_domain) {
+        $_om_cp   = session_get_cookie_params();
+        $_om_opts = ['expires' => $_om_cp['lifetime'] ? time() + $_om_cp['lifetime'] : 0, 'path' => $_om_cp['path'],
+                     'secure' => $_om_cp['secure'], 'httponly' => $_om_cp['httponly'], 'samesite' => $_om_cp['samesite'] ?: 'Lax'];
+        $_om_old  = (string) ($_SESSION['_om_cookie_domain'] ?? '');
+        setcookie(session_name(), '', ['expires' => 1, 'domain' => $_om_old] + $_om_opts);
+        setcookie(session_name(), session_id(), ['domain' => $_om_cookie_domain] + $_om_opts);
+        $_SESSION['_om_cookie_domain'] = $_om_cookie_domain;
+    }
 }
 
 // ── Cross-subdomain admin-bar token ───────────────────────────────────────────
@@ -216,8 +262,8 @@ function _admin_bar_secret(): ?string {
 }
 
 function _admin_bar_domain(): string {
-    // Host-only cookie — the admin bar is only rendered on the main site.
-    return '';
+    // Host-only, unless the site shares its login with its subdomains (SESSION_SHARE_SUBDOMAINS).
+    return site_session_cookie_domain();
 }
 
 function admin_bar_token_set(): void {

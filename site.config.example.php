@@ -120,6 +120,13 @@ define('SITE_LAUNCH_BANNER_EN', '');
 // Also switched in Admin → Организация, which wins over this line.
 define('ARTICLE_SLUGS_LATIN', false);
 
+// ── Subdomains ────────────────────────────────────────────────────────────────
+// Share the login and the form protection with the site's own subdomains (e.g. a
+// campaign page on kampaniya.example.org whose forms send to the main site).
+// Only switch on when every subdomain of the site's address is yours: they all
+// receive the visitor's session. Off (the line missing) = this address only.
+// define('SESSION_SHARE_SUBDOMAINS', true);
+
 // Keep every public page out of search results (a robots "noindex, nofollow"
 // tag) while the site is publicly reachable but not finished. Remove on launch,
 // or untick „Скрий сайта от търсачките“ in Admin → Организация → Google.
