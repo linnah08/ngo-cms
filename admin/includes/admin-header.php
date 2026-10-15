@@ -10,8 +10,8 @@ $current_user = admin_user();
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= h($page_title_admin ?? 'Admin') ?> — <?= h(SITE_NAME_BG) ?> Admin</title>
-  <link rel="stylesheet" href="/assets/css/main.css">
-  <link rel="stylesheet" href="/admin/assets/admin.css">
+  <link rel="stylesheet" href="<?= h(versioned_asset('/assets/css/main.css')) ?>">
+  <link rel="stylesheet" href="<?= h(versioned_asset('/admin/assets/admin.css')) ?>">
   <?php /* Phone layout: stack the pages' inline multi-column grids (BG/EN field pairs,
            sidebar + editor) so nothing forces sideways scrolling at 375px. Inline here,
            not in admin.css, because admin.css may be stale-cached on the server. */ ?>
@@ -34,11 +34,11 @@ $current_user = admin_user();
   // „Помощ от изкуствен интелект“ (Admin → Модули): off = no translate / AI buttons anywhere.
   window._aiHelpersOn = <?= module_enabled_with_needs('ai_helpers') ? 'true' : 'false' ?>;
   </script>
-  <script src="/admin/js/autosave.js"></script>
+  <script src="<?= h(versioned_asset('/admin/js/autosave.js')) ?>"></script>
   <!-- ── Shared image cropper (Cropper.js vendored locally) -->
-  <link rel="stylesheet" href="/assets/vendor/cropperjs/cropper.min.css">
-  <script src="/assets/vendor/cropperjs/cropper.min.js"></script>
-  <script src="/assets/js/image-cropper.js"></script>
+  <link rel="stylesheet" href="<?= h(versioned_asset('/assets/vendor/cropperjs/cropper.min.css')) ?>">
+  <script src="<?= h(versioned_asset('/assets/vendor/cropperjs/cropper.min.js')) ?>"></script>
+  <script src="<?= h(versioned_asset('/assets/js/image-cropper.js')) ?>"></script>
   <!-- ── Shared TinyMCE config — must be in <head> so tinymce.init() calls can reference it -->
   <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/tinymce-base.php'; ?>
 </head>

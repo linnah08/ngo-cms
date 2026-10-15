@@ -30,8 +30,8 @@ $heading = $is_new ? 'Изберете парола' : 'Нова парола';
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= h($heading) ?> — <?= h(SITE_NAME_BG) ?> Admin</title>
-  <link rel="stylesheet" href="/assets/css/main.css">
-  <link rel="stylesheet" href="/admin/assets/admin.css">
+  <link rel="stylesheet" href="<?= h(versioned_asset('/assets/css/main.css')) ?>">
+  <link rel="stylesheet" href="<?= h(versioned_asset('/admin/assets/admin.css')) ?>">
 </head>
 <body class="admin-login-body">
 

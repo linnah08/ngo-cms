@@ -406,7 +406,7 @@ document.querySelectorAll('.translate-legal-btn').forEach(function(btn) {
 })();
 </script>
 <?php endif; ?>
-<script src="/admin/js/session-guard.js"></script>
+<script src="<?= h(versioned_asset('/admin/js/session-guard.js')) ?>"></script>
 <?php // Jobs the server's schedule isn't running are started after the page is sent (includes/scheduled_jobs.php).
 try { require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/scheduled_jobs.php'; scheduled_jobs_run_on_visit(); }
 catch (Throwable $e) { error_log('scheduled_jobs_run_on_visit: ' . $e->getMessage()); } ?>

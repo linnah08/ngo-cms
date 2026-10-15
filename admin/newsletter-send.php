@@ -133,8 +133,8 @@ $active_nav       = 'newsletter-send';
 <head>
   <meta charset="UTF-8">
   <title>Изпращане — <?= h(SITE_NAME_BG) ?> Admin</title>
-  <link rel="stylesheet" href="/assets/css/main.css">
-  <link rel="stylesheet" href="/admin/assets/admin.css">
+  <link rel="stylesheet" href="<?= h(versioned_asset('/assets/css/main.css')) ?>">
+  <link rel="stylesheet" href="<?= h(versioned_asset('/admin/assets/admin.css')) ?>">
   <style>
     body { font-family: monospace; background: #f8f6f2; padding: 2rem; color: #1a1916; }
     .line { margin: .2rem 0; font-size: .9rem; }
