@@ -32,6 +32,11 @@ $_show_nl_banner = module_enabled_with_needs('newsletter') && empty($_COOKIE['om
   <?= h($_f['message'] ?? '') ?>
 </div>
 <?php endforeach; endif; ?>
+<?php // The site's own blocks (includes/site-extensions.php 'footer_partial'), e.g. a quiz invitation.
+if (!$_is_admin_page) {
+    require_once __DIR__ . '/../includes/site_extensions.php';   // also for a site that kept an older config.php
+    foreach (site_footer_partials() as $_site_partial) site_extension_render($_site_partial, ['lang' => $lang, 'pages' => $pages]);
+} ?>
 <?php if ($_show_nl_banner): ?>
 <?php // The band colour is chosen in Admin → Организация → Визия (text colour follows
       // for contrast); else a theme's palette sets --newsletter-bg / --newsletter-fg;

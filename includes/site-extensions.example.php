@@ -72,4 +72,16 @@ return [
     'admin_nav' => [
         'quiz' => ['label' => 'Тест', 'href' => '/admin/site/quiz.php', 'roles' => ['admin', 'author'], 'active_nav' => 'quiz'],
     ],
+
+    // A PHP file of the site's own, shown on every public page just above the
+    // footer's sign-up band (one path from the site root, or a list). It gets
+    // $lang ('bg' or 'en'); if it fails, the page shows without it. Keep it in a
+    // folder no release ships, e.g. templates/site/.
+    'footer_partial' => 'templates/site/footer-banner.php',
+
+    // Extra addresses for /sitemap.xml: paths on this site, or BG/EN pairs.
+    'sitemap_urls' => [
+        ['bg' => '/test/', 'en' => '/en/quiz/'],
+        '/kampaniya-2026/',
+    ],
 ];

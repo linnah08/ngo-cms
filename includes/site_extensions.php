@@ -13,6 +13,8 @@
  *   'reports'        => extra monthly report files (site_reports())
  *   'document_types' => its own document kinds and numbering (site_document_types())
  *   'admin_nav'      => its own links in the admin menu (site_admin_nav())
+ *   'footer_partial' => its own PHP file(s) shown above the footer (site_footer_partials())
+ *   'sitemap_urls'   => extra addresses for /sitemap.xml (site_sitemap_paths())
  *
  * The file returns an array with any of those keys. Each entry is checked; a
  * broken one is logged and skipped — a mistake in that file must never take the
@@ -72,6 +74,90 @@ function site_extension_local_path(mixed $path): ?string
     if (!is_string($path) || $path === '' || strlen($path) > 500) return null;
     if (!preg_match('#^/(?![/\\\\])[^\s\\\\\x00-\x1f\x7f]*$#u', $path)) return null;
     return $path;
+}
+
+/** The site's root directory (where config.php lives). Tests point it elsewhere. */
+function site_extension_root(): string
+{
+    return (string) ($GLOBALS['_om_site_root'] ?? dirname(__DIR__));
+}
+
+/**
+ * The absolute path of a site's own PHP file given relative to the site root
+ * ("templates/site/quiz-banner.php"), or null when it isn't a .php file inside
+ * the site that exists. "..", absolute paths and links leading outside are refused.
+ */
+function site_extension_php_file(mixed $rel): ?string
+{
+    if (!is_string($rel) || !preg_match('#^[A-Za-z0-9_][A-Za-z0-9_/.-]*\.php$#', $rel) || str_contains($rel, '..')) return null;
+    $root = realpath(site_extension_root());
+    $file = realpath(site_extension_root() . '/' . $rel);
+    if ($root === false || $file === false || !is_file($file) || !str_starts_with($file, $root . DIRECTORY_SEPARATOR)) return null;
+    return $file;
+}
+
+/**
+ * Show a site's own PHP file. It sees only $vars (e.g. $lang). If it throws,
+ * nothing it printed is shown and the error is logged — a broken site file
+ * never takes the page down. Returns whether it ran.
+ */
+function site_extension_render(string $file, array $vars = []): bool
+{
+    $level = ob_get_level();
+    ob_start();
+    try {
+        (static function (string $__file, array $__vars): void {
+            extract($__vars, EXTR_SKIP);
+            include $__file;
+        })($file, $vars);
+    } catch (Throwable $e) {
+        while (ob_get_level() > $level) ob_end_clean();
+        error_log('site_extensions: ' . basename($file) . ' failed — ' . $e->getMessage());
+        return false;
+    }
+    while (ob_get_level() > $level + 1) ob_end_flush();
+    ob_end_flush();
+    return true;
+}
+
+// ── Footer and sitemap ───────────────────────────────────────────────────────
+
+/**
+ * The site's own files shown on every public page just above the footer's
+ * sign-up band (e.g. an invitation to a quiz): 'footer_partial' is one path
+ * relative to the site root, or a list of them. Files that are missing or
+ * outside the site are logged and skipped.
+ */
+function site_footer_partials(): array
+{
+    $raw = site_extensions()['footer_partial'] ?? [];
+    $out = [];
+    foreach ((array) $raw as $rel) {
+        $file = site_extension_php_file($rel);
+        if ($file === null) { error_log('site_extensions: footer_partial ' . (is_string($rel) ? "'$rel'" : '') . ' is not a .php file inside the site — skipped'); continue; }
+        $out[] = $file;
+    }
+    return array_values(array_unique($out));
+}
+
+/**
+ * Extra addresses for /sitemap.xml: 'sitemap_urls' is a list of paths on this
+ * site ("/quiz/"), or BG/EN pairs (['bg' => '/test/', 'en' => '/en/quiz/']).
+ * Returns the paths, each once; anything else is logged and skipped.
+ */
+function site_sitemap_paths(): array
+{
+    $raw = site_extensions()['sitemap_urls'] ?? [];
+    if (!is_array($raw)) { error_log("site_extensions: 'sitemap_urls' is not a list — ignored"); return []; }
+    $out = [];
+    foreach ($raw as $entry) {
+        foreach (is_array($entry) ? $entry : [$entry] as $p) {
+            $path = site_extension_local_path($p);
+            if ($path === null || str_contains($path, '#')) { error_log('site_extensions: sitemap address ' . (is_string($p) ? "'$p'" : '') . ' is not a path on this site — skipped'); continue; }
+            $out[$path] = true;
+        }
+    }
+    return array_keys($out);
 }
 
 // ── Admin menu ───────────────────────────────────────────────────────────────

@@ -79,6 +79,13 @@ foreach (cpage_all() as $cp) {
     $urls[]  = [$base . cpage_url($cp, 'en'), $lastmod];
 }
 
+// ── The site's own addresses (includes/site-extensions.php 'sitemap_urls') ──
+require_once __DIR__ . '/includes/site_extensions.php';
+$_have = array_column($urls, 0);
+foreach (site_sitemap_paths() as $p) {
+    if (!in_array($base . $p, $_have, true)) $urls[] = [$base . $p, null];
+}
+
 // ── Pages of switched-off modules (Admin → Модули) do not exist ───────────
 $urls = array_filter($urls, static fn(array $u): bool => module_link_visible($u[0]));
 
