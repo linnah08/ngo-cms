@@ -241,6 +241,17 @@ $current_user = admin_user();
       <?php endif; ?>
       <?php endif; ?>
       <?php endif; ?>
+      <?php
+      // The site's own links (includes/site-extensions.php 'admin_nav'), for the roles it names.
+      require_once dirname(__DIR__, 2) . '/includes/site_extensions.php';   // also for a site that kept an older config.php
+      foreach (site_admin_nav((string) ($current_user['role'] ?? '')) as $_site_nav):
+      ?>
+      <a href="<?= h($_site_nav['href']) ?>"
+         class="admin-nav__link <?= ($active_nav ?? '') === $_site_nav['active_nav'] ? 'active' : '' ?>"
+         <?= ($active_nav ?? '') === $_site_nav['active_nav'] ? 'aria-current="page"' : '' ?>>
+        <?= h($_site_nav['label']) ?>
+      </a>
+      <?php endforeach; ?>
       <a href="/admin/support.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'support' ? 'active' : '' ?>">
         Поддръжка

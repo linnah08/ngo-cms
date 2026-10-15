@@ -22,6 +22,7 @@ final class ExampleFileTest extends TestCase
         $this->assertSame(array_keys($raw['order_filters']), array_keys(site_order_filters()));
         $this->assertSame(array_keys($raw['reports']), array_keys(site_reports()));
         $this->assertSame(array_keys($raw['document_types']), array_keys(site_document_types()));
+        $this->assertSame(array_keys($raw['admin_nav']), array_keys(site_admin_nav()));
     }
 
     public function test_the_real_site_file_is_never_part_of_the_repository(): void

@@ -65,4 +65,11 @@ return [
     'document_types' => [
         'partner_cert' => ['label' => 'Сертификат (партньор)', 'plural' => 'Сертификати за партньора', 'digits' => 5],
     ],
+
+    // Links of the site's own in the admin menu (shown above „Поддръжка“).
+    // href: a page on this site. roles: who sees it (default: administrators only).
+    // active_nav: the $active_nav value of the page it opens, so the link lights up there.
+    'admin_nav' => [
+        'quiz' => ['label' => 'Тест', 'href' => '/admin/site/quiz.php', 'roles' => ['admin', 'author'], 'active_nav' => 'quiz'],
+    ],
 ];

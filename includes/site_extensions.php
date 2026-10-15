@@ -12,6 +12,7 @@
  *   'order_filters'  => filter buttons on Админ → Поръчки (site_order_filters())
  *   'reports'        => extra monthly report files (site_reports())
  *   'document_types' => its own document kinds and numbering (site_document_types())
+ *   'admin_nav'      => its own links in the admin menu (site_admin_nav())
  *
  * The file returns an array with any of those keys. Each entry is checked; a
  * broken one is logged and skipped — a mistake in that file must never take the
@@ -59,6 +60,47 @@ function site_extension_section(string $section): array
 function site_extension_key_ok(string $key): bool
 {
     return (bool) preg_match('/^[a-z][a-z0-9_-]{1,39}$/', $key);
+}
+
+/**
+ * $path when it is a path on this site ("/quiz/", "/admin/quiz.php?tab=2"), else
+ * null. Never another host: "//evil.example", "/\evil", "https://…", spaces and
+ * control characters are all refused.
+ */
+function site_extension_local_path(mixed $path): ?string
+{
+    if (!is_string($path) || $path === '' || strlen($path) > 500) return null;
+    if (!preg_match('#^/(?![/\\\\])[^\s\\\\\x00-\x1f\x7f]*$#u', $path)) return null;
+    return $path;
+}
+
+// ── Admin menu ───────────────────────────────────────────────────────────────
+
+/**
+ * A site's own links in the admin menu: key => [label, href, roles, active_nav].
+ * `href` is a path on this site (its own admin page or any other page), `roles`
+ * the roles that see the link (default: administrators only), `active_nav` the
+ * $active_nav value of the page it opens (default: the key) so the link lights
+ * up there. With $role, only the links that role sees.
+ */
+function site_admin_nav(?string $role = null): array
+{
+    $out = [];
+    foreach (site_extension_section('admin_nav') as $key => $n) {
+        $label = trim((string) ($n['label'] ?? ''));
+        $href  = site_extension_local_path($n['href'] ?? null);
+        if (!site_extension_key_ok($key) || $label === '' || $href === null) {
+            error_log("site_extensions: admin menu link '$key' needs a label and a link to a page on this site — skipped");
+            continue;
+        }
+        $roles = array_values(array_filter((array) ($n['roles'] ?? ['admin']), 'is_string'));
+        if (!$roles) $roles = ['admin'];
+        $active = (string) ($n['active_nav'] ?? $key);
+        $out[$key] = ['label' => $label, 'href' => $href, 'roles' => $roles,
+                      'active_nav' => preg_match('/^[a-z0-9_-]{1,40}$/i', $active) ? $active : $key];
+    }
+    if ($role === null) return $out;
+    return array_filter($out, static fn($n) => in_array($role, $n['roles'], true));
 }
 
 // ── Donation recipients ──────────────────────────────────────────────────────
