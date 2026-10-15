@@ -61,6 +61,9 @@ function org_fields(): array
         'google_ads_purchase_label' => 'GOOGLE_ADS_PURCHASE_LABEL',
         'site_noindex'     => 'SITE_NOINDEX',      // '1': ask search engines not to list the site (includes/seo.php)
         'article_slugs_latin' => 'ARTICLE_SLUGS_LATIN',   // '1': new article addresses in Latin letters
+        'newsletter_donate_shop'       => 'NEWSLETTER_DONATE_SHOP',
+        'newsletter_donate_shop_label_bg' => 'NEWSLETTER_DONATE_SHOP_LABEL_BG',
+        'newsletter_donate_shop_label_en' => 'NEWSLETTER_DONATE_SHOP_LABEL_EN',
         'site_launched'    => 'SITE_LAUNCHED',     // set by „Пусни сайта“ (admin/launch.php), not by the form
     ] + org_module_fields();
 }
@@ -129,6 +132,10 @@ function org_hidden_fields(): array
     if (!$newsletter || !module_enabled_with_needs('donations')) {
         array_push($hidden, 'newsletter_donate_cta', 'newsletter_donate_heading_bg', 'newsletter_donate_heading_en',
             'newsletter_donate_text_bg', 'newsletter_donate_text_en');
+    }
+    // The box's second button goes to the shop, so it needs the shop as well.
+    if (in_array('newsletter_donate_cta', $hidden, true) || !module_enabled_with_needs('shop')) {
+        array_push($hidden, 'newsletter_donate_shop', 'newsletter_donate_shop_label_bg', 'newsletter_donate_shop_label_en');
     }
     return $hidden;
 }
@@ -428,6 +435,7 @@ function org_validate(array $in, array $themeKeys): array
     $v['newsletter_donate_cta'] = ($in['newsletter_donate_cta'] ?? '') === '1' ? '1' : '0';
     // And for Latin article addresses — off (Cyrillic, as before) unless ticked.
     $v['article_slugs_latin'] = ($in['article_slugs_latin'] ?? '') === '1' ? '1' : '0';
+    $v['newsletter_donate_shop'] = ($in['newsletter_donate_shop'] ?? '') === '1' ? '1' : '0';
 
     foreach (['launch_banner_bg' => 'на български', 'launch_banner_en' => 'на английски'] as $k => $lang) {
         if (mb_strlen($v[$k]) > 200) {
@@ -440,6 +448,8 @@ function org_validate(array $in, array $themeKeys): array
         'newsletter_donate_heading_en' => ['заглавието на английски', 120],
         'newsletter_donate_text_bg'    => ['текстът на български', 300],
         'newsletter_donate_text_en'    => ['текстът на английски', 300],
+        'newsletter_donate_shop_label_bg' => ['надписът на бутона към магазина на български', 40],
+        'newsletter_donate_shop_label_en' => ['надписът на бутона към магазина на английски', 40],
     ];
     foreach ($nl_limits as $k => [$what, $max]) {
         if (mb_strlen($v[$k]) > $max) {

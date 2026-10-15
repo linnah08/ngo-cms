@@ -93,6 +93,50 @@ final class NewsletterDonateCtaTest extends TestCase
         $this->assertStringContainsString(rawurlencode(SITE_URL . '/en/donation/'), $tracked);
     }
 
+    // ── Optional shop button ──────────────────────────────────────────────────
+
+    public function test_shop_button_only_when_asked(): void
+    {
+        $this->assertStringNotContainsString(SITE_URL . '/magazin/', newsletter_cta_block('bg', true, false));
+        $bg = newsletter_cta_block('bg', true, true);
+        $en = newsletter_cta_block('en', true, true);
+        $this->assertStringContainsString(SITE_URL . '/magazin/', $bg);
+        $this->assertStringContainsString(SITE_URL . '/en/shop/', $en);
+        $this->assertStringContainsString(h(newsletter_donate_shop_label('bg')), $bg);
+        $this->assertStringContainsString(h(newsletter_donate_shop_label('en')), $en);
+        $this->assertNotSame(newsletter_donate_shop_label('bg'), newsletter_donate_shop_label('en'));
+        // Both buttons still fit a 375px phone: no fixed widths, they wrap.
+        $this->assertDoesNotMatchRegularExpression('/\bwidth:\s*\d{3,}px/', $bg);
+        $this->assertSame(2, substr_count($bg, 'display:inline-block'));
+        $this->assertSame('', newsletter_cta_block('bg', false, true), 'no shop button without the donate box');
+    }
+
+    #[RunInSeparateProcess]
+    public function test_shop_button_follows_the_switch_and_the_shop_module(): void
+    {
+        define('NEWSLETTER_DONATE_SHOP', '1');
+        define('NEWSLETTER_DONATE_SHOP_LABEL_BG', 'Към нашите подаръци');
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
+        $this->assertSame(module_enabled_with_needs('shop'), newsletter_donate_shop_enabled(),
+            'the button needs the shop module on');
+        $this->assertSame('Към нашите подаръци', newsletter_donate_shop_label('bg'), "the site's own label wins");
+    }
+
+    public function test_shop_button_switch_is_saved_and_its_label_limited(): void
+    {
+        $on  = org_validate($this->orgInput(['newsletter_donate_shop' => '1']), array_keys(brand_themes()));
+        $off = org_validate($this->orgInput(), array_keys(brand_themes()));
+        $this->assertSame('1', $on['values']['newsletter_donate_shop']);
+        $this->assertSame('0', $off['values']['newsletter_donate_shop'], 'unticked is saved as off');
+        $this->assertSame('NEWSLETTER_DONATE_SHOP', org_fields()['newsletter_donate_shop']);
+        $long = org_validate($this->orgInput(['newsletter_donate_shop_label_en' => str_repeat('x', 41)]), array_keys(brand_themes()));
+        $this->assertArrayHasKey('newsletter_donate_shop_label_en', $long['errors']);
+
+        $admin = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/admin/organisation.php');
+        $this->assertStringContainsString('Добави бутон към магазина', $admin);
+        $this->assertStringContainsString("module_enabled_with_needs('shop')", $admin);
+    }
+
     // ── Admin switch (Организация) ────────────────────────────────────────────
 
     /** Without Бюлетин or Дарения the box's fields are hidden in Организация and not saved. */

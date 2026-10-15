@@ -96,6 +96,9 @@ define('FEATURE_SELF_UPDATE', true);
 // to switch (and reword) in Admin → Организация, which wins over this line.
 // Needs FEATURE_DONATIONS on.
 define('NEWSLETTER_DONATE_CTA', false);
+// A second button in that box, to the shop (needs FEATURE_SHOP on). Also in
+// Admin → Организация („Добави бутон към магазина“).
+define('NEWSLETTER_DONATE_SHOP', false);
 
 // ── While the site is still being filled in ───────────────────────────────────
 // A dark strip at the top of every public page saying the site is new. It is a

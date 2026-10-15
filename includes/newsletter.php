@@ -692,13 +692,35 @@ function newsletter_donate_cta_text(string $part, string $lang): string
 }
 
 /**
+ * Does the donate box also get a second button, to the shop? Off unless ticked
+ * in Admin → Организация ("Добави бутон към магазина"), and only while the box
+ * itself is on and the shop module is on — never a button to a missing page.
+ */
+function newsletter_donate_shop_enabled(): bool
+{
+    if (!defined('NEWSLETTER_DONATE_SHOP')) return false;
+    $v  = constant('NEWSLETTER_DONATE_SHOP');
+    $on = is_string($v) ? filter_var(trim($v), FILTER_VALIDATE_BOOLEAN) : (bool) $v;
+    return $on && module_enabled_with_needs('shop');
+}
+
+/** Label of the shop button: the site's own from Admin → Организация, else the default. */
+function newsletter_donate_shop_label(string $lang): string
+{
+    $lang  = $lang === 'en' ? 'en' : 'bg';
+    $const = 'NEWSLETTER_DONATE_SHOP_LABEL_' . strtoupper($lang);
+    $own   = defined($const) ? trim((string) constant($const)) : '';
+    return $own !== '' ? $own : t_or('newsletter.donate.shop_button', 'Разгледайте магазина', 'Visit our shop', $lang);
+}
+
+/**
  * Closing box inviting the reader to donate, placed between the campaign body
  * and the unsubscribe link of every newsletter (send, test and preview alike).
  * Empty when switched off ($enabled overrides the switch, for tests). Its link goes through newsletter_inject_tracking()
  * like any other link in the body. Inline styles only — email clients ignore
  * stylesheets — and nothing fixed-width, so it fits a 375px phone.
  */
-function newsletter_cta_block(string $lang, ?bool $enabled = null): string
+function newsletter_cta_block(string $lang, ?bool $enabled = null, ?bool $shop = null): string
 {
     if (!($enabled ?? newsletter_donate_cta_enabled())) return '';
     if (!function_exists('donation_path')) {
@@ -710,10 +732,19 @@ function newsletter_cta_block(string $lang, ?bool $enabled = null): string
     $label = t_or('newsletter.donate.button', 'Дарете сега', 'Donate now', $lang);
     $e     = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
 
+    // Optional second button to the shop ($shop overrides the switch, for tests).
+    // Inline-block buttons with a side margin wrap under each other on a phone.
+    $shop_btn = '';
+    if ($shop ?? newsletter_donate_shop_enabled()) {
+        $shop_btn = '<a href="' . $e($base . shop_path('shop', $lang)) . '" style="display:inline-block;background:#ffffff;color:#0387A5;border:2px solid #0387A5;padding:10px 26px;border-radius:4px;text-decoration:none;font-size:15px;font-weight:600;margin:0 4px 8px;">'
+            . $e(newsletter_donate_shop_label($lang)) . '</a>';
+    }
+
     return '<div class="nl-donate" style="margin-top:32px;padding:24px 16px;background:#e4f0f5;border-radius:8px;text-align:center;">'
         . '<p style="margin:0 0 12px;color:#1a1916;font-size:17px;font-weight:600;line-height:1.4;">' . $e(newsletter_donate_cta_text('heading', $lang)) . '</p>'
         . '<p style="margin:0 0 20px;color:#4a4640;font-size:14px;line-height:1.6;">' . $e(newsletter_donate_cta_text('text', $lang)) . '</p>'
-        . '<a href="' . $e($url) . '" style="display:inline-block;background:#0387A5;color:#ffffff;padding:12px 28px;border-radius:4px;text-decoration:none;font-size:15px;font-weight:600;">' . $e($label) . '</a>'
+        . '<a href="' . $e($url) . '" style="display:inline-block;background:#0387A5;color:#ffffff;padding:12px 28px;border-radius:4px;text-decoration:none;font-size:15px;font-weight:600;' . ($shop_btn !== '' ? 'margin:0 4px 8px;' : '') . '">' . $e($label) . '</a>'
+        . $shop_btn
         . '</div>';
 }
 

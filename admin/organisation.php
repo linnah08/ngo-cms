@@ -575,6 +575,29 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <small style="<?= $hint ?>">Оставете празно, за да се показва текстът по подразбиране.</small>
       </label>
     </div>
+    <?php if (module_enabled_with_needs('shop')): ?>
+    <label class="admin-checkbox" style="margin:1.25rem 0 1rem;">
+      <input type="checkbox" name="newsletter_donate_shop" value="1" <?= in_array($val('newsletter_donate_shop'), ['1', 'true'], true) ? 'checked' : '' ?>>
+      Добави бутон към магазина
+    </label>
+    <p class="admin-meta" style="margin:-.5rem 0 1rem;line-height:1.6;">
+      Втори бутон в същата кутийка, до „Дарете сега“, който води към магазина на сайта.
+    </p>
+    <div class="admin-form-grid">
+      <label id="f-newsletter_donate_shop_label_bg">Надпис на бутона на български
+        <input type="text" name="newsletter_donate_shop_label_bg" value="<?= h($val('newsletter_donate_shop_label_bg')) ?>" maxlength="40"
+               placeholder="<?= h(t_or('newsletter.donate.shop_button', 'Разгледайте магазина', 'Visit our shop', 'bg')) ?>"<?= $fattr('newsletter_donate_shop_label_bg') ?>>
+        <?= $ferr('newsletter_donate_shop_label_bg') ?>
+        <small style="<?= $hint ?>">Оставете празно, за да се показва текстът по подразбиране.</small>
+      </label>
+      <label id="f-newsletter_donate_shop_label_en">Надпис на бутона на английски
+        <input type="text" name="newsletter_donate_shop_label_en" data-translate-from="newsletter_donate_shop_label_bg" value="<?= h($val('newsletter_donate_shop_label_en')) ?>" maxlength="40"
+               placeholder="<?= h(t_or('newsletter.donate.shop_button', 'Разгледайте магазина', 'Visit our shop', 'en')) ?>"<?= $fattr('newsletter_donate_shop_label_en') ?>>
+        <?= $ferr('newsletter_donate_shop_label_en') ?>
+        <small style="<?= $hint ?>">Оставете празно, за да се показва текстът по подразбиране.</small>
+      </label>
+    </div>
+    <?php endif; ?>
   </section>
   <?php endif; ?>
 
