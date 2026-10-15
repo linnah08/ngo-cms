@@ -131,12 +131,14 @@ const ORDERS_LIST_STATUSES = ['all', 'new', 'confirmed', 'shipped', 'delivered',
  *   status — one of ORDERS_LIST_STATUSES ('unpaid' = the "Неплатени" filter)
  *   q      — search text: part of the order number, name, email or phone. A phone
  *            matches however it is written ("0888 12 34 56", "+359888123456").
+ *   product — a product id: only orders that contain that product (any variant);
+ *            the list then shows how many of it each order has (order_product_quantity()).
  *
  * Unknown type/status values fall back to 'all'. The search text only ever goes
  * into $params, never into the SQL itself.
  *
  * @param array $query $_GET (or $_POST with the same keys)
- * @return array{type:string,status:string,q:string,where:string,params:list<string>}
+ * @return array{type:string,status:string,q:string,rec:string,x:string,product:int,where:string,params:list<string>}
  */
 function orders_list_filter(array $query): array {
     require_once __DIR__ . '/payment/unpaid_orders.php';
@@ -150,6 +152,7 @@ function orders_list_filter(array $query): array {
     $rec = is_string($query['rec'] ?? null) && donation_recipients_choosable() && isset(donation_recipients()[$query['rec']]) ? $query['rec'] : '';
     $x   = is_string($query['x'] ?? null) && isset(site_order_filters()[$query['x']]) ? $query['x'] : '';
     if ($rec !== '') $type = 'donation';
+    $product = is_scalar($query['product'] ?? null) && preg_match('/^[1-9]\d{0,9}$/', (string) $query['product']) ? (int) $query['product'] : 0;
 
     $where  = ['1=1'];
     $params = [];
@@ -193,8 +196,14 @@ function orders_list_filter(array $query): array {
         $where[] = '(' . $f['where'] . ')';
         array_push($params, ...$f['params']);
     }
+    if ($product > 0) {
+        // Array containment: some element of `items` has this product_id (no path wildcards needed).
+        $where[]  = 'JSON_CONTAINS(items, ?)';
+        $params[] = json_encode([['product_id' => $product]]);
+    }
 
-    return ['type' => $type, 'status' => $status, 'q' => $q, 'rec' => $rec, 'x' => $x, 'where' => implode(' AND ', $where), 'params' => $params];
+    return ['type' => $type, 'status' => $status, 'q' => $q, 'rec' => $rec, 'x' => $x, 'product' => $product,
+            'where' => implode(' AND ', $where), 'params' => $params];
 }
 
 /**
@@ -203,10 +212,28 @@ function orders_list_filter(array $query): array {
  */
 function orders_list_url(array $filter, array $change = []): string {
     $f  = array_merge(['type' => $filter['type'], 'status' => $filter['status'], 'q' => $filter['q'],
-                       'rec' => $filter['rec'] ?? '', 'x' => $filter['x'] ?? ''], $change);
+                       'rec' => $filter['rec'] ?? '', 'x' => $filter['x'] ?? '', 'product' => $filter['product'] ?? 0], $change);
     if (($f['type'] ?? '') !== 'donation') $f['rec'] = '';   // a recipient only narrows donations
+    $f['product'] = (int) $f['product'] > 0 ? (string) (int) $f['product'] : '';
     $qs = http_build_query(array_filter($f, fn($v) => $v !== '' && $v !== 'all'));
     return '/admin/orders.php' . ($qs !== '' ? '?' . $qs : '');
+}
+
+/**
+ * How many of product $product_id an order holds (all its variants together),
+ * from the order's items JSON — for the "Бр." column when Поръчки is narrowed
+ * to one product.
+ */
+function order_product_quantity(string|array|null $items, int $product_id): int
+{
+    if (!is_array($items)) $items = json_decode((string) $items, true);
+    $qty = 0;
+    foreach (is_array($items) ? $items : [] as $item) {
+        if (is_array($item) && (int) ($item['product_id'] ?? 0) === $product_id && ($item['type'] ?? '') !== 'donation') {
+            $qty += max(0, (int) ($item['quantity'] ?? 0));
+        }
+    }
+    return $qty;
 }
 
 /**

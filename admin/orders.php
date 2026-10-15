@@ -56,6 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'status' => $_POST['filter_status'] ?? '',
         'rec'    => $_POST['filter_rec']    ?? '',
         'x'      => $_POST['filter_x']      ?? '',
+        'product'=> $_POST['filter_product']?? '',
         'q'      => $_POST['filter_q']      ?? '',
     ]);
     header('Location: ' . orders_list_url($back));
@@ -72,6 +73,15 @@ $sql    = 'SELECT *, TIMESTAMPDIFF(MINUTE, created_at, NOW()) AS age_minutes FRO
 $stmt   = $pdo->prepare($sql);
 $stmt->execute($filter['params']);
 $orders = $stmt->fetchAll();
+
+// "Продукт": narrow the list to orders containing one product and count how many of it each has.
+$product_options = $pdo->query('SELECT id, name_bg, active FROM products ORDER BY active DESC, name_bg')->fetchAll();
+$product_names   = array_column($product_options, 'name_bg', 'id');
+$filter_product  = isset($product_names[$filter['product']]) ? $filter['product'] : 0;
+$product_qty     = [];
+if ($filter_product) {
+    foreach ($orders as $o) $product_qty[(int) $o['id']] = order_product_quantity($o['items'], $filter_product);
+}
 
 $type_labels = ['physical' => 'Продукт', 'donation' => 'Дарение', 'ticket' => 'Билет'];
 
@@ -101,6 +111,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <?php if ($filter_status !== 'all'): ?><input type="hidden" name="status" value="<?= h($filter_status) ?>"><?php endif; ?>
   <?php if ($filter['rec'] !== ''): ?><input type="hidden" name="rec" value="<?= h($filter['rec']) ?>"><?php endif; ?>
   <?php if ($filter['x'] !== ''): ?><input type="hidden" name="x" value="<?= h($filter['x']) ?>"><?php endif; ?>
+  <?php if ($filter_product): ?><input type="hidden" name="product" value="<?= (int) $filter_product ?>"><?php endif; ?>
   <div style="flex:1 1 16rem;min-width:0;">
     <label for="ordersSearch" style="display:block;font-size:.85rem;font-weight:600;margin-bottom:.3rem;">Търсене</label>
     <input type="search" id="ordersSearch" name="q" value="<?= h($search) ?>" maxlength="100"
@@ -164,10 +175,40 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 </div>
 <?php endif; ?>
 
+<?php if ($product_options): ?>
+<form method="GET" action="/admin/orders.php" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem;max-width:640px;margin:-.5rem 0 1.5rem;">
+  <?php foreach (['type' => $filter_type, 'status' => $filter_status, 'rec' => $filter['rec'], 'x' => $filter['x'], 'q' => $search] as $_hk => $_hv): ?>
+    <?php if ($_hv !== '' && $_hv !== 'all'): ?><input type="hidden" name="<?= $_hk ?>" value="<?= h($_hv) ?>"><?php endif; ?>
+  <?php endforeach; ?>
+  <div style="flex:1 1 16rem;min-width:0;">
+    <label for="ordersProduct" style="display:block;font-size:.85rem;font-weight:600;margin-bottom:.3rem;">Поръчки с продукт</label>
+    <select id="ordersProduct" name="product" aria-describedby="ordersProductHelp"
+            style="width:100%;box-sizing:border-box;min-height:44px;padding:.5rem .75rem;border:1px solid #6b7280;border-radius:8px;font-size:1rem;font-family:inherit;background:#fff;">
+      <option value="">Всички продукти</option>
+      <?php foreach ($product_options as $_p): ?>
+        <option value="<?= (int) $_p['id'] ?>"<?= (int) $_p['id'] === $filter_product ? ' selected' : '' ?>><?= h($_p['name_bg']) ?><?= $_p['active'] ? '' : ' (скрит)' ?></option>
+      <?php endforeach; ?>
+    </select>
+  </div>
+  <button type="submit" class="btn btn--primary" style="min-height:44px;padding:.5rem 1.1rem;">Покажи</button>
+  <?php if ($filter_product): ?>
+    <a href="<?= h(orders_list_url($filter, ['product' => 0])) ?>" class="btn btn--outline" style="min-height:44px;padding:.5rem 1.1rem;box-sizing:border-box;display:inline-flex;align-items:center;">Всички продукти</a>
+  <?php endif; ?>
+  <p id="ordersProductHelp" style="flex-basis:100%;font-size:.8rem;color:var(--text-muted);margin:0;">Показва само поръчките, в които има избрания продукт, и колко броя от него има във всяка.</p>
+</form>
+<?php endif; ?>
+
+<?php if ($filter_product && $orders): ?>
+  <p role="status" style="font-size:.875rem;margin:0 0 1rem;">
+    Поръчки с „<?= h($product_names[$filter_product]) ?>“: <strong><?= count($orders) ?><?= count($orders) >= 200 ? '+' : '' ?></strong>,
+    общо <strong><?= array_sum($product_qty) ?> бр.</strong><?= count($orders) >= 200 ? ' (броени са първите 200 поръчки — стеснете с тип или статус)' : '' ?>
+  </p>
+<?php endif; ?>
+
 <?php if (empty($orders)): ?>
   <p role="status" style="color:var(--text-muted);"><?= $search !== ''
       ? 'Няма поръчки, които отговарят на „' . h($search) . '“' . ($filter_type !== 'all' || $filter_status !== 'all' ? ' при избраните тип и статус' : '') . '.'
-      : 'Няма поръчки.' ?></p>
+      : ($filter_product ? 'Няма поръчки с „' . h($product_names[$filter_product]) . '“' . ($filter_type !== 'all' || $filter_status !== 'all' ? ' при избраните тип и статус' : '') . '.' : 'Няма поръчки.') ?></p>
 <?php else: ?>
 
 <?php if ($search !== ''): ?>
@@ -181,6 +222,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <input type="hidden" name="filter_type"   value="<?= h($filter_type) ?>">
   <input type="hidden" name="filter_rec"    value="<?= h($filter['rec']) ?>">
   <input type="hidden" name="filter_x"      value="<?= h($filter['x']) ?>">
+  <input type="hidden" name="filter_product" value="<?= $filter_product ?: '' ?>">
   <input type="hidden" name="filter_status" value="<?= h($filter_status) ?>">
   <input type="hidden" name="filter_q"      value="<?= h($search) ?>">
 
@@ -211,6 +253,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <col style="width:10%;">
         <col style="width:15%;">
         <col style="width:9%;">
+        <?php if ($filter_product): ?><col style="width:7%;"><?php endif; ?>
       </colgroup>
       <thead>
         <tr>
@@ -222,6 +265,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
           <th data-sort style="overflow:hidden;">Куриер</th>
           <th data-sort style="overflow:hidden;">Статус</th>
           <th data-sort style="overflow:hidden;">Общо</th>
+          <?php if ($filter_product): ?><th data-sort style="overflow:hidden;" title="Брой „<?= h($product_names[$filter_product]) ?>“ в поръчката" aria-label="Брой „<?= h($product_names[$filter_product]) ?>“">Бр.</th><?php endif; ?>
         </tr>
       </thead>
       <tbody>
@@ -272,6 +316,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
               <small style="display:block;font-weight:400;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= h(payment_method_label($o['payment_method'])) ?></small>
             <?php endif; ?>
           </td>
+          <?php if ($filter_product): ?>
+          <td style="font-weight:600;cursor:pointer;" onclick="location='/admin/order-view.php?id=<?= (int)$o['id'] ?>'"><?= (int) ($product_qty[(int) $o['id']] ?? 0) ?></td>
+          <?php endif; ?>
         </tr>
         <?php endforeach; ?>
       </tbody>

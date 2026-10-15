@@ -38,6 +38,9 @@ return [
     ],
 
     // Extra filter buttons on Админ → Поръчки: an SQL condition on `orders`.
+    // Not needed for "orders containing product X": Поръчки has a built-in
+    // „Поръчки с продукт“ list that does that and adds a „Бр.“ column with how
+    // many of the product each order has (bookmarkable: /admin/orders.php?product=<id>).
     'order_filters' => [
         'big_orders' => ['label' => 'Над 100 €', 'where' => 'total_eur >= ?', 'params' => [100]],
     ],

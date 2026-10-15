@@ -86,6 +86,53 @@ final class OrdersListFilterTest extends TestCase
         $this->assertSame('/admin/orders.php', orders_list_url(orders_list_filter([])));
     }
 
+    public function testProductFilterTakesOnlyAPositiveIdAndAddsAParameter(): void
+    {
+        foreach (['', '0', '-3', 'abc', '5 OR 1=1', ['5'], '1.5', '00012'] as $bad) {
+            $f = orders_list_filter(['product' => $bad]);
+            $this->assertSame(0, $f['product'], var_export($bad, true));
+            $this->assertSame('1=1', $f['where']);
+        }
+        $f = orders_list_filter(['product' => '42', 'status' => 'new']);
+        $this->assertSame(42, $f['product']);
+        $this->assertStringContainsString('JSON_CONTAINS(items, ?)', $f['where']);
+        $this->assertStringNotContainsString('42', $f['where'], 'the id goes in params, never the SQL');
+        $this->assertSame(['new', '[{"product_id":42}]'], $f['params']);
+    }
+
+    public function testUrlKeepsTheProductAndCanDropIt(): void
+    {
+        $f = orders_list_filter(['product' => '7', 'type' => 'physical']);
+        $this->assertSame('/admin/orders.php?type=physical&product=7', orders_list_url($f));
+        $this->assertSame('/admin/orders.php?type=physical&status=new&product=7', orders_list_url($f, ['status' => 'new']));
+        $this->assertSame('/admin/orders.php?type=physical', orders_list_url($f, ['product' => 0]));
+    }
+
+    public function testProductQuantityAddsUpEveryVariantOfThatProduct(): void
+    {
+        $items = json_encode([
+            ['product_id' => 7, 'variant_id' => 1, 'quantity' => 2],
+            ['product_id' => 8, 'quantity' => 5],
+            ['product_id' => 7, 'variant_id' => 2, 'quantity' => 3],
+            ['type' => 'donation', 'amount_eur' => 10],
+            'garbage',
+        ]);
+        $this->assertSame(5, order_product_quantity($items, 7));
+        $this->assertSame(5, order_product_quantity(json_decode($items, true), 8));
+        $this->assertSame(0, order_product_quantity($items, 9));
+        $this->assertSame(0, order_product_quantity('{not json', 7));
+        $this->assertSame(0, order_product_quantity(null, 7));
+    }
+
+    public function testOrdersPageOffersTheProductPickerAndKeepsItThroughBulkActions(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 2) . '/admin/orders.php');
+        $this->assertStringContainsString('<label for="ordersProduct"', $src);
+        $this->assertStringContainsString('name="filter_product"', $src, 'a bulk action returns to the same product list');
+        $this->assertStringContainsString("\$_POST['filter_product']", $src);
+        $this->assertStringContainsString('order_product_quantity(', $src);
+    }
+
     // ── against the database ─────────────────────────────────────────────────
 
     private function insertOrder(array $o): string
@@ -97,7 +144,7 @@ final class OrdersListFilterTest extends TestCase
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
         )->execute([
             $number, $o['type'] ?? 'physical', $o['status'] ?? 'new', 'bg', $o['name'], $o['email'], $o['phone'] ?? null,
-            '[]', 10.00, 0, 10.00, 'cod', 'pending',
+            $o['items'] ?? '[]', 10.00, 0, 10.00, 'cod', 'pending',
         ]);
         self::$order_ids[] = (int)self::$pdo->lastInsertId();
         return $number;
@@ -133,5 +180,20 @@ final class OrdersListFilterTest extends TestCase
 
         $this->assertSame([$pct], $this->find(['q' => '100%']), '% is searched for literally');
         $this->assertSame([], $this->find(['q' => '_']), 'a lone _ does not match everything');
+    }
+
+    public function testProductFilterFindsOnlyOrdersContainingTheProduct(): void
+    {
+        if (!self::$pdo) $this->markTestSkipped('No DB configured.');
+        $pid   = 900000 + random_int(1, 99999);   // an id no real product has
+        $with  = $this->insertOrder(['name' => 'A ' . self::$tag, 'email' => 'a@example.test',
+                                     'items' => json_encode([['product_id' => $pid, 'quantity' => 3]])]);
+        $mixed = $this->insertOrder(['name' => 'B ' . self::$tag, 'email' => 'b@example.test', 'status' => 'shipped',
+                                     'items' => json_encode([['product_id' => 1, 'quantity' => 1], ['product_id' => $pid, 'variant_id' => 4, 'quantity' => 2]])]);
+        $this->insertOrder(['name' => 'C ' . self::$tag, 'email' => 'c@example.test',
+                            'items' => json_encode([['product_id' => $pid + 1, 'quantity' => 9]])]);
+
+        $this->assertSame([$with, $mixed], $this->find(['product' => (string) $pid]));
+        $this->assertSame([$mixed], $this->find(['product' => (string) $pid, 'status' => 'shipped']), 'product + status');
     }
 }
