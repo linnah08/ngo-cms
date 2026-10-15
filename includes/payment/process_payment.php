@@ -44,6 +44,7 @@ function notify_order_paid(array $order): void
                 'amount_eur'       => (float)$order['total_eur'],
                 'donation_message' => $order['donation_message'] ?? '',
                 'order_number'     => $order['order_number'],
+                'payment_method'   => $order['payment_method'] ?? '',
             ])
         );
     } else {

@@ -259,10 +259,42 @@ final class EmailTest extends TestCase
             'amount_eur'       => 100.0,
             'donation_message' => '',
             'order_number'     => 'OM-20260405-ABCD',
+            'payment_method'   => 'card',
         ]);
         $this->assertStringContainsString('Иван Иванов', $html);
         $this->assertStringContainsString('ivan@example.com', $html);
         $this->assertStringContainsString('100.00', $html);
+        $this->assertStringContainsString('Плащането е потвърдено', $html);
+        $this->assertStringContainsString('карта', $html);
+        $this->assertStringNotContainsString('банков превод', $html);
+    }
+
+    public function testDonationAdminNotificationLabelsIrisPayment(): void
+    {
+        $html = render_email('donation-notification-admin', [
+            'donor_name'       => 'Иван Иванов',
+            'donor_email'      => 'ivan@example.com',
+            'amount_eur'       => 100.0,
+            'donation_message' => '',
+            'order_number'     => 'OM-20260405-ABCD',
+            'payment_method'   => 'iris',
+        ]);
+        $this->assertStringContainsString('IRIS Pay by Bank', $html);
+        $this->assertStringNotContainsString('банков превод', $html);
+    }
+
+    public function testDonationAdminNotificationBankTransferStillWaits(): void
+    {
+        $html = render_email('donation-notification-admin', [
+            'donor_name'       => 'Иван Иванов',
+            'donor_email'      => 'ivan@example.com',
+            'amount_eur'       => 100.0,
+            'donation_message' => '',
+            'order_number'     => 'OM-20260405-ABCD',
+            'payment_method'   => 'bank_transfer',
+        ]);
+        $this->assertStringContainsString('банков превод', $html);
+        $this->assertStringNotContainsString('Плащането е потвърдено', $html);
     }
 
     // ── campaign-ticket ───────────────────────────────────────────────────────
