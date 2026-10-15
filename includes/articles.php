@@ -268,6 +268,15 @@ function article_publish_with_social(string $slug, int $social_ts, string $label
           . " сутринта, преди публикацията в {$label}.";
 }
 
+/**
+ * Where the editor goes after a successful save: back to itself (by the article's
+ * possibly new address), with ?_asclear so admin/js/autosave.js drops the draft
+ * it kept under $autosave_key.
+ */
+function article_editor_url_after_save(string $slug, string $autosave_key): string {
+    return '/admin/article-edit.php?slug=' . rawurlencode($slug) . '&_asclear=' . rawurlencode($autosave_key);
+}
+
 // ── Old article addresses ───────────────────────────────────────────────────────
 
 /**

@@ -7,7 +7,14 @@
   // (autosave.js is loaded on every admin page, including the redirect targets.)
   try {
     var _clearKey = new URLSearchParams(window.location.search).get('_asclear');
-    if (_clearKey) localStorage.removeItem('autosave:' + _clearKey);
+    if (_clearKey) {
+      localStorage.removeItem('autosave:' + _clearKey);
+      // The editors land back on themselves after a save: drop the marker from the
+      // address, so reloading the page later can't wipe a newer draft.
+      var _u = new URL(window.location.href);
+      _u.searchParams.delete('_asclear');
+      history.replaceState(history.state, '', _u.pathname + _u.search + _u.hash);
+    }
   } catch (e) {}
 
   window.initAutosave = function (cfg) {

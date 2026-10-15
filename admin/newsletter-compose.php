@@ -90,8 +90,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
                 ->execute([$subject_bg, $subject_en, $body_bg, $body_en, $topic, $send_date]);
             $id = (int)$pdo->lastInsertId();
         }
+        // Stay in the editor after saving, so preview and sending are right here;
+        // "← Назад" still leads to the list.
         flash_set('success', 'Кампанията е записана.');
-        header('Location: /admin/newsletter.php?_asclear=' . urlencode('newsletter:' . $as_id));
+        header('Location: /admin/newsletter-compose.php?id=' . (int) $id . '&_asclear=' . urlencode('newsletter:' . $as_id));
         exit;
     }
 
@@ -121,6 +123,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   </div>
 </div>
 
+<?php foreach (flash_get() as $_flash): ?>
+<div role="<?= $_flash['type'] === 'error' ? 'alert' : 'status' ?>" style="padding:.9rem 1.25rem;border-radius:6px;margin-bottom:1.5rem;<?= $_flash['type'] === 'error' ? 'background:#fdf0ef;border:1px solid #f0c4c0;color:#c0392b;' : 'background:#e6f4ea;border:1px solid #a8d5b0;color:#2d6a35;' ?>"><?= h($_flash['message']) ?></div>
+<?php endforeach; ?>
 <?php foreach ($errors as $e): ?>
 <div style="padding:.9rem 1.25rem;border-radius:6px;background:#fdf0ef;border:1px solid #f0c4c0;color:#c0392b;margin-bottom:1.5rem;"><?= h($e) ?></div>
 <?php endforeach; ?>

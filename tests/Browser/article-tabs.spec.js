@@ -88,7 +88,9 @@ test('saving with the English section folded keeps the English version', async (
   await page.goto('/admin/article-edit.php?slug=' + SLUG);
   await expect(page.locator('#title_en')).toBeHidden();
   await page.locator('.admin-page-header button[type="submit"]').click();
-  await page.waitForURL('**/admin/articles.php**');
+  // Saving keeps the editor open, with a success message.
+  await page.waitForURL(/\/admin\/article-edit\.php\?slug=/);
+  await expect(page.getByRole('status').filter({ hasText: 'Статията е запазена.' })).toBeVisible();
   const en = JSON.parse(fs.readFileSync(EN_FILE, 'utf8'));
   expect(en.title).toBe('PW tabs');
   expect(en.content).toContain('x');

@@ -162,8 +162,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        // Stay in the editor after saving (reviews, preview and the next edit are
+        // right here); "← Назад" still leads to the list.
         flash_set('success', 'Продуктът е запазен.');
-        header('Location: /admin/products.php?_asclear=' . urlencode('product:' . ($id ?: 'new')));
+        header('Location: /admin/product-edit.php?id=' . (int) $saved_id . '&_asclear=' . urlencode('product:' . ($id ?: 'new')));
         exit;
     }
 
@@ -212,6 +214,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   </div>
 </div>
 
+<?php foreach (flash_get() as $_flash): ?>
+  <div class="admin-alert admin-alert--<?= h($_flash['type']) ?>" role="<?= $_flash['type'] === 'error' ? 'alert' : 'status' ?>" style="margin-bottom:1rem;"><?= h($_flash['message']) ?></div>
+<?php endforeach; ?>
 <?php foreach ($errors as $e): ?>
   <div class="admin-alert admin-alert--error" style="margin-bottom:1rem;"><?= h($e) ?></div>
 <?php endforeach; ?>

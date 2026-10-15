@@ -175,14 +175,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             save_json($dir_en . '/' . $new_slug_en . '.json', $data_en);
         }
 
+        // Stay in the editor after saving: the next steps (the Social tab, the
+        // public preview) are right here. "← Обратно" still leads to the list.
         $as_key = 'article:' . ($is_new ? 'new' : $slug_param);
-        $redirect = '/admin/articles.php?saved=1&_asclear=' . urlencode($as_key);
+        flash_set('success', 'Статията е запазена.');
         if ($image_error !== '') {
             // Image problems never block saving the article text — surface the
             // warning as a separate banner instead of losing the whole save.
-            $redirect .= '&image_error=' . urlencode($image_error);
+            flash_set('error', 'Снимката не бе запазена: ' . $image_error);
         }
-        header('Location: ' . $redirect);
+        header('Location: ' . article_editor_url_after_save($new_slug, $as_key));
         exit;
     }
 }
@@ -271,6 +273,9 @@ $badge_style       = 'font-size:.75rem;font-weight:600;border-radius:3px;padding
 </nav>
 <?php endif; ?>
 
+<?php foreach (flash_get() as $_flash): ?>
+  <div class="admin-alert admin-alert--<?= h($_flash['type']) ?>" role="<?= $_flash['type'] === 'error' ? 'alert' : 'status' ?>" style="margin-bottom:1.5rem;"><?= h($_flash['message']) ?></div>
+<?php endforeach; ?>
 <?php if ($error): ?>
   <div class="admin-alert admin-alert--error" style="margin-bottom:1.5rem;"><?= h($error) ?></div>
 <?php endif; ?>
