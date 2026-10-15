@@ -10,6 +10,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/home.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/home_admin.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/home_seo.php';
 
 admin_require_login();
 admin_require_admin();
@@ -23,6 +24,8 @@ $errors = [];
 $form   = null;   // section shown in the edit form: ['id' => '' for new, 'type', 'fields']
 $cp_errors = [];  // created page: errors and typed values of its title/address form
 $cp_values = null;
+$seo_errors = [];  // front page: errors and typed values of the search-engine form
+$seo_values = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($_POST === [] && (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
@@ -48,6 +51,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Shown again below, with the typed values and what to fix.
         $cp_errors = $r['errors'];
         $cp_values = $r['values'];
+    } elseif ($action === 'home_seo' && $cpage === null) {   // the front page's title for search engines
+        $r = home_seo_clean($_POST);
+        if (!$r['errors']) {
+            home_seo_save($r['values']);
+            flash_set('success', 'Заглавието за търсачките е запазено.');
+            header('Location: ' . hs_url(['focus' => 'seo:'])); exit;
+        }
+        $seo_errors = $r['errors'];
+        $seo_values = $r['values'];
     } elseif ($action === 'reorder') {   // sent by the drag handles, answers in JSON
         header('Content-Type: application/json; charset=UTF-8');
         $order = is_array($_POST['order'] ?? null) ? $_POST['order'] : [];
@@ -386,6 +398,49 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </ul>
   </details>
   <?php endif; ?>
+
+  <?php if ($cpage === null):
+    $sv = $seo_values ?? home_seo_values();
+    $seo_field = function (string $name, string $label, string $lang, int $max, string $hint_id) use ($sv, $seo_errors): string {
+        $err  = $seo_errors[$name] ?? null;
+        $desc = $hint_id . ($err ? " {$name}_err" : '');
+        $attrs = ' id="' . $name . '" name="' . $name . '" maxlength="' . $max . '" aria-describedby="' . h($desc) . '"'
+               . ($lang === 'en' ? ' data-translate-from="' . str_replace('_en', '_bg', $name) . '"' : '')
+               . ($err ? ' aria-invalid="true"' : '')
+               . ' style="width:100%;box-sizing:border-box;min-height:44px;' . ($err ? 'border:2px solid #b91c1c;' : '') . '"';
+        $sr = '<span style="' . HS_SR . '"> на ' . ($lang === 'en' ? 'английски' : 'български') . '</span>';
+        return '<div class="form-group" style="margin:0;"><label for="' . $name . '">' . h($label) . $sr . hs_badge($lang) . '</label>'
+             . '<input type="text"' . $attrs . ' value="' . h($sv[$name]) . '">'
+             . hs_error_html($name . '_err', $err) . '</div>';
+    };
+  ?>
+  <section id="hsSeo" aria-labelledby="hsSeoTitle" style="border:1px solid var(--border);border-radius:8px;padding:1.25rem;margin:2rem 0 0;background:#fff;">
+    <h2 id="hsSeoTitle" tabindex="-1" style="font-size:1.15rem;margin:0 0 .5rem;">Как изглежда в Google</h2>
+    <p id="hsSeoHint" style="margin:0 0 1rem;color:var(--text-muted);font-size:.9rem;">
+      Заглавието, което търсачките показват за началната страница. Добре е да е до около
+      60 знака. Ако оставите полето празно, се показва името на организацията.
+      Текстът под заглавието е „Кратко описание“ от
+      <a href="/admin/organisation.php#f-site_description_bg">Организация</a>.
+    </p>
+    <?php if ($seo_errors): ?>
+      <div id="hsSeoErr" role="alert" tabindex="-1" style="border:2px solid #b91c1c;background:#fef2f2;color:#7f1d1d;border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem;">
+        <p style="margin:0 0 .4rem;font-weight:700;"><span aria-hidden="true">⚠ </span>Не е запазено. Поправете следното:</p>
+        <ul style="margin:0;padding-left:1.25rem;">
+          <?php foreach ($seo_errors as $k => $msg): ?><li><a href="#<?= h($k) ?>"><?= h($msg) ?></a></li><?php endforeach; ?>
+        </ul>
+      </div>
+    <?php endif; ?>
+    <form method="POST" action="<?= h(hs_url()) ?>" class="admin-form" novalidate>
+      <?= csrf_field() ?>
+      <input type="hidden" name="action" value="home_seo">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:1rem 1.5rem;">
+        <?= $seo_field('home_seo_title_bg', 'Заглавие за търсачките', 'bg', HOME_SEO_TITLE_MAX, 'hsSeoHint') ?>
+        <?= $seo_field('home_seo_title_en', 'Заглавие за търсачките', 'en', HOME_SEO_TITLE_MAX, 'hsSeoHint') ?>
+      </div>
+      <button type="submit" class="btn btn--primary" style="min-height:44px;margin-top:1rem;">Запази за търсачките</button>
+    </form>
+  </section>
+  <?php endif; ?>
 <?php endif; ?>
 
 <script>
@@ -400,12 +455,13 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   if (q) {
     var p = q.split(':'), el = document.getElementById('btn-' + p[0] + '-' + p[1]);
     if (p[0] === 'settings') el = document.getElementById('cpSettingsTitle');   // a created page's title/address saved
+    if (p[0] === 'seo') el = document.getElementById('hsSeoTitle');             // the search-engine texts saved
     if (!el || el.disabled) el = document.getElementById('h-' + p[1]) || document.getElementById('hsListTitle');
     var fold = el && el.closest('details');   // a section just hidden: open the group so focus can land on it
     if (fold) fold.open = true;
     if (el) el.focus();
   }
-  var summary = document.getElementById('hsErrSummary') || document.getElementById('cpErrSummary');
+  var summary = document.getElementById('hsErrSummary') || document.getElementById('cpErrSummary') || document.getElementById('hsSeoErr');
   if (summary) summary.focus();
 
   // Images: library picker and "remove".

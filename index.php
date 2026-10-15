@@ -11,8 +11,10 @@ if (!in_array(url_request_path($_SERVER['REQUEST_URI'] ?? '/'), ['/', '/index.ph
 }
 $lang = get_lang();
 $page_title = 'Начало';
-// Keyword-rich homepage title (overrides the "Page — Site" template)
-$page_title_full  = $lang === 'bg' ? SITE_NAME_BG : SITE_NAME_EN;
+// Title for search engines, set in Админ → Начална страница (the site's name
+// when empty). It replaces the "Page — Site" template.
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/home_seo.php';
+$page_title_full  = home_seo_title($lang, $lang === 'bg' ? SITE_NAME_BG : SITE_NAME_EN);
 $page_description = org_site_description($lang);   // Admin → Организация
 
 // Sections, their order and their content are edited in admin/home-sections.php.
