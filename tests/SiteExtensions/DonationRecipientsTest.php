@@ -86,4 +86,52 @@ final class DonationRecipientsTest extends TestCase
         }
         $this->assertStringContainsString('templates/donation-recipients.php', (string) file_get_contents("$root/templates/donation-form.php"));
     }
+
+    public function test_learn_more_links_per_language_fall_back_to_one_link(): void
+    {
+        $this->site('<?php return ["recipients" => [
+            "foundation" => ["label_bg" => "Фондацията", "purpose_bg" => "П", "hint_bg" => "Х", "hint_url" => "/za-nas/"],
+            "both"       => ["label_bg" => "Двата", "purpose_bg" => "П", "hint_bg" => "Х",
+                             "hint_url_bg" => "/novini/25/", "hint_url_en" => "/en/news/25/"],
+            "bg_only"    => ["label_bg" => "Само БГ", "purpose_bg" => "П", "hint_bg" => "Х",
+                             "hint_url" => "https://example.org/", "hint_url_bg" => "/novini/7/"],
+            "none"       => ["label_bg" => "Без", "purpose_bg" => "П"],
+        ]];');
+        $this->assertSame(['/za-nas/', '/za-nas/'], [donation_recipient_hint_url('foundation', 'bg'), donation_recipient_hint_url('foundation', 'en')], 'hint_url alone serves both languages');
+        $this->assertSame(['/novini/25/', '/en/news/25/'], [donation_recipient_hint_url('both', 'bg'), donation_recipient_hint_url('both', 'en')]);
+        $this->assertSame(['/novini/7/', 'https://example.org/'], [donation_recipient_hint_url('bg_only', 'bg'), donation_recipient_hint_url('bg_only', 'en')], 'a missing language falls back to hint_url');
+        $this->assertSame(['', ''], [donation_recipient_hint_url('none', 'bg'), donation_recipient_hint_url('none', 'en')]);
+    }
+
+    public function test_only_site_paths_and_web_addresses_are_kept_as_links(): void
+    {
+        foreach (['javascript:alert(1)', '//evil.example/', '/\\evil.example/', 'novini/1/', '/a b/', '/x"onmouseover=1', 'ftp://x/'] as $bad) {
+            $this->assertSame('', donation_recipient_url_clean($bad), $bad);
+        }
+        foreach (['/novini/1/', '/en/news/1/#more', 'https://example.org/page?x=1', 'http://example.org'] as $ok) {
+            $this->assertSame($ok, donation_recipient_url_clean($ok), $ok);
+        }
+        $this->assertSame('', donation_recipient_url_clean(['/x/']));
+    }
+
+    public function test_the_choice_links_to_the_page_in_the_visitors_language(): void
+    {
+        $this->site('<?php return ["recipients" => [
+            "foundation" => ["label_bg" => "Фондацията", "purpose_bg" => "П"],
+            "partner"    => ["label_bg" => "Партньор", "label_en" => "Partner", "purpose_bg" => "П",
+                             "hint_bg" => "Център", "hint_en" => "Centre",
+                             "hint_url_bg" => "/novini/25/", "hint_url_en" => "/en/news/25/"],
+        ]];');
+        $render = function (string $lang): string {
+            ob_start();
+            require dirname(__DIR__, 2) . '/templates/donation-recipients.php';
+            return (string) ob_get_clean();
+        };
+        $bg = $render('bg');
+        $en = $render('en');
+        $this->assertStringContainsString('href="/novini/25/"', $bg);
+        $this->assertStringNotContainsString('/en/news/25/', $bg);
+        $this->assertStringContainsString('href="/en/news/25/"', $en);
+        $this->assertStringNotContainsString('/novini/25/', $en);
+    }
 }

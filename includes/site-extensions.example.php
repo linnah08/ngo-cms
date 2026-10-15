@@ -22,7 +22,10 @@ return [
             'label_bg' => 'Партньорски център', 'label_en' => 'Partner centre',
             'hint_bg' => 'Дарението отива изцяло за работата на центъра.',
             'hint_en' => 'The donation goes entirely to the centre\'s work.',
-            'hint_url' => '/novini/partnyorski-centar/',
+            // "Научете повече" link after the hint, per language. hint_url alone
+            // gives one link for both languages.
+            'hint_url_bg' => '/novini/partnyorski-centar/',
+            'hint_url_en' => '/en/news/partner-centre/',
             'purpose_bg' => 'За работата на партньорския център',
             'purpose_en' => 'For the partner centre\'s work',
         ],

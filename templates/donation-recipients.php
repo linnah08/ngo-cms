@@ -17,6 +17,7 @@ $_dr_id       = $_dr_id ?? 'donRecipient';
   <div style="display:grid;gap:.5rem;">
 <?php foreach (donation_recipients() as $_dr_key => $_dr): ?>
 <?php   $_dr_hint = $lang === 'en' ? ($_dr['hint_en'] ?: $_dr['hint_bg']) : $_dr['hint_bg']; ?>
+<?php   $_dr_url  = $lang === 'en' ? $_dr['hint_url_en'] : $_dr['hint_url_bg']; ?>
     <label for="<?= h($_dr_id . '-' . $_dr_key) ?>" style="display:flex;gap:.6rem;align-items:flex-start;padding:.7rem .85rem;border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;min-height:44px;">
       <input type="radio" id="<?= h($_dr_id . '-' . $_dr_key) ?>" name="donation_recipient" value="<?= h($_dr_key) ?>"
              <?= $_dr_key === $_dr_selected ? 'checked' : '' ?> style="accent-color:var(--teal);margin-top:.2rem;">
@@ -24,8 +25,8 @@ $_dr_id       = $_dr_id ?? 'donRecipient';
         <strong style="display:block;font-size:.92rem;"><?= h($lang === 'en' ? $_dr['label_en'] : $_dr['label_bg']) ?></strong>
 <?php   if ($_dr_hint !== ''): ?>
         <span style="display:block;font-size:.85rem;color:var(--text-muted);text-transform:none;letter-spacing:normal;font-weight:400;margin-top:.15rem;"><?= h($_dr_hint) ?>
-<?php     if ($_dr['hint_url'] !== ''): ?>
-          <a href="<?= h($_dr['hint_url']) ?>" target="_blank" rel="noopener"><?= te('donation.recipient_more', 'Научете повече', 'Learn more', $lang) ?></a>
+<?php     if ($_dr_url !== ''): ?>
+          <a href="<?= h($_dr_url) ?>" target="_blank" rel="noopener"><?= te('donation.recipient_more', 'Научете повече', 'Learn more', $lang) ?></a>
 <?php     endif; ?>
         </span>
 <?php   endif; ?>

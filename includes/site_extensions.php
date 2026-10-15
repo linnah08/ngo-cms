@@ -68,11 +68,14 @@ const DONATION_RECIPIENT_DEFAULT = 'foundation';
 
 /**
  * Who a donation can go to: key => [label_bg, label_en, hint_bg, hint_en,
- * purpose_bg, purpose_en, default]. Without site recipients there is one — the
+ * hint_url, hint_url_bg, hint_url_en, purpose_bg, purpose_en, default]. Without site recipients there is one — the
  * organisation itself, with the purpose from site.config (DONATION_PURPOSE_BG/EN)
  * — and donors are never asked to choose. A site's list replaces it; exactly one
  * entry is the default (the first, unless one says 'default' => true).
- * hint_* is plain text shown under the choice (may contain one link via hint_url).
+ * hint_bg/hint_en is plain text shown under the choice, followed by a "learn more"
+ * link: hint_url_bg on the Bulgarian site, hint_url_en on the English one, each
+ * falling back to hint_url (one link for both). A link is a path on the site
+ * ("/novini/…") or a full http(s) address; anything else is dropped.
  */
 function donation_recipients(): array
 {
@@ -85,7 +88,7 @@ function donation_recipients(): array
     $own = [DONATION_RECIPIENT_DEFAULT => [
         'label_bg'   => $site_bg,
         'label_en'   => $site_en,
-        'hint_bg'    => '', 'hint_en' => '', 'hint_url' => '',
+        'hint_bg'    => '', 'hint_en' => '', 'hint_url' => '', 'hint_url_bg' => '', 'hint_url_en' => '',
         'purpose_bg' => defined('DONATION_PURPOSE_BG') ? (string) DONATION_PURPOSE_BG : 'За дейността и програмите на ' . $site_bg,
         'purpose_en' => defined('DONATION_PURPOSE_EN') ? (string) DONATION_PURPOSE_EN : 'For the activities and programmes of ' . $site_en,
         'default'    => true,
@@ -103,7 +106,9 @@ function donation_recipients(): array
             'label_en'   => trim((string) ($r['label_en'] ?? '')) ?: $label_bg,
             'hint_bg'    => trim((string) ($r['hint_bg'] ?? '')),
             'hint_en'    => trim((string) ($r['hint_en'] ?? '')),
-            'hint_url'   => preg_match('#^(/|https?://)#', (string) ($r['hint_url'] ?? '')) ? (string) $r['hint_url'] : '',
+            'hint_url'   => $url = donation_recipient_url_clean($r['hint_url'] ?? ''),
+            'hint_url_bg'=> donation_recipient_url_clean($r['hint_url_bg'] ?? '') ?: $url,
+            'hint_url_en'=> donation_recipient_url_clean($r['hint_url_en'] ?? '') ?: $url,
             'purpose_bg' => $purpose_bg,
             'purpose_en' => trim((string) ($r['purpose_en'] ?? '')) ?: ($base['purpose_en'] ?? $purpose_bg),
             'default'    => !empty($r['default']),
@@ -119,6 +124,20 @@ function donation_recipients(): array
 
     $cache = ['file' => $file, 'list' => $list];
     return $list;
+}
+
+/** A recipient's "learn more" link as given, or '' unless it is a site path or an http(s) address. */
+function donation_recipient_url_clean(mixed $url): string
+{
+    $url = is_string($url) ? trim($url) : '';
+    return preg_match('#^(/(?![/\\\\])|https?://)[^\s"<>]*$#', $url) ? $url : '';
+}
+
+/** The recipient's "learn more" link for $lang ('' when there is none). */
+function donation_recipient_hint_url(?string $key, string $lang = 'bg'): string
+{
+    $r = donation_recipients()[donation_recipient_clean($key)];
+    return $lang === 'en' ? $r['hint_url_en'] : $r['hint_url_bg'];
 }
 
 /** Do donors choose a recipient? Only when the site lists more than one. */
