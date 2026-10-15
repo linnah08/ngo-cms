@@ -208,3 +208,53 @@ function orders_list_url(array $filter, array $change = []): string {
     $qs = http_build_query(array_filter($f, fn($v) => $v !== '' && $v !== 'all'));
     return '/admin/orders.php' . ($qs !== '' ? '?' . $qs : '');
 }
+
+/**
+ * Correct the invoice recipient (фирмени данни) of an order: the posted
+ * company name, ЕИК / БУЛСТАТ, ДДС №, МОЛ and address merged into the order's
+ * stored invoice_data. The invoice PDF reads them from there, so the fix shows
+ * on the next „Генерирай отново“ (which keeps the invoice number).
+ *
+ * Other keys already in invoice_data are kept. Name and ЕИК are required; the
+ * ЕИК must be a real one (its check digits are checked) and is stored clean.
+ * A ДДС № may be left empty; when given it is a country prefix and digits
+ * ("BG123456789"). Returns ['data' => new invoice_data] or ['errors' => [plain text…]].
+ *
+ * @param array|null $current The order's decoded invoice_data (null/non-array = none yet)
+ * @param array      $post    $_POST
+ * @return array{data?: array, errors?: list<string>}
+ */
+function order_invoice_recipient_update(?array $current, array $post): array
+{
+    $field = static fn(string $k, int $max): string
+        => is_string($post[$k] ?? null) ? mb_substr(trim(preg_replace('/\s+/u', ' ', $post[$k]) ?? ''), 0, $max) : '';
+
+    $company = $field('company_name', 200);
+    $eik_raw = $field('eik', 30);
+    $vat_raw = $field('vat_number', 30);
+    $mol     = $field('mol', 120);
+    $address = $field('company_address', 300);
+
+    $errors = [];
+    if ($company === '') $errors[] = 'Попълнете името на фирмата.';
+    $eik = null;
+    if ($eik_raw === '') {
+        $errors[] = 'Попълнете ЕИК / БУЛСТАТ.';
+    } elseif (($eik = org_eik_normalize($eik_raw)) === null) {
+        $errors[] = 'ЕИК / БУЛСТАТ „' . $eik_raw . '“ не е верен — проверете цифрите (9 или 13 цифри).';
+    }
+    $vat = strtoupper(str_replace(' ', '', $vat_raw));
+    if ($vat !== '' && !preg_match('/^[A-Z]{2}[0-9A-Z]{2,13}$/', $vat)) {
+        $errors[] = 'ДДС номерът трябва да започва с буквите на държавата и да продължава с цифри, например BG123456789. Ако фирмата няма ДДС номер, оставете полето празно.';
+    }
+    if ($errors) return ['errors' => $errors];
+
+    $data = is_array($current) ? $current : [];
+    $data['needs_invoice']   = true;
+    $data['company_name']    = $company;
+    $data['eik']             = $eik;
+    $data['vat_number']      = $vat;
+    $data['mol']             = $mol;
+    $data['company_address'] = $address;
+    return ['data' => $data];
+}

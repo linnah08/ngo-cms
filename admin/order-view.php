@@ -85,6 +85,7 @@ $is_b2b         = !empty($invoice_data['needs_invoice']);
 
 $success = '';
 $errors  = [];
+$recipient_form = null;   // „Редактирай получателя“: what the admin typed, kept when it has errors
 
 // Messages forwarded back via GET from generate-document.php
 if (!empty($_GET['doc_success'])) {
@@ -174,6 +175,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$id]);
             $order = $stmt->fetch();
             $success = $success ?: trim('Поръчката е обновена. ' . $stock_change['message']);
+        }
+    }
+
+    // Correct the invoice recipient (фирмени данни). The invoice PDF reads it
+    // from orders.invoice_data, so the fix shows on the next „Генерирай отново“,
+    // which keeps the invoice number.
+    if ($action === 'update_invoice_data') {
+        $res = order_invoice_recipient_update(is_array($invoice_data) ? $invoice_data : null, $_POST);
+        if (isset($res['errors'])) {
+            $errors = array_merge($errors, $res['errors']);
+            $recipient_form = array_map(static fn($v) => is_string($v) ? $v : '', array_intersect_key($_POST,
+                array_flip(['company_name', 'eik', 'vat_number', 'mol', 'company_address'])));
+        } else {
+            $pdo->prepare('UPDATE orders SET invoice_data = ?, updated_at = NOW() WHERE id = ?')
+                ->execute([json_encode($res['data'], JSON_UNESCAPED_UNICODE), $id]);
+            $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = ?');
+            $stmt->execute([$id]);
+            $order        = $stmt->fetch();
+            $invoice_data = json_decode($order['invoice_data'] ?? 'null', true);
+            $is_b2b       = !empty($invoice_data['needs_invoice']);
+            $success = isset($docs_by_type['invoice'])
+                ? 'Данните на получателя са запазени. Натиснете „Генерирай отново“ при фактурата, за да се обнови и PDF файлът (номерът остава същият).'
+                : 'Данните на получателя са запазени.';
         }
     }
 
@@ -476,10 +500,10 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 </div>
 
 <?php if ($success): ?>
-  <div class="admin-alert admin-alert--success" style="margin-bottom:1.5rem;"><?= h($success) ?></div>
+  <div class="admin-alert admin-alert--success" role="status" style="margin-bottom:1.5rem;"><?= h($success) ?></div>
 <?php endif; ?>
 <?php foreach ($errors as $e): ?>
-  <div class="admin-alert admin-alert--error" style="margin-bottom:1rem;"><?= h($e) ?></div>
+  <div class="admin-alert admin-alert--error" role="alert" style="margin-bottom:1rem;"><?= h($e) ?></div>
 <?php endforeach; ?>
 
 <?php if ($is_unpaid): ?>
@@ -713,6 +737,44 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <?php if (!empty($invoice_data['vat_number'])): ?> &nbsp;·&nbsp; ДДС №: <?= h($invoice_data['vat_number']) ?><?php endif; ?>
         <?php if (!empty($invoice_data['company_address'])): ?><br><?= h($invoice_data['company_address']) ?><?php endif; ?>
       </div>
+
+      <?php $rcp = $recipient_form ?? (is_array($invoice_data) ? array_map(static fn($v) => is_scalar($v) ? (string) $v : '', $invoice_data) : []); ?>
+      <details style="margin-top:.75rem;"<?= $recipient_form !== null ? ' open' : '' ?>>
+        <summary style="cursor:pointer;font-size:.875rem;color:var(--teal);font-weight:600;min-height:44px;display:flex;align-items:center;">✎ Редактирай получателя</summary>
+        <form method="POST" style="margin-top:.5rem;display:grid;gap:.6rem;">
+          <?= csrf_field() ?>
+          <input type="hidden" name="action" value="update_invoice_data">
+          <p style="margin:0;font-size:.82rem;">Поправете грешка в данните на фирмата, на която е издадена фактурата. Полетата със * са задължителни.</p>
+          <div>
+            <label for="rcp-company_name" style="display:block;font-size:.85rem;font-weight:600;margin-bottom:.2rem;">Име на фирма <span aria-hidden="true">*</span></label>
+            <input type="text" id="rcp-company_name" name="company_name" required aria-required="true" value="<?= h($rcp['company_name'] ?? '') ?>" style="width:100%;min-height:44px;padding:.4rem .55rem;border:1px solid #767676;border-radius:var(--radius);font-size:.9rem;box-sizing:border-box;">
+          </div>
+          <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+            <div style="flex:1;min-width:140px;">
+            <label for="rcp-eik" style="display:block;font-size:.85rem;font-weight:600;margin-bottom:.2rem;">ЕИК / БУЛСТАТ <span aria-hidden="true">*</span></label>
+            <input type="text" id="rcp-eik" name="eik" required aria-required="true" value="<?= h($rcp['eik'] ?? '') ?>" style="width:100%;min-height:44px;padding:.4rem .55rem;border:1px solid #767676;border-radius:var(--radius);font-size:.9rem;box-sizing:border-box;">
+          </div>
+            <div style="flex:1;min-width:140px;">
+            <label for="rcp-vat_number" style="display:block;font-size:.85rem;font-weight:600;margin-bottom:.2rem;">ДДС № (ако има)</label>
+            <input type="text" id="rcp-vat_number" name="vat_number" value="<?= h($rcp['vat_number'] ?? '') ?>" style="width:100%;min-height:44px;padding:.4rem .55rem;border:1px solid #767676;border-radius:var(--radius);font-size:.9rem;box-sizing:border-box;">
+          </div>
+          </div>
+          <div>
+            <label for="rcp-mol" style="display:block;font-size:.85rem;font-weight:600;margin-bottom:.2rem;">МОЛ</label>
+            <input type="text" id="rcp-mol" name="mol" value="<?= h($rcp['mol'] ?? '') ?>" style="width:100%;min-height:44px;padding:.4rem .55rem;border:1px solid #767676;border-radius:var(--radius);font-size:.9rem;box-sizing:border-box;">
+          </div>
+          <div>
+            <label for="rcp-company_address" style="display:block;font-size:.85rem;font-weight:600;margin-bottom:.2rem;">Адрес</label>
+            <input type="text" id="rcp-company_address" name="company_address" value="<?= h($rcp['company_address'] ?? '') ?>" style="width:100%;min-height:44px;padding:.4rem .55rem;border:1px solid #767676;border-radius:var(--radius);font-size:.9rem;box-sizing:border-box;">
+          </div>
+          <div>
+            <button type="submit" class="btn btn--primary" style="min-height:44px;">Запази данните</button>
+          </div>
+          <?php if (isset($docs_by_type['invoice'])): ?>
+          <p style="margin:0;font-size:.82rem;">След запис натиснете „Генерирай отново“ при фактурата — PDF файлът ще се обнови под същия номер.</p>
+          <?php endif; ?>
+        </form>
+      </details>
     </div>
     <?php endif; ?>
 
