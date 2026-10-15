@@ -40,6 +40,10 @@ return [
     ],
 
     // Extra files for Админ → Месечен отчет and the monthly report email.
+    // The csv function may reuse the main report's helpers from
+    // includes/reports/monthly-orders.php: monthly_report_payment_label($order)
+    // (Платена / Върната / Неплатена (издадена фактура)) and
+    // monthly_report_order_lines($order) (an order split into accounting lines).
     'reports' => [
         'partner' => [
             'label'    => 'Отчет за партньора',

@@ -8,8 +8,26 @@ use PHPUnit\Framework\Attributes\Group;
 #[Group('db')]
 final class MonthlyOrdersReportTest extends TestCase
 {
+    private const COL_TYPE   = 2; // Вид
+    private const COL_STATUS = 3; // Статус на плащане
+    private const COL_AMOUNT = 4; // Сума (EUR)
+
     private static ?PDO $pdo = null;
     private static array $order_ids = [];
+
+    /** All data rows (parsed) whose order-number column equals $order_number. */
+    private function findRows(string $csv, string $order_number): array
+    {
+        $rows_csv = ltrim($csv, "\xEF\xBB\xBF");
+        $all_rows = array_map(fn($l) => str_getcsv($l, ',', '"', ''), array_filter(explode("\n", trim($rows_csv))));
+        array_shift($all_rows); // header
+        return array_values(array_filter($all_rows, fn($r) => isset($r[1]) && $r[1] === $order_number));
+    }
+
+    private function findRow(string $csv, string $order_number): ?array
+    {
+        return $this->findRows($csv, $order_number)[0] ?? null;
+    }
 
     public static function setUpBeforeClass(): void
     {
@@ -24,6 +42,13 @@ final class MonthlyOrdersReportTest extends TestCase
         if (!test_db_available()) {
             $this->markTestSkipped('No DB configured — set db.config.php to run DB tests.');
         }
+        // One donation recipient (no site extensions file): donations read "Дарение".
+        $GLOBALS['_om_site_extensions_file'] = sys_get_temp_dir() . '/no-site-ext-' . bin2hex(random_bytes(4)) . '.php';
+    }
+
+    protected function tearDown(): void
+    {
+        unset($GLOBALS['_om_site_extensions_file']);
     }
 
     public static function tearDownAfterClass(): void
@@ -77,8 +102,8 @@ final class MonthlyOrdersReportTest extends TestCase
     {
         $csv = generate_monthly_orders_csv(2026, 4);
         $lines = explode("\n", trim(ltrim($csv, "\xEF\xBB\xBF")));
-        $this->assertStringContainsString('Order Number', $lines[0]);
-        $this->assertStringContainsString('Amount (EUR)', $lines[0]);
+        $this->assertStringContainsString('Номер на поръчка', $lines[0]);
+        $this->assertStringContainsString('Сума (EUR)', $lines[0]);
     }
 
     public function testIncludesPaidOrder(): void
@@ -103,7 +128,7 @@ final class MonthlyOrdersReportTest extends TestCase
         ]);
         $csv = generate_monthly_orders_csv(2026, 4);
         $this->assertStringContainsString('TEST-REFUND-001', $csv);
-        $this->assertStringContainsString('refunded', $csv);
+        $this->assertSame('Върната', $this->findRow($csv, 'TEST-REFUND-001')[self::COL_STATUS]);
     }
 
     public function testExcludesPendingOrder(): void
@@ -139,16 +164,9 @@ final class MonthlyOrdersReportTest extends TestCase
         $csv = generate_monthly_orders_csv(2026, 4);
         $this->assertStringContainsString('TEST-PHYS-001', $csv);
 
-        $rows_csv = ltrim($csv, "\xEF\xBB\xBF");
-        $all_rows = array_map('str_getcsv', array_filter(explode("\n", trim($rows_csv))));
-        $header = array_shift($all_rows);
-        $col_type = array_search('Type', $header);
-        $found_row = null;
-        foreach ($all_rows as $r) {
-            if (isset($r[1]) && $r[1] === 'TEST-PHYS-001') { $found_row = $r; break; }
-        }
+        $found_row = $this->findRow($csv, 'TEST-PHYS-001');
         $this->assertNotNull($found_row, 'Row for TEST-PHYS-001 not found in CSV');
-        $this->assertSame('purchase', $found_row[$col_type]);
+        $this->assertSame('Покупка', $found_row[self::COL_TYPE]);
     }
 
     public function testDonationTypeIncluded(): void
@@ -162,16 +180,46 @@ final class MonthlyOrdersReportTest extends TestCase
         $csv = generate_monthly_orders_csv(2026, 4);
         $this->assertStringContainsString('TEST-DON-001', $csv);
 
-        $rows_csv = ltrim($csv, "\xEF\xBB\xBF");
-        $all_rows = array_map('str_getcsv', array_filter(explode("\n", trim($rows_csv))));
-        $header = array_shift($all_rows);
-        $col_type = array_search('Type', $header);
-        $found_row = null;
-        foreach ($all_rows as $r) {
-            if (isset($r[1]) && $r[1] === 'TEST-DON-001') { $found_row = $r; break; }
-        }
+        $found_row = $this->findRow($csv, 'TEST-DON-001');
         $this->assertNotNull($found_row, 'Row for TEST-DON-001 not found in CSV');
-        $this->assertSame('donation', $found_row[$col_type]);
+        $this->assertSame('Дарение', $found_row[self::COL_TYPE]);
+    }
+
+    public function testMixedOrderSplitsPurchaseAndDonationRows(): void
+    {
+        // Products 40 + shipping 5 + donation add-on 10 = 55 total.
+        $this->insertOrder([
+            'order_number' => 'TEST-MIX-001',
+            'type' => 'physical',
+            'subtotal_eur' => 40.00,
+            'shipping_eur' => 5.00,
+            'total_eur' => 55.00,
+            'items' => json_encode([
+                ['product_id' => 1, 'name_bg' => 'Тениска', 'price_eur' => 40.00, 'quantity' => 1, 'subtotal_eur' => 40.00],
+                ['type' => 'donation', 'amount_eur' => 10.00, 'subtotal_eur' => 10.00],
+            ], JSON_UNESCAPED_UNICODE),
+            'payment_status' => 'paid',
+            'created_at' => '2026-04-22 10:00:00',
+        ]);
+        $rows = $this->findRows(generate_monthly_orders_csv(2026, 4), 'TEST-MIX-001');
+        $this->assertCount(2, $rows, 'Mixed order should split into two rows');
+        $by_type = array_column($rows, self::COL_AMOUNT, self::COL_TYPE);
+        $this->assertSame('45.00', $by_type['Покупка'] ?? null, 'Purchase row = products + shipping');
+        $this->assertSame('10.00', $by_type['Дарение'] ?? null, 'Donation row = donation amount');
+    }
+
+    public function testIssuedButUnpaidInvoiceMarked(): void
+    {
+        $this->insertOrder([
+            'order_number' => 'TEST-PROFORMA-001',
+            'status' => 'new',
+            'payment_method' => 'bank_transfer',
+            'payment_status' => 'paid',
+            'created_at' => '2026-04-23 10:00:00',
+        ]);
+        $row = $this->findRow(generate_monthly_orders_csv(2026, 4), 'TEST-PROFORMA-001');
+        $this->assertNotNull($row);
+        $this->assertSame('Неплатена (издадена фактура)', $row[self::COL_STATUS]);
     }
 
     public function testAmountFormattedToTwoDecimals(): void

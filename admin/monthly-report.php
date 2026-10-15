@@ -49,15 +49,15 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
 <div class="admin-content">
   <h1 class="admin-h1">Месечен отчет</h1>
-  <p style="color:#666;margin-bottom:24px;">Изтеглете CSV с платените и върнати поръчки за избран месец.</p>
+  <p style="color:#666;margin-bottom:24px;">Изтеглете таблица (CSV) за счетоводителя с платените и върнатите поръчки за избран месец. Даренията са на отделни редове — и когато са добавени към покупка, а издадените, но още неплатени фактури са отбелязани.</p>
 
   <form method="post" action="/admin/monthly-report.php">
     <?= csrf_field() ?>
 
     <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
       <div>
-        <label style="display:block;font-weight:600;margin-bottom:4px;">Месец</label>
-        <select name="month" style="padding:8px 12px;border:1px solid #ccc;border-radius:6px;font-size:14px;">
+        <label for="mr-month" style="display:block;font-weight:600;margin-bottom:4px;">Месец</label>
+        <select id="mr-month" name="month" style="padding:8px 12px;border:1px solid #ccc;border-radius:6px;font-size:14px;">
           <?php
           $month_names = [
             1 => 'Януари', 2 => 'Февруари', 3 => 'Март',     4 => 'Април',
@@ -74,8 +74,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       </div>
 
       <div>
-        <label style="display:block;font-weight:600;margin-bottom:4px;">Година</label>
-        <select name="year" style="padding:8px 12px;border:1px solid #ccc;border-radius:6px;font-size:14px;">
+        <label for="mr-year" style="display:block;font-weight:600;margin-bottom:4px;">Година</label>
+        <select id="mr-year" name="year" style="padding:8px 12px;border:1px solid #ccc;border-radius:6px;font-size:14px;">
           <?php for ($y = (int)date('Y'); $y >= 2024; $y--): ?>
             <option value="<?= $y ?>" <?= $y === $default_year ? 'selected' : '' ?>>
               <?= $y ?>

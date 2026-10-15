@@ -46,9 +46,10 @@ if (file_put_contents($tmp, $csv) === false) {
     exit(1);
 }
 
-// Count data rows (subtract BOM header line)
-$lines     = array_filter(explode("\n", trim(ltrim($csv, "\xEF\xBB\xBF"))));
-$row_count = max(0, count($lines) - 1); // exclude header
+// Count orders, not rows: a purchase with a donation add-on is two rows of one order.
+$lines = array_filter(explode("\n", trim(ltrim($csv, "\xEF\xBB\xBF"))));
+array_shift($lines); // header
+$row_count = count(array_unique(array_map(static fn($l) => str_getcsv($l, ',', '"', '')[1] ?? '', $lines)));
 
 $doc_attachments = get_monthly_document_attachments($year, $month, $site_root);
 $cert_count      = count(array_filter($doc_attachments, fn($a) => str_contains($a['name'], 'DC-') || str_contains($a['path'], 'donation_cert')));
