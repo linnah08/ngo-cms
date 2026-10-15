@@ -69,6 +69,7 @@
   "newsletter.err.no_topic": "Please choose at least one topic.",
   "newsletter.err.email": "Invalid email address.",
   "newsletter.err.order": "We could not sign you up from here. Please use the sign-up form at the bottom of the page.",
+  "newsletter.err.session": "This page was open for too long. Please reload it and try again.",
   "newsletter.donate.heading": "Support our cause",
   "newsletter.donate.text": "Every donation helps us continue our work.",
   "newsletter.donate.button": "Donate now",

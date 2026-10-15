@@ -53,7 +53,7 @@ if (!$_is_admin_page) {
               . ' data-cms-en="' . h((string) ($_nlb_saved[$f . '_en'] ?? '')) . '"'; ?>
     <h3 style="color:var(--newsletter-fg,#fff);margin:0 0 .5rem;font-size:1.3rem;" <?= $_nlb_cms('banner_title') ?>><?= h(newsletter_banner_text('title', $lang)) ?></h3>
     <p style="color:var(--newsletter-fg,#fff);margin:0 0 1.5rem;font-size:.95rem;" <?= $_nlb_cms('banner_text') ?>><?= h(newsletter_banner_text('text', $lang)) ?></p>
-    <form method="POST" action="/newsletter/subscribe.php"
+    <form method="POST" action="/newsletter/subscribe.php" id="nlBannerForm"
           style="display:flex;gap:.5rem 1.5rem;justify-content:center;align-items:center;flex-wrap:wrap;text-align:left;">
       <?= csrf_field() ?>
       <input type="hidden" name="lang" value="<?= h($lang) ?>">
@@ -69,8 +69,63 @@ if (!$_is_admin_page) {
         </button>
       </div>
     </form>
+    <?php // The background sign-up's answer lands here, read out by screen readers:
+          // a success politely (role=status), a problem at once (role=alert). Both are
+          // empty until then, so nothing is announced on page load. ?>
+    <div id="nlBannerOk" role="status" tabindex="-1"
+         style="margin:0;font-size:1rem;font-weight:700;color:var(--newsletter-fg,#fff);outline-offset:4px;"></div>
+    <div id="nlBannerErr" role="alert"
+         style="margin:0;font-size:.95rem;"></div>
   </div>
 </section>
+<script>
+// Footer sign-up without leaving the page. Without JavaScript (or if the request
+// fails) the form simply posts as before and the result shows after a reload.
+(function () {
+  var form = document.getElementById('nlBannerForm');
+  var ok   = document.getElementById('nlBannerOk');
+  var err  = document.getElementById('nlBannerErr');
+  if (!form || !ok || !err || !window.fetch || !window.FormData) return;
+  var busy = false;
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (busy) return;
+    busy = true;
+    form.setAttribute('aria-busy', 'true');
+    var data = new FormData(form);
+    data.append('ajax', '1');
+    fetch(form.action, {
+      method: 'POST', body: data, credentials: 'same-origin',
+      headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(function (r) { return r.json(); }).then(function (res) {
+      busy = false;
+      form.removeAttribute('aria-busy');
+      if (res && res.ok) {
+        err.textContent = '';
+        err.removeAttribute('style');
+        err.style.margin = '0';
+        form.style.display = 'none';
+        ok.textContent = res.message || '';
+        ok.style.margin = '1rem 0 0';
+        // The button the visitor pressed is gone — keep their place on the answer.
+        ok.focus();
+      } else {
+        err.textContent = (res && res.message) || '';
+        err.style.cssText = 'margin:1rem auto 0;max-width:30rem;padding:.6rem 1rem;border-radius:4px;'
+          + 'background:#fdf0ef;color:#a4243d;font-size:.95rem;font-weight:600;';
+        var target = res && res.field === 'email' ? form.querySelector('input[name="email"]')
+                   : res && res.field === 'topics' ? form.querySelector('.nl-topics input[type="checkbox"]')
+                   : null;
+        if (target) target.focus();
+      }
+    }).catch(function () {
+      // Network trouble or a non-JSON reply: fall back to the normal full-page post.
+      busy = false;
+      form.submit();
+    });
+  });
+})();
+</script>
 <?php endif; ?>
 <footer class="site-footer">
   <div class="container">
