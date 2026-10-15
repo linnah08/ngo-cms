@@ -9,6 +9,14 @@ if (!defined('OM_CPAGE_ROUTED') && ($_SERVER['REDIRECT_STATUS'] ?? '') === '404'
     require dirname(__DIR__) . '/page.php';
     return;
 }
+// The site's own redirects: config.php applies them on every page, but an
+// address no file serves comes straight here (and a site may keep an older config.php).
+try {
+    require_once dirname(__DIR__) . '/includes/site_extensions.php';
+    site_redirects_apply();
+} catch (Throwable $e) {
+    error_log('404 redirects: ' . $e->getMessage());
+}
 http_response_code(404);
 $code       = 404;
 $title      = 'Страницата не е намерена';

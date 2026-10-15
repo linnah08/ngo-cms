@@ -91,4 +91,15 @@ return [
     // texts edited on the page). If it fails, the plain header shows. A theme
     // preset in includes/themes-site.php may name it instead ('shop_header').
     'shop_header' => 'templates/site/shop-header.php',
+
+    // Permanent (301) redirects of the site's own — no update overwrites them, so
+    // there is no need to edit the shared .htaccess. Both sides are paths on this
+    // site (never another address). A key ending in * catches everything under
+    // it; a target ending in * keeps the rest of the address. The query string
+    // is kept. The admin, /api/ and the installer are never redirected.
+    'redirects' => [
+        '/en/donate/' => '/en/donation/',
+        '/blog/*'     => '/novini/*',
+        '/old-shop/*' => '/magazin/',
+    ],
 ];

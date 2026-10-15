@@ -826,6 +826,11 @@ function admin_can_sign(): bool {
     return admin_logged_in() && (admin_user()['email'] ?? '') === SIGNING_ADMIN_EMAIL;
 }
 
+// The site's own redirects (includes/site-extensions.php 'redirects'), which
+// no update overwrites — so a site never has to edit the shared .htaccess.
+require_once __DIR__ . '/includes/site_extensions.php';
+site_redirects_apply();
+
 // Going live: a new site is closed to visitors (a "Скоро отваряме" page) until
 // the admin presses „Пусни сайта“ on the dashboard. See includes/launch.php.
 require_once __DIR__ . '/includes/launch.php';

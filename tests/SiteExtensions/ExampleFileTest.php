@@ -24,6 +24,7 @@ final class ExampleFileTest extends TestCase
         $this->assertSame(array_keys($raw['document_types']), array_keys(site_document_types()));
         $this->assertSame(array_keys($raw['admin_nav']), array_keys(site_admin_nav()));
         $this->assertSame(['/test/', '/en/quiz/', '/kampaniya-2026/'], site_sitemap_paths());
+        $this->assertSame(array_keys($raw['redirects']), array_keys(site_redirects()));
         $this->assertSame('templates/site/footer-banner.php', $raw['footer_partial'], 'a file each site writes itself; ngo-cms has none');
     }
 

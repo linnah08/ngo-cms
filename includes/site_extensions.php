@@ -16,6 +16,7 @@
  *   'footer_partial' => its own PHP file(s) shown above the footer (site_footer_partials())
  *   'sitemap_urls'   => extra addresses for /sitemap.xml (site_sitemap_paths())
  *   'shop_header'    => its own PHP file in place of the shop's header (site_shop_header_file())
+ *   'redirects'      => its own permanent redirects (site_redirects())
  *
  * The file returns an array with any of those keys. Each entry is checked; a
  * broken one is logged and skipped — a mistake in that file must never take the
@@ -177,6 +178,91 @@ function site_shop_header_file(): ?string
     $file = site_extension_php_file($rel);
     if ($file === null) error_log('site_extensions: shop_header ' . (is_string($rel) ? "'$rel'" : '') . ' is not a .php file inside the site — the built-in header is shown');
     return $file;
+}
+
+// ── Redirects ────────────────────────────────────────────────────────────────
+
+/**
+ * The site's own permanent (301) redirects: 'redirects' => ['/old/' => '/new/'].
+ * Both sides are paths on this site — never another host. A key ending in *
+ * matches every address that starts with it ('/blog/*' => '/novini/'); when the
+ * target ends in * too, the rest of the address is kept ('/blog/*' => '/novini/*').
+ * An exact key also matches without (or with) its trailing slash.
+ * Returns [from => to], checked; broken entries are logged and skipped.
+ */
+function site_redirects(): array
+{
+    $raw = site_extensions()['redirects'] ?? [];
+    if (!is_array($raw)) { error_log("site_extensions: 'redirects' is not a list — ignored"); return []; }
+    $out = [];
+    foreach ($raw as $from => $to) {
+        $from = (string) $from;
+        $wild = str_ends_with($from, '*');
+        $ok = site_extension_local_path($wild ? substr($from, 0, -1) : $from) !== null
+            && !str_contains($wild ? substr($from, 0, -1) : $from, '*')
+            && is_string($to)
+            && site_extension_local_path(str_ends_with($to, '*') && $wild ? substr($to, 0, -1) : $to) !== null
+            && !str_contains(rtrim($to, '*'), '*') && (!str_ends_with($to, '*') || $wild)
+            && $from !== $to;
+        if (!$ok) { error_log("site_extensions: redirect '$from' needs a path on this site on both sides — skipped"); continue; }
+        $out[$from] = $to;
+    }
+    return $out;
+}
+
+/**
+ * Where a request for $requestUri is sent by the site's redirects (the query
+ * string kept), or null. Exact addresses win over * ones; the longest * wins.
+ */
+function site_redirect_target(string $requestUri): ?string
+{
+    $list = site_redirects();
+    if (!$list) return null;
+    $raw_path = (string) preg_replace('/[?#].*$/s', '', $requestUri);
+    $path = rawurldecode($raw_path === '' ? '/' : $raw_path);
+    $qs   = (string) (parse_url('http://x' . (str_starts_with($requestUri, '/') ? $requestUri : '/'), PHP_URL_QUERY) ?? '');
+    $trim = static fn(string $p): string => $p === '/' ? '/' : rtrim($p, '/');
+
+    $target = null;
+    foreach ($list as $from => $to) {
+        if (!str_ends_with($from, '*') && $trim(rawurldecode($from)) === $trim($path)) { $target = $to; break; }
+    }
+    if ($target === null) {
+        $best = -1;
+        foreach ($list as $from => $to) {
+            if (!str_ends_with($from, '*')) continue;
+            $prefix = rawurldecode(substr($from, 0, -1));
+            if (strlen($prefix) > $best && str_starts_with($path, $prefix)) {
+                $best   = strlen($prefix);
+                $target = str_ends_with($to, '*') ? substr($to, 0, -1) . substr($path, strlen($prefix)) : $to;
+            }
+        }
+    }
+    // The finished address must still be a path here (the kept rest comes from the visitor).
+    if ($target === null || site_extension_local_path($target) === null) return null;
+    if ($trim(rawurldecode((string) strtok($target, '?#'))) === $trim($path)) return null;   // already there
+    $target = (string) preg_replace_callback('/[^\x21-\x7E]/', static fn($m) => rawurlencode($m[0]), $target);
+    if ($qs !== '' && !str_contains($target, '?')) $target .= '?' . $qs;
+    return $target;
+}
+
+/**
+ * Send the visitor on when the site has a redirect for this address. Only for
+ * page views (GET/HEAD) and never for the admin, the APIs or the installer, so
+ * a broad * rule cannot lock anyone out. Called from config.php and from the
+ * 404 page (for a site that kept an older config.php).
+ */
+function site_redirects_apply(?string $requestUri = null, ?string $method = null, bool $cli = PHP_SAPI === 'cli'): void
+{
+    if ($cli) return;
+    $requestUri ??= (string) ($_SERVER['REQUEST_URI'] ?? '/');
+    $method     ??= strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+    if (!in_array($method, ['GET', 'HEAD'], true)) return;
+    if (preg_match('#^/(admin|api|install)(/|$|\?)#', $requestUri)) return;
+    $to = site_redirect_target($requestUri);
+    if ($to === null || headers_sent()) return;
+    header('Location: ' . $to, true, 301);
+    exit;
 }
 
 // ── Admin menu ───────────────────────────────────────────────────────────────
