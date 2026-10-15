@@ -180,51 +180,11 @@ if (is_dir($articles_dir)) {
         // The rest is social posts — not shown while „Социални мрежи“ is off (Admin → Модули).
         if (!module_enabled_with_needs('social')) continue;
 
-        // Social channels via *_scheduled_at (Europe/Sofia datetime-local strings)
-        foreach ([
-            'fb_scheduled_at'      => 'fb',
-            'insta_scheduled_at'   => 'ig',
-            'insta_story_scheduled_at' => 'igs',
-            'linkedin_scheduled_at' => 'li',
-        ] as $field => $ch) {
-            if (empty($a[$field]) || $a[$field] === 'now') continue;
-            try {
-                $dt = new DateTimeImmutable($a[$field], $tz);
-                $d  = $dt->format('Y-m-d');
-                $t  = $dt->format('H:i');
-                if (isset($calendar[$d])) {
-                    $calendar[$d][] = ['ch' => $ch, 'title' => $title, 'time' => $t, 'slug' => $slug];
-                }
-            } catch (Exception $e) { /* skip malformed date */ }
-        }
-
-        // Published-now FB/IG posts: scheduled_at='now', actual time stored in *_due_at (UTC)
-        foreach ([
-            'fb_scheduled_at'    => ['fb_due_at',    'fb'],
-            'insta_scheduled_at' => ['insta_due_at', 'ig'],
-            'insta_story_scheduled_at' => ['insta_story_due_at', 'igs'],
-        ] as $sched_field => [$due_field, $ch]) {
-            if (($a[$sched_field] ?? '') !== 'now' || empty($a[$due_field])) continue;
-            try {
-                $dt = (new DateTimeImmutable($a[$due_field]))->setTimezone($tz);
-                $d  = $dt->format('Y-m-d');
-                $t  = $dt->format('H:i');
-                if (isset($calendar[$d])) {
-                    $calendar[$d][] = ['ch' => $ch, 'title' => $title, 'time' => $t, 'slug' => $slug];
-                }
-            } catch (Exception $e) { /* skip malformed date */ }
-        }
-
-        // Published LinkedIn posts (linkedin_posted_at)
-        if (!empty($a['linkedin_posted_at'])) {
-            try {
-                $dt = new DateTimeImmutable($a['linkedin_posted_at'], $tz);
-                $d  = $dt->format('Y-m-d');
-                $t  = $dt->format('H:i');
-                if (isset($calendar[$d])) {
-                    $calendar[$d][] = ['ch' => 'li', 'title' => $title, 'time' => $t, 'slug' => $slug];
-                }
-            } catch (Exception $e) { /* skip malformed date */ }
+        // Scheduled and published social posts (rules + tests: article_social_calendar_entries()).
+        foreach (article_social_calendar_entries($a, $tz) as $e) {
+            if (isset($calendar[$e['date']])) {
+                $calendar[$e['date']][] = ['ch' => $e['ch'], 'title' => $title, 'time' => $e['time'], 'slug' => $slug];
+            }
         }
     }
 }

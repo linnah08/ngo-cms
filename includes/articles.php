@@ -277,6 +277,47 @@ function article_editor_url_after_save(string $slug, string $autosave_key): stri
     return '/admin/article-edit.php?slug=' . rawurlencode($slug) . '&_asclear=' . rawurlencode($autosave_key);
 }
 
+/**
+ * The article's social posts for the dashboard calendar (Начало), as
+ * [['date' => 'Y-m-d', 'time' => 'H:i', 'ch' => fb|ig|igs|li], ...] in $tz.
+ *
+ * - A scheduled post: *_scheduled_at, a Europe/Sofia datetime-local string.
+ * - A post published "now": *_scheduled_at is 'now' and the real time is in
+ *   *_due_at (UTC) — for LinkedIn as well as Facebook and Instagram.
+ * - A LinkedIn post marked as published by hand: linkedin_posted_at, unless the
+ *   "now" entry above already shows that same post.
+ * Malformed dates are skipped.
+ */
+function article_social_calendar_entries(array $a, DateTimeZone $tz): array {
+    $out = [];
+    $add = static function (string $value, string $ch, ?DateTimeZone $source) use ($tz, &$out): void {
+        try {
+            $dt = $source ? new DateTimeImmutable($value, $source) : (new DateTimeImmutable($value))->setTimezone($tz);
+            $out[] = ['date' => $dt->format('Y-m-d'), 'time' => $dt->format('H:i'), 'ch' => $ch];
+        } catch (Exception $e) { /* skip malformed date */ }
+    };
+    $channels = [
+        'fb'  => ['fb_scheduled_at', 'fb_due_at'],
+        'ig'  => ['insta_scheduled_at', 'insta_due_at'],
+        'igs' => ['insta_story_scheduled_at', 'insta_story_due_at'],
+        'li'  => ['linkedin_scheduled_at', 'linkedin_due_at'],
+    ];
+    foreach ($channels as $ch => [$sched, $due]) {
+        $value = is_string($a[$sched] ?? null) ? $a[$sched] : '';
+        if ($value === '') continue;
+        if ($value !== 'now') {
+            $add($value, $ch, $tz);
+        } elseif (is_string($a[$due] ?? null) && $a[$due] !== '') {
+            $add($a[$due], $ch, null);
+        }
+    }
+    $li_now = ($a['linkedin_scheduled_at'] ?? '') === 'now' && !empty($a['linkedin_due_at']);
+    if (is_string($a['linkedin_posted_at'] ?? null) && $a['linkedin_posted_at'] !== '' && !$li_now) {
+        $add($a['linkedin_posted_at'], 'li', $tz);
+    }
+    return $out;
+}
+
 // ── Old article addresses ───────────────────────────────────────────────────────
 
 /**
