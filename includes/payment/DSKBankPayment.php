@@ -103,14 +103,21 @@ class DSKBankPayment
      *
      * @param  string $dskOrderId  The UUID returned by register() / sent in callback
      * @return array  Full API response; key fields: orderStatus (int), authRefNum (string)
+     * @throws RuntimeException when the bank answers with an error (unknown order id,
+     *         wrong credentials…) — such a reply carries no order data to act on.
      */
     public function getStatus(string $dskOrderId): array
     {
-        return $this->post('getOrderStatusExtended.do', [
+        $data = $this->post('getOrderStatusExtended.do', [
             'userName' => $this->merchant,
             'password' => $this->password,
             'orderId'  => $dskOrderId,
         ]);
+        $code = (string)($data['errorCode'] ?? '');
+        if ($code !== '' && $code !== '0') {
+            throw new RuntimeException('DSK Bank status error ' . $code . ': ' . ($data['errorMessage'] ?? json_encode($data)));
+        }
+        return $data;
     }
 
     /**
