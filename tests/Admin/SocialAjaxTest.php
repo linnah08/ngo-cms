@@ -213,9 +213,13 @@ final class SocialAjaxTest extends TestCase
 
     public function testDashboardCalendarShowsScheduledStories(): void
     {
+        // The rules live in article_social_calendar_entries() (SocialCalendarEntriesTest).
         $src = file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/admin/dashboard.php');
-        $this->assertStringContainsString("'insta_story_scheduled_at' => 'igs'", $src);
-        $this->assertStringContainsString("'insta_story_scheduled_at' => ['insta_story_due_at', 'igs']", $src);
+        $this->assertStringContainsString('article_social_calendar_entries($a, $tz)', $src);
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/articles.php';
+        $tz = new DateTimeZone('Europe/Sofia');
+        $this->assertSame('igs', article_social_calendar_entries(['insta_story_scheduled_at' => '2026-10-20T09:00'], $tz)[0]['ch'] ?? null);
+        $this->assertSame('igs', article_social_calendar_entries(['insta_story_scheduled_at' => 'now', 'insta_story_due_at' => '2026-10-20T06:00:00Z'], $tz)[0]['ch'] ?? null);
     }
 
     public function testEmojiPickerIsReachableFromInlineHandlers(): void
