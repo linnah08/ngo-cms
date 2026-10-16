@@ -128,10 +128,10 @@ final class HomeRenderTest extends TestCase
     public function test_a_stored_teal_background_outside_the_cta_block_renders_as_the_default(): void
     {
         $html = $this->render([$this->s('text_image', ['heading' => ['bg' => 'Х', 'en' => ''], 'background' => 'teal'])]);
-        $this->assertStringNotContainsString('section--teal', $html);
+        $this->assertStringNotContainsString('class="section section--teal', $html);
         $html = $this->render([$this->s('mission', ['title' => ['bg' => 'Х', 'en' => ''], 'background' => 'teal'])]);
-        $this->assertStringNotContainsString('section--teal', $html);
-        $this->assertStringContainsString('section--grey', $html);
+        $this->assertStringNotContainsString('class="section section--teal', $html);
+        $this->assertStringContainsString('class="section section--grey', $html);
     }
 
     public function test_cta_on_teal_uses_solid_white_text_and_white_buttons(): void
@@ -174,5 +174,14 @@ final class HomeRenderTest extends TestCase
     {
         $html = $this->render([$this->s('cta', []), $this->s('richtext', [])]);
         $this->assertSame(1, substr_count($html, 'id="home-sections-css"'));
+    }
+
+    public function test_blocks_on_the_same_background_do_not_double_the_gap(): void
+    {
+        $css = home_shared_head();
+        foreach (['grey', 'teal', 'warm'] as $bg) {
+            $this->assertStringContainsString(".section--$bg+.section--$bg", $css);
+        }
+        $this->assertMatchesRegularExpression('/\.section:not\(\.section--grey\):not\(\.section--teal\):not\(\.section--warm\)\+\.section:not\(\.section--grey\):not\(\.section--teal\):not\(\.section--warm\)[^{]*\{padding-top:0\}/', $css);
     }
 }

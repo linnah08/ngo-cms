@@ -132,6 +132,10 @@ function home_shared_head(): string {
 <style id="home-sections-css">
 .home-video__play:focus-visible{outline:4px solid #fff;outline-offset:-8px;box-shadow:inset 0 0 0 8px #000}
 .home-rich>*:first-child{margin-top:0}.home-rich>*+*{margin-top:1rem}
+/* Two blocks in a row on the same background read as one band: the second drops its
+   top padding, so the gap between them is one block's padding, not two. */
+.section:not(.section--grey):not(.section--teal):not(.section--warm)+.section:not(.section--grey):not(.section--teal):not(.section--warm),
+.section--grey+.section--grey,.section--teal+.section--teal,.section--warm+.section--warm{padding-top:0}
 /* Single-product spotlight (templates/home/product-spotlight.php). A site theme
    stylesheet restyles it without touching this shared file: set the --spot-* variables
    on .home-spot, or override a part with one extra class (.home-spot .home-spot__title). */
