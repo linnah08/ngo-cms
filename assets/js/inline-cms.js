@@ -12,6 +12,7 @@ window.OmCMS = (function () {
   // ── Edit mode ────────────────────────────────────────────────────────────
 
   function toggleEdit() {
+    if (_framing) _endFraming(false);
     editMode = !editMode;
     document.body.classList.toggle('om-edit-mode', editMode);
 
@@ -30,6 +31,14 @@ window.OmCMS = (function () {
   function _activateEditables() {
     document.querySelectorAll('[data-cms-field]').forEach(function (el) {
       if (el.dataset.cmsType === 'richtext') return; // TinyMCE handles these
+      // A photo is changed through its dialog, never typed into: a typed-in wrap marked the
+      // image dirty with its HTML on blur. It acts as a button instead, so keys reach it too.
+      if (el.classList.contains('om-img-wrap')) {
+        el.setAttribute('tabindex', '0');
+        el.setAttribute('role', 'button');
+        el.setAttribute('aria-label', 'Смени или нагласи снимката');
+        return;
+      }
       el.setAttribute('contenteditable', 'true');
       el.addEventListener('blur', _onBlur);
     });
@@ -40,6 +49,11 @@ window.OmCMS = (function () {
     document.querySelectorAll('[data-cms-field]').forEach(function (el) {
       el.removeAttribute('contenteditable');
       el.removeEventListener('blur', _onBlur);
+    });
+    document.querySelectorAll('.om-img-wrap[role="button"]').forEach(function (el) {
+      el.removeAttribute('tabindex');
+      el.removeAttribute('role');
+      el.removeAttribute('aria-label');
     });
     // Destroy TinyMCE inline instances
     if (window.tinymce) {
@@ -172,7 +186,12 @@ window.OmCMS = (function () {
     if (wrap.dataset.omImgBound) return;
     wrap.dataset.omImgBound = '1';
     wrap.addEventListener('click', function () {
-      if (!editMode) return;
+      if (!editMode || _framing) return;
+      _showImageOptions(wrap);
+    });
+    wrap.addEventListener('keydown', function (e) {
+      if (!editMode || _framing || (e.key !== 'Enter' && e.key !== ' ')) return;
+      e.preventDefault();
       _showImageOptions(wrap);
     });
   }
@@ -204,7 +223,29 @@ window.OmCMS = (function () {
     btnCancel.style.cssText = 'display:block;width:100%;padding:8px 16px;border-radius:8px;border:none;background:transparent;font-size:13px;color:#666;cursor:pointer;text-align:center';
     btnCancel.textContent = 'Cancel';
 
-    function close() { document.body.removeChild(overlay); }
+    // Blocks that print data-om-frame (templates/home/*) can also be framed on the page.
+    var btnFrame = null;
+    if (wrap.hasAttribute('data-om-frame') && wrap.closest('[data-om-fbox]')) {
+      btnFrame = document.createElement('button');
+      btnFrame.style.cssText = btnUpload.style.cssText;
+      btnFrame.textContent = '\uD83C\uDFAF\u2002Нагласи снимката';
+      btnUpload.style.marginBottom = '8px';
+      btnFrame.addEventListener('click', function () { close(); _startFraming(wrap); });
+    }
+
+    function close() {
+      document.removeEventListener('keydown', onKey, true);
+      if (overlay.parentNode) document.body.removeChild(overlay);
+    }
+    function cancel() { close(); if (wrap.hasAttribute('tabindex')) wrap.focus(); }
+    // Keyboard: Esc closes, Tab stays inside the dialog.
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); cancel(); return; }
+      if (e.key !== 'Tab') return;
+      var f = box.querySelectorAll('button'), first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
 
     btnLib.addEventListener('click', function () { close(); _openLibraryPicker(wrap); });
     btnUpload.addEventListener('click', function () {
@@ -218,15 +259,22 @@ window.OmCMS = (function () {
       };
       input.click();
     });
-    btnCancel.addEventListener('click', close);
-    overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+    btnCancel.addEventListener('click', cancel);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) cancel(); });
 
+    title.id = 'om-img-options-title';
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-labelledby', title.id);
     box.appendChild(title);
     box.appendChild(btnLib);
     box.appendChild(btnUpload);
+    if (btnFrame) box.appendChild(btnFrame);
     box.appendChild(btnCancel);
     overlay.appendChild(box);
     document.body.appendChild(overlay);
+    document.addEventListener('keydown', onKey, true);
+    btnLib.focus();
   }
 
   function _openLibraryPicker(wrap) {
@@ -309,6 +357,7 @@ window.OmCMS = (function () {
 
   function _applyImagePath(path, wrap) {
     const img = wrap.querySelector('img');
+    if (img && img.getAttribute('src') !== path) _recentreFrame(wrap);
     if (img) img.src = path;
     // Image paths are language-neutral — mark both languages dirty
     markDirty(wrap.dataset.cmsSection, wrap.dataset.cmsField, 'bg', path, wrap);
@@ -331,6 +380,340 @@ window.OmCMS = (function () {
         _applyImagePath(data.path, wrap);
       })
       .catch(function () { alert('Upload failed'); });
+  }
+
+  // ── Photo framing ("Нагласи снимката") ────────────────────────────────────
+  // A photo block (templates/home/hero|mission|text_image.php) marks the row
+  // (data-om-fgrid), the photo's frame (data-om-fbox) and, on its .om-img-wrap, the
+  // stored frame as JSON (data-om-frame, '' for the block's normal look). While the
+  // editor runs it paints inline styles; "Готово" keeps them and marks image_frame
+  // dirty, so the frame is saved with the page's other changes. Limits and meaning of
+  // w/r/x/y/z: HOME_FRAME_LIMITS in includes/home.php.
+
+  var FRAME_LIMITS = { w: [35, 65], r: [0.5, 2], x: [0, 100], y: [0, 100], z: [1, 3] };
+  var _framing = null;
+
+  function _fClamp(k, v) {
+    var l = FRAME_LIMITS[k];
+    return Math.min(l[1], Math.max(l[0], v));
+  }
+
+  function _readFrame(wrap) {
+    var f = null;
+    try { f = JSON.parse(wrap.getAttribute('data-om-frame') || 'null'); } catch (e) { return null; }
+    if (!f || typeof f !== 'object') return null;
+    var out = {};
+    for (var k in FRAME_LIMITS) {
+      if (typeof f[k] !== 'number' || !isFinite(f[k])) return null;
+      out[k] = _fClamp(k, f[k]);
+    }
+    return out;
+  }
+
+  // Width of the row's two columns together (the gap left out); 0 when the row is stacked.
+  function _rowWidth(grid) {
+    if (!grid) return 0;
+    var cols = getComputedStyle(grid).gridTemplateColumns.split(' ')
+      .map(parseFloat).filter(function (n) { return n > 0; });
+    return cols.length >= 2 ? cols[0] + cols[1] : 0;
+  }
+
+  // How far (px) the photo reaches past its frame on each side, at the current zoom.
+  function _overflow(st) {
+    var bw = st.box.clientWidth, bh = st.box.clientHeight;
+    var nw = st.img.naturalWidth || bw, nh = st.img.naturalHeight || bh;
+    var s = Math.max(bw / nw, bh / nh) * st.frame.z;
+    return { x: nw * s - bw, y: nh * s - bh };
+  }
+
+  // The frame the block shows right now, measured, for a block that has none stored.
+  function _measureFrame(st) {
+    var b = st.box.getBoundingClientRect(), row = _rowWidth(st.grid);
+    return {
+      w: row ? _fClamp('w', b.width / row * 100) : 50,
+      r: _fClamp('r', b.height ? b.width / b.height : 1),
+      x: 50, y: 50, z: 1
+    };
+  }
+
+  function _paintFrame(st) {
+    var fr = st.frame;
+    if (st.styleEl) st.styleEl.disabled = true;   // inline styles carry the look while editing
+    if (!fr) {                                     // the block's normal look
+      st.box.style.aspectRatio = '';
+      st.box.style.maxHeight = '';
+      st.wrap.style.cssText = '';
+      st.img.style.cssText = st.natural ? 'width:100%;height:auto;display:block;' : '';
+      if (st.grid) st.grid.style.gridTemplateColumns = st.natural ? '1fr 1fr' : '';
+      st.zoom.value = '1';
+      return;
+    }
+    var pos = fr.x.toFixed(1) + '% ' + fr.y.toFixed(1) + '%';
+    st.box.style.aspectRatio = String(fr.r.toFixed(3));
+    st.box.style.maxHeight = '90vh';
+    st.wrap.style.cssText = 'display:block;width:100%;height:100%;';
+    st.img.style.cssText = 'display:block;width:100%;height:100%;object-fit:cover;'
+      + 'object-position:' + pos + ';transform:scale(' + fr.z.toFixed(3) + ');transform-origin:' + pos + ';';
+    if (st.grid && _rowWidth(st.grid)) {
+      var w = Math.round(fr.w), a = 'minmax(0,' + w + 'fr)', b = 'minmax(0,' + (100 - w) + 'fr)';
+      st.grid.style.gridTemplateColumns = st.first ? a + ' ' + b : b + ' ' + a;
+    }
+    st.zoom.value = String(fr.z);
+  }
+
+  function _frameSummary(fr) {
+    if (!fr) return 'Снимката ще е в обичайния си вид.';
+    var shape = fr.r < 0.95 ? 'изправена' : (fr.r > 1.05 ? 'легнала' : 'квадратна');
+    return 'Снимката заема ' + Math.round(fr.w) + '% от ширината, форма: ' + shape
+      + ', увеличение ' + Math.round(fr.z * 100) + '%.';
+  }
+
+  // Said once things settle, not on every step of a drag or key repeat.
+  function _announceFrame(st) {
+    clearTimeout(st.announceTimer);
+    st.announceTimer = setTimeout(function () { st.status.textContent = _frameSummary(st.frame); }, 350);
+  }
+
+  function _frameButton(label, primary) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.style.cssText = 'min-height:44px;min-width:44px;padding:0 16px;border-radius:8px;font:inherit;cursor:pointer;'
+      + (primary ? 'border:1px solid #6d28d9;background:#6d28d9;color:#fff;font-weight:600;'
+                 : 'border:1px solid #9ca3af;background:#fff;color:#1a1a2e;');
+    return b;
+  }
+
+  function _startFraming(wrap) {
+    var box = wrap.closest('[data-om-fbox]'), img = wrap.querySelector('img');
+    if (_framing || !box || !img) return;
+    var key = box.getAttribute('data-om-fbox');
+    var st = {
+      wrap: wrap, box: box, img: img,
+      grid: document.querySelector('[data-om-fgrid="' + key + '"]'),
+      styleEl: document.querySelector('style[data-om-frame-css="' + key + '"]'),
+      natural: wrap.hasAttribute('data-om-frame-natural'),
+      first: wrap.getAttribute('data-om-frame-handle') === 'right',   // photo is the row's first column
+      saved: null, frame: null, announceTimer: 0
+    };
+    st.saved = {
+      box: box.style.cssText, wrap: wrap.style.cssText, img: img.style.cssText,
+      grid: st.grid ? st.grid.style.cssText : '', css: st.styleEl ? st.styleEl.disabled : false
+    };
+    st.frame = _readFrame(wrap) || _measureFrame(st);
+
+    // On the photo: a layer to drag it by, and the resize corner on the side facing the text.
+    st.savedPos = box.style.position;
+    if (getComputedStyle(box).position === 'static') box.style.position = 'relative';
+    var layer = document.createElement('div');
+    layer.setAttribute('aria-hidden', 'true');   // the keyboard way is the panel below
+    layer.style.cssText = 'position:absolute;inset:0;z-index:5;cursor:move;touch-action:none;'
+      + 'outline:3px dashed #6d28d9;outline-offset:-3px;';
+    var handle = document.createElement('div');
+    var left = !st.first;
+    handle.style.cssText = 'position:absolute;bottom:0;' + (left ? 'left:0;' : 'right:0;')
+      + 'width:44px;height:44px;background:#6d28d9;color:#fff;display:flex;align-items:center;justify-content:center;'
+      + 'font-size:22px;line-height:1;cursor:' + (left ? 'nesw' : 'nwse') + '-resize;'
+      + 'border-radius:' + (left ? '0 10px 0 0' : '10px 0 0 0') + ';';
+    handle.textContent = left ? '◣' : '◢';
+    layer.appendChild(handle);
+    box.appendChild(layer);
+    st.hint = wrap.querySelector('.om-img-overlay');   // "📷 Replace" would sit over the photo
+    if (st.hint) st.hint.style.display = 'none';
+
+    layer.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      if (!st.frame) st.frame = _measureFrame(st);
+      layer.setPointerCapture(e.pointerId);
+      var resize = e.target === handle;
+      var b = box.getBoundingClientRect();
+      var d = { x: e.clientX, y: e.clientY, w: b.width, h: b.height, row: _rowWidth(st.grid),
+                f: Object.assign({}, st.frame), over: _overflow(st) };
+      function move(ev) {
+        var dx = ev.clientX - d.x, dy = ev.clientY - d.y, fr = st.frame;
+        if (resize) {
+          var wPx = d.w + (left ? -dx : dx);
+          fr.w = d.row ? _fClamp('w', wPx / d.row * 100) : d.f.w;
+          var realW = d.row ? fr.w / 100 * d.row : d.w;
+          var hPx = Math.max(120, Math.min(window.innerHeight * 0.9, d.h + dy));
+          fr.r = _fClamp('r', realW / hPx);
+        } else {
+          // Dragging the photo right shows more of its left side.
+          if (d.over.x > 0) fr.x = _fClamp('x', d.f.x - dx / d.over.x * 100);
+          if (d.over.y > 0) fr.y = _fClamp('y', d.f.y - dy / d.over.y * 100);
+        }
+        _paintFrame(st);
+      }
+      function up() {
+        layer.removeEventListener('pointermove', move);
+        layer.removeEventListener('pointerup', up);
+        layer.removeEventListener('pointercancel', up);
+        _announceFrame(st);
+      }
+      layer.addEventListener('pointermove', move);
+      layer.addEventListener('pointerup', up);
+      layer.addEventListener('pointercancel', up);
+    });
+
+    // The panel: the same controls for keyboard and screen-reader users, plus the help.
+    var bar = document.createElement('div');
+    bar.id = 'om-frame-panel';
+    bar.setAttribute('role', 'dialog');
+    bar.setAttribute('aria-labelledby', 'om-frame-title');
+    bar.setAttribute('aria-describedby', 'om-frame-help');
+    bar.tabIndex = -1;
+    // Beside the photo, on the text's side, so it does not cover what is being framed.
+    bar.style.cssText = 'position:fixed;bottom:16px;' + (st.first ? 'right:16px;' : 'left:16px;') + 'z-index:200001;'
+      + 'width:min(400px,calc(100vw - 32px));box-sizing:border-box;padding:16px;border-radius:12px;'
+      + 'background:#fff;color:#1a1a2e;box-shadow:0 8px 32px rgba(0,0,0,.3);'
+      + 'font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;';
+    var title = document.createElement('p');
+    title.id = 'om-frame-title';
+    title.style.cssText = 'margin:0 0 4px;font-weight:600;font-size:15px;';
+    title.textContent = 'Нагласяне на снимката';
+    var help = document.createElement('p');
+    help.id = 'om-frame-help';
+    help.style.cssText = 'margin:0 0 12px;font-size:13px;color:#4b5563;';
+    help.textContent = 'Влачете снимката, за да изберете коя част да се вижда. Влачете лилавия ъгъл, '
+      + 'за да я направите по-широка или по-тясна, по-висока или по-ниска. С клавиатурата: стрелките '
+      + 'местят снимката, Shift + стрелките променят размера, + и − я увеличават и намаляват.';
+
+    var zoomRow = document.createElement('div');
+    zoomRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px;';
+    var zoomLabel = document.createElement('label');
+    zoomLabel.htmlFor = 'om-frame-zoom';
+    zoomLabel.textContent = 'Увеличение';
+    zoomLabel.style.cssText = 'font-size:13px;white-space:nowrap;text-transform:none;letter-spacing:normal;margin:0;color:#1a1a2e;';
+    var zOut = _frameButton('−');
+    zOut.setAttribute('aria-label', 'Намали увеличението');
+    var zoom = document.createElement('input');
+    zoom.type = 'range'; zoom.id = 'om-frame-zoom';
+    zoom.min = '1'; zoom.max = '3'; zoom.step = '0.05';
+    zoom.style.cssText = 'flex:1;min-width:0;min-height:44px;accent-color:#6d28d9;';
+    var zIn = _frameButton('+');
+    zIn.setAttribute('aria-label', 'Увеличи');
+    zoomRow.append(zoomLabel, zOut, zoom, zIn);
+    st.zoom = zoom;
+
+    var status = document.createElement('p');
+    status.setAttribute('role', 'status');
+    status.style.cssText = 'margin:0 0 12px;font-size:13px;color:#4b5563;min-height:1.5em;';
+    st.status = status;
+
+    var actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;';
+    var bReset = _frameButton('Обичаен вид'), bCancel = _frameButton('Отказ'), bDone = _frameButton('Готово', true);
+    actions.append(bReset, bCancel, bDone);
+    var note = document.createElement('p');
+    note.style.cssText = 'margin:8px 0 0;font-size:12px;color:#4b5563;';
+    note.textContent = '„Готово“ приема нагласянето. Запазва се, когато натиснете „Save changes“.';
+    bar.append(title, help, zoomRow, status, actions, note);
+    document.body.appendChild(bar);
+
+    function setZoom(z) {
+      if (!st.frame) st.frame = _measureFrame(st);
+      st.frame.z = _fClamp('z', z);
+      _paintFrame(st);
+      _announceFrame(st);
+    }
+    zoom.addEventListener('input', function () { setZoom(parseFloat(zoom.value)); });
+    zOut.addEventListener('click', function () { setZoom((st.frame ? st.frame.z : 1) - 0.1); });
+    zIn.addEventListener('click', function () { setZoom((st.frame ? st.frame.z : 1) + 0.1); });
+    bReset.addEventListener('click', function () { st.frame = null; _paintFrame(st); _announceFrame(st); });
+    bCancel.addEventListener('click', function () { _endFraming(false); });
+    bDone.addEventListener('click', function () { _endFraming(true); });
+
+    st.layer = layer; st.bar = bar;
+    _framing = st;
+    document.addEventListener('keydown', _onFrameKey, true);
+    _paintFrame(st);
+    box.scrollIntoView({ block: 'nearest' });
+    bar.focus();
+    _announceFrame(st);
+  }
+
+  function _onFrameKey(e) {
+    var st = _framing;
+    if (!st) return;
+    if (e.key === 'Escape') { e.preventDefault(); _endFraming(false); return; }
+    if (e.key === 'Tab') {   // keep focus in the panel
+      var f = st.bar.querySelectorAll('button, input'), first = f[0], last = f[f.length - 1];
+      if (!st.bar.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+      else if (e.shiftKey && (document.activeElement === first || document.activeElement === st.bar)) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      return;
+    }
+    var t = e.target;
+    if (t === st.zoom && !e.shiftKey && /^Arrow/.test(e.key)) return;   // the slider's own keys
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (!st.frame) st.frame = _measureFrame(st);
+    var fr = st.frame, row = _rowWidth(st.grid), step = 2;
+    var keys = e.shiftKey ? {
+      ArrowRight: function () { if (row) fr.w = _fClamp('w', fr.w + step); },
+      ArrowLeft:  function () { if (row) fr.w = _fClamp('w', fr.w - step); },
+      ArrowUp:    function () { fr.r = _fClamp('r', fr.r * 1.05); },   // lower
+      ArrowDown:  function () { fr.r = _fClamp('r', fr.r / 1.05); }    // taller
+    } : {
+      ArrowLeft:  function () { fr.x = _fClamp('x', fr.x + step); },
+      ArrowRight: function () { fr.x = _fClamp('x', fr.x - step); },
+      ArrowUp:    function () { fr.y = _fClamp('y', fr.y + step); },
+      ArrowDown:  function () { fr.y = _fClamp('y', fr.y - step); }
+    };
+    keys['+'] = keys['='] = function () { fr.z = _fClamp('z', fr.z + 0.1); };
+    keys['-'] = keys['_'] = function () { fr.z = _fClamp('z', fr.z - 0.1); };
+    if (!keys[e.key]) return;
+    e.preventDefault();
+    keys[e.key]();
+    _paintFrame(st);
+    _announceFrame(st);
+  }
+
+  function _endFraming(keep) {
+    var st = _framing;
+    if (!st) return;
+    _framing = null;
+    clearTimeout(st.announceTimer);
+    document.removeEventListener('keydown', _onFrameKey, true);
+    st.layer.remove();
+    st.bar.remove();
+    if (st.hint) st.hint.style.display = '';
+    if (keep) {
+      var fr = st.frame;
+      var v = fr ? { w: Math.round(fr.w), r: Math.round(fr.r * 1000) / 1000, x: Math.round(fr.x * 10) / 10,
+                     y: Math.round(fr.y * 10) / 10, z: Math.round(fr.z * 1000) / 1000 } : [];
+      st.box.style.position = st.savedPos;
+      st.wrap.setAttribute('data-om-frame', fr ? JSON.stringify(v) : '');
+      markDirty(st.wrap.dataset.cmsSection, 'image_frame', 'bg', v, st.wrap);
+      markDirty(st.wrap.dataset.cmsSection, 'image_frame', 'en', v, st.wrap);
+    } else {
+      st.box.style.cssText = st.saved.box;
+      st.wrap.style.cssText = st.saved.wrap;
+      st.img.style.cssText = st.saved.img;
+      if (st.grid) st.grid.style.cssText = st.saved.grid;
+      if (st.styleEl) st.styleEl.disabled = st.saved.css;
+    }
+    if (st.wrap.hasAttribute('tabindex')) st.wrap.focus();
+  }
+
+  // A new photo keeps its frame's size and shape but starts centred — the server does the
+  // same when it saves the photo (includes/home.php, home_frame_recentre()).
+  function _recentreFrame(wrap) {
+    var fr = _readFrame(wrap);
+    if (!fr) return;
+    fr.x = 50; fr.y = 50; fr.z = 1;
+    wrap.setAttribute('data-om-frame', JSON.stringify(fr));
+    var img = wrap.querySelector('img');
+    if (img && img.style.objectPosition) {
+      img.style.objectPosition = '50% 50%';
+      img.style.transformOrigin = '50% 50%';
+      img.style.transform = 'scale(1)';
+    }
+    // A frame already waiting to be saved would bring the old photo's focus point back.
+    if (dirtyFields[wrap.dataset.cmsSection + '.image_frame']) {
+      markDirty(wrap.dataset.cmsSection, 'image_frame', 'bg', fr, wrap);
+      markDirty(wrap.dataset.cmsSection, 'image_frame', 'en', fr, wrap);
+    }
   }
 
   // ── Add / Remove ──────────────────────────────────────────────────────────

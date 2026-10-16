@@ -40,6 +40,51 @@ function home_img_attrs(string $sid, string $key): string {
     return ' data-cms-section="' . h(home_cms_section($sid)) . '" data-cms-field="' . h($key) . '"';
 }
 
+/**
+ * The pieces a photo block prints for its framing (field image_frame, see HOME_FRAME_LIMITS).
+ * $first: the photo is the row's first column. $stack: the width (px) at which the block's
+ * stylesheet stacks the row into one column, or null when the template sets the columns
+ * itself (then 'cols' is for its inline style). Everything is inline or in a <style> printed
+ * with the block, so a stale main.css cannot break it. Without a frame every piece is the
+ * block's normal look, except the edit-mode attributes.
+ * @return array{css:string, grid:string, box:string, wrap:string, img:string, cols:string, admin:string}
+ */
+function home_frame_parts(string $sid, array $f, bool $first, ?int $stack, bool $show_admin): array {
+    $fr  = home_frame($f['image_frame'] ?? null);
+    $key = preg_match('/^[a-zA-Z0-9_-]{1,40}$/', $sid) ? $sid : '';
+    $out = ['css' => '', 'grid' => '', 'box' => '', 'wrap' => '', 'img' => '', 'cols' => '', 'admin' => ''];
+    if ($key !== '') {
+        $out['grid'] = ' data-om-fgrid="' . $key . '"';
+        $out['box']  = ' data-om-fbox="' . $key . '"';
+    }
+    if ($show_admin) {
+        // For the on-page editor: the stored frame, the side the resize corner sits on (the
+        // one facing the text), and whether the block's normal look is the photo's own shape.
+        $out['admin'] = ' data-om-frame="' . h($fr === null ? '' : (string) json_encode($fr)) . '" data-om-frame-handle="' . ($first ? 'right' : 'left') . '"'
+                      . ($stack === null ? ' data-om-frame-natural' : '');
+    }
+    if ($fr === null || $key === '') return $out;
+
+    $n    = fn(float $v): string => rtrim(rtrim(number_format($v, 3, '.', ''), '0'), '.');
+    $cols = $first ? "minmax(0,{$fr['w']}fr) minmax(0," . (100 - $fr['w']) . 'fr)'
+                   : 'minmax(0,' . (100 - $fr['w']) . "fr) minmax(0,{$fr['w']}fr)";
+    // The attribute twice outranks the theme's own two-class rules (.hero .container).
+    $grid = 'html body [data-om-fgrid="' . $key . '"][data-om-fgrid]';
+    $box  = 'html body [data-om-fbox="' . $key . '"][data-om-fbox]';
+    $css  = "$box{aspect-ratio:{$n($fr['r'])};max-height:90vh}";
+    if ($stack !== null) {
+        // Stacked on a phone the photo keeps its focus point, but a tall shape is held to 4:5.
+        $css .= '@media(min-width:' . ($stack + 1) . "px){{$grid}{grid-template-columns:$cols}}"
+              . "@media(max-width:{$stack}px){{$box}{aspect-ratio:{$n(max($fr['r'], 0.8))}}}";
+    }
+    $pos = $n($fr['x']) . '% ' . $n($fr['y']) . '%';
+    $out['css']  = '<style data-om-frame-css="' . $key . '">' . $css . '</style>';
+    $out['cols'] = $cols;
+    $out['wrap'] = ' style="display:block;width:100%;height:100%;"';
+    $out['img']  = "display:block;width:100%;height:100%;object-fit:cover;object-position:$pos;transform:scale({$n($fr['z'])});transform-origin:$pos;";
+    return $out;
+}
+
 /** The stored background if this block offers it, else $default (a stored teal outside the CTA block → $default). */
 function home_bg_key(array $f, string $default = 'white', array $allowed = HOME_BACKGROUNDS): string {
     $bg = is_string($f['background'] ?? null) ? $f['background'] : $default;

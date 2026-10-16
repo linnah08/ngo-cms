@@ -108,6 +108,16 @@ function hs_field(string $key, array $def, mixed $val, array $errors, string $nb
         case 'cards':
             return hs_cards(is_array($val) ? $val : [], $errors);
 
+        case 'frame':  // set on the live page; the form says where, and can undo it
+            $reset = home_frame($val) === null ? ''
+                : '<label style="display:flex;gap:.5rem;align-items:center;min-height:44px;font-weight:400;">'
+                . '<input type="checkbox" id="' . h($id) . '" name="' . h($name) . '" value="reset" aria-describedby="' . h($hint_id) . '" style="width:20px;height:20px;">'
+                . 'Върни снимката в обичайния ѝ размер и изрязване</label>';
+            return '<div class="form-group" style="margin-bottom:1.5rem;"><p style="font-weight:600;margin:0;">' . $label . '</p>' . $reset
+                 . '<p id="' . h($hint_id) . '" style="font-size:.82rem;color:var(--text-muted);margin:.3rem 0 0;">'
+                 . 'Колко голяма да е снимката и коя част от нея да се вижда, се нагласява на самата страница: '
+                 . 'включете режима за редактиране, щракнете снимката и изберете „Нагласи снимката“.</p></div>';
+
         case 'site':   // a site's own field (see home_site_types()) draws itself
             return is_callable($def['render'] ?? null) ? ($def['render'])($key, $def, $val, $errors) : '';
     }

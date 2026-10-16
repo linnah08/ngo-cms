@@ -2,15 +2,18 @@
 $img  = (string) ($f['image'] ?? '');
 $img  = home_valid_image_path($img) ? $img : '';
 $side = ($f['image_side'] ?? 'left') === 'right' ? 'right' : 'left';
+$fp   = home_frame_parts($sid, $f, $side === 'left', null, $show_admin);
+$cols = $img === '' ? '1fr' : ($fp['cols'] !== '' ? $fp['cols'] : '1fr 1fr');
 ?>
 <section class="section<?= home_bg_class($f) ?>">
+  <?= $img !== '' ? $fp['css'] : '' ?>
   <div class="container">
-    <div class="home-ti" style="display:grid;grid-template-columns:<?= $img !== '' ? '1fr 1fr' : '1fr' ?>;gap:2.5rem;align-items:center;">
+    <div class="home-ti"<?= $fp['grid'] ?> style="display:grid;grid-template-columns:<?= $cols ?>;gap:2.5rem;align-items:center;">
       <?php if ($img !== ''): ?>
-      <div style="order:<?= $side === 'right' ? 2 : 0 ?>;border-radius:8px;overflow:hidden;">
-        <span class="om-img-wrap"<?= home_img_attrs($sid, 'image') ?>>
+      <div<?= $fp['box'] ?> style="order:<?= $side === 'right' ? 2 : 0 ?>;border-radius:8px;overflow:hidden;">
+        <span class="om-img-wrap"<?= home_img_attrs($sid, 'image') ?><?= $fp['admin'] ?><?= $fp['wrap'] ?>>
           <img src="<?= asset_url($img) ?>" alt="<?= h(hf($f, 'image_alt', $lang)) ?>" loading="lazy"
-               style="width:100%;height:auto;display:block;">
+               style="<?= $fp['img'] !== '' ? $fp['img'] : 'width:100%;height:auto;display:block;' ?>">
           <?php if ($show_admin): ?><span class="om-img-overlay">📷 Replace</span><?php endif; ?>
         </span>
       </div>

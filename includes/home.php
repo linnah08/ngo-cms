@@ -155,6 +155,14 @@ function home_pair(mixed $raw): array {
 // Teal is offered only for the call-to-action block: its template switches text and
 // buttons to white there. On teal, the other blocks' links and primary buttons (also
 // teal) would disappear.
+/**
+ * How a block's photo sits in its frame (field kind 'frame', set on the live page with
+ * "Нагласи снимката"): w = share of the row the photo column takes (%), r = frame shape
+ * (width / height), x/y = which point of the photo stays in view (%), z = zoom.
+ * An empty frame means the block's normal look.
+ */
+const HOME_FRAME_LIMITS = ['w' => [35, 65], 'r' => [0.5, 2.0], 'x' => [0, 100], 'y' => [0, 100], 'z' => [1.0, 3.0]];
+
 const HOME_BACKGROUNDS     = ['white' => 'Бял', 'grey' => 'Светлосив', 'warm' => 'Топъл (бежов)'];
 const HOME_BACKGROUNDS_CTA = ['white' => 'Бял', 'grey' => 'Светлосив', 'teal' => 'Основният цвят на сайта', 'warm' => 'Топъл (бежов)'];
 
@@ -213,6 +221,7 @@ function home_types(): array {
         'image'     => ['kind' => 'image', 'label' => $label],
         'image_alt' => ['kind' => 'alt', 'label' => 'Описание на снимката', 'max' => 200,
                         'hint' => 'Опишете снимката с няколко думи — за хора, които не виждат. Оставете празно, ако е само за украса.'],
+        'image_frame' => ['kind' => 'frame', 'label' => 'Размер и изрязване на снимката'],
     ];
     $rich = ['kind' => 'html', 'label' => 'Текст', 'max' => 20000,
              'hint' => 'Размерът и цветът на шрифта не се запазват — сайтът използва своите стилове.'];
@@ -330,6 +339,11 @@ function home_clean_field(array $def, mixed $raw, string $key): array {
                 ? [$v, []]
                 : [$url, [$key => 'Това не е линк към видео в YouTube или Vimeo. Отворете видеото, копирайте адреса от браузъра и го поставете тук.']];
 
+        case 'frame':
+            if (!is_array($raw) || $raw === []) return [[], []];   // no framing: the block's normal look
+            $frame = home_frame($raw);
+            return $frame !== null ? [$frame, []] : [[], [$key => 'Нагласянето на снимката не можа да се запази. Опитайте отново.']];
+
         case 'internal':
             $v = is_string($raw) ? $raw : '';
             return [home_valid_image_path($v) ? $v : '', []];
@@ -389,6 +403,30 @@ function home_button_errors(array $fields): array {
         }
     }
     return $errors;
+}
+
+/**
+ * A stored or posted frame, cleaned: every value a number, pulled into HOME_FRAME_LIMITS.
+ * @return ?array{w:int, r:float, x:float, y:float, z:float} null when it is not a frame.
+ */
+function home_frame(mixed $raw): ?array {
+    if (!is_array($raw)) return null;
+    $out = [];
+    foreach (HOME_FRAME_LIMITS as $k => [$min, $max]) {
+        $v = $raw[$k] ?? null;
+        if (!is_int($v) && !is_float($v) && !(is_string($v) && is_numeric($v))) return null;
+        $v = (float) $v;
+        if (!is_finite($v)) return null;
+        $v = max($min, min($max, $v));
+        $out[$k] = match ($k) { 'w' => (int) round($v), 'r', 'z' => round($v, 3), default => round($v, 1) };
+    }
+    return $out;
+}
+
+/** A frame for a new photo: the same size and shape, but centred and not zoomed in. */
+function home_frame_recentre(mixed $frame): array {
+    $f = home_frame($frame);
+    return $f === null ? [] : ['x' => 50.0, 'y' => 50.0, 'z' => 1.0] + $f;
 }
 
 // ── Which document ───────────────────────────────────────────────────────────
@@ -838,8 +876,10 @@ function home_inline_save(string $id, array $fields): array {
     $accepted = 0;
     foreach ($fields as $key => $values) {
         $def = $defs[$key] ?? null;
-        if ($def === null || !in_array($def['kind'], ['text', 'textarea', 'html', 'alt', 'image'], true) || !is_array($values)) continue;
-        if ($def['kind'] === 'image') {
+        if ($def === null || !in_array($def['kind'], ['text', 'textarea', 'html', 'alt', 'image', 'frame'], true) || !is_array($values)) continue;
+        if ($def['kind'] === 'frame') {
+            $raw = $values['bg'] ?? null;   // one frame for both languages
+        } elseif ($def['kind'] === 'image') {
             $raw = (string) ($values['bg'] ?? '');
         } else {
             // A language the editor did not send keeps its stored value. One that is
@@ -855,6 +895,11 @@ function home_inline_save(string $id, array $fields): array {
         }
         [$value, $err] = home_clean_field($def, $raw, (string) $key);
         if ($err) return ['ok' => false, 'error' => (string) reset($err)];
+        // A new photo starts centred, unless its framing was set in the same save.
+        if ($def['kind'] === 'image' && $value !== ($doc['sections'][$i]['fields'][$key] ?? '')
+            && isset($defs['image_frame']) && !array_key_exists('image_frame', $fields)) {
+            $doc['sections'][$i]['fields']['image_frame'] = home_frame_recentre($doc['sections'][$i]['fields']['image_frame'] ?? null);
+        }
         $doc['sections'][$i]['fields'][$key] = $value;
         $accepted++;
     }
@@ -960,6 +1005,15 @@ function home_admin_save(array $doc, array $post, array $files, ?callable $fetch
     $upload_errors     = home_apply_uploads($in, $type, $files, $sid);
     [$fields, $errors] = home_validate_section($type, $in);
     $errors += $upload_errors;
+
+    // The framing is set on the live page; the form only offers to reset it. A new
+    // photo keeps the frame's size and shape but starts centred.
+    foreach ($types[$type]['fields'] as $key => $def) {
+        if ($def['kind'] !== 'frame') continue;
+        $keep = ($in[$key] ?? null) === 'reset' ? [] : (home_frame($old[$key] ?? null) ?? []);
+        if ($keep && ($old['image'] ?? '') !== ($fields['image'] ?? '')) $keep = home_frame_recentre($keep);
+        $fields[$key] = $keep;
+    }
 
     // Any block with a video and a thumb field keeps a local thumbnail (site types too).
     if (!$errors && isset($types[$type]['fields']['video'], $types[$type]['fields']['thumb'])) {
