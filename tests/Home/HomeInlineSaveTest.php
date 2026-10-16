@@ -141,6 +141,90 @@ final class HomeInlineSaveTest extends TestCase
         $this->assertTrue(home_inline_save('s_hero', ['btn1_label' => ['bg' => 'Помогни', 'en' => '']])['ok']);
     }
 
+    private function seedPhotos(array $photos): void
+    {
+        $doc = json_decode(file_get_contents($this->file), true);
+        $doc['sections'][] = ['id' => 's_ti01', 'type' => 'text_image', 'visible' => true, 'fields' => ['photos' => $photos]];
+        file_put_contents($this->file, json_encode($doc));
+    }
+
+    private function twoPhotos(): array
+    {
+        return [
+            ['id' => 'i_aaaaaa', 'image' => '/assets/images/a.jpg', 'image_alt' => ['bg' => 'A', 'en' => 'A']],
+            ['id' => 'i_bbbbbb', 'image' => '/assets/images/b.jpg', 'image_alt' => ['bg' => 'B', 'en' => 'B']],
+        ];
+    }
+
+    public function test_replaces_one_list_photo_by_item_id(): void
+    {
+        $this->seedPhotos($this->twoPhotos());
+        $r = home_inline_save('s_ti01', ['photos.i_bbbbbb.image' => ['bg' => '/assets/images/c.jpg', 'en' => '/assets/images/c.jpg']]);
+        $this->assertTrue($r['ok']);
+        $p = $this->section('s_ti01')['fields']['photos'];
+        $this->assertSame('/assets/images/a.jpg', $p[0]['image']);
+        $this->assertSame('/assets/images/c.jpg', $p[1]['image']);
+        $this->assertSame('i_bbbbbb', $p[1]['id']);
+        $this->assertSame(['bg' => 'B', 'en' => 'B'], $p[1]['image_alt']);
+    }
+
+    public function test_list_photo_follows_its_id_after_reorder(): void
+    {
+        $this->seedPhotos(array_reverse($this->twoPhotos()));
+        $r = home_inline_save('s_ti01', ['photos.i_bbbbbb.image' => ['bg' => '/assets/images/c.jpg', 'en' => '']]);
+        $this->assertTrue($r['ok']);
+        $p = $this->section('s_ti01')['fields']['photos'];
+        $this->assertSame('i_bbbbbb', $p[0]['id']);
+        $this->assertSame('/assets/images/c.jpg', $p[0]['image']);
+        $this->assertSame('/assets/images/a.jpg', $p[1]['image']);
+    }
+
+    public function test_unknown_item_id_is_refused(): void
+    {
+        $this->seedPhotos($this->twoPhotos());
+        $before = file_get_contents($this->file);
+        $rev = home_load()['doc']['rev'];
+        $r = home_inline_save('s_ti01', ['photos.i_zzzzzz.image' => ['bg' => '/assets/images/c.jpg', 'en' => '']]);
+        $this->assertFalse($r['ok']);
+        $this->assertSame($rev, home_load()['doc']['rev']);
+        $this->assertSame($before, file_get_contents($this->file));
+    }
+
+    public function test_unknown_list_or_item_field_is_refused(): void
+    {
+        $this->seedPhotos($this->twoPhotos());
+        $this->assertFalse(home_inline_save('s_ti01', ['nope.i_aaaaaa.image' => ['bg' => '/assets/images/c.jpg', 'en' => '']])['ok']);
+        $this->assertFalse(home_inline_save('s_ti01', ['photos.i_aaaaaa.id' => ['bg' => 'i_cccccc', 'en' => '']])['ok']);
+        $this->assertFalse(home_inline_save('s_ti01', ['heading.i_aaaaaa.image' => ['bg' => '/assets/images/c.jpg', 'en' => '']])['ok']);
+    }
+
+    public function test_invalid_path_for_list_photo_is_refused(): void
+    {
+        $this->seedPhotos($this->twoPhotos());
+        $this->assertFalse(home_inline_save('s_ti01', ['photos.i_aaaaaa.image' => ['bg' => '/etc/passwd', 'en' => '']])['ok']);
+        $this->assertFalse(home_inline_save('s_ti01', ['photos.i_aaaaaa.image' => ['bg' => '', 'en' => '']])['ok']);
+        $this->assertSame('/assets/images/a.jpg', $this->section('s_ti01')['fields']['photos'][0]['image']);
+    }
+
+    public function test_replaces_the_photo_of_an_old_single_image_block(): void
+    {
+        $doc = json_decode(file_get_contents($this->file), true);
+        $doc['sections'][] = ['id' => 's_old1', 'type' => 'text_image', 'visible' => true,
+            'fields' => ['image' => '/assets/images/a.jpg', 'image_alt' => ['bg' => 'A', 'en' => 'A']]];
+        file_put_contents($this->file, json_encode($doc));
+        $r = home_inline_save('s_old1', ['photos.i_' . substr(md5('s_old1'), 0, 6) . '.image' => ['bg' => '/assets/images/c.jpg', 'en' => '']]);
+        $this->assertTrue($r['ok']);
+        $p = $this->section('s_old1')['fields']['photos'];
+        $this->assertCount(1, $p);
+        $this->assertSame('/assets/images/c.jpg', $p[0]['image']);
+    }
+
+    public function test_dotted_key_survives_the_endpoint_json_body(): void
+    {
+        $body = json_decode(json_encode(['section' => 'home:s_ti01', 'fields' => ['photos.i_bbbbbb.image' => ['bg' => '/assets/images/c.jpg', 'en' => '']]]), true);
+        $this->assertSame(['photos.i_bbbbbb.image'], array_keys($body['fields']));
+    }
+
     public function test_unknown_section_is_refused(): void
     {
         $this->assertFalse(home_inline_save('s_nope', ['title' => ['bg' => 'x', 'en' => '']])['ok']);

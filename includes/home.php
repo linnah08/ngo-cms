@@ -952,7 +952,20 @@ function home_inline_save(string $id, array $fields): array {
     $defs = home_types()[$doc['sections'][$i]['type']]['fields'] ?? [];
     $accepted = 0;
     foreach ($fields as $key => $values) {
-        $def = $defs[$key] ?? null;
+        // "<list key>.<item id>.<item field>" addresses one item of a list by its id, never by position.
+        $item_pos = null;
+        $parts = explode('.', (string) $key);
+        if (count($parts) === 3) {
+            $ldef = $defs[$parts[0]] ?? null;
+            if ($ldef === null || $ldef['kind'] !== 'list') continue;
+            $def = $ldef['fields'][$parts[2]] ?? null;
+            $item_pos = home_list_find(is_array($doc['sections'][$i]['fields'][$parts[0]] ?? null) ? $doc['sections'][$i]['fields'][$parts[0]] : [], $parts[1]);
+            if ($def === null || $item_pos === null) continue;
+            $stored = $doc['sections'][$i]['fields'][$parts[0]][$item_pos][$parts[2]] ?? null;
+        } else {
+            $def = $defs[$key] ?? null;
+            $stored = $doc['sections'][$i]['fields'][$key] ?? null;
+        }
         if ($def === null || !in_array($def['kind'], ['text', 'textarea', 'html', 'alt', 'image', 'frame'], true) || !is_array($values)) continue;
         if ($def['kind'] === 'frame') {
             $raw = $values['bg'] ?? null;   // one frame for both languages
@@ -961,7 +974,7 @@ function home_inline_save(string $id, array $fields): array {
         } else {
             // A language the editor did not send keeps its stored value. One that is
             // sent — even as '' — replaces it, so clearing a field on purpose still works.
-            $raw = home_pair($doc['sections'][$i]['fields'][$key] ?? null);
+            $raw = home_pair($stored);
             foreach (['bg', 'en'] as $l) {
                 if (!array_key_exists($l, $values)) continue;
                 $v = is_string($values[$l]) ? $values[$l] : '';
@@ -973,11 +986,17 @@ function home_inline_save(string $id, array $fields): array {
         [$value, $err] = home_clean_field($def, $raw, (string) $key);
         if ($err) return ['ok' => false, 'error' => (string) reset($err)];
         // A new photo starts centred, unless its framing was set in the same save.
-        if ($def['kind'] === 'image' && $value !== ($doc['sections'][$i]['fields'][$key] ?? '')
+        if ($def['kind'] === 'image' && $value !== ($stored ?? '')
             && isset($defs['image_frame']) && !array_key_exists('image_frame', $fields)) {
             $doc['sections'][$i]['fields']['image_frame'] = home_frame_recentre($doc['sections'][$i]['fields']['image_frame'] ?? null);
         }
-        $doc['sections'][$i]['fields'][$key] = $value;
+        if ($item_pos !== null) {
+            $list = array_values($doc['sections'][$i]['fields'][$parts[0]]);
+            $list[$item_pos][$parts[2]] = $value;
+            $doc['sections'][$i]['fields'][$parts[0]] = $list;
+        } else {
+            $doc['sections'][$i]['fields'][$key] = $value;
+        }
         $accepted++;
     }
     if ($accepted === 0) {
