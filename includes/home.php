@@ -1156,7 +1156,10 @@ function home_drop_stale_focus(string $type, array &$fields, array $old): void {
             if (($fdef['kind'] ?? '') !== 'focus') continue;
             $img = $fdef['for'] ?? '';
             foreach ($fields[$key] as $n => $item) {
-                if (($fields[$key][$n][$fk] ?? null) !== null && (string) ($was[$item['id']][$img] ?? '') !== (string) ($item[$img] ?? '')) {
+                $prev = $was[$item['id'] ?? ''] ?? null;
+                // Only a crop carried over unchanged from the old photo is stale; one posted with the new photo was made for it.
+                if ($prev !== null && ($item[$fk] ?? null) !== null && $item[$fk] === ($prev[$fk] ?? null)
+                    && (string) ($prev[$img] ?? '') !== (string) ($item[$img] ?? '')) {
                     $fields[$key][$n][$fk] = null;
                 }
             }

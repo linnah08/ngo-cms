@@ -87,14 +87,14 @@ final class HomeFinalFixesTest extends TestCase
         return ['x' => 100, 'y' => 0, 'w' => 300, 'h' => 400, 'iw' => 1200, 'ih' => 800];
     }
 
-    private function savePerson(string $image): array
+    private function savePerson(string $image, ?array $crop = null, string $id = 'i_pppp01'): array
     {
         $old = ['id' => 'i_pppp01', 'image' => '/assets/images/a.jpg', 'focus' => $this->crop(), 'image_alt' => ['bg' => '', 'en' => ''],
                 'name' => ['bg' => 'М', 'en' => ''], 'role' => ['bg' => '', 'en' => ''], 'bio' => ['bg' => '', 'en' => '']];
         $doc = ['version' => 1, 'rev' => 1, 'sections' => [['id' => 's_pe01', 'type' => 'people', 'visible' => true, 'fields' => ['people' => [$old]]]]];
         file_put_contents($this->dir . '/home.json', json_encode($doc));
         $post = ['id' => 's_pe01', 'rev' => 1, 'f' => ['people' => [[
-            'id' => 'i_pppp01', 'image' => $image, 'focus' => json_encode($this->crop()),
+            'id' => $id, 'image' => $image, 'focus' => json_encode($crop ?? $this->crop()),
             'name' => ['bg' => 'М', 'en' => ''],
         ]]]];
         $r = home_admin_save(home_load()['doc'], $post, []);
@@ -105,6 +105,17 @@ final class HomeFinalFixesTest extends TestCase
     public function test_changed_photo_drops_the_old_crop(): void
     {
         $this->assertNull($this->savePerson('/assets/images/b.jpg')['focus']);
+    }
+
+    public function test_new_person_with_photo_and_crop_keeps_the_crop(): void
+    {
+        $this->assertSame($this->crop(), $this->savePerson('/assets/images/b.jpg', null, 'i_pppp09')['focus']);
+    }
+
+    public function test_changed_photo_with_a_new_crop_keeps_the_new_crop(): void
+    {
+        $new = ['x' => 0, 'y' => 0, 'w' => 150, 'h' => 200, 'iw' => 1200, 'ih' => 800];
+        $this->assertSame($new, $this->savePerson('/assets/images/b.jpg', $new)['focus']);
     }
 
     public function test_same_photo_keeps_its_crop(): void
