@@ -627,6 +627,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         rm.setAttribute('aria-label', 'Премахни ' + list.dataset.hsItemName + ' ' + n);
         rm.disabled = r.length <= min;
         rm.setAttribute('aria-describedby', note.id);
+        Array.prototype.forEach.call(row.querySelectorAll('[data-hs-focus-label]'), function (l) {
+          l.textContent = list.dataset.hsItemLabel + ' ' + n + ' — ' + l.dataset.hsBase;
+        });
       });
       add.disabled = r.length >= max;
       // The reason a button is off is written out, not only greyed.
@@ -659,7 +662,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       Array.prototype.forEach.call(row.querySelectorAll('textarea.hs-rich'), function (t) { initRich('#' + t.id); });
       Array.prototype.forEach.call(row.querySelectorAll('[data-hs-focus]'), refreshFocus);
       renumber(); sorter.relabel();
-      var first = row.querySelector('[aria-required="true"]') || row.querySelector('input:not([type=hidden]):not([type=file]), textarea, select');
+      var first = row.querySelector('[data-hs-image] input[type=file]') || row.querySelector('[aria-required="true"]') || row.querySelector('input:not([type=hidden]):not([type=file]), textarea, select');
       if (first) first.focus();
       announce(list.dataset.hsSayAdded);
     });

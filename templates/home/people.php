@@ -26,7 +26,8 @@ $style_printed = !empty($GLOBALS['_om_people_style']);
       <li class="home-people__row" style="display:grid;grid-template-columns:<?= $img !== '' ? '200px 1fr' : '1fr' ?>;gap:3rem;align-items:start;">
         <?php if ($img !== ''): ?>
         <span class="om-img-wrap home-people__frame"<?= home_img_attrs($sid, 'people.' . (string) ($p['id'] ?? '') . '.image') ?> style="display:block;position:relative;overflow:hidden;aspect-ratio:3/4;width:100%;border-radius:8px;">
-          <img src="<?= asset_url($img) ?>" alt="<?= h($alt) ?>" loading="lazy" style="<?= h(home_focus_style(is_array($p['focus'] ?? null) ? $p['focus'] : null)) ?>">
+          <span aria-hidden="true" style="display:block;padding-top:133.3333%;"></span>
+          <img data-cms-img-style="<?= h(home_focus_style(null)) ?>" src="<?= asset_url($img) ?>" alt="<?= h($alt) ?>" loading="lazy" style="<?= h(home_focus_style(is_array($p['focus'] ?? null) ? $p['focus'] : null)) ?>">
           <?php if ($show_admin): ?><span class="om-img-overlay">📷 Replace</span><?php endif; ?>
         </span>
         <?php endif; ?>

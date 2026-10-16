@@ -358,7 +358,11 @@ window.OmCMS = (function () {
   function _applyImagePath(path, wrap) {
     const img = wrap.querySelector('img');
     if (img && img.getAttribute('src') !== path) _recentreFrame(wrap);
-    if (img) img.src = path;
+    if (img) {
+      img.src = path;
+      // A person's old crop does not fit the new picture: back to the element's default style.
+      if (img.dataset.cmsImgStyle) img.setAttribute('style', img.dataset.cmsImgStyle);
+    }
     // Image paths are language-neutral — mark both languages dirty
     markDirty(wrap.dataset.cmsSection, wrap.dataset.cmsField, 'bg', path, wrap);
     markDirty(wrap.dataset.cmsSection, wrap.dataset.cmsField, 'en', path, wrap);

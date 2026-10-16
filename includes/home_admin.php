@@ -111,12 +111,12 @@ function hs_field(string $key, array $def, mixed $val, array $errors, string $nb
             $json   = $f === null ? '' : (string) json_encode($f);
             $reason = $id . '_why';
             return '<div class="form-group" data-hs-focus data-hs-for="' . h($def['for']) . '" style="margin-bottom:1.5rem;">'
-                 . '<span id="' . h($id) . '_label" style="display:block;font-weight:600;margin-bottom:.4rem;">' . $label . '</span>'
+                 . '<span id="' . h($id) . '_label" data-hs-focus-label data-hs-base="' . h($def['label']) . '" style="display:block;font-weight:600;margin-bottom:.4rem;">' . (isset($def['row']) ? h($def['row'] . ' — ' . $def['label']) : $label) . '</span>'
                  . '<input type="hidden" name="' . h($name) . '" value="' . h($json) . '" data-hs-focus-value>'
                  . '<div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">'
-                 . '<div data-hs-focus-frame style="position:relative;overflow:hidden;aspect-ratio:3/4;width:90px;border-radius:6px;background:#eee;flex:none;"><img src="" alt="" style="display:none;"></div>'
+                 . '<div data-hs-focus-frame style="position:relative;overflow:hidden;aspect-ratio:3/4;width:90px;border-radius:6px;background:#eee;flex:none;"><span aria-hidden="true" style="display:block;padding-top:133.3333%;"></span><img src="" alt="" style="display:none;"></div>'
                  . '<div style="flex:1;min-width:200px;">'
-                 . '<button type="button" class="btn btn--outline" style="min-height:44px;" id="' . h($id) . '" data-hs-focus-btn aria-describedby="' . h($reason) . '" disabled>Избери какво да се вижда</button>'
+                 . '<button type="button" class="btn btn--outline" style="min-height:44px;" id="' . h($id) . '" data-hs-focus-btn aria-labelledby="' . h($id) . '_label ' . h($id) . '" aria-describedby="' . h($reason) . '" disabled>Избери какво да се вижда</button>'
                  . '<p id="' . h($reason) . '" data-hs-focus-why style="font-size:.9rem;color:var(--text-muted);margin:.4rem 0 0;">Първо изберете снимка.</p>'
                  . '</div></div>' . $hint . '</div>';
 
@@ -169,6 +169,7 @@ function hs_list_row(string $key, array $def, string $i, array $item, array $err
          . '<input type="hidden" name="' . h("f[$key][$i][id]") . '" value="' . h($iid) . '" data-hs-item-id>'
          . '<div style="margin:0 0 .75rem;">' . hs_sort_handle('Премести ' . mb_strtolower($def['item']) . ' ' . $number, 'hsListSortHelp_' . $key) . '</div>';
     foreach ($def['fields'] as $ik => $idef) {
+        if (($idef['kind'] ?? '') === 'focus') $idef['row'] = $def['item'] . ' ' . $number;   // names the person in the control's label
         $out .= hs_field($ik, $idef, $item[$ik] ?? null, $errors, "f[$key][$i]", "f_{$key}_$i", "$key.$i.", "up_list[$key][$i][$ik]");
     }
     return $out . '<div style="display:flex;gap:.5rem;flex-wrap:wrap;">'

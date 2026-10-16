@@ -196,6 +196,16 @@ const HOME_PERSON_FIELDS = [
  *   'uploads' fn(array &$in, array $files, string $sid, string $key): array  — optional, stores files, returns errors
  * Templates go where every type's does: templates/home/<type>.php.
  */
+/** The 'cards' list (2–4 cards): the built-in Карти block and any site block that still says kind 'cards'. */
+function home_cards_list_def(string $label = 'Карти'): array {
+    return [
+        'kind' => 'list', 'label' => $label, 'item' => 'Карта', 'add' => '+ Добави карта', 'remove' => 'Премахни картата',
+        'plural' => 'карти', 'one' => 'карта', 'plural_the' => 'картите', 'min' => 2, 'max' => 4, 'preview' => true,
+        'say' => ['added' => 'Добавена е нова карта.', 'removed' => 'Картата е премахната.', 'moved' => 'Картата е на място %d. Редът се запазва с бутона „Запази“.'],
+        'fields' => HOME_CARD_FIELDS,
+    ];
+}
+
 function home_site_types(): array {
     $file = $GLOBALS['_om_home_types_file']
         ?? (function_exists('current_theme') ? (string) (current_theme()['home_types'] ?? '') : '');
@@ -209,6 +219,10 @@ function home_site_types(): array {
     $out   = [];
     foreach (is_array($extra) ? $extra : [] as $type => $def) {
         if (!is_string($type) || !preg_match('/^[a-z][a-z0-9_]{1,31}$/', $type) || !is_array($def['fields'] ?? null)) continue;
+        // Older site files say kind 'cards' (before it became the generic list): same field, their own label.
+        foreach ($def['fields'] as $fk => $fdef) {
+            if (is_array($fdef) && ($fdef['kind'] ?? '') === 'cards') $def['fields'][$fk] = home_cards_list_def((string) ($fdef['label'] ?? 'Карти'));
+        }
         $out[$type] = ['builtin' => false, 'icon' => $def['icon'] ?? '▫️', 'label' => (string) ($def['label'] ?? $type),
                        'desc' => (string) ($def['desc'] ?? ''), 'note' => $def['note'] ?? null, 'fields' => $def['fields']];
     }
@@ -270,7 +284,7 @@ function home_types(): array {
             'desc' => 'Заглавие, текст и снимка отляво или отдясно, по желание с бутон.', 'note' => null,
             'fields' => ['heading' => $head, 'body' => $rich, 'photos' => [
                 'kind' => 'list', 'label' => 'Снимки', 'item' => 'Снимка', 'add' => '+ Добави снимка', 'remove' => 'Премахни снимката',
-                'plural' => 'снимки', 'plural_the' => 'снимките', 'min' => 0, 'max' => 4,
+                'plural' => 'снимки', 'one' => 'снимка', 'plural_the' => 'снимките', 'min' => 0, 'max' => 4,
                 'say' => ['added' => 'Добавена е нова снимка.', 'removed' => 'Снимката е премахната.', 'moved' => 'Снимката е на място %d. Редът се запазва с бутона „Запази“.'],
                 'fields' => [
                     'image'     => ['kind' => 'image', 'label' => 'Снимка', 'required' => true],
@@ -287,16 +301,12 @@ function home_types(): array {
             'fields' => ['heading' => $head, 'body' => $rich, 'background' => $bg('white')]],
         'cards' => ['builtin' => false, 'icon' => '🗂', 'label' => 'Карти',
             'desc' => 'От 2 до 4 карти, всяка със снимка, заглавие, кратък текст и линк.', 'note' => null,
-            'fields' => ['heading' => $head, 'cards' => [
-                'kind' => 'list', 'label' => 'Карти', 'item' => 'Карта', 'add' => '+ Добави карта', 'remove' => 'Премахни картата',
-                'plural' => 'карти', 'plural_the' => 'картите', 'min' => 2, 'max' => 4, 'preview' => true,
-                'say' => ['added' => 'Добавена е нова карта.', 'removed' => 'Картата е премахната.', 'moved' => 'Картата е на място %d. Редът се запазва с бутона „Запази“.'],
-                'fields' => HOME_CARD_FIELDS], 'background' => $bg('white')]],
+            'fields' => ['heading' => $head, 'cards' => home_cards_list_def(), 'background' => $bg('white')]],
         'people' => ['builtin' => false, 'icon' => '👥', 'label' => 'Хора',
             'desc' => 'Списък с хора — снимка, име, роля и кратък текст за всеки. За екип, доброволци или истории.', 'note' => null,
             'fields' => ['heading' => $head, 'people' => [
                 'kind' => 'list', 'label' => 'Хора', 'item' => 'Човек', 'add' => '+ Добави човек', 'remove' => 'Премахни човека',
-                'plural' => 'души', 'plural_the' => 'хората', 'min' => 1, 'max' => 30, 'preview' => true,
+                'plural' => 'души', 'one' => 'човек', 'plural_the' => 'хората', 'min' => 1, 'max' => 30, 'preview' => true,
                 'say' => ['added' => 'Добавен е нов човек.', 'removed' => 'Човекът е премахнат.', 'moved' => 'Човекът е на място %d. Редът се запазва с бутона „Запази“.'],
                 'fields' => HOME_PERSON_FIELDS], 'background' => $bg('white')]],
         'video' => ['builtin' => false, 'icon' => '▶️', 'label' => 'Видео',
@@ -855,7 +865,10 @@ function home_section_preview(array $s): string {
     }
     $defs = home_types()[$s['type'] ?? '']['fields'] ?? [];
     foreach ($defs as $k => $d) {
-        if (($d['kind'] ?? '') === 'list' && !empty($d['preview'])) return count($f[$k] ?? []) . ' ' . ($d['plural'] ?? 'елемента');
+        if (($d['kind'] ?? '') === 'list' && !empty($d['preview'])) {
+            $n = count($f[$k] ?? []);
+            return $n . ' ' . ($n === 1 ? ($d['one'] ?? $d['plural'] ?? 'елемент') : ($d['plural'] ?? 'елемента'));
+        }
     }
     foreach (['heading', 'title', 'text', 'body', 'intro'] as $k) {
         $v = (string) ($f[$k]['bg'] ?? '');
@@ -1006,7 +1019,8 @@ function home_inline_save(string $id, array $fields): array {
             if ($ldef === null || $ldef['kind'] !== 'list') continue;
             $def = $ldef['fields'][$parts[2]] ?? null;
             $item_pos = home_list_find(is_array($doc['sections'][$i]['fields'][$parts[0]] ?? null) ? $doc['sections'][$i]['fields'][$parts[0]] : [], $parts[1]);
-            if ($def === null || $item_pos === null) continue;
+            if ($def === null) continue;
+            if ($item_pos === null) return ['ok' => false, 'error' => 'Тази снимка вече е премахната. Презаредете страницата.'];
             $stored = $doc['sections'][$i]['fields'][$parts[0]][$item_pos][$parts[2]] ?? null;
         } else {
             $def = $defs[$key] ?? null;
@@ -1130,6 +1144,26 @@ function home_apply_uploads(array &$in, string $type, array $files, string $sid)
     return $errors;
 }
 
+/** A list item whose photo changed keeps no crop of the old one: its 'focus' field becomes null. Matched by item id. */
+function home_drop_stale_focus(string $type, array &$fields, array $old): void {
+    foreach (home_types()[$type]['fields'] ?? [] as $key => $def) {
+        if (($def['kind'] ?? '') !== 'list' || !is_array($fields[$key] ?? null)) continue;
+        $was = [];
+        foreach (is_array($old[$key] ?? null) ? $old[$key] : [] as $item) {
+            if (is_array($item) && isset($item['id'])) $was[$item['id']] = $item;
+        }
+        foreach ($def['fields'] as $fk => $fdef) {
+            if (($fdef['kind'] ?? '') !== 'focus') continue;
+            $img = $fdef['for'] ?? '';
+            foreach ($fields[$key] as $n => $item) {
+                if (($fields[$key][$n][$fk] ?? null) !== null && (string) ($was[$item['id']][$img] ?? '') !== (string) ($item[$img] ?? '')) {
+                    $fields[$key][$n][$fk] = null;
+                }
+            }
+        }
+    }
+}
+
 /**
  * Handle admin/home-sections.php's action=save POST: resolve the target section
  * (existing id, or a brand-new non-builtin type), apply uploads, validate, fetch
@@ -1166,6 +1200,7 @@ function home_admin_save(array $doc, array $post, array $files, ?callable $fetch
     $upload_errors     = home_apply_uploads($in, $type, $files, $sid);
     [$fields, $errors] = home_validate_section($type, $in);
     $errors += $upload_errors;
+    if (!$errors) home_drop_stale_focus($type, $fields, $old);
 
     // The framing is set on the live page; the form only offers to reset it. A new
     // photo keeps the frame's size and shape but starts centred.

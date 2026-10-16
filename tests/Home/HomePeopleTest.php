@@ -158,6 +158,21 @@ final class HomePeopleTest extends TestCase
         $this->assertSame(1, substr_count($html, '.home-people__frame{max-width:160px'));
     }
 
+    public function test_frame_has_a_height_without_aspect_ratio_and_a_default_style_for_replaced_photos(): void
+    {
+        $html = $this->render([$this->person(['image' => '/assets/images/a.jpg', 'focus' => ['x' => 100, 'y' => 0, 'w' => 300, 'h' => 400, 'iw' => 1200, 'ih' => 800]])]);
+        $this->assertStringContainsString('padding-top:133.3333%', $html, 'older iPhones have no aspect-ratio');
+        $this->assertStringContainsString('data-cms-img-style="' . h(home_focus_style(null)) . '"', $html);
+    }
+
+    public function test_focus_control_names_its_row_and_is_labelled_by_it(): void
+    {
+        $html = hs_list_row('people', home_types()['people']['fields']['people'], '1', ['id' => 'i_pppp02'], [], 2);
+        $this->assertStringContainsString('Човек 2 — Коя част от снимката да се вижда', $html);
+        $this->assertMatchesRegularExpression('/aria-labelledby="f_people_1_focus_label f_people_1_focus"/', $html);
+        $this->assertStringContainsString('padding-top:133.3333%', $html);
+    }
+
     public function test_render_each_photo_replaceable(): void
     {
         $GLOBALS['_show_admin_bar'] = true;
