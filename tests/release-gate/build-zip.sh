@@ -25,7 +25,11 @@ $exactFiles  = ["phpunit.xml", "playwright.config.js", "package.json", "package-
                 "CLAUDE.md", ".gitignore",
                 // Site-owned: a site keeps its own theme and wording here, and a
                 // release must never carry (and so overwrite) one.
-                "includes/themes-site.php", "content/bg/strings.site.json", "content/en/strings.site.json"];
+                "includes/themes-site.php", "content/bg/strings.site.json", "content/en/strings.site.json",
+                // Site content edited on the site (centres, numbers, partners). A
+                // fresh install reads a missing file as an empty list; an update
+                // must never replace the site copy with an empty placeholder.
+                "content/centres.json", "content/impact.json", "content/partners.json"];
 $exclude = function (string $rel) use ($dirPrefixes, $exactFiles): bool {
     if (in_array($rel, $exactFiles, true)) return true;
     if (str_ends_with($rel, ".zip")) return true;
@@ -58,5 +62,6 @@ zip -rq "$OUT" . \
      "package.json" "package-lock.json" ".githooks/*" "deploy.php" \
      "relay/*" "docs/*" "CLAUDE.md" ".gitignore" \
      "includes/themes-site.php" "content/bg/strings.site.json" "content/en/strings.site.json" \
+     "content/centres.json" "content/impact.json" "content/partners.json" \
      "content/pages/*" "assets/images/pages/created/*"
 echo "Built $OUT"

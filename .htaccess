@@ -40,6 +40,9 @@ ErrorDocument 503 /errors/503.php
   RewriteRule \.(config\.php|log|sql|lock|example|yml|md)$ - [F,L]
   # (deploy.php must stay reachable — it is the GitHub webhook receiver.)
   RewriteRule (^|/)(migrate|install)\.php$ - [F,L]
+  # Composer's folder: libraries and vendor/composer/installed.json (which lists
+  # every library and version) are never for the web.
+  RewriteRule ^vendor(/|$) - [F,L]
 
   # Force HTTPS
   RewriteCond %{HTTPS} off

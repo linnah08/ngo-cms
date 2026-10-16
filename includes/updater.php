@@ -520,15 +520,20 @@ function updater_files_to_apply(array $newFiles): array
 }
 
 /**
- * Files the site owner replaces from the admin (Admin → Организация uploads the
- * logo and regenerates the favicon). The release ships placeholders at these
- * paths, but an existing live copy is always the owner's and is never
- * overwritten — even on a first self-update with no checksums.json baseline,
- * when conflict detection is otherwise off.
+ * Files that hold the site's own content: the logo and favicon (Admin →
+ * Организация), the front-page photo, and the centres, numbers and partners
+ * edited on the site. A release may ship a placeholder at these paths for a
+ * fresh install (hero.webp), but an existing live copy is always the owner's
+ * and is never overwritten — even on a first self-update with no
+ * checksums.json baseline, when conflict detection is otherwise off. The
+ * three content/*.json files are not shipped at all (tests/release-gate/
+ * build-zip.sh): a missing one reads as an empty list, exactly like the
+ * placeholder would.
  */
 function updater_owner_files(): array
 {
-    return ['assets/images/logo.png', 'assets/images/favicon.png'];
+    return ['assets/images/logo.png', 'assets/images/favicon.png', 'assets/images/hero.webp',
+            'content/centres.json', 'content/impact.json', 'content/partners.json'];
 }
 
 /**
