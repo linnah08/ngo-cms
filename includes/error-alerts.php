@@ -67,6 +67,25 @@ function error_alert_capture(string $error_class, string $message, string $file,
     }
 }
 
+/** Was this same error (type, message, file, line) already emailed in the last 24 hours? */
+function error_alert_sent_recently(array $row): bool
+{
+    $stmt = get_pdo()->prepare(
+        'SELECT 1 FROM error_alerts
+          WHERE id <> ? AND error_class = ? AND message = ? AND file = ? AND line = ?
+            AND sent_at IS NOT NULL AND sent_at > NOW() - INTERVAL 1 DAY
+          LIMIT 1'
+    );
+    $stmt->execute([
+        (int)($row['id'] ?? 0),
+        (string)($row['error_class'] ?? ''),
+        (string)($row['message'] ?? ''),
+        (string)($row['file'] ?? ''),
+        (int)($row['line'] ?? 0),
+    ]);
+    return $stmt->fetchColumn() !== false;
+}
+
 function error_alert_send_immediate(array $row, string $email): void
 {
     try {
@@ -82,6 +101,13 @@ function error_alert_send_immediate(array $row, string $email): void
         $lastHash = setting_get('error_alert_last_hash');
         $lastAt   = setting_get('error_alert_last_hash_at');
         if ($lastHash === $hash && $lastAt !== '' && (time() - (int)strtotime($lastAt)) < 300) {
+            return;
+        }
+        // One email a day per identical error. A scheduled job that hits the same
+        // problem on every run (e.g. the bank not knowing one order's payment)
+        // would otherwise mail the admin every 15–30 minutes. Every occurrence is
+        // still recorded in error_alerts; only the repeat email is held back.
+        if (error_alert_sent_recently($row)) {
             return;
         }
 

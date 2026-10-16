@@ -113,6 +113,45 @@ final class ErrorAlertsTest extends TestCase
         setting_set('error_alert_last_hash_at', '');
     }
 
+    private function insertAlert(string $message, ?string $sentAt): int
+    {
+        self::$pdo->prepare(
+            "INSERT INTO error_alerts (error_class, message, file, line, sent_at) VALUES ('TestCapture', ?, '/f.php', 9, ?)"
+        )->execute([$message, $sentAt]);
+        return (int) self::$pdo->lastInsertId();
+    }
+
+    private function alertRow(int $id): array
+    {
+        $sel = self::$pdo->prepare('SELECT * FROM error_alerts WHERE id = ?');
+        $sel->execute([$id]);
+        return $sel->fetch(\PDO::FETCH_ASSOC);
+    }
+
+    public function testSameErrorAlreadyEmailedTodayIsNotEmailedAgain(): void
+    {
+        $this->insertAlert('Repeat test', date('Y-m-d H:i:s', time() - 3600));
+        $repeat = $this->insertAlert('Repeat test', null);
+
+        $this->assertTrue(error_alert_sent_recently($this->alertRow($repeat)));
+
+        error_alert_send_immediate($this->alertRow($repeat), 'test@example.com');
+        $this->assertNull($this->alertRow($repeat)['sent_at'], 'the repeat is recorded but not emailed');
+    }
+
+    public function testSameErrorEmailedMoreThanADayAgoOrADifferentErrorIsEmailed(): void
+    {
+        $this->insertAlert('Old repeat', date('Y-m-d H:i:s', time() - 2 * 86400));
+        $this->assertFalse(error_alert_sent_recently($this->alertRow($this->insertAlert('Old repeat', null))));
+
+        $this->insertAlert('Order A failed', date('Y-m-d H:i:s'));
+        $this->assertFalse(error_alert_sent_recently($this->alertRow($this->insertAlert('Order B failed', null))));
+
+        // Never emailed before (alerts were only recorded) — the next one still goes out.
+        $this->insertAlert('Unsent before', null);
+        $this->assertFalse(error_alert_sent_recently($this->alertRow($this->insertAlert('Unsent before', null))));
+    }
+
     // ── AI auto-fix groundwork: polling API support ─────────────────────────
     // (No ai_status/outcome tracking here — that lands with the routine itself.)
 
