@@ -72,7 +72,8 @@ foreach (['bg' => '/novini/', 'en' => '/en/news/'] as $lang => $prefix) {
 // ── Pages created in Admin → Страници: published ones only ────────────────
 require_once __DIR__ . '/includes/created_pages.php';
 foreach (cpage_all() as $cp) {
-    if ($cp['status'] !== 'published' || $cp['slug_bg'] === '' || $cp['slug_en'] === '') continue;
+    // A built-in page built from blocks (За нас) is already listed with the static pages.
+    if ($cp['status'] !== 'published' || $cp['slug_bg'] === '' || $cp['slug_en'] === '' || cpage_is_builtin($cp['id'])) continue;
     $lastmod = $cp['updated'] !== '' && strtotime($cp['updated']) ? date('Y-m-d', strtotime($cp['updated'])) : null;
     $urls[]  = [$base . cpage_url($cp, 'bg'), $lastmod];
     $urls[]  = [$base . cpage_url($cp, 'en'), $lastmod];

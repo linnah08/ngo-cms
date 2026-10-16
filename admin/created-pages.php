@@ -93,6 +93,7 @@ switch ($action) {
     case 'delete':
         $page = cpage_get($id);
         if ($page === null) cp_done($json, false, 'Страницата не е намерена — може би вече е изтрита.', '/admin/pages.php');
+        if (cpage_is_builtin($id)) cp_done($json, false, 'Тази страница е част от сайта и не може да се изтрие.', '/admin/page-edit.php?id=' . $id);
         $menus = cpage_menus_using($page);
         if (!cpage_delete($id)) cp_done($json, false, 'Страницата не можа да се изтрие. Опитайте отново след малко.', '/admin/pages.php');
         cp_done($json, true, "Страницата \u{201E}{$page['title_bg']}\u{201C} е изтрита, заедно с нейните снимки."

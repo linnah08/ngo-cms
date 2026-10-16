@@ -191,6 +191,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     $cpv   = $cp_values ?? $cpage;
     $cpe   = $cp_errors;
     $draft = $cpage['status'] !== 'published';
+    $cp_builtin = cpage_is_builtin($cpage['id']);   // part of the site (За нас): no hiding, fixed addresses
     $site  = rtrim(SITE_URL, '/');
     $cp_untranslated = trim($cpv['title_en']) === trim($cpv['title_bg']) && preg_match('/\p{Cyrillic}/u', $cpv['title_en']) === 1;
     $cp_field = function (string $name, string $label, string $badge, array $extra = []) use ($cpv, $cpe): string {
@@ -214,6 +215,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       <p style="margin:0;font-weight:700;padding:.5rem .85rem;border-radius:6px;<?= $draft ? 'background:#fef3c7;color:#78350f;border:1px solid #b45309;' : 'background:#f0fdf4;color:#14532d;border:1px solid #15803d;' ?>">
         <?= $draft ? '<span aria-hidden="true">✎ </span>Чернова — не се вижда от посетителите' : '<span aria-hidden="true">● </span>Публикувана — вижда се на сайта' ?>
       </p>
+      <?php if (!$cp_builtin): ?>
       <form method="POST" action="/admin/created-pages.php" style="margin:0;">
         <?= csrf_field() ?>
         <input type="hidden" name="action" value="<?= $draft ? 'publish' : 'unpublish' ?>">
@@ -221,8 +223,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <input type="hidden" name="back" value="edit">
         <button type="submit" id="btn-publish-page" class="btn <?= $draft ? 'btn--primary' : 'btn--outline' ?>" style="min-height:44px;"><?= $draft ? 'Публикувай' : 'Скрий от сайта' ?></button>
       </form>
+      <?php endif; ?>
     </div>
-    <h2 id="cpSettingsTitle" tabindex="-1" style="font-size:1.15rem;margin:0 0 .75rem;">Заглавие и адрес</h2>
+    <h2 id="cpSettingsTitle" tabindex="-1" style="font-size:1.15rem;margin:0 0 .75rem;"><?= $cp_builtin ? 'Заглавие' : 'Заглавие и адрес' ?></h2>
     <?php if ($cpe): ?>
       <div id="cpErrSummary" role="alert" tabindex="-1" style="border:2px solid #b91c1c;background:#fef2f2;color:#7f1d1d;border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem;">
         <p style="margin:0 0 .4rem;font-weight:700;"><span aria-hidden="true">⚠ </span>Не е запазено. Поправете следното:</p>
@@ -244,6 +247,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
           <?= $cp_field('title_en', 'Заглавие', hs_badge('en'), ['attrs' => ' data-translate-from="title_bg"', 'hint_id' => 'cp_title_en_note']) ?>
           <p id="cp_title_en_note" style="margin:.35rem 0 0;font-size:.85rem;color:#92400e;<?= $cp_untranslated ? '' : 'display:none;' ?>"><?= $cp_untranslated ? '⚠ Не е преведено — на английски засега стои българското заглавие. Натиснете „✦ Translate“ или го напишете.' : '' ?></p>
         </div>
+        <?php if (!$cp_builtin): ?>
         <div class="form-group" style="margin:0;">
           <?= $cp_field('slug_bg', 'Адрес', hs_badge('bg'), [
                 'hint_id' => 'cp_slug_hint', 'attrs' => ' autocomplete="off" spellcheck="false" aria-required="true"',
@@ -254,12 +258,17 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
                 'hint_id' => 'cp_slug_hint', 'attrs' => ' autocomplete="off" spellcheck="false" aria-required="true"',
                 'prefix'  => '<span style="display:block;font-size:.82rem;color:var(--text-muted);margin-bottom:.2rem;">' . h($site) . '/en/</span>']) ?>
         </div>
+        <?php endif; ?>
       </div>
+      <?php if ($cp_builtin): ?>
+      <p style="margin:.75rem 0 0;">Адресът на тази страница не може да се променя.</p>
+      <?php else: ?>
       <p id="cp_slug_hint" style="font-size:.85rem;color:var(--text-muted);margin:.75rem 0 0;">
         Адресът е частта след името на сайта: само малки латински букви, цифри и тирета (например <code>nashata-istoriya</code>).
         Ако го смените, връзките в менютата се пренасочват сами.
       </p>
-      <button type="submit" class="btn btn--primary" style="min-height:44px;margin-top:1rem;">Запази заглавието и адреса</button>
+      <?php endif; ?>
+      <button type="submit" class="btn btn--primary" style="min-height:44px;margin-top:1rem;"><?= $cp_builtin ? 'Запази заглавието' : 'Запази заглавието и адреса' ?></button>
     </form>
     <p style="margin:1rem 0 0;font-size:.9rem;">
       На сайта:

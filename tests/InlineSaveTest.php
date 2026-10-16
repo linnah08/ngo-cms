@@ -154,6 +154,80 @@ final class InlineSaveTest extends TestCase
         $this->assertSame('Home', $menus['header']['en'][0]['label'], 'EN not sent, so untouched');
     }
 
+    // ── inline-save.php: a page's own title (pagetitle:<page id>) ───────────
+
+    /** A page file in a temp folder the endpoint is pointed at; returns that folder. */
+    private function pageDir(): string
+    {
+        $dir = sys_get_temp_dir() . '/om-pagetitle-' . bin2hex(random_bytes(4));
+        mkdir($dir, 0755, true);
+        file_put_contents($dir . '/p_abcd1234.json', json_encode(['version' => 1, 'rev' => 3, 'id' => 'p_abcd1234',
+            'status' => 'published', 'title_bg' => 'Стара', 'title_en' => 'Old', 'slug_bg' => 'stara', 'slug_en' => 'old',
+            'sections' => [], 'created' => '', 'updated' => ''], JSON_UNESCAPED_UNICODE));
+        return $dir;
+    }
+
+    private function dropDir(string $dir): void
+    {
+        foreach (glob($dir . '/{,.}*', GLOB_BRACE) ?: [] as $f) if (is_file($f)) unlink($f);
+        @rmdir($dir);
+    }
+
+    private function savePageTitle(string $dir, string $id, array $title): array
+    {
+        return $this->save('inline-save.php', ['section' => 'pagetitle:' . $id, 'fields' => ['title' => $title]],
+            ['globals' => ['_om_pages_dir' => $dir]]);
+    }
+
+    private function storedPage(string $dir): array
+    {
+        return json_decode((string) file_get_contents($dir . '/p_abcd1234.json'), true);
+    }
+
+    public function test_pagetitle_saves_both_languages(): void
+    {
+        $dir = $this->pageDir();
+        try {
+            $r = $this->savePageTitle($dir, 'p_abcd1234', ['bg' => 'Нова &amp; <b>страница</b>', 'en' => ' New  title ']);
+            $this->assertSame(['ok' => true], $r['json'], $r['body']);
+            $p = $this->storedPage($dir);
+            $this->assertSame(['Нова & страница', 'New title', 4], [$p['title_bg'], $p['title_en'], $p['rev']]);
+            $this->assertSame(['stara', 'old', 'published'], [$p['slug_bg'], $p['slug_en'], $p['status']], 'nothing else changes');
+        } finally {
+            $this->dropDir($dir);
+        }
+    }
+
+    public function test_pagetitle_refuses_empty_bg(): void
+    {
+        $dir = $this->pageDir();
+        try {
+            $before = file_get_contents($dir . '/p_abcd1234.json');
+            $r = $this->savePageTitle($dir, 'p_abcd1234', ['bg' => ' <br> ', 'en' => 'New']);
+            $this->assertSame(['ok' => false, 'error' => 'Заглавието не може да е празно.'], $r['json'], $r['body']);
+            $this->assertSame($before, file_get_contents($dir . '/p_abcd1234.json'));
+        } finally {
+            $this->dropDir($dir);
+        }
+    }
+
+    public function test_pagetitle_unknown_page(): void
+    {
+        $dir = $this->pageDir();
+        try {
+            foreach (['p_zzzz9999', '../pages', 'p_abcd1234:x', ''] as $id) {
+                $r = $this->savePageTitle($dir, $id, ['bg' => 'X', 'en' => 'X']);
+                $this->assertSame(['ok' => false, 'error' => 'unknown page'], $r['json'], $id . ': ' . $r['body']);
+            }
+            $r = $this->save('inline-save.php', ['section' => 'pagetitle:p_abcd1234', 'fields' => ['title' => ['bg' => 'X']]],
+                ['role' => null, 'globals' => ['_om_pages_dir' => $dir]]);
+            $this->assertSame('unauthorized', $r['json']['error'] ?? null);
+            $this->assertSame('Стара', $this->storedPage($dir)['title_bg']);
+        } finally {
+            $this->dropDir($dir);
+        }
+    }
+
     // ── inline-save-article.php ──────────────────────────────────────────────
 
     public function test_article_title_saves_to_each_language(): void

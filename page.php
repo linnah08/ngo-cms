@@ -44,47 +44,12 @@ $seo_canonical    = rtrim(SITE_URL, '/') . cpage_url($_cp_page, $lang);
 $page_title       = cpage_title($_cp_page, $lang);
 $page_description = cpage_description($_cp_page, $lang);
 
-home_target_page($_cp_page['id']);
-$_cp_doc = home_load()['doc'];
-
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
-if ($_cp_draft): ?>
-<div role="status" style="background:#fef3c7;border-bottom:3px solid #b45309;color:#78350f;">
-  <div style="max-width:1200px;margin:0 auto;padding:.85rem 1rem;display:flex;flex-wrap:wrap;gap:.75rem 1.25rem;align-items:center;justify-content:space-between;">
-    <p style="margin:0;font-weight:700;font-size:1rem;line-height:1.4;">
-      <span aria-hidden="true">✎ </span>Чернова — не се вижда от посетителите
-    </p>
-    <div style="display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;">
-      <a href="/admin/page-edit.php?id=<?= h($_cp_page['id']) ?>"
-         style="display:inline-flex;align-items:center;min-height:44px;padding:0 1rem;border:2px solid #78350f;border-radius:6px;color:#78350f;font-weight:600;text-decoration:none;background:#fff;">Редактирай</a>
-      <form method="POST" action="/admin/created-pages.php" style="margin:0;">
-        <?= csrf_field() ?>
-        <input type="hidden" name="action" value="publish">
-        <input type="hidden" name="id" value="<?= h($_cp_page['id']) ?>">
-        <input type="hidden" name="back" value="view">
-        <button type="submit" style="min-height:44px;padding:0 1.1rem;border:2px solid #166534;border-radius:6px;background:#166534;color:#fff;font-weight:700;font-size:1rem;cursor:pointer;">Публикувай</button>
-      </form>
-    </div>
-  </div>
-</div>
-<?php endif; ?>
+// Draft bar, title and sections: shared with the built-in pages built from blocks (За нас).
+$_bp_page  = $_cp_page;
+$_bp_label = '';
+$_bp_draft = $_cp_draft;
+require $_SERVER['DOCUMENT_ROOT'] . '/templates/block-page.php';
 
-<section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
-  <div class="container">
-    <h1 style="margin:0;"><?= h($page_title) ?></h1>
-  </div>
-</section>
-
-<?php
-if (!$_cp_doc['sections'] && $_cp_draft): ?>
-<section class="section">
-  <div class="container container--narrow">
-    <p style="color:var(--text-muted);">Страницата още няма съдържание. Добавете секции от „Редактирай“.</p>
-  </div>
-</section>
-<?php endif;
-
-home_render($_cp_doc, $lang);
-home_target_reset();
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/footer.php';

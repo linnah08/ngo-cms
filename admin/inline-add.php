@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') add_json(['ok' => false, 'error' => '
 if (!csrf_verify()) add_json(['ok' => false, 'error' => 'csrf']);
 
 $type = trim($_POST['type'] ?? '');
-$allowed_types = ['team', 'partner', 'impact', 'centre', 'faq'];
+$allowed_types = ['partner', 'impact', 'centre', 'faq'];
 if (!in_array($type, $allowed_types, true)) add_json(['ok' => false, 'error' => 'unknown type']);
 
 // Helper: upload an image file from $_FILES
@@ -34,20 +34,6 @@ function _inline_add_upload(string $field, string $dir): string {
 }
 
 switch ($type) {
-    case 'team':
-        $photo = _inline_add_upload('photo', '/assets/images/pages');
-        $pages = load_json(CONTENT_PATH . '/pages.json');
-        if (!isset($pages['about']['team'])) $pages['about']['team'] = [];
-        $pages['about']['team'][] = [
-            'name'    => trim(strip_tags($_POST['name_bg'] ?? '')),
-            'name_en' => trim(strip_tags($_POST['name_en'] ?? '')),
-            'role'    => trim(strip_tags($_POST['role_bg'] ?? '')),
-            'role_en' => trim(strip_tags($_POST['role_en'] ?? '')),
-            'photo'   => $photo,
-        ];
-        save_json(CONTENT_PATH . '/pages.json', $pages);
-        add_json(['ok' => true]);
-
     case 'partner':
         $logo = _inline_add_upload('logo', '/assets/images/pages');
         $partners = load_json(PARTNERS_FILE);

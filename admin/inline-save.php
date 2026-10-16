@@ -178,13 +178,23 @@ if (is_string($section) && str_starts_with($section, 'page:')) {
     save_json_response(home_inline_save($parts[2], $fields));
 }
 
-// The built-in About page (/za-nas/, /en/about/): title, intro and team bios (bio_<n>).
-if ($section === 'about') {
-    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/about.php';
-    $pages = load_json(CONTENT_PATH . '/pages.json');
-    $pages['about'] = about_inline_apply(is_array($pages['about'] ?? null) ? $pages['about'] : [], $fields);
-    save_json(CONTENT_PATH . '/pages.json', $pages);
-    save_json_response(['ok' => true]);
+// The title of a page built from blocks — a created page or a built-in one such as
+// За нас: "pagetitle:<page id>", field "title". Nothing else of the page changes here.
+if (is_string($section) && str_starts_with($section, 'pagetitle:')) {
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/home.php';
+    $pid = substr($section, 10);
+    if (!cpage_valid_id($pid) || cpage_get($pid) === null) save_json_response(['ok' => false, 'error' => 'unknown page']);
+    $title = $fields['title'] ?? null;
+    if (!is_array($title)) save_json_response(['ok' => false, 'error' => 'invalid input']);
+    $r = cpage_update($pid, function (array $p) use ($title) {
+        // A language the editor did not send keeps its stored title.
+        foreach (['bg', 'en'] as $l) {
+            if (!array_key_exists($l, $title)) continue;
+            $p['title_' . $l] = cpage_clean_title(home_plain_text(is_string($title[$l]) ? $title[$l] : ''));
+        }
+        return $p['title_bg'] === '' ? 'Заглавието не може да е празно.' : $p;
+    });
+    save_json_response($r['ok'] ? ['ok' => true] : ['ok' => false, 'error' => $r['error']]);
 }
 
 // Allowed field map: section → [field_name => [bg_key, en_key]]

@@ -15,9 +15,16 @@ use PHPUnit\Framework\Attributes\DataProvider;
 final class HttpTest extends TestCase
 {
     private static string $base = '';
+    /** Visiting /za-nas/ writes the About page the first time: what was there before, so it can be put back. */
+    private static bool $aboutExisted = true;
+    private static bool $pagesDirExisted = true;
+
+    private static function aboutFile(): string { return CONTENT_PATH . '/pages/p_000about.json'; }
 
     public static function setUpBeforeClass(): void
     {
+        self::$pagesDirExisted = is_dir(dirname(self::aboutFile()));
+        self::$aboutExisted    = is_file(self::aboutFile());
         self::$base = TestServer::start();
         if (self::$base === '') {
             self::markTestSkipped('Could not start a local test server — skipping HTTP smoke tests.');
@@ -27,6 +34,14 @@ final class HttpTest extends TestCase
     public static function tearDownAfterClass(): void
     {
         TestServer::stop();
+        if (!self::$aboutExisted) {
+            @unlink(self::aboutFile());
+            @unlink(self::aboutFile() . '.lock');
+        }
+        if (!self::$pagesDirExisted) {
+            @unlink(dirname(self::aboutFile()) . '/.htaccess');
+            @rmdir(dirname(self::aboutFile()));
+        }
     }
 
     public static function publicPages(): array

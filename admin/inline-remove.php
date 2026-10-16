@@ -18,19 +18,10 @@ if (!csrf_matches($body['csrf_token'] ?? '')) rm_json(['ok' => false, 'error' =>
 $type    = $body['type'] ?? '';
 $id      = $body['id']   ?? '';
 
-$allowed_types = ['team', 'partner', 'impact', 'centre', 'article', 'product', 'faq'];
+$allowed_types = ['partner', 'impact', 'centre', 'article', 'product', 'faq'];
 if (!in_array($type, $allowed_types, true)) rm_json(['ok' => false, 'error' => 'unknown type']);
 
 switch ($type) {
-    case 'team':
-        $pages = load_json(CONTENT_PATH . '/pages.json');
-        $idx = (int)$id;
-        if (isset($pages['about']['team'][$idx])) {
-            array_splice($pages['about']['team'], $idx, 1);
-            save_json(CONTENT_PATH . '/pages.json', $pages);
-        }
-        break;
-
     case 'partner':
         $partners = load_json(PARTNERS_FILE);
         $idx = (int)$id;

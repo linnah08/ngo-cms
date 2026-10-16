@@ -21,6 +21,37 @@ const CPAGE_SLUG_RE = '/^[a-z0-9]+(?:-[a-z0-9]+)*$/';
 const CPAGE_SLUG_MAX  = 80;
 const CPAGE_TITLE_MAX = 150;
 
+/** За нас (/za-nas/, /en/about/): the first built-in page built from blocks. */
+const CPAGE_ABOUT_ID = 'p_000about';
+
+/**
+ * Built-in pages built from blocks. Each is stored like a created page, but it is
+ * part of the site: its own PHP file serves it at a fixed address, so it can't be
+ * deleted, hidden or moved. 'file' defines 'load', which returns the page and
+ * writes it the first time (see cpage_seed_once()).
+ * @return array<string, array{slug_bg: string, slug_en: string, file: string, load: string}>
+ */
+function cpage_builtins(): array
+{
+    return [
+        CPAGE_ABOUT_ID => ['slug_bg' => 'za-nas', 'slug_en' => 'about', 'file' => __DIR__ . '/about.php', 'load' => 'about_page'],
+    ];
+}
+
+function cpage_is_builtin(string $id): bool
+{
+    return isset(cpage_builtins()[$id]);
+}
+
+/** A built-in page, written from its seed if it doesn't exist yet; null for any other id. */
+function cpage_builtin_load(string $id): ?array
+{
+    $b = cpage_builtins()[$id] ?? null;
+    if ($b === null) return null;
+    require_once $b['file'];
+    return ($b['load'])();
+}
+
 /**
  * Addresses a created page may never take, beyond the site's own folders and
  * files: old addresses .htaccess redirects elsewhere, and names that are, or
@@ -235,6 +266,50 @@ function cpage_write_file(string $path, array $page): bool
 }
 
 /**
+ * A built-in page's file, written from $seed() only when there is none yet.
+ * The file is created with fopen(…, 'x') under the page's lock, so when two
+ * requests arrive at once only one writes it, and an existing file (another
+ * request won, or an admin has edited the page) is read, never overwritten.
+ * If the file is there but unreadable, the seed is shown and the file left alone.
+ */
+function cpage_seed_once(string $id, callable $seed): array
+{
+    $page = cpage_get($id);
+    if ($page !== null) return $page;
+    $path = cpage_file($id);
+    if ($path === null) throw new InvalidArgumentException('not a page id');
+    $dir = dirname($path);
+    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+    if (!is_file($dir . '/.htaccess')) @file_put_contents($dir . '/.htaccess', "Require all denied\n");
+
+    $new  = null;
+    $lock = @fopen($path . '.lock', 'c');
+    if ($lock !== false && flock($lock, LOCK_EX)) {
+        try {
+            clearstatcache(true, $path);
+            if (!file_exists($path)) {
+                $new  = $seed();
+                $json = json_encode($new, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $fh   = $json !== false ? @fopen($path, 'x') : false;
+                if ($fh !== false) {
+                    $ok = fwrite($fh, $json) === strlen($json);
+                    fclose($fh);
+                    if (!$ok) { @unlink($path); error_log("cpage_seed_once: could not write $id"); }
+                }
+            }
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+    }
+    cpage_cache_reset();
+    $page = cpage_get($id);
+    if ($page !== null) return $page;
+    error_log("cpage_seed_once: $id could not be read or written — showing its starting content");
+    return cpage_normalize($new ?? $seed(), $id) ?? throw new RuntimeException('bad seed for ' . $id);
+}
+
+/**
  * Create a draft page. $slug_bg / $slug_en are used when given and free;
  * otherwise addresses are built from the titles.
  * @return array{ok: bool, page?: array, error?: string}
@@ -298,6 +373,9 @@ function cpage_update(string $id, callable $fn): array
 function cpage_set_status(string $id, string $status): array
 {
     $status = $status === 'published' ? 'published' : 'draft';
+    if ($status === 'draft' && cpage_is_builtin($id)) {
+        return ['ok' => false, 'error' => 'Тази страница е част от сайта и винаги се вижда.'];
+    }
     return cpage_update($id, function (array $p) use ($status) {
         if ($status === 'published' && ($p['slug_bg'] === '' || $p['slug_en'] === '')) {
             return 'Страницата няма адрес. Попълнете адресите в настройките ѝ и опитайте отново.';
@@ -319,9 +397,15 @@ function cpage_save_settings(string $id, array $in): array
         'slug_bg'  => is_string($in['slug_bg'] ?? null) ? strtolower(trim($in['slug_bg'], " \t\n\r\0\x0B/")) : '',
         'slug_en'  => is_string($in['slug_en'] ?? null) ? strtolower(trim($in['slug_en'], " \t\n\r\0\x0B/")) : '',
     ];
+    // A built-in page keeps its addresses whatever is posted.
+    $builtin = cpage_builtins()[$id] ?? null;
+    if ($builtin !== null) {
+        $v['slug_bg'] = $builtin['slug_bg'];
+        $v['slug_en'] = $builtin['slug_en'];
+    }
     $errors = [];
     if ($v['title_bg'] === '') $errors['title_bg'] = 'Напишете заглавие на български.';
-    foreach (['bg', 'en'] as $l) {
+    foreach ($builtin === null ? ['bg', 'en'] : [] as $l) {
         $e = cpage_slug_error($l, $v["slug_$l"], $id);
         if ($e !== null) $errors["slug_$l"] = $e;
     }
@@ -339,6 +423,7 @@ function cpage_save_settings(string $id, array $in): array
  */
 function cpage_delete(string $id): bool
 {
+    if (cpage_is_builtin($id)) return false;   // part of the site
     $path = cpage_file($id);
     if ($path === null || !is_file($path)) return false;
     $page = cpage_normalize(json_decode((string) @file_get_contents($path), true), $id);

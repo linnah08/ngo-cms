@@ -31,7 +31,6 @@ final class BottomSaveButtonTest extends TestCase
             'pages: campaignForm'               => [$dir . 'pages.php',        'campaignForm',      'Campaign page form'],
             'pages: impactEditForm'             => [$dir . 'pages.php',        'impactEditForm',    'Impact item form'],
             'pages: centresForm'                => [$dir . 'pages.php',        'centresForm',       'Centres page form'],
-            'pages: aboutForm'                  => [$dir . 'pages.php',        'aboutForm',         'About page form'],
             'pages: projectEditForm'            => [$dir . 'pages.php',        'projectEditForm',   'Projects page form'],
             'pages: helpForm'                   => [$dir . 'pages.php',        'helpForm',          'Help page form'],
             'pages: shopForm'                   => [$dir . 'pages.php',        'shopForm',          'Shop page form'],

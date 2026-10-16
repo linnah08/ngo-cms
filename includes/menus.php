@@ -389,7 +389,8 @@ function menu_pick_options(): array
 {
     $created = [];
     foreach (cpage_all() as $p) {
-        if ($p['slug_bg'] === '' || $p['slug_en'] === '') continue;
+        // A built-in page built from blocks (За нас) is already among the built-in ones.
+        if ($p['slug_bg'] === '' || $p['slug_en'] === '' || cpage_is_builtin($p['id'])) continue;
         $created[cpage_url($p, 'bg')] = $p;
     }
     return ['builtin' => path_builtin_names(), 'created' => $created];

@@ -4,6 +4,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pages_admin.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/created_pages.php';   // CPAGE_ABOUT_ID: За нас is edited in page-edit.php
 $active_nav = 'pages';
 
 admin_require_login();
@@ -163,61 +164,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         save_json(CENTRES_FILE, array_values($indexed));
         header('Location: /admin/pages.php?page=centres&saved=1'); exit;
 
-    } elseif ($section === 'about') {
-        // Saves title and intro only — team is managed by team_save / team_delete
-        $pages = load_json(CONTENT_PATH . '/pages.json');
-        $pages['about']['title']    = trim($_POST['about_title']    ?? '');
-        $pages['about']['intro']    = trim($_POST['about_intro']    ?? '');
-        $pages['about']['title_en'] = trim($_POST['about_title_en'] ?? '');
-        $pages['about']['intro_en'] = trim($_POST['about_intro_en'] ?? '');
-        save_json(CONTENT_PATH . '/pages.json', $pages);
-        header('Location: /admin/pages.php?page=about&saved=1&_asclear=page:about'); exit;
-
-    } elseif ($section === 'team_delete') {
-        $pages = load_json(CONTENT_PATH . '/pages.json');
-        $team  = pages_list_delete($pages['about']['team'] ?? [], (int)($_POST['team_index'] ?? -1));
-        if ($team !== null) {
-            $pages['about']['team'] = $team;
-            save_json(CONTENT_PATH . '/pages.json', $pages);
-            flash_set('success', 'Членът е изтрит.');
-        }
-        header('Location: /admin/pages.php?page=about');
-        exit;
-
-    } elseif ($section === 'team_save') {
-        $pages = load_json(CONTENT_PATH . '/pages.json');
-
-        // Handle file upload (kept in the controller — the list maths is pure).
-        $photo = trim($_POST['member_photo_current'] ?? '');
-        if (
-            !empty($_FILES['member_photo_file']['tmp_name']) &&
-            $_FILES['member_photo_file']['error'] === UPLOAD_ERR_OK
-        ) {
-            $ext = strtolower(pathinfo($_FILES['member_photo_file']['name'], PATHINFO_EXTENSION));
-            if (in_array($ext, ['jpg', 'jpeg', 'png', 'webp'])) {
-                $dir = $_SERVER['DOCUMENT_ROOT'] . '/assets/images/team/';
-                if (!is_dir($dir)) mkdir($dir, 0755, true);
-                $filename = 'member-' . uniqid() . '.' . $ext;
-                if (move_uploaded_file($_FILES['member_photo_file']['tmp_name'], $dir . $filename)) {
-                    image_resize_to_fit($dir . $filename);
-                    $photo = '/assets/images/team/' . $filename;
-                }
-            }
-        }
-
-        $member = [
-            'name'    => trim($_POST['member_name']    ?? ''),
-            'role'    => trim($_POST['member_role']    ?? ''),
-            'role_en' => trim($_POST['member_role_en'] ?? ''),
-            'photo'   => $photo,
-            'bio'     => trim($_POST['member_bio']     ?? ''),
-            'bio_en'  => trim($_POST['member_bio_en']  ?? ''),
-        ];
-
-        $pages['about']['team'] = pages_list_upsert($pages['about']['team'] ?? [], $_POST['team_index'] ?? 'new', $member);
-        save_json(CONTENT_PATH . '/pages.json', $pages);
-        header('Location: /admin/pages.php?page=about&saved=1&_asclear=page:team:' . (int)($_POST['team_index'] ?? 0));
-        exit;
+    } elseif (in_array($section, ['about', 'team_save', 'team_delete'], true)) {
+        // An old open tab from before За нас was built from blocks.
+        flash_set('error', 'Страница „За нас“ вече се редактира на ново място. Моля, въведете промените отново там.');
+        header('Location: /admin/page-edit.php?id=' . CPAGE_ABOUT_ID); exit;
 
     } elseif ($section === 'projects_delete') {
         $pages   = load_json(CONTENT_PATH . '/pages.json');
@@ -363,7 +313,6 @@ $all_pages = load_json(CONTENT_PATH . '/pages.json');
 $home      = $all_pages['home']        ?? [];
 $impact    = get_impact();
 $centres   = get_centres();
-$about     = $all_pages['about']       ?? [];
 $projects  = $all_pages['projects']    ?? [];
 $help      = $all_pages['how_to_help'] ?? [];
 $shop      = $all_pages['shop']        ?? [];
@@ -433,7 +382,7 @@ $cp_flash = flash_get();
 <!-- ── Pages the admin created (content/pages/, admin/created-pages.php) ──── -->
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/menus.php';
-$cp_list  = cpage_all();
+$cp_list  = array_filter(cpage_all(), fn(array $p): bool => !cpage_is_builtin($p['id']));   // За нас is listed below, with the site's pages
 ?>
 <section aria-labelledby="cpListTitle" style="margin-bottom:2.5rem;">
   <h2 id="cpListTitle" style="margin:0 0 .5rem;font-size:1.15rem;">Вашите страници</h2>
@@ -557,7 +506,8 @@ $cp_list  = cpage_all();
           <?php endif; ?>
         </td>
         <td style="text-align:right;">
-          <a href="<?= $key === 'home' ? '/admin/home-sections.php' : ($key === 'reports' ? '/admin/financial-reports.php' : '/admin/pages.php?page=' . h($key)) ?>" class="btn btn--outline" style="font-size:0.85rem;padding:0.4rem 0.9rem;">
+          <a href="<?= match ($key) { 'home' => '/admin/home-sections.php', 'reports' => '/admin/financial-reports.php',
+                                       'about' => '/admin/page-edit.php?id=' . CPAGE_ABOUT_ID, default => '/admin/pages.php?page=' . h($key) } ?>" class="btn btn--outline" style="font-size:0.85rem;padding:0.4rem 0.9rem;">
             Редактиране
           </a>
         </td>
@@ -1099,345 +1049,14 @@ usort($impact, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
 </form>
 
 <?php elseif ($page === 'about'): ?>
-<!-- ══ ABOUT ══ -->
-<?php
-// ── Single team member edit ───────────────────────────────────────────────────
-$edit_team_idx = $_GET['edit_team'] ?? null;
-if ($edit_team_idx !== null):
-    $team_data = $about['team'] ?? [];
-    foreach ($team_data as $i => &$_p2) {
-        if (!isset($_p2['order'])) $_p2['order'] = $i;
-    }
-    unset($_p2);
-    usort($team_data, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
-
-    $is_new      = ($edit_team_idx === 'new');
-    $edit_member = $is_new
-        ? ['name' => '', 'role' => '', 'role_en' => '', 'photo' => '', 'bio' => '', 'bio_en' => '']
-        : ($team_data[(int)$edit_team_idx] ?? null);
-    if (!$is_new && !$edit_member): ?>
-        <p>Членът не е намерен. <a href="/admin/pages.php?page=about">← Назад</a></p>
-<?php else: ?>
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
-  <div>
-    <a href="/admin/pages.php?page=about" style="color:var(--text-muted);font-size:0.9rem;display:block;margin-bottom:.25rem;">← Назад към За нас</a>
-    <h1 style="margin:0;"><?= $is_new ? 'Нов член на екипа' : h($edit_member['name']) ?></h1>
-  </div>
-  <button type="submit" form="teamEditForm" class="btn btn--primary">Запази</button>
-</div>
-
-<form id="teamEditForm" method="POST" action="/admin/pages.php?page=about"
-      enctype="multipart/form-data" class="admin-form">
-  <?= csrf_field() ?>
-  <input type="hidden" name="section"              value="team_save">
-  <input type="hidden" name="team_index"           value="<?= h($edit_team_idx) ?>">
-  <input type="hidden" name="member_photo_current" value="<?= h($edit_member['photo'] ?? '') ?>">
-
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
-    <div class="form-group">
-      <label>Имена <?= $lbl_bg_badge ?></label>
-      <input type="text" id="memberNameBg" name="member_name"
-             value="<?= h($edit_member['name'] ?? '') ?>" required>
-    </div>
-    <div class="form-group">
-      <!-- name intentionally not translated — it's a proper noun -->
-    </div>
-    <div class="form-group">
-      <label>Роля <?= $lbl_bg_badge ?></label>
-      <input type="text" id="memberRoleBg" name="member_role"
-             value="<?= h($edit_member['role'] ?? '') ?>">
-    </div>
-    <div class="form-group">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
-        <label style="margin:0;">Role <?= $lbl_en_badge ?></label>
-        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
-                onclick="txField('memberRoleBg','memberRoleEn',this)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
-      </div>
-      <input type="text" id="memberRoleEn" name="member_role_en"
-             value="<?= h($edit_member['role_en'] ?? '') ?>">
-    </div>
-    <div class="form-group">
-      <label>Биография <?= $lbl_bg_badge ?></label>
-      <textarea id="teamBioBg" name="member_bio" rows="8"><?= h($edit_member['bio'] ?? '') ?></textarea>
-    </div>
-    <div class="form-group">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
-        <label style="margin:0;">Bio <?= $lbl_en_badge ?></label>
-        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
-                onclick="txField('teamBioBg','teamBioEn',this,true)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
-      </div>
-      <textarea id="teamBioEn" name="member_bio_en" rows="8"><?= h($edit_member['bio_en'] ?? '') ?></textarea>
-    </div>
-  </div>
-
-  <div class="form-group" style="margin-top:.5rem;">
-    <label>Снимка</label>
-    <?php if (!empty($edit_member['photo'])): ?>
-      <img src="<?= h($edit_member['photo']) ?>" alt=""
-           style="height:80px;border-radius:4px;margin-bottom:0.5rem;display:block;">
-    <?php endif; ?>
-    <input type="file" name="member_photo_file" accept="image/*" data-om-crop>
-    <small style="color:var(--text-muted);display:block;margin-top:.25rem;">Качи нова снимка (замества текущата).</small>
-  </div>
-
-  <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--border);">
-    <button type="submit" class="btn btn--primary">Запази</button>
-  </div>
-</form>
-<script>
-if (window._tinyBase) {
-  tinymce.init(Object.assign({}, window._tinyBase, { selector: '#teamBioBg, #teamBioEn', min_height: 200 }));
-}
-</script>
-<?php endif; ?>
-<?php
-require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-footer.php';
-exit;
-endif; // end $edit_team_idx !== null
-?>
-
-<!-- ══ ABOUT — title/intro form ══ -->
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
-  <div>
-    <a href="/admin/pages.php" style="color:var(--text-muted);font-size:0.9rem;display:block;margin-bottom:.25rem;">← Назад</a>
-    <h1 style="margin:0;">За нас</h1>
-  </div>
-  <button type="submit" form="aboutForm" class="btn btn--primary">Запази</button>
-</div>
-
-<?php if (!empty($_GET['saved'])): ?>
-  <div class="admin-alert admin-alert--success" style="margin-bottom:1.5rem;">Запазено успешно.</div>
-<?php endif; ?>
-
-<form id="aboutForm" method="POST" action="/admin/pages.php?page=about" class="admin-form">
-  <?= csrf_field() ?>
-  <input type="hidden" name="section" value="about">
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
-    <div class="form-group">
-      <label>Заглавие <?= $lbl_bg_badge ?></label>
-      <input type="text" id="aboutTitleBg" name="about_title" value="<?= h($about['title'] ?? '') ?>">
-    </div>
-    <div class="form-group">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
-        <label style="margin:0;">Title <?= $lbl_en_badge ?></label>
-        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
-                onclick="txField('aboutTitleBg','aboutTitleEn',this)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
-      </div>
-      <input type="text" id="aboutTitleEn" name="about_title_en" value="<?= h($about['title_en'] ?? '') ?>">
-    </div>
-    <div class="form-group">
-      <label>Уводен текст <?= $lbl_bg_badge ?></label>
-      <textarea id="aboutIntroBg" name="about_intro" rows="8"><?= h($about['intro'] ?? '') ?></textarea>
-      <small style="color:var(--text-muted);">Двоен нов ред = нов параграф.</small>
-    </div>
-    <div class="form-group">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
-        <label style="margin:0;">Intro <?= $lbl_en_badge ?></label>
-        <?php if (module_enabled_with_needs('ai_helpers')): ?><button type="button" class="btn btn--outline"
-                onclick="txField('aboutIntroBg','aboutIntroEn',this)"
-                style="font-size:.75rem;padding:.2rem .5rem;">✦ Translate</button><?php endif; ?>
-      </div>
-      <textarea id="aboutIntroEn" name="about_intro_en" rows="8"><?= h($about['intro_en'] ?? '') ?></textarea>
-    </div>
-  </div>
-  <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--border);">
-    <button type="submit" class="btn btn--primary">Запази</button>
-  </div>
-</form>
-<script>
-if (window._tinyBase) {
-  tinymce.init(Object.assign({}, window._tinyBase, { selector: '#aboutIntroBg, #aboutIntroEn', min_height: 200 }));
-}
-</script>
-
-<!-- ══ ABOUT — team sortable list ══ -->
-<?php
-$team_list = $about['team'] ?? [];
-foreach ($team_list as $i => &$_tp) {
-    if (!isset($_tp['order'])) $_tp['order'] = $i;
-}
-unset($_tp);
-usort($team_list, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
-?>
-<h2 style="margin:2.5rem 0 .5rem;">Екип</h2>
-<p style="color:var(--text-muted);margin:0 0 1rem;">По желание. Оставете празно, ако страницата разказва само историята — тогава разделът „Екипът“ не се показва.</p>
-
-<div id="teamReorderAnnounce" aria-live="polite" aria-atomic="true"
-     style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;"></div>
-
-<?php $flash_msgs = flash_get(); foreach ($flash_msgs as $f): ?>
-<div style="padding:.9rem 1.25rem;border-radius:6px;margin-bottom:1.5rem;
-  <?= $f['type']==='success' ? 'background:#e6f4ea;border:1px solid #a8d5b0;color:#2d6a35;' : 'background:#fdf0ef;border:1px solid #f0c4c0;color:#c0392b;' ?>">
-  <?= h($f['message']) ?>
-</div>
-<?php endforeach; ?>
-
-<div style="display:flex;justify-content:flex-end;margin-bottom:1rem;">
-  <a href="/admin/pages.php?page=about&edit_team=new" class="btn btn--primary">+ Нов член</a>
-</div>
-
-<input type="hidden" id="teamCsrfToken" name="csrf_token" value="<?= csrf_token() ?>">
-
-<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;">
-  <div style="overflow-x:auto;">
-  <table class="admin-table" style="width:100%;border-collapse:collapse;" id="teamTable">
-    <thead>
-      <tr style="background:var(--off-white);">
-        <th style="padding:.65rem .75rem;width:36px;" aria-label="Пренареди"></th>
-        <th style="padding:.65rem 1rem;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);">Член</th>
-        <th style="padding:.65rem 1rem;width:120px;"></th>
-        <th style="padding:.65rem .5rem;width:64px;text-align:center;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);">Ред</th>
-        <th style="padding:.65rem 1rem;width:120px;"></th>
-      </tr>
-    </thead>
-    <tbody id="teamBody">
-      <?php if (empty($team_list)): ?>
-        <tr><td colspan="5" style="padding:2rem;text-align:center;color:var(--text-muted);">Няма членове. <a href="/admin/pages.php?page=about&edit_team=new">Добавете първия →</a></td></tr>
-      <?php else: foreach ($team_list as $idx => $member):
-        $thumb = !empty($member['photo']) ? $member['photo'] : '';
-      ?>
-        <tr data-key="<?= h($member['name']) ?>" style="border-top:1px solid var(--border);cursor:default;">
-          <td style="padding:.5rem .75rem;text-align:center;">
-            <span class="team-drag-handle" draggable="true" aria-hidden="true"
-                  style="cursor:grab;font-size:1.1rem;color:var(--text-muted);user-select:none;display:inline-block;padding:.2rem .3rem;"
-                  title="Влачи за пренареждане">⠿</span>
-          </td>
-          <td style="padding:.75rem 1rem;">
-            <div style="display:flex;align-items:center;gap:.75rem;">
-              <?php if ($thumb): ?>
-                <img src="<?= h($thumb) ?>" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:50%;flex-shrink:0;">
-              <?php else: ?>
-                <div style="width:48px;height:48px;background:var(--off-white);border-radius:50%;flex-shrink:0;"></div>
-              <?php endif; ?>
-              <div>
-                <strong style="font-size:.9rem;"><?= h($member['name']) ?></strong>
-                <?php if (!empty($member['role'])): ?>
-                  <div style="font-size:.78rem;color:var(--text-muted);"><?= h($member['role']) ?></div>
-                <?php endif; ?>
-              </div>
-            </div>
-          </td>
-          <td style="padding:.75rem 1rem;text-align:right;">
-            <a href="/admin/pages.php?page=about&edit_team=<?= $idx ?>" class="btn btn--outline" style="font-size:.78rem;padding:.3rem .7rem;">Редактирай</a>
-          </td>
-          <td style="padding:.5rem;text-align:center;">
-            <div style="display:flex;flex-direction:column;gap:.2rem;align-items:center;">
-              <button type="button" class="btn btn--outline team-up"
-                      style="padding:.2rem .5rem;font-size:.75rem;line-height:1;"
-                      aria-label="Премести нагоре — <?= h($member['name']) ?>">↑</button>
-              <button type="button" class="btn btn--outline team-down"
-                      style="padding:.2rem .5rem;font-size:.75rem;line-height:1;"
-                      aria-label="Премести надолу — <?= h($member['name']) ?>">↓</button>
-            </div>
-          </td>
-          <td style="padding:.75rem 1rem;text-align:right;">
-            <form method="POST" action="/admin/pages.php?page=about" style="display:inline;">
-              <?= csrf_field() ?>
-              <input type="hidden" name="section"    value="team_delete">
-              <input type="hidden" name="team_index" value="<?= $idx ?>">
-              <button type="submit" class="btn btn--outline"
-                      style="font-size:.78rem;padding:.3rem .7rem;color:#c0392b;border-color:#f0c4c0;"
-                      data-confirm="Изтриване на члена?">Изтрий</button>
-            </form>
-          </td>
-        </tr>
-      <?php endforeach; endif; ?>
-    </tbody>
-  </table>
-  </div>
-</div>
-
-<script>
-(function () {
-  var tbody    = document.getElementById('teamBody');
-  var announce = document.getElementById('teamReorderAnnounce');
-  if (!tbody) return;
-
-  function getRows() { return Array.from(tbody.querySelectorAll('tr[data-key]')); }
-  function keysOrder() { return getRows().map(function(r){ return r.dataset.key; }); }
-
-  function saveOrder(prevRows) {
-    var token   = document.getElementById('teamCsrfToken');
-    var csrfVal = token ? token.value : '';
-    fetch('/admin/team-reorder-ajax.php', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ csrf_token: csrfVal, order: keysOrder() })
-    }).then(function(r){ return r.json(); })
-      .then(function(d){
-        if (!d.ok) {
-          if (prevRows) { prevRows.forEach(function(row) { tbody.appendChild(row); }); updateAriaButtons(); }
-          alert('Грешка при запис: ' + (d.error || ''));
-        }
-      })
-      .catch(function(e){
-        if (prevRows) { prevRows.forEach(function(row) { tbody.appendChild(row); }); updateAriaButtons(); }
-        alert('Грешка: ' + e.message);
-      });
-  }
-
-  function updateAriaButtons() {
-    var rows = getRows();
-    rows.forEach(function(row, i) {
-      row.querySelector('.team-up').disabled   = (i === 0);
-      row.querySelector('.team-down').disabled = (i === rows.length - 1);
-    });
-  }
-
-  tbody.addEventListener('click', function(e) {
-    var btn = e.target.closest('.team-up, .team-down');
-    if (!btn) return;
-    var row      = btn.closest('tr');
-    var rows     = getRows();
-    var idx      = rows.indexOf(row);
-    var prevRows = getRows();
-    if (btn.classList.contains('team-up') && idx > 0) {
-      tbody.insertBefore(row, rows[idx - 1]);
-    } else if (btn.classList.contains('team-down') && idx < rows.length - 1) {
-      tbody.insertBefore(rows[idx + 1], row);
-    } else { return; }
-    updateAriaButtons();
-    var newPos = getRows().indexOf(row) + 1;
-    announce.textContent = row.dataset.key + ' — преместен на позиция ' + newPos;
-    saveOrder(prevRows);
-  });
-
-  var dragging = null;
-  tbody.addEventListener('dragstart', function(e) {
-    var handle = e.target.closest('.team-drag-handle');
-    if (!handle) { e.preventDefault(); return; }
-    dragging = handle.closest('tr');
-    dragging.style.opacity = '0.4';
-    e.dataTransfer.effectAllowed = 'move';
-  });
-  tbody.addEventListener('dragend', function() {
-    if (dragging) { dragging.style.opacity = ''; dragging = null; }
-    getRows().forEach(function(r){ r.style.borderTop = ''; });
-  });
-  tbody.addEventListener('dragover', function(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    var target = e.target.closest('tr[data-key]');
-    getRows().forEach(function(r){ r.style.borderTop = ''; });
-    if (target && target !== dragging) target.style.borderTop = '2px solid var(--teal)';
-  });
-  tbody.addEventListener('drop', function(e) {
-    e.preventDefault();
-    var target = e.target.closest('tr[data-key]');
-    if (!target || target === dragging || !dragging) return;
-    var prevRows = getRows();
-    tbody.insertBefore(dragging, target);
-    getRows().forEach(function(r){ r.style.borderTop = ''; });
-    updateAriaButtons();
-    saveOrder(prevRows);
-  });
-
-  updateAriaButtons();
-}());
-</script>
+<!-- ══ ABOUT — built from blocks now, edited in admin/page-edit.php ══ -->
+<a href="/admin/pages.php" style="color:var(--text-muted);font-size:0.9rem;display:block;margin-bottom:.25rem;">← Назад</a>
+<h1 style="margin:0 0 1.5rem;">За нас</h1>
+<section aria-labelledby="aboutMovedTitle" style="border:1px solid var(--border);border-radius:8px;padding:1.25rem;background:#fff;max-width:640px;">
+  <h2 id="aboutMovedTitle" style="font-size:1.15rem;margin:0 0 .5rem;">Страницата „За нас“ се редактира на ново място</h2>
+  <p style="margin:0 0 1rem;">Там подреждате текста, снимките и хората от екипа, както на всяка друга страница.</p>
+  <a href="/admin/page-edit.php?id=<?= h(CPAGE_ABOUT_ID) ?>" class="btn btn--primary" style="min-height:44px;display:inline-flex;align-items:center;">Отвори „За нас“</a>
+</section>
 
 <?php elseif ($page === 'projects'): ?>
 <?php
@@ -2289,12 +1908,6 @@ function togglePwd(btn) {
 <script>
 <?php if ($page === 'home_campaign'): ?>
 initAutosave({ key: 'page:campaign-text', formId: 'campaignForm', tinyIds: ['campTextBg', 'campTextEn'] });
-<?php endif; ?>
-<?php if ($page === 'about' && $edit_team_idx === null): ?>
-initAutosave({ key: 'page:about', formId: 'aboutForm', tinyIds: ['aboutIntroBg', 'aboutIntroEn'] });
-<?php endif; ?>
-<?php if ($page === 'about' && $edit_team_idx !== null): ?>
-initAutosave({ key: 'page:team:<?= (int)$edit_team_idx ?>', formId: 'teamEditForm', tinyIds: ['teamBioBg', 'teamBioEn'] });
 <?php endif; ?>
 <?php if ($page === 'projects' && $edit_idx !== null): ?>
 initAutosave({ key: 'page:project:<?= (int)$edit_idx ?>', formId: 'projectEditForm', tinyIds: ['projTextBg', 'projTextEn'] });

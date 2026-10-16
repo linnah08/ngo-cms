@@ -11,6 +11,7 @@ admin_require_login();
 admin_require_admin();
 
 $_cp_id = is_string($_GET['id'] ?? null) ? $_GET['id'] : '';
+cpage_builtin_load($_cp_id);   // a built-in page (За нас) is written from its seed the first time, even before anyone visits it
 if (cpage_get($_cp_id) === null) {
     flash_set('error', 'Страницата не е намерена — може би е изтрита междувременно.');
     header('Location: /admin/pages.php');

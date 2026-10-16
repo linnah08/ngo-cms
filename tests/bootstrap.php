@@ -174,7 +174,8 @@ function with_setting(string $key, string $value, callable $fn): mixed {
  *        get (query params), method ('POST'), ip (REMOTE_ADDR),
  *        json (array: sent as the raw JSON body, with the CSRF token inside it),
  *        user (array: overrides the session's id/name/email, for pages that act
- *              on the signed-in user's own admin_users row).
+ *              on the signed-in user's own admin_users row),
+ *        globals (array: $GLOBALS set before the page runs, e.g. _om_pages_dir).
  */
 function run_admin_page(string $rel, array $post = [], array $opts = []): array {
     $spec = [
@@ -188,6 +189,7 @@ function run_admin_page(string $rel, array $post = [], array $opts = []): array 
         'ip'     => $opts['ip'] ?? '127.0.0.1',
         'json'   => $opts['json'] ?? null,
         'user'   => $opts['user'] ?? [],
+        'globals' => $opts['globals'] ?? [],   // e.g. ['_om_pages_dir' => …]: point the page at a test's own files
     ];
     $code = <<<'PHP'
 $s = json_decode($argv[1], true);
@@ -199,6 +201,7 @@ $_SERVER['REMOTE_ADDR']    = $s['ip'];
 define('MAIL_DISABLED', true);   // a page under test must never mail anyone
 $_GET  = $s['get'];
 $_POST = $s['post'];
+foreach ($s['globals'] as $k => $v) $GLOBALS[$k] = $v;
 session_id('phpunit' . bin2hex(random_bytes(8)));
 require $s['root'] . '/config.php';
 start_session();

@@ -30,7 +30,6 @@ final class InlineAddRemoveTest extends TestCase
 
         save_json(CONTENT_PATH . '/pages.json', ['about' => ['team' => [
             ['name' => 'Мария', 'name_en' => 'Maria', 'role' => 'Директор', 'role_en' => 'Director', 'photo' => ''],
-            ['name' => 'Иван', 'name_en' => 'Ivan', 'role' => 'Доброволец', 'role_en' => 'Volunteer', 'photo' => ''],
         ]]]);
         save_json(IMPACT_FILE, [['number' => '10', 'label_bg' => 'деца', 'label_en' => 'children'],
                                 ['number' => '3', 'label_bg' => 'центъра', 'label_en' => 'centres']]);
@@ -97,7 +96,7 @@ final class InlineAddRemoveTest extends TestCase
         $this->assertSame(['number' => '999', 'label_bg' => 'Тест', 'label_en' => 'Test'], end($items));
     }
 
-    public function test_add_centre_and_team_member(): void
+    public function test_add_centre(): void
     {
         $centres = count(load_json(CENTRES_FILE));
         $this->add(['type' => 'centre', 'name_bg' => 'Тест център', 'name_en' => 'Test Centre',
@@ -105,11 +104,15 @@ final class InlineAddRemoveTest extends TestCase
         $last = load_json(CENTRES_FILE);
         $this->assertCount($centres + 1, $last);
         $this->assertSame(['Тест център', 'Test Centre', true], [end($last)['name_bg'], end($last)['name_en'], end($last)['active']]);
+    }
 
-        $this->add(['type' => 'team', 'name_bg' => 'Петя', 'name_en' => 'Petya', 'role_bg' => 'Касиер', 'role_en' => 'Treasurer']);
-        $team = load_json(CONTENT_PATH . '/pages.json')['about']['team'];
-        $this->assertCount(3, $team);
-        $this->assertSame(['Петя', 'Treasurer'], [$team[2]['name'], $team[2]['role_en']]);
+    /** The team lives in the За нас page's "Хора" block now (Admin → Страници → За нас), not in pages.json. */
+    public function test_old_team_add_and_remove_are_gone(): void
+    {
+        $before = file_get_contents(CONTENT_PATH . '/pages.json');
+        $this->assertSame('unknown type', $this->add(['type' => 'team', 'name_bg' => 'Петя'])['json']['error'] ?? null);
+        $this->assertSame('unknown type', $this->remove('team', 0)['json']['error'] ?? null);
+        $this->assertSame($before, file_get_contents(CONTENT_PATH . '/pages.json'));
     }
 
     public function test_partner_link_must_be_a_web_address(): void
@@ -126,11 +129,7 @@ final class InlineAddRemoveTest extends TestCase
 
     public function test_remove_takes_out_exactly_the_chosen_item(): void
     {
-        $this->assertSame(['ok' => true], $this->remove('team', 0)['json']);
-        $team = load_json(CONTENT_PATH . '/pages.json')['about']['team'];
-        $this->assertSame(['Иван'], array_column($team, 'name'));
-
-        $this->remove('impact', 1);
+        $this->assertSame(['ok' => true], $this->remove('impact', 1)['json']);
         $this->assertSame(['10'], array_column(load_json(IMPACT_FILE), 'number'));
     }
 

@@ -812,13 +812,6 @@ window.OmCMS = (function () {
   // ── Modal (Add item) ──────────────────────────────────────────────────────
 
   const _modalForms = {
-    team: [
-      { name: 'name_bg', label: 'Name (BG)', type: 'text', required: true },
-      { name: 'name_en', label: 'Name (EN)', type: 'text', required: true },
-      { name: 'role_bg', label: 'Role (BG)', type: 'text', required: true },
-      { name: 'role_en', label: 'Role (EN)', type: 'text', required: true },
-      { name: 'photo', label: 'Photo', type: 'file', required: false }
-    ],
     partner: [
       { name: 'url', label: 'Website URL', type: 'url', required: true },
       { name: 'name', label: 'Partner name', type: 'text', required: true },
@@ -844,7 +837,7 @@ window.OmCMS = (function () {
     ]
   };
 
-  const _modalTitles = { team: 'Add team member', partner: 'Add partner', impact: 'Add impact number', centre: 'Add centre', faq: 'Add question' };
+  const _modalTitles = { partner: 'Add partner', impact: 'Add impact number', centre: 'Add centre', faq: 'Add question' };
 
   function openModal(type) {
     pendingModalType = type;
