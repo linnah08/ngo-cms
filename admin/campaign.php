@@ -38,7 +38,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $desc_en      = trim($_POST['campaign_description_en']   ?? '');
         $target       = (float)($_POST['campaign_target_eur']    ?? 5000);
         $end_date     = trim($_POST['campaign_end_date']         ?? '');
-        $total_packs  = max(0, (int)($_POST['lafetki_total_packs'] ?? 100));
 
         if ($target <= 0) $errors[] = 'Целевата сума трябва да е положително число.';
         if (empty($errors)) {
@@ -51,7 +50,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             setting_set('campaign_description_en',       $desc_en);
             setting_set('campaign_target_eur',           (string)$target);
             setting_set('campaign_end_date',             $end_date);
-            setting_set('lafetki_total_packs',           (string)$total_packs);
             if ($active === '1') setting_set('campaign_url', SITE_URL . '/campaign/');
             $saved = true;
         }
@@ -195,7 +193,6 @@ $desc         = setting_get('campaign_description',         '');
 $desc_en      = setting_get('campaign_description_en',      '');
 $target_eur  = (float)(setting_get('campaign_target_eur', '5000') ?: '5000');
 $end_date    = setting_get('campaign_end_date', '');
-$total_packs = (int)setting_get('lafetki_total_packs', '100');
 $photos      = json_decode(setting_get('campaign_photos', '[]'), true) ?: [];
 $budget      = json_decode(setting_get('campaign_budget', '[]'), true) ?: [];
 $faq         = json_decode(setting_get('campaign_faq',    '[]'), true) ?: [];
@@ -345,14 +342,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <label style="<?= $lbl ?>">Крайна дата</label>
         <input type="date" name="campaign_end_date" value="<?= h($end_date) ?>"
                style="<?= $inp ?>">
-      </div>
-    </div>
-    <div style="margin-top:1rem;">
-      <label style="<?= $lbl ?>">Общо налични бройки за наградата</label>
-      <input type="number" name="lafetki_total_packs" value="<?= h((string)$total_packs) ?>" min="0" step="1"
-             style="<?= $inp ?>">
-      <div style="font-size:.8rem;color:#6b6560;margin-top:.35rem;">
-        Броячът „продадени пакета“ на страницата показва това число минус текущата наличност на Ледоразбивачи. Увеличете го, ако отпечатате още.
       </div>
     </div>
     <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--border);">
