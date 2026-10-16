@@ -201,7 +201,8 @@ function home_shared_head(): string {
 .home-spot__soldout{margin:0;padding:.8rem 1.6rem;border-radius:var(--radius);background:#fdf0ef;border:1px solid #f0c4c0;color:#c0392b;font-weight:600}
 @media(max-width:640px){
   .home-ti,.campaign-block-grid,.home-spot{grid-template-columns:1fr!important}
-  .home-ti>div{order:0!important}
+  .home-ti>div{order:1!important}
+  .home-ti>div.home-ti__text{order:0!important}
   .home-cards{grid-template-columns:1fr!important}
 }
 </style>

@@ -258,7 +258,14 @@ function home_types(): array {
 
         'text_image' => ['builtin' => false, 'icon' => '🖼', 'label' => 'Текст и снимка',
             'desc' => 'Заглавие, текст и снимка отляво или отдясно, по желание с бутон.', 'note' => null,
-            'fields' => ['heading' => $head, 'body' => $rich] + $img('Снимка')
+            'fields' => ['heading' => $head, 'body' => $rich, 'photos' => [
+                'kind' => 'list', 'label' => 'Снимки', 'item' => 'Снимка', 'add' => '+ Добави снимка', 'remove' => 'Премахни снимката',
+                'plural' => 'снимки', 'plural_the' => 'снимките', 'min' => 0, 'max' => 4,
+                'say' => ['added' => 'Добавена е нова снимка.', 'removed' => 'Снимката е премахната.', 'moved' => 'Снимката е на място %d. Редът се запазва с бутона „Запази“.'],
+                'fields' => [
+                    'image'     => ['kind' => 'image', 'label' => 'Снимка', 'required' => true],
+                    'image_alt' => $img('')['image_alt'],
+                ]], 'image_frame' => $img('')['image_frame']]
                 + ['image_side' => ['kind' => 'choice', 'label' => 'Къде да е снимката', 'options' => ['left' => 'Отляво на текста', 'right' => 'Отдясно на текста'], 'default' => 'left']]
                 + $btn(1) + ['background' => $bg('white')]],
         'cta' => ['builtin' => false, 'icon' => '📢', 'label' => 'Призив за действие',
@@ -325,6 +332,8 @@ function home_clean_field(array $def, mixed $raw, string $key): array {
             $v = is_string($raw) ? trim($raw) : '';
             if ($v !== '' && !home_valid_image_path($v)) {
                 $err[$key] = 'Снимката не е намерена. Качете я отново или я изберете от библиотеката.';
+            } elseif ($v === '' && !empty($def['required'])) {
+                $err[$key] = 'Изберете снимка или премахнете реда.';
             }
             return [$v, $err];
 
@@ -373,7 +382,10 @@ function home_clean_field(array $def, mixed $raw, string $key): array {
             }
             $min = (int) ($def['min'] ?? 0);
             $max = (int) ($def['max'] ?? PHP_INT_MAX);
-            if (count($out) < $min || count($out) > $max) $err[$key] = "Добавете между {$min} и {$max} " . ($def['plural'] ?? 'елемента') . '.';
+            if (count($out) < $min || count($out) > $max) {
+                $plural = $def['plural'] ?? 'елемента';
+                $err[$key] = $min === 0 ? "Може да добавите до {$max} {$plural}." : "Добавете между {$min} и {$max} {$plural}.";
+            }
             return [$out, $err];
     }
     return [null, [$key => 'Непознато поле.']];
@@ -394,12 +406,38 @@ function home_list_find(array $items, string $item_id): ?int {
     return null;
 }
 
+/**
+ * The photos of a "Текст и снимка" block, valid images only. A block saved with one `image` reads as one photo.
+ * @return list<array{id: string, image: string, image_alt: array{bg: string, en: string}}>
+ */
+function home_ti_photos(array $f): array {
+    $raw = $f['photos'] ?? null;
+    if (!is_array($raw)) {
+        $raw = home_valid_image_path((string) ($f['image'] ?? ''))
+            ? [['id' => 'i_legacy', 'image' => $f['image'], 'image_alt' => $f['image_alt'] ?? null]] : [];
+    }
+    $out = [];
+    foreach ($raw as $p) {
+        if (!is_array($p) || !home_valid_image_path((string) ($p['image'] ?? ''))) continue;
+        $out[] = ['id' => (string) ($p['id'] ?? ''), 'image' => (string) $p['image'], 'image_alt' => home_pair($p['image_alt'] ?? null)];
+    }
+    return $out;
+}
+
 /** @return array{0: array, 1: array<string,string>} */
 function home_validate_section(string $type, array $in): array {
     $types = home_types();
     if (!isset($types[$type])) return [[], ['_type' => 'Непознат вид секция.']];
     $fields = [];
     $errors = [];
+    if ($type === 'text_image' && !array_key_exists('photos', $in) && is_string($in['image'] ?? null) && trim($in['image']) !== '') {
+        // A block saved before it took several photos: its one photo becomes the first of the list.
+        if (home_valid_image_path(trim($in['image']))) {
+            $in['photos'] = [['image' => trim($in['image']), 'image_alt' => $in['image_alt'] ?? null]];
+        } else {
+            $errors['image'] = 'Снимката не е намерена. Качете я отново или я изберете от библиотеката.';
+        }
+    }
     foreach ($types[$type]['fields'] as $key => $def) {
         [$fields[$key], $e] = home_clean_field($def, $in[$key] ?? null, $key);
         $errors += $e;
