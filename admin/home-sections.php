@@ -568,7 +568,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       // The reason a button is off is written out, not only greyed.
       var why = [];
       if (r.length >= max) why.push('Най-много ' + max + ' ' + list.dataset.hsPlural + '.');
-      if (r.length <= min) why.push('Трябват поне ' + min + ' ' + list.dataset.hsPlural + ' — не може да се премахне повече.');
+      if (min > 0 && r.length <= min) why.push('Трябват поне ' + min + ' ' + list.dataset.hsPlural + ' — не може да се премахне повече.');
       note.textContent = why.join(' ');
     }
     var sorter = sortable(list, {
@@ -583,7 +583,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       var to = row.nextElementSibling || row.previousElementSibling;
       if (window.tinymce) Array.prototype.forEach.call(row.querySelectorAll('textarea.hs-rich'), function (t) { var ed = tinymce.get(t.id); if (ed) ed.remove(); });
       row.remove(); renumber(); sorter.relabel();
-      var f = to.querySelector('input[type=text]') || to.querySelector('input:not([type=hidden]), textarea, select');
+      var f = to ? (to.querySelector('input[type=text]') || to.querySelector('input:not([type=hidden]), textarea, select')) : add;
       if (f) f.focus();
       announce(list.dataset.hsSayRemoved);
     });
