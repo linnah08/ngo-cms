@@ -267,9 +267,10 @@ function cpage_write_file(string $path, array $page): bool
 
 /**
  * A built-in page's file, written from $seed() only when there is none yet.
- * The file is created with fopen(…, 'x') under the page's lock, so when two
- * requests arrive at once only one writes it, and an existing file (another
- * request won, or an admin has edited the page) is read, never overwritten.
+ * The file is written to a temp file and renamed into place under the page's lock,
+ * only if there is still none, so when two requests arrive at once only one writes
+ * it, and an existing file (another request won, or an admin has edited the page)
+ * is read, never overwritten.
  * If the file is there but unreadable, the seed is shown and the file left alone.
  */
 function cpage_seed_once(string $id, callable $seed): array
@@ -290,12 +291,13 @@ function cpage_seed_once(string $id, callable $seed): array
             if (!file_exists($path)) {
                 $new  = $seed();
                 $json = json_encode($new, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                $fh   = $json !== false ? @fopen($path, 'x') : false;
-                if ($fh !== false) {
-                    $ok = fwrite($fh, $json) === strlen($json);
-                    fclose($fh);
-                    if (!$ok) { @unlink($path); error_log("cpage_seed_once: could not write $id"); }
-                }
+                // Written beside the target and renamed into place, so a reader never sees half a file.
+                $tmp = $path . '.tmp-' . bin2hex(random_bytes(4));
+                $ok  = $json !== false && @file_put_contents($tmp, $json) === strlen($json);
+                clearstatcache(true, $path);
+                if ($ok && !file_exists($path)) $ok = @rename($tmp, $path);
+                else $ok = false;
+                if (!$ok) { @unlink($tmp); error_log("cpage_seed_once: could not write $id"); }
             }
         } finally {
             flock($lock, LOCK_UN);

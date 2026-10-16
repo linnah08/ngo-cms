@@ -179,6 +179,36 @@ final class AboutPageTest extends CreatedPagesTestCase
         $this->assertSame([CPAGE_ABOUT_ID . '.json'], array_values(array_filter(scandir($this->dir), fn($f) => str_ends_with($f, '.json'))));
     }
 
+    public function test_seed_is_written_through_a_temp_file_and_never_over_a_file_made_meanwhile(): void
+    {
+        $this->putAbout($this->threeMembers());
+        // Someone else's file appears while the seed is being built (the seed callable stands in for it).
+        $page = cpage_seed_once(CPAGE_ABOUT_ID, function (): array {
+            file_put_contents($this->aboutFile(), 'THEIRS');
+            return about_seed_page(['title' => 'Seed']);
+        });
+        $this->assertSame('THEIRS', file_get_contents($this->aboutFile()), 'a file that appeared meanwhile is not replaced');
+        $this->assertSame('Seed', $page['title_bg'], 'the page is still shown from the seed');
+        $this->assertSame([], array_values(array_filter(scandir($this->dir), fn($f) => str_contains($f, '.tmp-'))), 'no temp file is left behind');
+    }
+
+    public function test_page_is_shown_with_its_sections_when_the_file_cannot_be_written(): void
+    {
+        $this->putAbout($this->threeMembers());
+        chmod($this->dir, 0555);
+        try {
+            if (@file_put_contents($this->dir . '/probe', 'x') !== false) { @unlink($this->dir . '/probe'); $this->markTestSkipped('the directory stays writable (running as root)'); }
+            [$bg, $code] = $this->request('za-nas/index.php', '/za-nas/');
+        } finally {
+            chmod($this->dir, 0755);
+        }
+        $this->assertSame(200, $code, $bg);
+        $this->assertFileDoesNotExist($this->aboutFile());
+        foreach (['Нашата история', 'Историята на продукта.', 'Мария', 'Петя'] as $want) {
+            $this->assertStringContainsString($want, $bg);
+        }
+    }
+
     // ── The public pages ─────────────────────────────────────────────────────
 
     public function test_bg_and_en_pages_render_blocks(): void

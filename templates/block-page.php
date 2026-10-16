@@ -50,7 +50,12 @@ if (!empty($_bp_draft)): ?>
 
 <?php
 home_target_page($_bp_page['id']);
-$_bp_doc = home_load()['doc'];
+$_bp_loaded = home_load();
+$_bp_doc    = $_bp_loaded['doc'];
+// A built-in page whose file could not be written or read is still shown with its seeded sections.
+if ((!$_bp_loaded['exists'] || $_bp_loaded['corrupt']) && !empty($_bp_page['sections'])) {
+    $_bp_doc = ['version' => 1, 'rev' => 0, 'sections' => $_bp_page['sections']];
+}
 
 if (!$_bp_doc['sections'] && !empty($_bp_draft)): ?>
 <section class="section">
