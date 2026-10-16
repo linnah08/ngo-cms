@@ -66,7 +66,10 @@ function seo_render_meta(array $ctx): void {
     $desc  = $ctx['description'] ?? '';
     $type  = $ctx['type'] ?? 'website';
     $lang  = ($ctx['lang'] ?? 'bg') === 'en' ? 'en' : 'bg';
-    $img   = seo_abs_url($ctx['image'] ?? '/assets/images/og-default.png');
+    // No picture of its own: the site's share picture (Admin → Организация).
+    $own   = !empty($ctx['image']);
+    $img   = seo_abs_url($own ? $ctx['image']
+        : (function_exists('org_share_image_url') ? org_share_image_url() : '/assets/images/logo.png'));
     $alts  = $ctx['alternates'] ?? [];
 
     // Pre-launch: the site must be publicly reachable — a payment provider
@@ -92,6 +95,10 @@ function seo_render_meta(array $ctx): void {
     echo '  <meta property="og:description" content="' . $h($desc) . "\">\n";
     echo '  <meta property="og:url" content="' . $h($url) . "\">\n";
     echo '  <meta property="og:image" content="' . $h($img) . "\">\n";
+    if (!$own && str_contains($img, '/assets/images/share')) {
+        echo '  <meta property="og:image:width" content="' . ORG_SHARE_W . "\">\n";
+        echo '  <meta property="og:image:height" content="' . ORG_SHARE_H . "\">\n";
+    }
     echo '  <meta property="og:locale" content="' . $locale . "\">\n";
     echo '  <meta property="og:locale:alternate" content="' . $locale_alt . "\">\n";
 

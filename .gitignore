@@ -73,3 +73,8 @@ scripts/
 /logs/.jobs-visit-checked
 /logs/.jobs-visit.lock
 /logs/crontab-backup-*.txt
+
+# Link-preview picture, owned by the site (Admin → Организация): made from the
+# logo, or uploaded. Never shipped in a release.
+/assets/images/share.png
+/assets/images/share-upload.jpg

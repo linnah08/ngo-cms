@@ -13,7 +13,7 @@ $lang = get_lang();
 $page_title = 'Начало';
 // Keyword-rich homepage title (overrides the "Page — Site" template)
 $page_title_full  = $lang === 'bg' ? SITE_NAME_BG : SITE_NAME_EN;
-$page_description = $lang === 'bg' ? SITE_NAME_BG : SITE_NAME_EN;
+$page_description = org_site_description($lang);   // Admin → Организация
 
 // Sections, their order and their content are edited in admin/home-sections.php.
 $home_doc = home_load()['doc'];

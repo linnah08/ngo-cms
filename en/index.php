@@ -11,7 +11,7 @@ if (!in_array(url_request_path($_SERVER['REQUEST_URI'] ?? '/'), ['/en', '/en/', 
 }
 $lang             = 'en';
 $page_title       = 'Home';
-$page_description = SITE_NAME_EN;
+$page_description = org_site_description('en');   // Admin → Организация
 
 // Sections, their order and their content are edited in admin/home-sections.php.
 $home_doc = home_load()['doc'];

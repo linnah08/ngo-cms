@@ -42,7 +42,11 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <?php $_doc_title = $page_title_full ?? (($page_title ?? $site_name) . ' — ' . $site_name); ?>
   <title><?= h($_doc_title) ?></title>
-  <meta name="description" content="<?= h($page_description ?? '') ?>">
+  <?php
+    // A page without its own description gets the organisation's (Admin → Организация).
+    if (trim((string) ($page_description ?? '')) === '') $page_description = org_site_description($lang);
+  ?>
+  <meta name="description" content="<?= h($page_description) ?>">
 
   <?php
     require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/seo.php';

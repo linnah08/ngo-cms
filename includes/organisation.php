@@ -23,6 +23,8 @@ function org_fields(): array
     return [
         'site_name_bg'     => 'SITE_NAME_BG',
         'site_name_en'     => 'SITE_NAME_EN',
+        'site_description_bg' => 'SITE_DESCRIPTION_BG',   // link previews + search results; see org_site_description()
+        'site_description_en' => 'SITE_DESCRIPTION_EN',
         'site_legal_name_bg' => 'SITE_LEGAL_NAME_BG',
         'site_legal_name_en' => 'SITE_LEGAL_NAME_EN',
         'site_legal_same'  => 'SITE_LEGAL_SAME',   // '1': the name above is also the registered name
@@ -306,6 +308,14 @@ function org_validate(array $in, array $themeKeys): array
         }
     }
 
+    // One or two sentences on one line: that's how link previews and search results show it.
+    foreach (['site_description_bg' => 'на български', 'site_description_en' => 'на английски'] as $k => $lang) {
+        $v[$k] = trim((string) preg_replace('/\s+/u', ' ', $v[$k]));
+        if (mb_strlen($v[$k]) > ORG_DESCRIPTION_MAX) {
+            $e[$k] = "Краткото описание {$lang} е твърде дълго (най-много " . ORG_DESCRIPTION_MAX . ' знака).';
+        }
+    }
+
     // The legal name is optional, but it is used as a pair (the translator keeps
     // BG → EN exactly as written), so one language without the other is a mistake.
     $legal = ['site_legal_name_bg' => 'на български', 'site_legal_name_en' => 'на английски'];
@@ -486,6 +496,57 @@ function make_favicon(string $src, string $dest, int $size = 64): void
 }
 
 /**
+ * Validate one $_FILES entry as a PNG/JPEG/WebP picture and decode it, turned
+ * upright. Returns [GdImage, null] or [null, plain-Bulgarian error]. $noun
+ * names the picture in the messages: ['Файлът с логото', 'Логото'].
+ */
+function org_decode_upload(array $upload, bool $requireUploaded, array $noun): array
+{
+    [$file, $it] = $noun;
+    $err = (int) ($upload['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE) {
+        return [null, "{$file} е твърде голям. Максимумът е 2 MB — намалете размера му и опитайте отново."];
+    }
+    if ($err !== UPLOAD_ERR_OK) {
+        return [null, "{$it} не можа да се качи. Опитайте отново."];
+    }
+    $tmp = (string) ($upload['tmp_name'] ?? '');
+    if ($tmp === '' || !is_file($tmp) || ($requireUploaded && !is_uploaded_file($tmp))) {
+        return [null, "{$it} не можа да се качи. Опитайте отново."];
+    }
+    if (filesize($tmp) > ORG_LOGO_MAX_BYTES) {
+        return [null, "{$file} е твърде голям. Максимумът е 2 MB — намалете размера му и опитайте отново."];
+    }
+
+    $allowed = ['image/png', 'image/jpeg', 'image/webp'];
+    $mime    = (string) (new finfo(FILEINFO_MIME_TYPE))->file($tmp);
+    $info    = @getimagesize($tmp);
+    if (!in_array($mime, $allowed, true) || !$info || ($info['mime'] ?? '') !== $mime) {
+        return [null, "{$it} трябва да е картинка във формат PNG, JPG или WebP."];
+    }
+    if ($info[0] < 1 || $info[1] < 1 || $info[0] > ORG_LOGO_MAX_SIDE || $info[1] > ORG_LOGO_MAX_SIDE) {
+        return [null, "{$it} е с твърде големи размери (най-много " . ORG_LOGO_MAX_SIDE . ' × ' . ORG_LOGO_MAX_SIDE . ' пиксела).'];
+    }
+    if (!function_exists('imagecreatetruecolor')) {
+        return [null, 'Сървърът не може да обработва картинки (липсва модулът GD). Помолете хостинг доставчика си да го включи.'];
+    }
+
+    $im = match ($mime) {
+        'image/png'  => @imagecreatefrompng($tmp),
+        'image/jpeg' => @imagecreatefromjpeg($tmp),
+        'image/webp' => @imagecreatefromwebp($tmp),
+    };
+    if (!$im) {
+        return [null, 'Картинката изглежда повредена и не може да се отвори. Опитайте с друг файл.'];
+    }
+    // A phone photo: turn it the way the browser showed it (GD ignores EXIF).
+    require_once __DIR__ . '/images.php';
+    $im = image_apply_orientation($im, image_exif_orientation($tmp));
+    if (!imageistruecolor($im)) imagepalettetotruecolor($im);
+    return [$im, null];
+}
+
+/**
  * Validate an uploaded logo and install it as $imagesDir/logo.png, then
  * regenerate $imagesDir/favicon.png. The image is decoded and re-encoded as a
  * real PNG, so nothing but pixel data ever lands on disk.
@@ -495,46 +556,8 @@ function make_favicon(string $src, string $dest, int $size = 64): void
  */
 function org_save_logo(array $upload, string $imagesDir, bool $requireUploaded = true): ?string
 {
-    $err = (int) ($upload['error'] ?? UPLOAD_ERR_NO_FILE);
-    if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE) {
-        return 'Файлът с логото е твърде голям. Максимумът е 2 MB — намалете размера му и опитайте отново.';
-    }
-    if ($err !== UPLOAD_ERR_OK) {
-        return 'Логото не можа да се качи. Опитайте отново.';
-    }
-    $tmp = (string) ($upload['tmp_name'] ?? '');
-    if ($tmp === '' || !is_file($tmp) || ($requireUploaded && !is_uploaded_file($tmp))) {
-        return 'Логото не можа да се качи. Опитайте отново.';
-    }
-    if (filesize($tmp) > ORG_LOGO_MAX_BYTES) {
-        return 'Файлът с логото е твърде голям. Максимумът е 2 MB — намалете размера му и опитайте отново.';
-    }
-
-    $allowed = ['image/png', 'image/jpeg', 'image/webp'];
-    $mime    = (string) (new finfo(FILEINFO_MIME_TYPE))->file($tmp);
-    $info    = @getimagesize($tmp);
-    if (!in_array($mime, $allowed, true) || !$info || ($info['mime'] ?? '') !== $mime) {
-        return 'Логото трябва да е картинка във формат PNG, JPG или WebP.';
-    }
-    if ($info[0] < 1 || $info[1] < 1 || $info[0] > ORG_LOGO_MAX_SIDE || $info[1] > ORG_LOGO_MAX_SIDE) {
-        return 'Логото е с твърде големи размери (най-много ' . ORG_LOGO_MAX_SIDE . ' × ' . ORG_LOGO_MAX_SIDE . ' пиксела).';
-    }
-    if (!function_exists('imagecreatetruecolor')) {
-        return 'Сървърът не може да обработва картинки (липсва модулът GD). Помолете хостинг доставчика си да го включи.';
-    }
-
-    $im = match ($mime) {
-        'image/png'  => @imagecreatefrompng($tmp),
-        'image/jpeg' => @imagecreatefromjpeg($tmp),
-        'image/webp' => @imagecreatefromwebp($tmp),
-    };
-    if (!$im) {
-        return 'Картинката изглежда повредена и не може да се отвори. Опитайте с друг файл.';
-    }
-    // A phone photo of the logo: turn it the way the browser showed it (GD ignores EXIF).
-    require_once __DIR__ . '/images.php';
-    $im = image_apply_orientation($im, image_exif_orientation($tmp));
-    if (!imageistruecolor($im)) imagepalettetotruecolor($im);
+    [$im, $error] = org_decode_upload($upload, $requireUploaded, ['Файлът с логото', 'Логото']);
+    if ($im === null) return $error;
     imagealphablending($im, false);
     imagesavealpha($im, true);
 
@@ -549,4 +572,153 @@ function org_save_logo(array $upload, string $imagesDir, bool $requireUploaded =
 
     make_favicon($logo, rtrim($imagesDir, '/') . '/favicon.png');
     return null;
+}
+
+// ── Sharing: the picture and text shown when someone shares a link ─────────────
+//
+// Facebook, Viber, Messenger, Discord… show a picture, the page title and a short
+// description for a shared link (Open Graph tags, includes/seo.php). Both are
+// the site owner's, set in Admin → Организация:
+//   assets/images/share-upload.jpg — a picture the admin uploaded, used as is;
+//   assets/images/share.png        — otherwise, made from the logo on a white
+//                                    card with bands in the main colour.
+// Neither file ships in a release, so an update never touches them.
+
+const ORG_SHARE_W = 1200;
+const ORG_SHARE_H = 630;
+const ORG_DESCRIPTION_MAX = 300;
+
+/** Short description of the organisation, for link previews and search results. */
+function org_site_description(string $lang = 'bg'): string
+{
+    $en    = $lang === 'en';
+    $const = $en ? 'SITE_DESCRIPTION_EN' : 'SITE_DESCRIPTION_BG';
+    $desc  = defined($const) ? trim((string) constant($const)) : '';
+    if ($desc !== '') return $desc;
+    $site  = $en && defined('SITE_NAME_EN') ? 'SITE_NAME_EN' : 'SITE_NAME_BG';
+    return defined($site) ? trim((string) constant($site)) : '';
+}
+
+/** "#RRGGBB" → [r, g, b], or null. */
+function org_hex_rgb(string $hex): ?array
+{
+    if (!org_color_valid($hex)) return null;
+    return [hexdec(substr($hex, 1, 2)), hexdec(substr($hex, 3, 2)), hexdec(substr($hex, 5, 2))];
+}
+
+/** Write a GD image to $dest atomically (temp file + rename). */
+function org_write_image(\GdImage $im, string $dest, string $type): bool
+{
+    $staging = $dest . '.tmp-' . bin2hex(random_bytes(4));
+    $ok = $type === 'jpeg' ? @imagejpeg($im, $staging, 86) : @imagepng($im, $staging);
+    if (!$ok || !@rename($staging, $dest)) {
+        @unlink($staging);
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Build the automatic share picture: the logo centred on a white 1200×630 card,
+ * with a band in $color (the site's main colour) along the top and bottom.
+ * Best effort — returns false when GD is missing or nothing could be written.
+ */
+function org_make_share_image(string $logo, string $dest, string $color = ''): bool
+{
+    if (!function_exists('imagecreatetruecolor') || !is_file($logo)) return false;
+    $info = @getimagesize($logo);
+    $src = match ($info['mime'] ?? '') {
+        'image/png'  => @imagecreatefrompng($logo),
+        'image/jpeg' => @imagecreatefromjpeg($logo),
+        'image/webp' => @imagecreatefromwebp($logo),
+        default      => null,
+    };
+    if (!$src) return false;
+
+    $W = ORG_SHARE_W; $H = ORG_SHARE_H;
+    $card = imagecreatetruecolor($W, $H);
+    imagefill($card, 0, 0, imagecolorallocate($card, 255, 255, 255));
+    $band = org_hex_rgb($color);
+    if ($band) {
+        $c = imagecolorallocate($card, $band[0], $band[1], $band[2]);
+        imagefilledrectangle($card, 0, 0, $W - 1, 11, $c);
+        imagefilledrectangle($card, 0, $H - 12, $W - 1, $H - 1, $c);
+    }
+
+    // Fit inside a generous safe area; a tiny logo grows at most 3×, so it
+    // doesn't turn into a blur.
+    $sw = imagesx($src); $sh = imagesy($src);
+    $scale = min(($W - 240) / $sw, ($H - 200) / $sh, 3.0);
+    $nw = max(1, (int) round($sw * $scale));
+    $nh = max(1, (int) round($sh * $scale));
+    imagealphablending($card, true);
+    imagecopyresampled($card, $src, intdiv($W - $nw, 2), intdiv($H - $nh, 2), 0, 0, $nw, $nh, $sw, $sh);
+    imagedestroy($src);
+
+    $ok = org_write_image($card, $dest, 'png');
+    imagedestroy($card);
+    return $ok;
+}
+
+/**
+ * Validate an uploaded share picture and install it as $imagesDir/share-upload.jpg,
+ * cropped from the centre to 1200×630 (what Facebook and others show). Returns
+ * null on success, or a plain-Bulgarian error message.
+ */
+function org_save_share_image(array $upload, string $imagesDir, bool $requireUploaded = true): ?string
+{
+    [$src, $error] = org_decode_upload($upload, $requireUploaded, ['Файлът с картинката за споделяне', 'Картинката за споделяне']);
+    if ($src === null) return $error;
+
+    $W = ORG_SHARE_W; $H = ORG_SHARE_H;
+    $sw = imagesx($src); $sh = imagesy($src);
+    $scale = max($W / $sw, $H / $sh);
+    $cw = (int) round($W / $scale); $ch = (int) round($H / $scale);
+    $card = imagecreatetruecolor($W, $H);
+    // JPEG has no transparency: put a see-through picture on white, not black.
+    imagefill($card, 0, 0, imagecolorallocate($card, 255, 255, 255));
+    imagealphablending($card, true);
+    imagecopyresampled($card, $src, 0, 0, intdiv($sw - $cw, 2), intdiv($sh - $ch, 2), $W, $H, $cw, $ch);
+    imagedestroy($src);
+
+    $ok = org_write_image($card, rtrim($imagesDir, '/') . '/share-upload.jpg', 'jpeg');
+    imagedestroy($card);
+    return $ok ? null : 'Картинката за споделяне не можа да се запише на сървъра. Опитайте отново или се свържете с поддръжката.';
+}
+
+/** The uploaded share picture, if there is one. */
+function org_share_upload_exists(?string $root = null): bool
+{
+    $root ??= dirname(__DIR__);
+    return is_file($root . '/assets/images/share-upload.jpg');
+}
+
+/**
+ * Site-relative path of the picture shown for a shared link: the uploaded one,
+ * else the one made from the logo — made now if it's missing (a site that had
+ * its logo before this existed) — else the logo itself.
+ */
+function org_share_image_path(?string $root = null): string
+{
+    $root ??= dirname(__DIR__);
+    $dir = $root . '/assets/images';
+    if (is_file($dir . '/share-upload.jpg')) return '/assets/images/share-upload.jpg';
+    if (is_file($dir . '/share.png'))        return '/assets/images/share.png';
+    if (is_file($dir . '/logo.png') && is_writable($dir)
+        && org_make_share_image($dir . '/logo.png', $dir . '/share.png', defined('BRAND_PRIMARY') ? (string) BRAND_PRIMARY : '')) {
+        return '/assets/images/share.png';
+    }
+    return '/assets/images/logo.png';
+}
+
+/**
+ * Share picture URL path with a version stamp: link previews are cached by
+ * address, so a new picture needs a new one for Facebook & co. to fetch it.
+ */
+function org_share_image_url(?string $root = null): string
+{
+    $root ??= dirname(__DIR__);
+    $path = org_share_image_path($root);
+    $v = @filemtime($root . $path);
+    return $path . ($v ? '?v=' . $v : '');
 }

@@ -82,7 +82,9 @@ final class SeoTest extends TestCase
         $this->assertStringContainsString('hreflang="en" href="' . $this->base() . '/en/about/"', $html);
         $this->assertStringContainsString('hreflang="x-default" href="' . $this->base() . '/za-nas/"', $html);
         $this->assertStringContainsString('og:locale" content="en_US"', $html);
-        $this->assertStringContainsString('og:image" content="' . $this->base() . '/assets/images/og-default.png"', $html);
+        // No page picture: the site's share picture (Admin → Организация), never another organisation's.
+        $this->assertMatchesRegularExpression('#og:image" content="' . preg_quote($this->base(), '#') . '/assets/images/(share-upload\\.jpg|share\\.png|logo\\.png)#', $html);
+        $this->assertStringNotContainsString('og-default', $html);
     }
 
     public function testMetaEscapesTitleAndDescription(): void

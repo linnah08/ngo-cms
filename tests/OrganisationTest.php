@@ -385,4 +385,89 @@ final class OrganisationTest extends TestCase
         $this->assertStringContainsString('csrf_field()', $src);
         $this->assertStringNotContainsString('window.confirm', $src);
     }
+
+    // ── Sharing: description and link-preview picture ───────────────────────────
+
+    public function test_description_is_one_line_and_has_a_length_limit(): void
+    {
+        $r = org_validate($this->validInput(['site_description_bg' => "  Подкрепяме\n деца   и семейства. "]), ['classic']);
+        $this->assertSame('Подкрепяме деца и семейства.', $r['values']['site_description_bg']);
+        $this->assertArrayNotHasKey('site_description_bg', $r['errors']);
+
+        $r = org_validate($this->validInput(['site_description_en' => str_repeat('a', ORG_DESCRIPTION_MAX + 1)]), ['classic']);
+        $this->assertStringContainsString('твърде дълго', $r['errors']['site_description_en']);
+    }
+
+    public function test_description_falls_back_to_the_site_name_in_the_same_language(): void
+    {
+        $inc = var_export($_SERVER['DOCUMENT_ROOT'] . '/includes/organisation.php', true);
+        [$rc, $out] = $this->runPhp("<?php
+            require {$inc};
+            define('SITE_NAME_BG', 'Фондация'); define('SITE_NAME_EN', 'Foundation');
+            define('SITE_DESCRIPTION_BG', 'Описание');
+            echo org_site_description('bg'), '|', org_site_description('en');
+        ");
+        $this->assertSame(0, $rc, $out);
+        $this->assertSame('Описание|Foundation', $out);
+    }
+
+    public function test_share_image_is_made_from_the_logo_with_bands_in_the_main_colour(): void
+    {
+        if (!function_exists('imagecreatetruecolor')) $this->markTestSkipped('GD not available');
+        $logo = $this->makeImage('png', 300, 100);   // a teal block
+        $this->assertTrue(org_make_share_image($logo, $this->tmp . '/share.png', '#FF0000'));
+
+        $im = imagecreatefrompng($this->tmp . '/share.png');
+        $this->assertSame([ORG_SHARE_W, ORG_SHARE_H], [imagesx($im), imagesy($im)]);
+        $rgb = static fn(int $x, int $y): array => array_values(array_slice(imagecolorsforindex($im, imagecolorat($im, $x, $y)), 0, 3));
+        $this->assertSame([255, 0, 0], $rgb(600, 3), 'top band');
+        $this->assertSame([255, 0, 0], $rgb(600, ORG_SHARE_H - 3), 'bottom band');
+        $this->assertSame([255, 255, 255], $rgb(20, 315), 'white card');
+        $this->assertSame([3, 135, 165], $rgb(600, 315), 'logo in the middle');
+        imagedestroy($im);
+
+        $this->assertFalse(org_make_share_image($this->tmp . '/missing.png', $this->tmp . '/x.png'));
+    }
+
+    public function test_uploaded_share_image_is_cropped_to_1200_by_630(): void
+    {
+        if (!function_exists('imagecreatetruecolor')) $this->markTestSkipped('GD not available');
+        foreach (['png', 'jpeg', 'webp'] as $type) {
+            $this->assertNull(org_save_share_image($this->upload($this->makeImage($type, 2000, 2000)), $this->tmp, false), $type);
+            $info = getimagesize($this->tmp . '/share-upload.jpg');
+            $this->assertSame(['image/jpeg', ORG_SHARE_W, ORG_SHARE_H], [$info['mime'], $info[0], $info[1]], $type);
+        }
+    }
+
+    public function test_uploaded_share_image_rejects_non_images(): void
+    {
+        $php = $this->tmp . '/x.png';
+        file_put_contents($php, '<?php echo 1;');
+        $this->assertStringContainsString('Картинката за споделяне', (string) org_save_share_image($this->upload($php), $this->tmp, false));
+        $this->assertStringContainsString('2 MB', (string) org_save_share_image(['error' => UPLOAD_ERR_INI_SIZE], $this->tmp, false));
+        $this->assertNotNull(org_save_share_image($this->upload($this->makeImage('png')), $this->tmp));   // not a real upload
+        $this->assertFileDoesNotExist($this->tmp . '/share-upload.jpg');
+    }
+
+    public function test_share_image_path_prefers_upload_then_logo_card_then_logo(): void
+    {
+        if (!function_exists('imagecreatetruecolor')) $this->markTestSkipped('GD not available');
+        $root = $this->tmp . '/site';
+        $dir  = $root . '/assets/images';
+        mkdir($dir, 0777, true);
+        try {
+            $this->assertSame('/assets/images/logo.png', org_share_image_path($root), 'nothing at all');
+
+            copy($this->makeImage('png'), $dir . '/logo.png');
+            $this->assertSame('/assets/images/share.png', org_share_image_path($root), 'made from the logo on demand');
+            $this->assertFileExists($dir . '/share.png');
+
+            touch($dir . '/share-upload.jpg');
+            $this->assertSame('/assets/images/share-upload.jpg', org_share_image_path($root));
+            $this->assertMatchesRegularExpression('#^/assets/images/share-upload\.jpg\?v=\d+$#', org_share_image_url($root));
+        } finally {
+            foreach (glob($dir . '/*') ?: [] as $f) @unlink($f);
+            @rmdir($dir); @rmdir($root . '/assets'); @rmdir($root);
+        }
+    }
 }

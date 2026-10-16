@@ -112,6 +112,8 @@ function launch_checklist(?array $pages = null, bool $only_required = false): ar
     }
     $add('mol', 'Представляващ (МОЛ)', 'Името на човека, който представлява организацията. Печата се на документите.',
         $const('SITE_MOL') !== '', $org . '#f-site_mol', false);
+    $add('description', 'Кратко описание', 'Показва се под връзката, когато някой сподели сайта във Facebook или Viber, и в Google под името на сайта.',
+        $const('SITE_DESCRIPTION_BG') !== '', $org . '#f-site_description_bg', false);
     return $items;
 }
 

@@ -15,7 +15,7 @@ $form      = null; // re-filled values after a failed save
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($_POST === [] && (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
         // PHP drops the whole request body when it exceeds post_max_size.
-        $errors['_form'] = 'Файлът с логото е твърде голям и нищо не беше запазено. Максимумът е 2 MB — намалете размера му и опитайте отново.';
+        $errors['_form'] = 'Качената картинка е твърде голяма и нищо не беше запазено. Максимумът е 2 MB — намалете размера ѝ и опитайте отново.';
     } elseif (!csrf_verify()) {
         $errors['_form'] = 'Страницата беше отворена твърде дълго и сесията изтече. Презаредете страницата и опитайте отново.';
     } else {
@@ -23,25 +23,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $form   = $result['values'];
         $errors = $result['errors'];
 
-        $has_logo = is_array($_FILES['logo'] ?? null)
-            && ($_FILES['logo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+        $images   = $_SERVER['DOCUMENT_ROOT'] . '/assets/images';
+        $has_file = static fn(string $k): bool => is_array($_FILES[$k] ?? null)
+            && ($_FILES[$k]['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+        $has_logo  = $has_file('logo');
+        $has_share = $has_file('share_image');
 
         if (!$errors && $has_logo) {
-            $logo_err = org_save_logo($_FILES['logo'], $_SERVER['DOCUMENT_ROOT'] . '/assets/images');
+            $logo_err = org_save_logo($_FILES['logo'], $images);
             if ($logo_err !== null) $errors['logo'] = $logo_err;
+        }
+        if (!$errors && $has_share) {
+            $share_err = org_save_share_image($_FILES['share_image'], $images);
+            if ($share_err !== null) $errors['share_image'] = $share_err;
+        } elseif (!$errors && ($_POST['share_image_remove'] ?? '') === '1') {
+            @unlink($images . '/share-upload.jpg');
         }
 
         if (!$errors) {
             if (org_save_overrides($form)) {
-                flash_set('success', $has_logo
-                    ? 'Промените и новото лого бяха запазени. Ако на сайта още виждате старото лого, презаредете страницата.'
+                // The automatic share picture follows the logo and the main colour.
+                org_make_share_image($images . '/logo.png', $images . '/share.png', $form['brand_primary'] ?? '');
+                flash_set('success', $has_logo || $has_share
+                    ? 'Промените и новата картинка бяха запазени. Ако на сайта още виждате старата, презаредете страницата.'
                     : 'Промените бяха запазени и вече се виждат на сайта.');
                 header('Location: /admin/organisation.php');
                 exit;
             }
             $errors['_form'] = 'Промените не можаха да се запишат на сървъра. Опитайте отново или се свържете с поддръжката.';
-        } elseif ($has_logo && !isset($errors['logo'])) {
-            $errors['logo'] = 'Логото не беше качено, защото има грешки в другите полета. След като ги поправите, изберете файла отново.';
+        } else {
+            if ($has_logo && !isset($errors['logo'])) {
+                $errors['logo'] = 'Логото не беше качено, защото има грешки в другите полета. След като ги поправите, изберете файла отново.';
+            }
+            if ($has_share && !isset($errors['share_image'])) {
+                $errors['share_image'] = 'Картинката за споделяне не беше качена, защото има грешки в другите полета. След като ги поправите, изберете файла отново.';
+            }
         }
     }
 }
@@ -317,6 +333,67 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </div>
   </section>
 
+  <!-- ── Sharing (link previews) ───────────────────────────────────────────── -->
+  <?php
+    $share_url    = org_share_image_url();
+    $share_custom = org_share_upload_exists();
+    $share_host   = (string) (parse_url(SITE_URL, PHP_URL_HOST) ?: '');
+  ?>
+  <section class="admin-card" style="<?= $card ?>" aria-labelledby="share-title">
+    <h2 class="admin-card__title" id="share-title">Когато някой сподели сайта</h2>
+    <p class="admin-meta" style="margin:0 0 1rem;line-height:1.6;max-width:60rem;">
+      Когато някой изпрати връзка към сайта във Facebook, Viber, Messenger или друго приложение, под нея се показват
+      картинка, името на сайта и кратко описание. Описанието се вижда и в Google под името на сайта.
+    </p>
+
+    <div style="display:flex;flex-wrap:wrap;gap:1.5rem;align-items:flex-start;">
+      <div style="flex:1 1 20rem;min-width:0;">
+        <label id="f-site_description_bg" style="display:block;">Кратко описание на български
+          <textarea name="site_description_bg" id="siteDescBg" rows="3" maxlength="<?= ORG_DESCRIPTION_MAX ?>"<?= $fattr('site_description_bg') ?>><?= h($val('site_description_bg')) ?></textarea>
+          <?= $ferr('site_description_bg') ?>
+          <small style="<?= $hint ?>">Едно-две изречения за това какво прави организацията, например „Подкрепяме деца с увреждания и техните семейства.“ До <?= ORG_DESCRIPTION_MAX ?> знака.</small>
+        </label>
+        <label id="f-site_description_en" style="display:block;margin-top:1rem;">Кратко описание на английски
+          <textarea name="site_description_en" id="siteDescEn" rows="3" maxlength="<?= ORG_DESCRIPTION_MAX ?>" data-translate-from="site_description_bg"<?= $fattr('site_description_en') ?>><?= h($val('site_description_en')) ?></textarea>
+          <?= $ferr('site_description_en') ?>
+        </label>
+
+        <div id="f-share_image" style="margin-top:1.25rem;">
+          <label style="display:block;">Качете своя картинка <span style="font-weight:400;text-transform:none;letter-spacing:normal;color:#6b7280;">(по желание; PNG, JPG или WebP, до 2 MB)</span>
+            <input type="file" name="share_image" id="shareInput" accept="image/png,image/jpeg,image/webp"
+                   style="display:block;margin-top:.4rem;max-width:100%;<?= isset($errors['share_image']) ? $bad_css : '' ?>"
+                   <?= isset($errors['share_image']) ? 'aria-invalid="true" aria-describedby="err-share_image"' : '' ?>>
+            <?= $ferr('share_image') ?>
+            <small style="<?= $hint ?>">Най-добре е картинка в широк формат, 1200 × 630 пиксела. Ако е с друг размер, се изрязва от средата.
+              <?= $share_custom ? '' : 'Докато не качите своя, картинката се прави автоматично от логото и основния цвят.' ?></small>
+          </label>
+          <?php if ($share_custom): ?>
+            <label style="display:flex;gap:.5rem;align-items:flex-start;margin-top:.75rem;font-weight:400;text-transform:none;letter-spacing:normal;">
+              <input type="checkbox" name="share_image_remove" value="1" style="margin-top:.2rem;width:auto;">
+              <span>Махнете качената картинка и използвайте автоматичната от логото</span>
+            </label>
+          <?php endif; ?>
+        </div>
+      </div>
+
+      <figure style="flex:0 1 22rem;min-width:0;margin:0;">
+        <figcaption style="font-size:.85rem;font-weight:600;margin-bottom:.4rem;">Как ще изглежда:</figcaption>
+        <div style="border:1px solid var(--border,#ddd);border-radius:10px;overflow:hidden;background:#fff;max-width:22rem;">
+          <img src="<?= h($share_url) ?>" id="sharePreview" alt="Картинка за споделяне" width="1200" height="630"
+               style="display:block;width:100%;height:auto;aspect-ratio:1200/630;object-fit:contain;background:#fff;">
+          <div style="padding:.6rem .8rem;background:#f0f2f5;">
+            <div style="font-size:.75rem;color:#65676b;text-transform:uppercase;letter-spacing:.02em;"><?= h($share_host) ?></div>
+            <div style="font-weight:700;color:#1c1e21;line-height:1.3;margin-top:.15rem;"><?= h($val('site_name_bg')) ?></div>
+            <div id="shareDescPreview" style="font-size:.85rem;color:#4b4f56;line-height:1.4;margin-top:.15rem;"><?= h($val('site_description_bg') !== '' ? $val('site_description_bg') : $val('site_name_bg')) ?></div>
+          </div>
+        </div>
+        <p class="admin-meta" style="margin:.5rem 0 0;font-size:.8rem;line-height:1.5;">
+          Приложенията помнят картинката за известно време — при вече споделяни връзки новата може да се появи след ден-два.
+        </p>
+      </figure>
+    </div>
+  </section>
+
   <!-- ── Social ────────────────────────────────────────────────────────────── -->
   <section class="admin-card" style="<?= $card ?>">
     <h2 class="admin-card__title">Социални мрежи</h2>
@@ -473,6 +550,18 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     [primary, accent, nlColor].forEach(function (el) {
         if (el) el.addEventListener('input', function () { nlUpdate(); });
     });
+    // Share preview: the description as it's typed, and a newly chosen picture.
+    (function () {
+      var desc = document.getElementById('siteDescBg'), out = document.getElementById('shareDescPreview');
+      var name = document.querySelector('[name="site_name_bg"]');
+      if (desc && out) desc.addEventListener('input', function () {
+        out.textContent = desc.value.trim() || (name ? name.value : '');
+      });
+      var file = document.getElementById('shareInput'), img = document.getElementById('sharePreview');
+      if (file && img) file.addEventListener('change', function () {
+        if (file.files && file.files[0]) img.src = URL.createObjectURL(file.files[0]);
+      });
+    })();
     // Preview the chosen logo before saving.
     var input = document.getElementById('logoInput'), preview = document.getElementById('logoPreview');
     if (input && preview && window.URL) {
