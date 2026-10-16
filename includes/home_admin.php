@@ -105,8 +105,8 @@ function hs_field(string $key, array $def, mixed $val, array $errors, string $nb
                  . '<p id="' . h($id) . '_hint" style="font-size:.82rem;color:var(--text-muted);margin:.3rem 0 0;">Отворете видеото в YouTube или Vimeo, копирайте адреса от браузъра и го поставете тук.</p>'
                  . hs_error_html($id . '_err', $err) . '</div>';
 
-        case 'cards':
-            return hs_cards(is_array($val) ? $val : [], $errors);
+        case 'list':
+            return hs_list($key, $def, is_array($val) ? $val : [], $errors);
 
         case 'frame':  // set on the live page; the form says where, and can undo it
             $reset = home_frame($val) === null ? ''
@@ -143,41 +143,53 @@ function hs_sort_help(string $id, string $what): string {
          . 'Esc отказва преместването.</p>';
 }
 
-function hs_card_row(string $i, array $card, array $errors, int $number): string {
-    $out = '<li data-hs-card style="border:1px solid var(--border);border-radius:8px;padding:1rem;background:#fff;">'
-         . '<fieldset style="border:0;padding:0;margin:0;min-width:0;"><legend data-hs-card-legend style="font-weight:600;margin-bottom:.75rem;">Карта ' . $number . '</legend>'
-         . '<div style="margin:0 0 .75rem;">' . hs_sort_handle('Премести карта ' . $number, 'hsCardSortHelp') . '</div>';
-    foreach (HOME_CARD_FIELDS as $k => $def) {
-        $out .= hs_field($k, $def, $card[$k] ?? null, $errors, "f[cards][$i]", "f_cards_$i", "cards.$i.", "up_card[$i]");
+/**
+ * One row of a repeating list ('kind' => 'list'). The hidden id input keeps the item's
+ * stable id, so a row that is reordered or replaced elsewhere is still the same item.
+ */
+function hs_list_row(string $key, array $def, string $i, array $item, array $errors, int $number): string {
+    $iid = is_string($item['id'] ?? null) ? $item['id'] : home_list_item_id();
+    $out = '<li data-hs-item style="border:1px solid var(--border);border-radius:8px;padding:1rem;background:#fff;">'
+         . '<fieldset style="border:0;padding:0;margin:0;min-width:0;"><legend data-hs-item-legend style="font-weight:600;margin-bottom:.75rem;">' . h($def['item']) . ' ' . $number . '</legend>'
+         . '<input type="hidden" name="' . h("f[$key][$i][id]") . '" value="' . h($iid) . '" data-hs-item-id>'
+         . '<div style="margin:0 0 .75rem;">' . hs_sort_handle('Премести ' . mb_strtolower($def['item']) . ' ' . $number, 'hsListSortHelp_' . $key) . '</div>';
+    foreach ($def['fields'] as $ik => $idef) {
+        $out .= hs_field($ik, $idef, $item[$ik] ?? null, $errors, "f[$key][$i]", "f_{$key}_$i", "$key.$i.", "up_list[$key][$i][$ik]");
     }
     return $out . '<div style="display:flex;gap:.5rem;flex-wrap:wrap;">'
-         . '<button type="button" class="btn btn--outline" style="min-height:44px;color:#b91c1c;border-color:#b91c1c;" data-hs-card-remove>Премахни картата</button>'
+         . '<button type="button" class="btn btn--outline" style="min-height:44px;color:#b91c1c;border-color:#b91c1c;" data-hs-item-remove>' . h($def['remove']) . '</button>'
          . '</div></fieldset></li>';
 }
 
-function hs_cards(array $cards, array $errors): string {
-    $cards = array_values(array_filter($cards, 'is_array'));
-    while (count($cards) < 2) $cards[] = [];
-    $err  = $errors['cards'] ?? null;
-    $html = '<fieldset id="f_cards" tabindex="-1" style="border:0;padding:0;margin:0 0 1.5rem;min-width:0;"' . ($err ? ' aria-describedby="f_cards_err"' : '') . '>'
-          . '<legend style="font-weight:600;font-size:1.05rem;margin-bottom:.5rem;">Карти (от 2 до 4)</legend>'
-          . hs_error_html('f_cards_err', $err)
-          . hs_sort_help('hsCardSortHelp', 'картите')
-          . '<ol data-hs-cards style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:1rem;">';
-    foreach ($cards as $i => $card) $html .= hs_card_row((string) $i, $card, $errors, $i + 1);
+function hs_list(string $key, array $def, array $items, array $errors): string {
+    $items = array_values(array_filter($items, 'is_array'));
+    while (count($items) < (int) ($def['min'] ?? 0)) $items[] = [];
+    $err  = $errors[$key] ?? null;
+    $say  = ($def['say'] ?? []) + ['added' => 'Добавен е нов ред.', 'removed' => 'Редът е премахнат.', 'moved' => 'Редът е на място %d. Редът се запазва с бутона „Запази“.'];
+    $html = '<fieldset id="f_' . h($key) . '" tabindex="-1" style="border:0;padding:0;margin:0 0 1.5rem;min-width:0;"' . ($err ? ' aria-describedby="f_' . h($key) . '_err"' : '') . '>'
+          . '<legend style="font-weight:600;font-size:1.05rem;margin-bottom:.5rem;">' . h($def['label']) . ' (от ' . (int) $def['min'] . ' до ' . (int) $def['max'] . ')</legend>'
+          . hs_error_html('f_' . $key . '_err', $err)
+          . hs_sort_help('hsListSortHelp_' . $key, $def['plural_the'] ?? 'редовете')
+          . '<ol data-hs-list="' . h($key) . '" data-hs-min="' . (int) $def['min'] . '" data-hs-max="' . (int) $def['max'] . '"'
+          . ' data-hs-item-name="' . h(mb_strtolower($def['item'])) . '" data-hs-item-label="' . h($def['item']) . '" data-hs-plural="' . h($def['plural'] ?? 'елемента') . '"'
+          . ' data-hs-say-added="' . h($say['added']) . '" data-hs-say-removed="' . h($say['removed']) . '" data-hs-say-moved="' . h($say['moved']) . '"'
+          . ' style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:1rem;">';
+    foreach ($items as $i => $item) $html .= hs_list_row($key, $def, (string) $i, $item, $errors, $i + 1);
     return $html . '</ol>'
-         . '<button type="button" class="btn btn--outline" style="min-height:44px;margin-top:1rem;" data-hs-card-add>+ Добави карта</button>'
-         . '<template id="hsCardTpl">' . hs_card_row('__I__', [], [], 0) . '</template></fieldset>';
+         . '<button type="button" class="btn btn--outline" style="min-height:44px;margin-top:1rem;" data-hs-item-add aria-describedby="hsListNote_' . h($key) . '">' . h($def['add']) . '</button>'
+         . '<span id="hsListNote_' . h($key) . '" data-hs-list-note style="margin-left:.75rem;color:var(--text-muted);"></span>'
+         . '<template id="hsListTpl_' . h($key) . '">' . hs_list_row($key, $def, '__I__', ['id' => ''], [], 0) . '</template></fieldset>';
 }
 
 /** Human label for an error key, e.g. "cards.1.title.bg" → "Карта 2 — Заглавие (BG)". */
 function hs_error_label(string $type, string $key): string {
     $parts = explode('.', $key);
     $lang  = in_array(end($parts), ['bg', 'en'], true) && count($parts) > 1 ? strtoupper(array_pop($parts)) : '';
-    if ($parts[0] === 'cards' && isset($parts[2])) {
-        $label = 'Карта ' . ((int) $parts[1] + 1) . ' — ' . (HOME_CARD_FIELDS[$parts[2]]['label'] ?? '');
+    $def   = home_types()[$type]['fields'][$parts[0]] ?? [];
+    if (($def['kind'] ?? '') === 'list' && isset($parts[2])) {
+        $label = $def['item'] . ' ' . ((int) $parts[1] + 1) . ' — ' . ($def['fields'][$parts[2]]['label'] ?? '');
     } else {
-        $label = home_types()[$type]['fields'][$parts[0]]['label'] ?? '';
+        $label = $def['label'] ?? '';
     }
     return $label . ($lang !== '' ? " ($lang)" : '');
 }

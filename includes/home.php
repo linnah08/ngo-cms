@@ -270,7 +270,11 @@ function home_types(): array {
             'fields' => ['heading' => $head, 'body' => $rich, 'background' => $bg('white')]],
         'cards' => ['builtin' => false, 'icon' => '🗂', 'label' => 'Карти',
             'desc' => 'От 2 до 4 карти, всяка със снимка, заглавие, кратък текст и линк.', 'note' => null,
-            'fields' => ['heading' => $head, 'cards' => ['kind' => 'cards', 'label' => 'Карти'], 'background' => $bg('white')]],
+            'fields' => ['heading' => $head, 'cards' => [
+                'kind' => 'list', 'label' => 'Карти', 'item' => 'Карта', 'add' => '+ Добави карта', 'remove' => 'Премахни картата',
+                'plural' => 'карти', 'plural_the' => 'картите', 'min' => 2, 'max' => 4, 'preview' => true,
+                'say' => ['added' => 'Добавена е нова карта.', 'removed' => 'Картата е премахната.', 'moved' => 'Картата е на място %d. Редът се запазва с бутона „Запази“.'],
+                'fields' => HOME_CARD_FIELDS], 'background' => $bg('white')]],
         'video' => ['builtin' => false, 'icon' => '▶️', 'label' => 'Видео',
             'desc' => "Видео от YouTube или Vimeo. Зарежда се едва когато посетителят натисне \u{201E}Пусни\u{201C}.", 'note' => null,
             'fields' => ['heading' => $head,
@@ -352,21 +356,42 @@ function home_clean_field(array $def, mixed $raw, string $key): array {
             if (!is_callable($def['clean'] ?? null)) return [null, [$key => 'Непознато поле.']];
             return ($def['clean'])($raw, $key);
 
-        case 'cards':
+        case 'list':
             $items = is_array($raw) ? array_values(array_filter($raw, 'is_array')) : [];
             $out = [];
-            foreach ($items as $i => $card) {
-                $c = [];
-                foreach (HOME_CARD_FIELDS as $ck => $cdef) {
-                    [$c[$ck], $e] = home_clean_field($cdef, $card[$ck] ?? null, "$key.$i.$ck");
+            $seen = [];
+            foreach ($items as $i => $item) {
+                $iid = $item['id'] ?? null;
+                if (!is_string($iid) || !preg_match(HOME_LIST_ID_RE, $iid) || isset($seen[$iid])) $iid = home_list_item_id();
+                $seen[$iid] = true;
+                $c = ['id' => $iid];
+                foreach ($def['fields'] as $ik => $idef) {
+                    [$c[$ik], $e] = home_clean_field($idef, $item[$ik] ?? null, "$key.$i.$ik");
                     $err += $e;
                 }
                 $out[] = $c;
             }
-            if (count($out) < 2 || count($out) > 4) $err[$key] = 'Добавете между 2 и 4 карти.';
+            $min = (int) ($def['min'] ?? 0);
+            $max = (int) ($def['max'] ?? PHP_INT_MAX);
+            if (count($out) < $min || count($out) > $max) $err[$key] = "Добавете между {$min} и {$max} " . ($def['plural'] ?? 'елемента') . '.';
             return [$out, $err];
     }
     return [null, [$key => 'Непознато поле.']];
+}
+
+const HOME_LIST_ID_RE = '/^i_[a-z0-9]{6}$/';
+
+/** A new id for an item in a repeating list ('kind' => 'list'). It stays with the item when rows are reordered. */
+function home_list_item_id(): string {
+    return 'i_' . bin2hex(random_bytes(3));
+}
+
+/** Position of the item with this id in a list's items, or null. */
+function home_list_find(array $items, string $item_id): ?int {
+    foreach (array_values($items) as $i => $item) {
+        if (is_array($item) && ($item['id'] ?? null) === $item_id) return $i;
+    }
+    return null;
 }
 
 /** @return array{0: array, 1: array<string,string>} */
@@ -732,8 +757,10 @@ function home_section_preview(array $s): string {
     if (($s['type'] ?? '') === 'video' && is_array($f['video'] ?? null) && home_video_valid($f['video'])) {
         return ($f['video']['provider'] === 'youtube' ? 'YouTube' : 'Vimeo') . ' видео';
     }
-    if (($s['type'] ?? '') === 'cards') return count($f['cards'] ?? []) . ' карти';
     $defs = home_types()[$s['type'] ?? '']['fields'] ?? [];
+    foreach ($defs as $k => $d) {
+        if (($d['kind'] ?? '') === 'list' && !empty($d['preview'])) return count($f[$k] ?? []) . ' ' . ($d['plural'] ?? 'елемента');
+    }
     foreach (['heading', 'title', 'text', 'body', 'intro'] as $k) {
         $v = (string) ($f[$k]['bg'] ?? '');
         // Formatted text is HTML: show "&nbsp;" and "&amp;" as the characters (output is escaped again).
@@ -926,6 +953,16 @@ function home_files_entry(array $files, string $name, string|int $key): ?array {
     ];
 }
 
+/** The file chosen in a repeating list's row: input name up_list[<key>][<row>][<item field>]. */
+function home_list_files_entry(array $files, string $key, string|int $row, string $ik): ?array {
+    if (!isset($files['up_list']['tmp_name'][$key][$row][$ik])) return null;
+    return [
+        'tmp_name' => $files['up_list']['tmp_name'][$key][$row][$ik],
+        'error'    => $files['up_list']['error'][$key][$row][$ik] ?? UPLOAD_ERR_NO_FILE,
+        'name'     => $files['up_list']['name'][$key][$row][$ik] ?? '',
+    ];
+}
+
 /** @return array{path: ?string, error: ?string} both null when no file was chosen. */
 function home_store_upload(array $file, string $sid, string $key): array {
     if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE || empty($file['tmp_name'])) return ['path' => null, 'error' => null];
@@ -942,7 +979,7 @@ function home_store_upload(array $file, string $sid, string $key): array {
     return ['path' => $rel, 'error' => null];
 }
 
-/** Store chosen files and put their paths into $in. Upload fields: up[<key>], up_card[<index>]. */
+/** Store chosen files and put their paths into $in. Upload fields: up[<key>], up_list[<list key>][<row>][<item field>]. */
 function home_apply_uploads(array &$in, string $type, array $files, string $sid): array {
     $errors = [];
     foreach (home_types()[$type]['fields'] ?? [] as $key => $def) {
@@ -954,13 +991,16 @@ function home_apply_uploads(array &$in, string $type, array $files, string $sid)
         if ($def['kind'] === 'site' && is_callable($def['uploads'] ?? null)) {
             $errors += ($def['uploads'])($in, $files, $sid, $key);
         }
-        if ($def['kind'] === 'cards' && is_array($in['cards'] ?? null)) {
+        if ($def['kind'] === 'list' && is_array($in[$key] ?? null)) {
             $pos = 0;
-            foreach (array_keys($in['cards']) as $ci) {
-                if (is_array($in['cards'][$ci]) && ($file = home_files_entry($files, 'up_card', $ci))) {
-                    $r = home_store_upload($file, $sid, 'card' . (int) $ci);
-                    if ($r['error']) $errors["cards.$pos.image"] = $r['error'];
-                    elseif ($r['path']) $in['cards'][$ci]['image'] = $r['path'];
+            foreach (array_keys($in[$key]) as $ri) {
+                if (is_array($in[$key][$ri])) {
+                    foreach ($def['fields'] as $ik => $idef) {
+                        if ($idef['kind'] !== 'image' || !($file = home_list_files_entry($files, $key, $ri, $ik))) continue;
+                        $r = home_store_upload($file, $sid, $key . (int) $ri . $ik);
+                        if ($r['error']) $errors["$key.$pos.$ik"] = $r['error'];
+                        elseif ($r['path']) $in[$key][$ri][$ik] = $r['path'];
+                    }
                 }
                 $pos++;
             }

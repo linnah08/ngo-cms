@@ -375,7 +375,24 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   // mouse or a finger; or focus it, press Space/Enter, move with ↑ ↓ and press Space/Enter
   // again (Esc puts the row back). o.label(row, pos, total) names each grip,
   // o.done(row, before) runs after a move that changed the order.
+  function initRich(selector) {
+    if (window.tinymce) tinymce.init(Object.assign({}, window._tinyBase, { selector: selector, min_height: 220 }));
+  }
+  // Moving a TinyMCE editor in the page breaks its iframe. While a row is being moved, the
+  // list's editors are taken down (their text goes back into the textareas) and set up again after.
+  function parkEditors(list) {
+    var ids = [];
+    if (!window.tinymce) return ids;
+    Array.prototype.forEach.call(list.querySelectorAll('textarea.hs-rich'), function (t) {
+      var ed = tinymce.get(t.id);
+      if (ed) { ed.remove(); ids.push(t.id); }
+    });
+    return ids;
+  }
+  function unparkEditors(ids) { ids.forEach(function (id) { initRich('#' + id); }); }
+
   function sortable(list, o) {
+    var parked = [];
     function items() { return Array.prototype.filter.call(list.children, function (el) { return el.matches(o.item); }); }
     function grip(row) { return row.querySelector('[data-hs-sort-handle]'); }
     function relabel() {
@@ -395,7 +412,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     // Keyboard. Rows around the held one are moved, not the held one itself, so focus stays put.
     var held = null, heldBefore = null;
     function pick(row) {
-      held = row; heldBefore = items();
+      held = row; heldBefore = items(); parked = parkEditors(list);
       grip(row).setAttribute('aria-pressed', 'true'); lift(row, true);
       announce(o.name(row) + ' — хваната. ' + where(row) + ' Преместете със стрелките, пуснете с интервал.');
     }
@@ -404,8 +421,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       var row = held, before = heldBefore;
       held = heldBefore = null;
       grip(row).setAttribute('aria-pressed', 'false'); lift(row, false);
-      if (cancel) { restore(before); announce('Преместването е отказано.'); return; }
+      if (cancel) { restore(before); unparkEditors(parked); parked = []; announce('Преместването е отказано.'); return; }
       relabel();
+      unparkEditors(parked); parked = [];
       if (changed(before)) o.done(row, before); else announce('Редът не е променен.');
     }
     list.addEventListener('keydown', function (e) {
@@ -448,7 +466,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       if (!drag || e.pointerId !== drag.id) return;
       if (!drag.moving) {
         if (Math.abs(e.clientY - drag.y) < 5) return;
-        drag.moving = true; lift(drag.row, true);
+        drag.moving = true; lift(drag.row, true); parked = parkEditors(list);
       }
       // Drop before the first other row whose middle is below the pointer.
       var ref = null;
@@ -474,8 +492,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       var g = grip(d.row);
       if (g.hasPointerCapture && g.hasPointerCapture(e.pointerId)) g.releasePointerCapture(e.pointerId);
       g.focus();
-      if (cancel) { restore(d.before); return; }
+      if (cancel) { restore(d.before); unparkEditors(parked); parked = []; return; }
       relabel();
+      unparkEditors(parked); parked = [];
       if (changed(d.before)) o.done(d.row, d.before);
     }
     document.addEventListener('pointerup', function (e) { end(e, false); });
@@ -529,48 +548,62 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     });
   }
 
-  // Cards: add, remove, reorder (2 to 4). The order is saved with the form.
-  var list = document.querySelector('[data-hs-cards]');
-  if (list) {
-    var tpl = document.getElementById('hsCardTpl'), add = document.querySelector('[data-hs-card-add]'), next = 100;
-    function rows() { return list.querySelectorAll('[data-hs-card]'); }
+  // Repeating lists (e.g. cards): add, remove, reorder within the list's min and max.
+  // The order is saved with the form.
+  Array.prototype.forEach.call(document.querySelectorAll('[data-hs-list]'), function (list) {
+    var key = list.dataset.hsList, min = parseInt(list.dataset.hsMin, 10), max = parseInt(list.dataset.hsMax, 10);
+    var tpl = document.getElementById('hsListTpl_' + key), add = list.parentNode.querySelector('[data-hs-item-add]'),
+        note = list.parentNode.querySelector('[data-hs-list-note]'), next = 100;
+    function rows() { return list.querySelectorAll('[data-hs-item]'); }
     function renumber() {
       var r = rows();
       r.forEach(function (row, i) {
-        var n = i + 1, rm = row.querySelector('[data-hs-card-remove]');
-        row.querySelector('[data-hs-card-legend]').textContent = 'Карта ' + n;
-        rm.setAttribute('aria-label', 'Премахни карта ' + n);
-        rm.disabled = r.length <= 2;
+        var n = i + 1, rm = row.querySelector('[data-hs-item-remove]');
+        row.querySelector('[data-hs-item-legend]').textContent = list.dataset.hsItemLabel + ' ' + n;
+        rm.setAttribute('aria-label', 'Премахни ' + list.dataset.hsItemName + ' ' + n);
+        rm.disabled = r.length <= min;
+        rm.setAttribute('aria-describedby', note.id);
       });
-      add.disabled = r.length >= 4;
+      add.disabled = r.length >= max;
+      // The reason a button is off is written out, not only greyed.
+      var why = [];
+      if (r.length >= max) why.push('Най-много ' + max + ' ' + list.dataset.hsPlural + '.');
+      if (r.length <= min) why.push('Трябват поне ' + min + ' ' + list.dataset.hsPlural + ' — не може да се премахне повече.');
+      note.textContent = why.join(' ');
     }
-    var cards = sortable(list, {
-      item: '[data-hs-card]',
-      name: function (row) { return row.querySelector('[data-hs-card-legend]').textContent; },
-      label: function (row, pos) { return 'Премести карта ' + pos; },
-      done: function (row) { renumber(); announce('Картата е на място ' + (Array.prototype.indexOf.call(rows(), row) + 1) + '. Редът се запазва с бутона „Запази“.'); }
+    var sorter = sortable(list, {
+      item: '[data-hs-item]',
+      name: function (row) { return row.querySelector('[data-hs-item-legend]').textContent; },
+      label: function (row, pos) { return 'Премести ' + list.dataset.hsItemName + ' ' + pos; },
+      done: function (row) { renumber(); announce(list.dataset.hsSayMoved.replace('%d', Array.prototype.indexOf.call(rows(), row) + 1)); }
     });
     list.addEventListener('click', function (e) {
-      var row = e.target.closest('[data-hs-card]');
-      if (!row || !e.target.closest('[data-hs-card-remove]') || rows().length <= 2) return;
+      var row = e.target.closest('[data-hs-item]');
+      if (!row || !e.target.closest('[data-hs-item-remove]') || rows().length <= min) return;
       var to = row.nextElementSibling || row.previousElementSibling;
-      row.remove(); renumber(); cards.relabel();
-      to.querySelector('input[type=text]').focus();
-      announce('Картата е премахната.');
+      if (window.tinymce) Array.prototype.forEach.call(row.querySelectorAll('textarea.hs-rich'), function (t) { var ed = tinymce.get(t.id); if (ed) ed.remove(); });
+      row.remove(); renumber(); sorter.relabel();
+      var f = to.querySelector('input[type=text]') || to.querySelector('input:not([type=hidden]), textarea, select');
+      if (f) f.focus();
+      announce(list.dataset.hsSayRemoved);
     });
     add.addEventListener('click', function () {
-      if (rows().length >= 4) return;
+      if (rows().length >= max) return;
       list.insertAdjacentHTML('beforeend', tpl.innerHTML.split('__I__').join(String(next++)));
-      renumber(); cards.relabel();
-      list.lastElementChild.querySelector('input[name$="[title][bg]"]').focus();
-      announce('Добавена е нова карта.');
+      var row = list.lastElementChild;
+      row.querySelector('[data-hs-item-id]').value = 'i_' + Math.random().toString(36).slice(2, 8).padEnd(6, '0');
+      Array.prototype.forEach.call(row.querySelectorAll('textarea.hs-rich'), function (t) { initRich('#' + t.id); });
+      renumber(); sorter.relabel();
+      var first = row.querySelector('[aria-required="true"]') || row.querySelector('input:not([type=hidden]):not([type=file]), textarea, select');
+      if (first) first.focus();
+      announce(list.dataset.hsSayAdded);
     });
     renumber();
-  }
+  });
 
-  if (window.tinymce && document.querySelector('textarea.hs-rich')) {
-    tinymce.init(Object.assign({}, window._tinyBase, { selector: 'textarea.hs-rich', min_height: 220 }));
-  }
+  // Server-rendered rich textareas, rows of lists included. A <template>'s content is not in the
+  // document, so rows added later are started by the list's add button.
+  if (window.tinymce && document.querySelector('textarea.hs-rich')) initRich('textarea.hs-rich');
 })();
 </script>
 <?php require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-footer.php'; ?>

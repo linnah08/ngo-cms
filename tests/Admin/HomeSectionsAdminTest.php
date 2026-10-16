@@ -281,7 +281,7 @@ final class HomeSectionsAdminTest extends TestCase
             3 => ['title' => ['bg' => 'Първа', 'en' => '']],
             7 => ['title' => ['bg' => 'Втора', 'en' => '']],
         ]];
-        $files = ['up_card' => ['tmp_name' => [7 => $tmp], 'error' => [7 => UPLOAD_ERR_OK], 'name' => [7 => 'x.txt']]];
+        $files = ['up_list' => ['tmp_name' => ['cards' => [7 => ['image' => $tmp]]], 'error' => ['cards' => [7 => ['image' => UPLOAD_ERR_OK]]], 'name' => ['cards' => [7 => ['image' => 'x.txt']]]]];
 
         $errors = home_apply_uploads($in, 'cards', $files, 's_ab12');
         unlink($tmp);
@@ -305,7 +305,7 @@ final class HomeSectionsAdminTest extends TestCase
     {
         foreach (home_types() as $type => $def) {
             foreach ($def['fields'] as $key => $fdef) {
-                $html = $fdef['kind'] === 'cards' ? hs_cards([], []) : hs_field($key, $fdef, null, []);
+                $html = $fdef['kind'] === 'list' ? hs_list($key, $fdef, [], []) : hs_field($key, $fdef, null, []);
                 preg_match_all('/<(?:input|textarea|select)\b(?![^>]*type="hidden")[^>]*\bid="([^"]+)"/', $html, $m);
                 foreach ($m[1] as $id) {
                     $this->assertStringContainsString('for="' . $id . '"', $html, "$type.$key: #$id has no label");
@@ -360,11 +360,11 @@ final class HomeSectionsAdminTest extends TestCase
 
     public function test_cards_move_by_handle_not_arrows(): void
     {
-        $html = hs_cards([], []);
+        $html = hs_list('cards', home_types()['cards']['fields']['cards'], [], []);
         $this->assertStringContainsString('data-hs-sort-handle', $html);
-        $this->assertStringContainsString('id="hsCardSortHelp"', $html);
-        $this->assertStringNotContainsString('data-hs-card-up', $html);
-        $this->assertStringNotContainsString('data-hs-card-down', $html);
+        $this->assertStringContainsString('id="hsListSortHelp_cards"', $html);
+        $this->assertStringNotContainsString('data-hs-item-up', $html);
+        $this->assertStringNotContainsString('data-hs-item-down', $html);
     }
 
     public function test_reorder_endpoint_checks_csrf_and_the_revision(): void
