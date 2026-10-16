@@ -232,16 +232,32 @@ $allowed = [
         'social_fb'    => ['social_fb',    'social_fb'],
         'social_ig'    => ['social_ig',    'social_ig'],
     ],
-    // Newsletter topic opt-in (templates/newsletter-topics.php).
+    // Newsletter topic opt-in (templates/newsletter-topics.php). The topic
+    // names themselves (topic_<id>_name) are saved to the DB above.
     'newsletter' => [
         'topics_heading'        => ['topics_heading',        'topics_heading_en'],
-        'topic_news_label'      => ['topic_news_label',      'topic_news_label_en'],
-        'topic_education_label' => ['topic_education_label', 'topic_education_label_en'],
         // Sign-up card on the confirmation pages (templates/newsletter-confirm-card.php).
         'confirm_heading'       => ['confirm_heading',       'confirm_heading_en'],
         'confirm_button'        => ['confirm_button',        'confirm_button_en'],
     ],
 ];
+
+// Newsletter topic names live in the newsletter_topics table, not pages.json.
+// The rest of the section (heading, confirmation card) carries on below.
+if ($section === 'newsletter') {
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
+    foreach ($fields as $field => $values) {
+        if (!preg_match('/^topic_(\d+)_name$/', (string) $field, $m)) continue;
+        unset($fields[$field]);
+        $topic = newsletter_topic_get((int) $m[1]);
+        $bg    = newsletter_clean_topic_name($values['bg'] ?? '');
+        // A topic can't be left without a name; keep the old one instead.
+        if ($topic && $bg !== '') {
+            newsletter_topic_rename((int) $topic['id'], $bg, newsletter_clean_topic_name($values['en'] ?? ''));
+        }
+    }
+    if (!$fields) save_json_response(['ok' => true]);
+}
 
 if (!isset($allowed[$section])) {
     save_json_response(['ok' => false, 'error' => 'unknown section']);

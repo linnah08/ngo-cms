@@ -409,27 +409,51 @@ final class NewsletterTest extends TestCase
 
     // ── Topics: merge-safe subscribe ──────────────────────────────────────────
 
-    /** Read topic flags (and status/source) for an email. */
+    /** Status, source and chosen topic ids ([] = everything) for an email. */
     private function topicsOf(string $email): array
     {
-        $stmt = self::$pdo->prepare(
-            "SELECT wants_news, wants_education, status, source FROM newsletter_subscribers WHERE email=?"
-        );
+        $stmt = self::$pdo->prepare("SELECT id, status, source FROM newsletter_subscribers WHERE email=?");
         $stmt->execute([strtolower(trim($email))]);
-        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$row) return [];
+        $row['topics'] = newsletter_subscriber_topic_ids(self::$pdo, (int) $row['id']);
+        return $row;
+    }
+
+    /** Id of one of the two built-in topics (migration 045). */
+    private function legacyTopic(string $key): int
+    {
+        $st = self::$pdo->prepare('SELECT id FROM newsletter_topics WHERE legacy_key = ?');
+        $st->execute([$key]);
+        return (int) $st->fetchColumn();
     }
 
     public function test_subscribe_stores_selected_topics(): void
     {
         $this->skipWithoutDb();
         $email = 'test_topics_' . uniqid() . '@example-test.invalid';
+        $news  = $this->legacyTopic('news');
         try {
-            $result = newsletter_subscribe($email, 'T', 'bg', 'checkout', true, false);
+            $result = newsletter_subscribe($email, 'T', 'bg', 'checkout', [$news]);
             $this->assertSame('subscribed', $result['status']);
             $row = $this->topicsOf($email);
-            $this->assertSame('1', (string)$row['wants_news']);
-            $this->assertSame('0', (string)$row['wants_education']);
+            $this->assertSame([$news], $row['topics']);
             $this->assertSame('checkout', $row['source'], 'checkout is a real source now, not folded into web_banner');
+        } finally {
+            $this->deleteSubscriber($email);
+        }
+    }
+
+    public function test_subscribe_without_topics_means_everything(): void
+    {
+        $this->skipWithoutDb();
+        $email = 'test_alltopics_' . uniqid() . '@example-test.invalid';
+        try {
+            $this->assertSame('subscribed', newsletter_subscribe($email, '', 'bg', 'manual')['status']);
+            $this->assertSame([], $this->topicsOf($email)['topics']);
+            // A later narrower tick must not take "everything" away.
+            $this->assertSame('merged', newsletter_subscribe($email, '', 'bg', 'web_banner', [$this->legacyTopic('news')])['status']);
+            $this->assertSame([], $this->topicsOf($email)['topics']);
         } finally {
             $this->deleteSubscriber($email);
         }
@@ -439,14 +463,18 @@ final class NewsletterTest extends TestCase
     {
         $this->skipWithoutDb();
         $email = 'test_merge_' . uniqid() . '@example-test.invalid';
+        $news  = $this->legacyTopic('news');
+        $edu   = $this->legacyTopic('education');
         try {
-            newsletter_subscribe($email, 'T', 'bg', 'checkout', true, false);            // news only
-            $result = newsletter_subscribe($email, 'T', 'bg', 'checkout', false, true);  // add the other
+            newsletter_subscribe($email, 'T', 'bg', 'checkout', [$news]);
+            $result = newsletter_subscribe($email, 'T', 'bg', 'checkout', [$edu]);
             $this->assertSame('merged', $result['status']);
             $this->assertTrue($result['duplicate']);
-            $row = $this->topicsOf($email);
-            $this->assertSame('1', (string)$row['wants_news'], 'a later sign-up must never clear a topic');
-            $this->assertSame('1', (string)$row['wants_education']);
+            $topics = $this->topicsOf($email)['topics'];
+            sort($topics);
+            $expected = [$news, $edu];
+            sort($expected);
+            $this->assertSame($expected, $topics, 'a later sign-up must never clear a topic');
         } finally {
             $this->deleteSubscriber($email);
         }
@@ -458,36 +486,23 @@ final class NewsletterTest extends TestCase
         $email = 'test_noresurrect_' . uniqid() . '@example-test.invalid';
         $this->insertSubscriber($email, 'unsubscribed');
         try {
-            $result = newsletter_subscribe($email, 'T', 'bg', 'checkout', true, true);
+            $result = newsletter_subscribe($email, 'T', 'bg', 'checkout', [$this->legacyTopic('news')]);
             $this->assertSame('resurrect_blocked', $result['status']);
-            $this->assertSame('unsubscribed', $this->topicsOf($email)['status']);
+            $row = $this->topicsOf($email);
+            $this->assertSame('unsubscribed', $row['status']);
+            $this->assertSame([], $row['topics']);
         } finally {
             $this->deleteSubscriber($email);
         }
     }
 
-    public function test_subscribe_with_no_topics_writes_nothing(): void
-    {
-        $this->skipWithoutDb();
-        $email = 'test_notopic_' . uniqid() . '@example-test.invalid';
-        try {
-            $result = newsletter_subscribe($email, 'T', 'bg', 'checkout', false, false);
-            $this->assertFalse($result['ok']);
-            $this->assertSame('no_topics', $result['status']);
-            $this->assertSame([], $this->topicsOf($email));
-        } finally {
-            $this->deleteSubscriber($email);
-        }
-    }
-
-    public function test_subscribe_uses_atomic_insert_and_greatest_merge(): void
+    public function test_subscribe_uses_atomic_inserts(): void
     {
         // Concurrency safety lives in the SQL: INSERT IGNORE decides who created
-        // the row, GREATEST() merges in one statement — no read-modify-write.
+        // the row and adds topics on the (subscriber, topic) key — no read-modify-write.
         $src = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php');
         $this->assertStringContainsString('INSERT IGNORE INTO newsletter_subscribers', $src);
-        $this->assertStringContainsString('wants_news = GREATEST(wants_news, ?)', $src);
-        $this->assertStringContainsString('wants_education = GREATEST(wants_education, ?)', $src);
+        $this->assertStringContainsString('INSERT IGNORE INTO newsletter_subscriber_topics', $src);
     }
 
     // ── Topics: helpers ───────────────────────────────────────────────────────
@@ -495,68 +510,63 @@ final class NewsletterTest extends TestCase
     public function test_topic_where_filters_by_topic(): void
     {
         $this->loadNewsletter();
-        $this->assertSame("status='active' AND wants_news=1",      newsletter_topic_where('news'));
-        $this->assertSame("status='active' AND wants_education=1", newsletter_topic_where('education'));
+        $this->assertSame("status='active' AND " . newsletter_topic_match_sql(7), newsletter_topic_where('7'));
+        $this->assertStringContainsString('st.topic_id = 7)', newsletter_topic_where('7'));
         $this->assertSame("status='active'", newsletter_topic_where('all'));
-        $this->assertSame("status='active'", newsletter_topic_where("news' OR 1=1 --"));
+        $this->assertSame("status='active'", newsletter_topic_where('0'));
+        $this->assertSame("status='active'", newsletter_topic_where("7' OR 1=1 --"));
     }
 
     public function test_clean_topic_whitelists(): void
     {
-        $this->loadNewsletter();
-        $this->assertSame('news', newsletter_clean_topic('news'));
-        $this->assertSame('education', newsletter_clean_topic('education'));
+        $this->skipWithoutDb();
+        $news = (string) $this->legacyTopic('news');
+        $this->assertSame($news, newsletter_clean_topic($news));
         $this->assertSame('all', newsletter_clean_topic('all'));
-        $this->assertSame('all', newsletter_clean_topic('evil'));
-        $this->assertSame('all', newsletter_clean_topic(['news']));
+        $this->assertSame('all', newsletter_clean_topic('news'), 'old ENUM keys are ids now');
+        $this->assertSame('all', newsletter_clean_topic('999999999'));
+        $this->assertSame('all', newsletter_clean_topic($news . ' OR 1=1'));
+        $this->assertSame('all', newsletter_clean_topic([$news]));
         $this->assertSame('all', newsletter_clean_topic(null));
     }
 
-    public function test_topics_from_post(): void
+    public function test_topics_from_post_reads_ids_and_old_checkbox_names(): void
     {
-        $this->loadNewsletter();
-        $this->assertSame([true, false], newsletter_topics_from_post(['wants_news' => '1']));
-        $this->assertSame([false, true], newsletter_topics_from_post(['wants_education' => '1']));
-        $this->assertSame([false, false], newsletter_topics_from_post([]));
+        $this->skipWithoutDb();
+        $news = $this->legacyTopic('news');
+        $edu  = $this->legacyTopic('education');
+        $this->assertSame([$news], newsletter_topics_from_post(['nl_topics' => [(string) $news, '999999999', 'x']]));
+        $this->assertSame([$edu], newsletter_topics_from_post(['wants_education' => '1']), 'a page cached before this change still works');
+        $this->assertSame([], newsletter_topics_from_post([]));
+        $this->assertSame([], newsletter_topics_from_post(['nl_topics' => 'not-an-array']));
     }
 
-    public function test_topic_labels_have_generic_defaults_in_both_languages(): void
+    public function test_topic_names_have_generic_defaults_in_both_languages(): void
     {
         $this->loadNewsletter();
-        foreach (['heading', 'news', 'education'] as $topic) {
-            foreach (['bg', 'en'] as $lang) {
-                $label = newsletter_topic_label($topic, $lang);
-                $this->assertNotSame('', trim($label));
-                $this->assertStringNotContainsString('newsletter.', $label, 'never a raw string key');
-            }
-            $this->assertNotSame(newsletter_topic_label($topic, 'bg'), newsletter_topic_label($topic, 'en'));
+        foreach (['bg', 'en'] as $lang) {
+            $label = newsletter_topics_heading($lang);
+            $this->assertNotSame('', trim($label));
+            $this->assertStringNotContainsString('newsletter.', $label, 'never a raw string key');
         }
+        foreach (['news', 'education'] as $key) {
+            $t = ['name_bg' => '', 'name_en' => '', 'legacy_key' => $key];
+            $this->assertNotSame('', trim(newsletter_topic_name($t, 'bg')));
+            $this->assertNotSame(newsletter_topic_name($t, 'bg'), newsletter_topic_name($t, 'en'));
+        }
+        $this->assertSame('Събития', newsletter_topic_name(['name_bg' => 'Събития', 'name_en' => '', 'legacy_key' => null], 'en'),
+            'no English name yet: the Bulgarian one, never an empty label');
+        $this->assertSame('Events', newsletter_topic_name(['name_bg' => 'Събития', 'name_en' => 'Events', 'legacy_key' => null], 'en'));
     }
 
-    public function test_topic_labels_are_inline_editable(): void
+    public function test_topic_names_are_inline_editable(): void
     {
         $partial = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/templates/newsletter-topics.php');
         $save    = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/admin/inline-save.php');
         $this->assertStringContainsString('data-cms-section="newsletter"', $partial);
-        $this->assertStringContainsString("'newsletter' => [", $save);
-        foreach (['topics_heading', 'topic_news_label', 'topic_education_label'] as $f) {
-            $this->assertStringContainsString("'$f'", $save, "$f must be saveable from the page");
-        }
-        $this->loadNewsletter();
-        $this->assertSame('topic_news_label', newsletter_topic_field('news'));
-        $this->assertSame('topics_heading', newsletter_topic_field('heading'));
-    }
-
-    public function test_topics_partial_renders_unticked_checkboxes_for_each_topic(): void
-    {
-        $this->loadNewsletter();
-        ob_start();
-        require $_SERVER['DOCUMENT_ROOT'] . '/templates/newsletter-topics.php';
-        $html = (string) ob_get_clean();
-        $this->assertStringContainsString('name="wants_news"', $html);
-        $this->assertStringContainsString('name="wants_education"', $html);
-        $this->assertStringNotContainsString(' checked', $html, 'consent is never pre-ticked');
-        $this->assertStringContainsString('<legend', $html);
+        $this->assertStringContainsString('data-cms-field="topic_<?= $_nlt_id ?>_name"', $partial);
+        $this->assertStringContainsString("'topics_heading'", $save);
+        $this->assertStringContainsString('newsletter_topic_rename(', $save, 'topic names are saved to the topics table');
     }
 
     public function test_every_send_path_filters_by_campaign_topic(): void
@@ -572,21 +582,24 @@ final class NewsletterTest extends TestCase
         }
     }
 
-    public function test_topic_send_selects_only_matching_subscribers(): void
+    public function test_topic_send_selects_choosers_and_everything_subscribers(): void
     {
         $this->skipWithoutDb();
         $a = 'test_tw_a_' . uniqid() . '@example-test.invalid';
         $b = 'test_tw_b_' . uniqid() . '@example-test.invalid';
+        $c = 'test_tw_c_' . uniqid() . '@example-test.invalid';
+        $news = $this->legacyTopic('news');
         try {
-            newsletter_subscribe($a, '', 'bg', 'manual', true, false);
-            newsletter_subscribe($b, '', 'bg', 'manual', false, true);
-            $emails = self::$pdo->query("SELECT email FROM newsletter_subscribers WHERE " . newsletter_topic_where('news'))
+            newsletter_subscribe($a, '', 'bg', 'manual', [$news]);
+            newsletter_subscribe($b, '', 'bg', 'manual', [$this->legacyTopic('education')]);
+            newsletter_subscribe($c, '', 'bg', 'manual');   // everything
+            $emails = self::$pdo->query("SELECT email FROM newsletter_subscribers WHERE " . newsletter_topic_where((string) $news))
                 ->fetchAll(\PDO::FETCH_COLUMN);
             $this->assertContains($a, $emails);
             $this->assertNotContains($b, $emails);
+            $this->assertContains($c, $emails, 'a subscriber who chose no topic gets every campaign');
         } finally {
-            $this->deleteSubscriber($a);
-            $this->deleteSubscriber($b);
+            foreach ([$a, $b, $c] as $e) $this->deleteSubscriber($e);
         }
     }
 
@@ -610,19 +623,19 @@ final class NewsletterTest extends TestCase
         $email = 'test_order_' . uniqid() . '@example-test.invalid';
         $num   = $this->insertOrder($email);
         $saved = $_SESSION[ORDER_SESSION_KEY] ?? null;
+        $edu   = $this->legacyTopic('education');
         try {
             unset($_SESSION[ORDER_SESSION_KEY]);
-            $this->assertSame('not_found', newsletter_subscribe_order(self::$pdo, $num, true, true),
+            $this->assertSame('not_found', newsletter_subscribe_order(self::$pdo, $num, [$edu]),
                 'knowing an order number must not be enough');
             $this->assertSame([], $this->topicsOf($email));
 
             newsletter_remember_order($num);
-            $this->assertSame('no_topics', newsletter_subscribe_order(self::$pdo, $num, false, false));
-            $this->assertSame('subscribed', newsletter_subscribe_order(self::$pdo, $num, false, true));
+            $this->assertSame('no_topics', newsletter_subscribe_order(self::$pdo, $num, null));
+            $this->assertSame('subscribed', newsletter_subscribe_order(self::$pdo, $num, [$edu]));
             $row = $this->topicsOf($email);
             $this->assertSame('confirmation', $row['source']);
-            $this->assertSame('0', (string)$row['wants_news']);
-            $this->assertSame('1', (string)$row['wants_education']);
+            $this->assertSame([$edu], $row['topics']);
         } finally {
             $_SESSION[ORDER_SESSION_KEY] = $saved;
             self::$pdo->prepare("DELETE FROM orders WHERE order_number=?")->execute([$num]);

@@ -32,14 +32,14 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     exit;
 }
 
-[$wants_news, $wants_edu] = newsletter_topics_from_post($_POST);
-if (!$wants_news && !$wants_edu) {
+$topic_ids = newsletter_signup_topics($_POST);
+if ($topic_ids === null) {
     flash_set('error', t_or('newsletter.err.no_topic', 'Моля, изберете поне една тема.', 'Please choose at least one topic.', $lang));
     header('Location: ' . $back);
     exit;
 }
 
-newsletter_subscribe($email, $name, $lang, 'web_banner', $wants_news, $wants_edu);
+newsletter_subscribe($email, $name, $lang, 'web_banner', $topic_ids);
 
 // A 1-year cookie so the banner hides on all subsequent pages
 newsletter_set_subscribed_cookie();

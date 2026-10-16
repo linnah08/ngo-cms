@@ -302,13 +302,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $step = 3;
             goto render;
         }
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
         $consents = [
             'terms_version' => LEGAL_VERSION,
             'accepted_at'   => date('c'),
             'documents'     => ['terms', 'privacy', 'withdrawal'],
-            // Ticking any newsletter topic is the opt-in.
-            // Ticking a topic is only possible while „Бюлетин“ is on (Admin → Модули).
-            'newsletter'    => module_enabled_with_needs('newsletter') && (!empty($_POST['wants_news']) || !empty($_POST['wants_education'])),
+            // Ticking a newsletter topic (or the one opt-in box when the site has
+            // fewer than two topics) is the opt-in — possible only while
+            // „Бюлетин“ is on (Admin → Модули).
+            'newsletter'    => module_enabled_with_needs('newsletter') && newsletter_post_opted_in($_POST),
         ];
 
         // Online payment only — COD is not offered. Resolve to an enabled provider.
@@ -452,10 +454,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($consents['newsletter'])) {
                 try {
                     require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
-                    [$nl_news, $nl_edu] = newsletter_topics_from_post($_POST);
                     newsletter_subscribe(
                         $d['customer_email'], $d['customer_name'], $order_lang, 'checkout',
-                        $nl_news, $nl_edu
+                        newsletter_signup_topics($_POST) ?? []
                     );
                     newsletter_set_subscribed_cookie();
                 } catch (Throwable $e) {
@@ -1071,7 +1072,9 @@ $subtotal  = $cart_info['subtotal'];
           <?php
             $nl_heading = t_or('checkout.newsletter_optin', 'Искам да получавам новини от {name}.', 'Send me news from {name}.',
                                null, ['name' => $lang === 'en' ? SITE_NAME_EN : SITE_NAME_BG]);
-            $nl_checked = ['news' => !empty($_POST['wants_news']), 'education' => !empty($_POST['wants_education'])];
+            require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
+            $nl_checked = newsletter_topics_from_post($_POST);
+            $nl_optin   = !empty($_POST['nl_optin']);
             require $_SERVER['DOCUMENT_ROOT'] . '/templates/newsletter-topics.php';
           ?>
         </div>

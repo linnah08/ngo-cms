@@ -239,7 +239,7 @@ $current_user = admin_user();
       <?php endif; ?>
       <?php if (module_admin_page_visible('newsletter.php')): ?>
       <a href="/admin/newsletter.php"
-         class="admin-nav__link <?= in_array($active_nav ?? '', ['newsletter','newsletter-compose','newsletter-send','newsletter-subscribers']) ? 'active' : '' ?>">
+         class="admin-nav__link <?= in_array($active_nav ?? '', ['newsletter','newsletter-compose','newsletter-send','newsletter-subscribers','newsletter-topics']) ? 'active' : '' ?>">
         Бюлетин
       </a>
       <?php endif; ?>

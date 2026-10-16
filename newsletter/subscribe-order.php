@@ -37,8 +37,7 @@ $is_donation = ($_POST['flow'] ?? '') === 'donation';
 $back = ($is_donation ? donation_path('confirmation', $lang) : shop_path('confirmation', $lang))
       . '?order=' . urlencode($order_number) . '#newsletter';
 
-[$wants_news, $wants_edu] = newsletter_topics_from_post($_POST);
-$status = newsletter_subscribe_order(get_pdo(), $order_number, $wants_news, $wants_edu);
+$status = newsletter_subscribe_order(get_pdo(), $order_number, newsletter_signup_topics($_POST));
 
 if ($status === 'no_topics') {
     flash_set('error', t_or('newsletter.err.no_topic', 'Моля, изберете поне една тема.', 'Please choose at least one topic.', $lang));

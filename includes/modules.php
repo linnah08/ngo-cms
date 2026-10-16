@@ -139,7 +139,8 @@ function modules_registry(?array $replace = null): array
             'off_warning' => 'Изключвате бюлетина. Формите за абониране ще изчезнат от сайта, а планираните бюлетини няма да бъдат изпратени, докато не го включите отново. Абонатите и изпратените бюлетини остават запазени, а връзката „Отпиши се“ в вече изпратените писма продължава да работи.',
             'needs'        => [],
             'admin_pages'  => ['newsletter.php', 'newsletter-compose.php', 'newsletter-import.php',
-                               'newsletter-preview.php', 'newsletter-send.php', 'newsletter-subscribers.php'],
+                               'newsletter-preview.php', 'newsletter-send.php', 'newsletter-subscribers.php',
+                               'newsletter-topics.php'],
             // Deliberately NOT /newsletter/unsubscribe.php or /newsletter/track.php:
             // links in emails already sent must keep working with the module off.
             'public_paths' => ['/newsletter/subscribe.php', '/newsletter/subscribe-order.php'],

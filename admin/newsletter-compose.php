@@ -225,8 +225,11 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <span style="font-weight:600;">Получатели:</span>
         <select name="topic" style="margin-left:.5rem;padding:.35rem .5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;max-width:100%;">
           <option value="all"<?= $cur_topic === 'all' ? ' selected' : '' ?>>Всички абонати</option>
-          <?php foreach (array_keys(newsletter_topics()) as $tk): ?>
-          <option value="<?= h($tk) ?>"<?= $cur_topic === $tk ? ' selected' : '' ?>>Само „<?= h(newsletter_topic_label($tk, 'bg')) ?>“</option>
+          <?php foreach (newsletter_topic_list(true) as $_t):
+                  $tk = (string) $_t['id'];
+                  // A hidden topic is offered only to the campaign already aimed at it.
+                  if (!(int) $_t['is_active'] && $cur_topic !== $tk) continue; ?>
+          <option value="<?= h($tk) ?>"<?= $cur_topic === $tk ? ' selected' : '' ?>>Само „<?= h(newsletter_topic_name($_t, 'bg')) ?>“<?= (int) $_t['is_active'] ? '' : ' (скрита тема)' ?></option>
           <?php endforeach; ?>
         </select>
       </label>

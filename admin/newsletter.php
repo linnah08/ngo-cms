@@ -71,6 +71,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     Активни абонати: <strong><?= $counts['bg'] ?></strong> БГ + <strong><?= $counts['en'] ?></strong> EN = <strong><?= $counts['total'] ?></strong>
     &nbsp;·&nbsp;
     <a href="/admin/newsletter-subscribers.php" style="color:var(--teal);">Управление →</a>
+    &nbsp;·&nbsp;
+    <a href="/admin/newsletter-topics.php" style="color:var(--teal);">Теми →</a>
   </div>
   <a href="/admin/newsletter-compose.php" class="btn btn--primary">+ Нова кампания</a>
 </div>

@@ -250,7 +250,7 @@ final class ModulesGatingTest extends TestCase
         $this->assertStringContainsString("\$_show_nl_banner = module_enabled_with_needs('newsletter') && ", self::src('templates/footer.php'));
         $this->assertStringContainsString("if (!module_enabled_with_needs('newsletter')) return;", self::src('templates/newsletter-confirm-card.php'));
         $checkout = self::src('checkout/index.php');
-        $this->assertStringContainsString("'newsletter'    => module_enabled_with_needs('newsletter') && (", $checkout, 'no opt-in recorded');
+        $this->assertStringContainsString("'newsletter'    => module_enabled_with_needs('newsletter') && newsletter_post_opted_in(", $checkout, 'no opt-in recorded');
         $this->assertMatchesRegularExpression("/<\?php if \(module_enabled_with_needs\('newsletter'\)\): \?>\s*<div[^>]*>\s*<\?php\s*\\\$nl_heading/", $checkout, 'no opt-in shown');
     }
 

@@ -99,8 +99,9 @@ $offset        = ($page - 1) * $per_page;
 $where = ['1=1']; $params = [];
 if ($filter_status !== 'all') { $where[] = 'status = ?'; $params[] = $filter_status; }
 if ($filter_source !== 'all') { $where[] = 'source = ?'; $params[] = $filter_source; }
-// Constant column name from newsletter_topics(), never user input.
-if ($filter_topic !== 'all')  { $where[] = newsletter_topics()[$filter_topic] . ' = 1'; }
+// Who gets this topic's campaigns: those who chose it and those who chose
+// nothing (= everything). A constant fragment, never user input.
+if ($filter_topic !== 'all')  { $where[] = newsletter_topic_match_sql((int) $filter_topic); }
 $where_sql = implode(' AND ', $where);
 
 $total = (int)$pdo->prepare("SELECT COUNT(*) FROM newsletter_subscribers WHERE $where_sql")
@@ -113,6 +114,16 @@ $pages = max(1, (int)ceil($total / $per_page));
 $stmt = $pdo->prepare("SELECT * FROM newsletter_subscribers WHERE $where_sql ORDER BY subscribed_at DESC LIMIT $per_page OFFSET $offset");
 $stmt->execute($params);
 $subscribers = $stmt->fetchAll();
+
+// The topics each listed subscriber chose (none = all of them).
+$topic_by_id = array_column(newsletter_topic_list(true), null, 'id');
+$sub_topics  = [];
+if ($subscribers) {
+    $in = implode(',', array_map(fn($r) => (int) $r['id'], $subscribers));
+    foreach ($pdo->query("SELECT subscriber_id, topic_id FROM newsletter_subscriber_topics WHERE subscriber_id IN ($in) ORDER BY topic_id") as $r) {
+        $sub_topics[(int) $r['subscriber_id']][] = (int) $r['topic_id'];
+    }
+}
 
 $counts = newsletter_active_count();
 $flash  = flash_get();
@@ -139,6 +150,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </span>
   </div>
   <div style="display:flex;flex-wrap:wrap;gap:.75rem;">
+    <a href="/admin/newsletter-topics.php" class="btn btn--outline" style="font-size:.85rem;">Теми</a>
     <a href="/admin/newsletter-import.php" class="btn btn--outline" style="font-size:.85rem;">↓ Импорт от клиенти</a>
     <a href="/admin/newsletter.php" class="btn btn--outline" style="font-size:.85rem;">← Кампании</a>
   </div>
@@ -158,8 +170,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     ['source','donation','Дарение','donation'],
     ['source','confirmation','След поръчка','confirmation'],
   ];
-  foreach (newsletter_topics() as $tk => $_col) {
-    $f_pairs[] = ['topic', $tk, 'Тема: ' . h(newsletter_topic_label($tk, 'bg')), $tk];
+  foreach (newsletter_topic_list() as $_t) {
+    $f_pairs[] = ['topic', (string) $_t['id'], 'Тема: ' . h(newsletter_topic_name($_t, 'bg')), (string) $_t['id']];
   }
   $f_current = ['status' => $filter_status, 'source' => $filter_source, 'topic' => $filter_topic];
   foreach ($f_pairs as [$key, $val, $label, $cmp]):
@@ -220,10 +232,10 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <td style="padding:.75rem 1rem;text-align:center;font-size:.8rem;">
           <?php
             $tags = [];
-            foreach (newsletter_topics() as $tk => $col) {
-                if (!empty($s[$col])) $tags[] = newsletter_topic_label($tk, 'bg');
+            foreach ($sub_topics[(int) $s['id']] ?? [] as $_tid) {
+                if (isset($topic_by_id[$_tid])) $tags[] = newsletter_topic_name($topic_by_id[$_tid], 'bg');
             }
-            echo h($tags ? implode(', ', $tags) : '—');
+            echo h($tags ? implode(', ', $tags) : 'Всички');
           ?>
         </td>
         <td style="padding:.75rem 1rem;text-align:center;">

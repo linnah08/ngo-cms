@@ -13,36 +13,36 @@ require_once __DIR__ . '/order_session.php';
 const NEWSLETTER_SOURCES = ['web_banner', 'customer_import', 'manual', 'checkout', 'donation', 'confirmation'];
 
 /**
- * Subscribe an email to one or both newsletter topics.
+ * Subscribe an email, to the topics in $topicIds.
+ *
+ * $topicIds are newsletter_topics ids. An empty list means "everything": the
+ * subscriber gets every campaign, whatever its topic — that is what manual
+ * adds, customer imports and sign-ups on a site without topics want.
+ * (Forms that need a choice and got none are refused by their caller; see
+ * newsletter_signup_topics().)
  *
  * Merge-aware and consent-safe:
- *  - no topic selected            → no write
  *  - new email                    → insert with the chosen topics
- *  - existing & active            → OR-merge topics (never clears one)
+ *  - existing & active            → add the chosen topics (never removes one)
  *  - existing & unsubscribed      → left untouched (no resurrection: the
  *                                   person said stop, a later form tick on
  *                                   some other page must not undo that)
  *
  * Concurrency-safe: INSERT IGNORE on the unique email decides atomically
- * whether this call created the row, and the merge uses GREATEST() in a single
- * UPDATE, so two simultaneous sign-ups can neither duplicate a row nor clear
- * each other's topic.
+ * whether this call created the row, and topics are added with INSERT IGNORE
+ * on the (subscriber, topic) key, so two simultaneous sign-ups can neither
+ * duplicate a row nor clear each other's topic.
  *
  * @return array ['ok' => bool, 'duplicate' => bool, 'status' => string]
- *   status ∈ subscribed | merged | resurrect_blocked | no_topics
+ *   status ∈ subscribed | merged | resurrect_blocked
  */
 function newsletter_subscribe(
     string $email,
     string $name,
     string $lang,
     string $source,
-    bool $wantsNews = true,
-    bool $wantsEducation = true
+    array $topicIds = []
 ): array {
-    if (!$wantsNews && !$wantsEducation) {
-        return ['ok' => false, 'duplicate' => false, 'status' => 'no_topics'];
-    }
-
     $email  = strtolower(trim($email));
     $lang   = in_array($lang, ['bg', 'en'], true) ? $lang : 'bg';
     $source = in_array($source, NEWSLETTER_SOURCES, true) ? $source : 'web_banner';
@@ -51,72 +51,115 @@ function newsletter_subscribe(
     $token = bin2hex(random_bytes(32));
 
     $ins = $pdo->prepare(
-        "INSERT IGNORE INTO newsletter_subscribers
-           (email, name, lang, source, token, wants_news, wants_education)
-         VALUES (?, ?, ?, ?, ?, ?, ?)"
+        "INSERT IGNORE INTO newsletter_subscribers (email, name, lang, source, token)
+         VALUES (?, ?, ?, ?, ?)"
     );
-    $ins->execute([
-        $email, trim($name) ?: null, $lang, $source, $token,
-        $wantsNews ? 1 : 0, $wantsEducation ? 1 : 0,
-    ]);
-    if ($ins->rowCount() === 1) {
-        return ['ok' => true, 'duplicate' => false, 'status' => 'subscribed'];
-    }
+    $ins->execute([$email, trim($name) ?: null, $lang, $source, $token]);
+    $created = $ins->rowCount() === 1;
 
-    // The email is already on the list.
     $sel = $pdo->prepare("SELECT id, status FROM newsletter_subscribers WHERE email = ?");
     $sel->execute([$email]);
     $row = $sel->fetch(\PDO::FETCH_ASSOC);
-    if (!$row || $row['status'] === 'unsubscribed') {
+    if (!$row || (!$created && $row['status'] === 'unsubscribed')) {
         // (No row: deleted between the INSERT and this SELECT — treat as a no-op.)
         return ['ok' => false, 'duplicate' => true, 'status' => 'resurrect_blocked'];
     }
 
-    $pdo->prepare(
-        "UPDATE newsletter_subscribers
-         SET wants_news = GREATEST(wants_news, ?), wants_education = GREATEST(wants_education, ?)
-         WHERE id = ?"
-    )->execute([$wantsNews ? 1 : 0, $wantsEducation ? 1 : 0, $row['id']]);
-    return ['ok' => true, 'duplicate' => true, 'status' => 'merged'];
+    $topicIds = array_values(array_unique(array_filter(array_map('intval', $topicIds), fn($v) => $v > 0)));
+    if (!$created && $topicIds && !newsletter_subscriber_topic_ids($pdo, (int) $row['id'])) {
+        // Already gets everything — a narrower tick now must not take that away.
+        $topicIds = [];
+    }
+    $add = $pdo->prepare('INSERT IGNORE INTO newsletter_subscriber_topics (subscriber_id, topic_id)
+                          SELECT ?, id FROM newsletter_topics WHERE id = ?');
+    foreach ($topicIds as $tid) $add->execute([(int) $row['id'], $tid]);
+
+    return $created
+        ? ['ok' => true, 'duplicate' => false, 'status' => 'subscribed']
+        : ['ok' => true, 'duplicate' => true, 'status' => 'merged'];
+}
+
+/** The topic ids a subscriber chose; [] means they get everything. */
+function newsletter_subscriber_topic_ids(\PDO $pdo, int $subscriberId): array
+{
+    $st = $pdo->prepare('SELECT topic_id FROM newsletter_subscriber_topics WHERE subscriber_id = ? ORDER BY topic_id');
+    $st->execute([$subscriberId]);
+    return array_map('intval', $st->fetchAll(\PDO::FETCH_COLUMN));
 }
 
 // ── Topics ─────────────────────────────────────────────────────────────────────
+//
+// The topics a subscriber can pick are rows of `newsletter_topics`, managed in
+// Admin → Бюлетин → Теми (admin/newsletter-topics.php). A hidden topic
+// (is_active = 0) is no longer offered anywhere, but subscribers keep having
+// chosen it and campaigns already aimed at it still go to them.
+
+/** Soft limit: above this many shown topics the admin screen warns. */
+const NEWSLETTER_TOPICS_SOFT_MAX = 6;
 
 /**
- * The topics a subscriber can pick, as campaign topic key => subscriber column.
- * The keys are internal; what people read comes from newsletter_topic_label().
+ * Topic rows in display order — only the shown ones unless $includeHidden.
+ * [] when the table is missing (a site mid-update, before migrate.php has run)
+ * so a page never breaks over it; the sign-up then simply has no checkboxes.
  */
-function newsletter_topics(): array
+function newsletter_topic_list(bool $includeHidden = false): array
 {
-    return ['news' => 'wants_news', 'education' => 'wants_education'];
+    try {
+        return get_pdo()->query(
+            'SELECT * FROM newsletter_topics'
+            . ($includeHidden ? '' : ' WHERE is_active = 1')
+            . ' ORDER BY is_active DESC, sort_order, id'
+        )->fetchAll(\PDO::FETCH_ASSOC);
+    } catch (\PDOException) {
+        return [];
+    }
+}
+
+/** One topic row by id (shown or hidden), or null. */
+function newsletter_topic_get(int $id): ?array
+{
+    foreach (newsletter_topic_list(true) as $t) {
+        if ((int) $t['id'] === $id) return $t;
+    }
+    return null;
 }
 
 /**
- * The visible name of a topic (or of the "topics" heading, $topic = 'heading').
- *
- * Wording is the site's own: an admin edits it in place on the page (inline
- * editing, saved to the `newsletter` section of content/pages.json). Until
- * then the strings.json default is used — generic text a site can also reword
- * in content/{bg,en}/strings.site.json.
+ * The name people read for a topic. Saved in the topic row; the two topics a
+ * site had before topics were editable keep, until renamed, the wording edited
+ * in place on the page back then (pages.json) or the strings.json default.
+ * A missing English name falls back to the Bulgarian one.
  */
-function newsletter_topic_label(string $topic, ?string $lang = null): string
+function newsletter_topic_name(array $topic, ?string $lang = null): string
 {
     $lang = ($lang ?? get_lang()) === 'en' ? 'en' : 'bg';
-    if (!in_array($topic, ['heading', 'news', 'education'], true)) return $topic;
-    $field = newsletter_topic_field($topic);
-    $saved = newsletter_pages_section()[$lang === 'en' ? $field . '_en' : $field] ?? '';
-    if (is_string($saved) && trim($saved) !== '') return $saved;
-    return match ($topic) {
-        'heading'   => t_or('newsletter.topics.heading', 'Какво искате да получавате?', 'What would you like to receive?', $lang),
-        'news'      => t_or('newsletter.topic.news', 'Новини за нашата дейност', 'News about our work', $lang),
-        'education' => t_or('newsletter.topic.education', 'Полезни материали и съвети', 'Useful resources and tips', $lang),
-    };
+    $own  = trim((string) ($topic[$lang === 'en' ? 'name_en' : 'name_bg'] ?? ''));
+    if ($own !== '') return $own;
+
+    $key = (string) ($topic['legacy_key'] ?? '');
+    if (in_array($key, ['news', 'education'], true)) {
+        $field = 'topic_' . $key . '_label';
+        $saved = newsletter_pages_section()[$lang === 'en' ? $field . '_en' : $field] ?? '';
+        if (is_string($saved) && trim($saved) !== '') return $saved;
+        return $key === 'news'
+            ? t_or('newsletter.topic.news', 'Новини за нашата дейност', 'News about our work', $lang)
+            : t_or('newsletter.topic.education', 'Полезни материали и съвети', 'Useful resources and tips', $lang);
+    }
+    return $lang === 'en' ? newsletter_topic_name($topic, 'bg') : '';
 }
 
-/** The pages.json field (BG; EN adds _en) holding a topic's label. */
-function newsletter_topic_field(string $topic): string
+/**
+ * The "What would you like to receive?" heading above the topic checkboxes.
+ * Edited in place on the page (`newsletter` section of content/pages.json);
+ * until then the strings.json default, which a site can reword in
+ * content/{bg,en}/strings.site.json.
+ */
+function newsletter_topics_heading(?string $lang = null): string
 {
-    return $topic === 'heading' ? 'topics_heading' : 'topic_' . $topic . '_label';
+    $lang  = ($lang ?? get_lang()) === 'en' ? 'en' : 'bg';
+    $saved = newsletter_pages_section()[$lang === 'en' ? 'topics_heading_en' : 'topics_heading'] ?? '';
+    if (is_string($saved) && trim($saved) !== '') return $saved;
+    return t_or('newsletter.topics.heading', 'Какво искате да получавате?', 'What would you like to receive?', $lang);
 }
 
 /** The `newsletter` section of content/pages.json (inline-edited copy). */
@@ -126,10 +169,62 @@ function newsletter_pages_section(): array
     return is_array($pages['newsletter'] ?? null) ? $pages['newsletter'] : [];
 }
 
-/** Topic flags ticked in a submitted form (the topics partial's checkboxes). */
+/**
+ * Ids of the shown topics ticked in a submitted form (the topics partial posts
+ * them as nl_topics[]). Also reads the two checkboxes forms had before topics
+ * were editable (wants_news / wants_education), so a page cached from then
+ * still signs people up for what they ticked.
+ */
 function newsletter_topics_from_post(array $post): array
 {
-    return [!empty($post['wants_news']), !empty($post['wants_education'])];
+    $ticked = array_map('intval', array_filter((array) ($post['nl_topics'] ?? []), 'is_scalar'));
+    $ids = [];
+    foreach (newsletter_topic_list() as $t) {
+        $legacy = (string) ($t['legacy_key'] ?? '');
+        if (in_array((int) $t['id'], $ticked, true) || ($legacy !== '' && !empty($post['wants_' . $legacy]))) {
+            $ids[] = (int) $t['id'];
+        }
+    }
+    return $ids;
+}
+
+/**
+ * The topics a sign-up form (footer band, confirmation card) subscribes to:
+ *  - two or more topics shown → the ticked ones; null when none was ticked
+ *    (the caller says "please choose at least one topic")
+ *  - one topic shown          → that one (the form had no checkbox)
+ *  - no topics                → [] (everything)
+ */
+function newsletter_signup_topics(array $post): ?array
+{
+    $shown = newsletter_topic_list();
+    if (count($shown) === 1) return [(int) $shown[0]['id']];
+    if (!$shown) return [];
+    return newsletter_topics_from_post($post) ?: null;
+}
+
+/**
+ * Did the buyer opt in to the newsletter at checkout? With two or more topics
+ * ticking any of them is the opt-in; otherwise the form shows one checkbox
+ * of its own (nl_optin).
+ */
+function newsletter_post_opted_in(array $post): bool
+{
+    return count(newsletter_topic_list()) >= 2
+        ? (bool) newsletter_topics_from_post($post)
+        : !empty($post['nl_optin']);
+}
+
+/**
+ * SQL condition (no user input in it — safe to embed) matching the
+ * subscribers a campaign of topic $topicId goes to: those who chose it, and
+ * those who chose nothing, i.e. everything. Use on newsletter_subscribers
+ * without a table alias.
+ */
+function newsletter_topic_match_sql(int $topicId): string
+{
+    $mine = 'SELECT 1 FROM newsletter_subscriber_topics st WHERE st.subscriber_id = newsletter_subscribers.id';
+    return "(NOT EXISTS ($mine) OR EXISTS ($mine AND st.topic_id = " . (int) $topicId . '))';
 }
 
 /**
@@ -138,14 +233,85 @@ function newsletter_topics_from_post(array $post): array
  */
 function newsletter_topic_where(string $topic): string
 {
-    $col = newsletter_topics()[$topic] ?? null;
-    return $col ? "status='active' AND $col=1" : "status='active'";
+    return ctype_digit($topic) && $topic !== '0'
+        ? "status='active' AND " . newsletter_topic_match_sql((int) $topic)
+        : "status='active'";
 }
 
-/** A campaign topic from untrusted input: one of 'all' / the topic keys. */
+/**
+ * A campaign topic from untrusted input: 'all', or the id (as a string) of an
+ * existing topic — a hidden one too, so a campaign already aimed at it keeps
+ * its audience.
+ */
 function newsletter_clean_topic(mixed $topic): string
 {
-    return is_string($topic) && isset(newsletter_topics()[$topic]) ? $topic : 'all';
+    if (!is_string($topic) && !is_int($topic)) return 'all';
+    $topic = (string) $topic;
+    return ctype_digit($topic) && newsletter_topic_get((int) $topic) ? $topic : 'all';
+}
+
+// ── Topic management (admin/newsletter-topics.php) ──────────────────────────────
+
+/** A topic name from untrusted input: plain text, at most 150 characters. */
+function newsletter_clean_topic_name(mixed $name): string
+{
+    return is_string($name) ? mb_substr(trim(strip_tags($name)), 0, 150) : '';
+}
+
+/** Add a shown topic at the end of the list. Returns its id. */
+function newsletter_topic_add(string $nameBg, string $nameEn): int
+{
+    $pdo  = get_pdo();
+    $next = (int) $pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM newsletter_topics')->fetchColumn();
+    $pdo->prepare('INSERT INTO newsletter_topics (name_bg, name_en, sort_order) VALUES (?, ?, ?)')
+        ->execute([newsletter_clean_topic_name($nameBg), newsletter_clean_topic_name($nameEn), $next]);
+    return (int) $pdo->lastInsertId();
+}
+
+/** Rename a topic. */
+function newsletter_topic_rename(int $id, string $nameBg, string $nameEn): void
+{
+    get_pdo()->prepare('UPDATE newsletter_topics SET name_bg = ?, name_en = ? WHERE id = ?')
+        ->execute([newsletter_clean_topic_name($nameBg), newsletter_clean_topic_name($nameEn), $id]);
+}
+
+/**
+ * Hide a topic, or show it again. Showing puts it back at the end of the list.
+ * Nothing about who chose it is touched either way.
+ */
+function newsletter_topic_set_shown(int $id, bool $shown): void
+{
+    $pdo = get_pdo();
+    if ($shown) {
+        $next = (int) $pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM newsletter_topics WHERE is_active = 1')->fetchColumn();
+        $pdo->prepare('UPDATE newsletter_topics SET is_active = 1, sort_order = ? WHERE id = ?')->execute([$next, $id]);
+    } else {
+        $pdo->prepare('UPDATE newsletter_topics SET is_active = 0 WHERE id = ?')->execute([$id]);
+    }
+}
+
+/** Move a shown topic one place up ($step = -1) or down (+1) in the list. */
+function newsletter_topic_move(int $id, int $step): void
+{
+    $ids = array_map(fn($t) => (int) $t['id'], newsletter_topic_list());
+    $at  = array_search($id, $ids, true);
+    $to  = $at === false ? false : $at + ($step < 0 ? -1 : 1);
+    if ($to === false || $to < 0 || $to >= count($ids)) return;
+    [$ids[$at], $ids[$to]] = [$ids[$to], $ids[$at]];
+
+    $upd = get_pdo()->prepare('UPDATE newsletter_topics SET sort_order = ? WHERE id = ?');
+    foreach ($ids as $i => $tid) $upd->execute([$i + 1, $tid]);
+}
+
+/** Active subscribers who chose each topic themselves: topic id => count. */
+function newsletter_topic_subscriber_counts(): array
+{
+    $rows = get_pdo()->query(
+        "SELECT st.topic_id, COUNT(*) AS n FROM newsletter_subscriber_topics st
+         JOIN newsletter_subscribers s ON s.id = st.subscriber_id AND s.status = 'active'
+         GROUP BY st.topic_id"
+    )->fetchAll(\PDO::FETCH_KEY_PAIR);
+    return array_map('intval', $rows);
 }
 
 /**
@@ -192,14 +358,15 @@ function newsletter_session_owns_order(string $order_number): bool
 }
 
 /**
- * Subscribe the buyer of an order this session placed. The email comes from
- * the order row, never from the request.
+ * Subscribe the buyer of an order this session placed, to $topicIds (from
+ * newsletter_signup_topics(); null = a choice was needed and none was made).
+ * The email comes from the order row, never from the request.
  *
  * @return string  subscribed | merged | resurrect_blocked | no_topics | not_found
  */
-function newsletter_subscribe_order(\PDO $pdo, string $order_number, bool $wantsNews, bool $wantsEducation): string
+function newsletter_subscribe_order(\PDO $pdo, string $order_number, ?array $topicIds): string
 {
-    if (!$wantsNews && !$wantsEducation) return 'no_topics';
+    if ($topicIds === null) return 'no_topics';   // see newsletter_signup_topics()
     if (!newsletter_session_owns_order($order_number)) return 'not_found';
 
     $stmt = $pdo->prepare('SELECT customer_email, customer_name, lang FROM orders WHERE order_number = ?');
@@ -209,7 +376,7 @@ function newsletter_subscribe_order(\PDO $pdo, string $order_number, bool $wants
 
     return newsletter_subscribe(
         (string) $order['customer_email'], (string) ($order['customer_name'] ?? ''),
-        (string) ($order['lang'] ?? 'bg'), 'confirmation', $wantsNews, $wantsEducation
+        (string) ($order['lang'] ?? 'bg'), 'confirmation', $topicIds
     )['status'];
 }
 

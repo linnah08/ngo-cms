@@ -152,7 +152,9 @@ final class NewsletterDonateCtaTest extends TestCase
             $html = $this->renderCard($order, 'donation');
             $this->assertStringContainsString('action="/newsletter/subscribe-order.php"', $html);
             $this->assertStringContainsString('name="flow" value="donation"', $html);
-            $this->assertStringContainsString('name="wants_news"', $html);
+            if (count(newsletter_topic_list()) >= 2) {
+                $this->assertStringContainsString('name="nl_topics[]"', $html);
+            }
             $this->assertStringContainsString('data-cms-field="confirm_heading"', $html);
             $this->assertStringNotContainsString('type="email"', $html, 'the email is taken from the order');
 

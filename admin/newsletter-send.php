@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
           <?php if ($topic === 'all'): ?>
           Всички абонати — БГ: <?= $counts['bg'] ?> &nbsp;·&nbsp; EN: <?= $counts['en'] ?>
           <?php else: ?>
-          Само абонатите, избрали „<?= h(newsletter_topic_label($topic, 'bg')) ?>“ (от <?= $counts['total'] ?> активни общо)
+          Само абонатите, избрали „<?= h(newsletter_topic_name(newsletter_topic_get((int) $topic) ?? [], 'bg')) ?>“, и тези без избрана тема (от <?= $counts['total'] ?> активни общо)
           <?php endif; ?>
         </div>
       </div>
