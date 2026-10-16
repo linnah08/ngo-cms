@@ -178,6 +178,15 @@ if (is_string($section) && str_starts_with($section, 'page:')) {
     save_json_response(home_inline_save($parts[2], $fields));
 }
 
+// The built-in About page (/za-nas/, /en/about/): title, intro and team bios (bio_<n>).
+if ($section === 'about') {
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/about.php';
+    $pages = load_json(CONTENT_PATH . '/pages.json');
+    $pages['about'] = about_inline_apply(is_array($pages['about'] ?? null) ? $pages['about'] : [], $fields);
+    save_json(CONTENT_PATH . '/pages.json', $pages);
+    save_json_response(['ok' => true]);
+}
+
 // Allowed field map: section → [field_name => [bg_key, en_key]]
 $allowed = [
     'home' => [

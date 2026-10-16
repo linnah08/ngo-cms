@@ -1262,7 +1262,8 @@ foreach ($team_list as $i => &$_tp) {
 unset($_tp);
 usort($team_list, fn($a, $b) => (int)$a['order'] - (int)$b['order']);
 ?>
-<h2 style="margin:2.5rem 0 1rem;">Екип</h2>
+<h2 style="margin:2.5rem 0 .5rem;">Екип</h2>
+<p style="color:var(--text-muted);margin:0 0 1rem;">По желание. Оставете празно, ако страницата разказва само историята — тогава разделът „Екипът“ не се показва.</p>
 
 <div id="teamReorderAnnounce" aria-live="polite" aria-atomic="true"
      style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;"></div>
