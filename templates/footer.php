@@ -39,8 +39,15 @@ $_show_nl_banner = module_enabled_with_needs('newsletter') && empty($_COOKIE['om
       // line would no longer meet the contrast the admin preview promises. ?>
 <section class="newsletter-banner" style="background:var(--newsletter-bg,#037F9B);padding:3rem 0;">
   <div class="container" style="max-width:680px;text-align:center;">
-    <h3 style="color:var(--newsletter-fg,#fff);margin:0 0 .5rem;font-size:1.3rem;"><?= t('newsletter.banner.title') ?></h3>
-    <p style="color:var(--newsletter-fg,#fff);margin:0 0 1.5rem;font-size:.95rem;"><?= t('newsletter.banner.text') ?></p>
+    <?php // Heading and line are editable in Edit mode (newsletter section of pages.json).
+          require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
+          $_nlb_saved = newsletter_pages_section();
+          $_nlb_cms = static fn(string $f): string =>
+              'data-cms-field="' . h($f) . '" data-cms-section="newsletter" data-cms-type="text"'
+              . ' data-cms-bg="' . h((string) ($_nlb_saved[$f] ?? '')) . '"'
+              . ' data-cms-en="' . h((string) ($_nlb_saved[$f . '_en'] ?? '')) . '"'; ?>
+    <h3 style="color:var(--newsletter-fg,#fff);margin:0 0 .5rem;font-size:1.3rem;" <?= $_nlb_cms('banner_title') ?>><?= h(newsletter_banner_text('title', $lang)) ?></h3>
+    <p style="color:var(--newsletter-fg,#fff);margin:0 0 1.5rem;font-size:.95rem;" <?= $_nlb_cms('banner_text') ?>><?= h(newsletter_banner_text('text', $lang)) ?></p>
     <form method="POST" action="/newsletter/subscribe.php"
           style="display:flex;gap:.5rem 1.5rem;justify-content:center;align-items:center;flex-wrap:wrap;text-align:left;">
       <?= csrf_field() ?>

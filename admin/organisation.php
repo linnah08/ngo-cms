@@ -4,6 +4,7 @@ $active_nav       = 'organisation';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/auth.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
 admin_require_admin();
 
 $themes    = brand_themes();
@@ -280,8 +281,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <div style="font-size:.85rem;font-weight:600;margin-bottom:.4rem;">Как ще изглежда:</div>
         <div id="nlPreview" aria-hidden="true"
              style="background:<?= h($nl_now['bg']) ?>;color:<?= h($nl_now['fg']) ?>;padding:1.25rem 1rem;border-radius:8px;text-align:center;border:1px solid var(--border,#ddd);">
-          <div style="font-weight:700;font-size:1.05rem;margin-bottom:.3rem;"><?= h(t_or('newsletter.banner.title', 'Бъдете в течение', 'Stay in touch', 'bg')) ?></div>
-          <div style="font-size:.85rem;margin-bottom:.8rem;"><?= h(t_or('newsletter.banner.text', 'Получавайте новини и истории директно в пощата си.', 'Get news and stories straight to your inbox.', 'bg')) ?></div>
+          <div style="font-weight:700;font-size:1.05rem;margin-bottom:.3rem;"><?= h(newsletter_banner_text('title', 'bg')) ?></div>
+          <div style="font-size:.85rem;margin-bottom:.8rem;"><?= h(newsletter_banner_text('text', 'bg')) ?></div>
           <div style="display:flex;gap:.4rem;justify-content:center;flex-wrap:wrap;">
             <span style="display:inline-block;background:#fff;color:#6b7280;border-radius:4px;padding:.4rem .75rem;font-size:.85rem;min-width:10rem;text-align:left;"><?= h(t_or('newsletter.banner.placeholder', 'Вашият имейл адрес', 'Your email address', 'bg')) ?></span>
             <span id="nlPreviewBtn" style="display:inline-block;border-radius:4px;padding:.4rem 1rem;font-size:.85rem;font-weight:700;background:<?= h($nl_now['fg']) ?>;color:<?= h($nl_now['bg']) ?>;"><?= h(t_or('newsletter.banner.submit', 'Запишете се', 'Subscribe', 'bg')) ?></span>

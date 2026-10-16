@@ -249,6 +249,9 @@ $allowed = [
         // Sign-up card on the confirmation pages (templates/newsletter-confirm-card.php).
         'confirm_heading'       => ['confirm_heading',       'confirm_heading_en'],
         'confirm_button'        => ['confirm_button',        'confirm_button_en'],
+        // Sign-up band above the footer (templates/footer.php).
+        'banner_title'          => ['banner_title',          'banner_title_en'],
+        'banner_text'           => ['banner_text',           'banner_text_en'],
     ],
 ];
 

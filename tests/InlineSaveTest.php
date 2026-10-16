@@ -138,6 +138,26 @@ final class InlineSaveTest extends TestCase
         $this->assertSame(['Подкрепи ни', 'Support us'], [$pages['donation']['title'], $pages['donation']['title_en']]);
     }
 
+    public function test_saves_the_newsletter_band_heading_and_line(): void
+    {
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
+        $r = $this->save('inline-save.php', ['section' => 'newsletter', 'fields' => [
+            'banner_title' => ['bg' => 'Пишете ни', 'en' => 'Hear from us'],
+            'banner_text'  => ['bg' => 'Новини веднъж месечно.', 'en' => ''],
+        ]]);
+        $this->assertSame(['ok' => true], $r['json'], $r['body']);
+
+        $this->assertSame('Пишете ни', newsletter_banner_text('title', 'bg'));
+        $this->assertSame('Hear from us', newsletter_banner_text('title', 'en'));
+        $this->assertSame('Новини веднъж месечно.', newsletter_banner_text('text', 'bg'));
+        $this->assertSame(t_or('newsletter.banner.text', '', 'Get news and stories straight to your inbox.', 'en'),
+            newsletter_banner_text('text', 'en'), 'an empty EN line falls back to the default wording');
+
+        $footer = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/templates/footer.php');
+        $this->assertStringContainsString("\$_nlb_cms('banner_title')", $footer);
+        $this->assertStringContainsString("\$_nlb_cms('banner_text')", $footer);
+    }
+
     public function test_menu_labels_change_but_items_cannot_be_added_or_retargeted(): void
     {
         $r = $this->save('inline-save.php', ['section' => 'menus', 'fields' => [

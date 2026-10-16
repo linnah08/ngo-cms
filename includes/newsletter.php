@@ -162,6 +162,23 @@ function newsletter_topics_heading(?string $lang = null): string
     return t_or('newsletter.topics.heading', 'Какво искате да получавате?', 'What would you like to receive?', $lang);
 }
 
+/**
+ * Heading ('title') or line under it ('text') of the sign-up band above the
+ * footer. Edited in place on the page (banner_title / banner_text in the
+ * `newsletter` section of content/pages.json); until then the strings.json
+ * default, which a site can reword in content/{bg,en}/strings.site.json.
+ */
+function newsletter_banner_text(string $which, ?string $lang = null): string
+{
+    if ($which !== 'title' && $which !== 'text') return '';
+    $lang  = ($lang ?? get_lang()) === 'en' ? 'en' : 'bg';
+    $saved = newsletter_pages_section()['banner_' . $which . ($lang === 'en' ? '_en' : '')] ?? '';
+    if (is_string($saved) && trim($saved) !== '') return $saved;
+    return $which === 'title'
+        ? t_or('newsletter.banner.title', 'Бъдете в течение', 'Stay in touch', $lang)
+        : t_or('newsletter.banner.text', 'Получавайте новини и истории директно в пощата си.', 'Get news and stories straight to your inbox.', $lang);
+}
+
 /** The `newsletter` section of content/pages.json (inline-edited copy). */
 function newsletter_pages_section(): array
 {
