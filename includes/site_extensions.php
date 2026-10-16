@@ -190,6 +190,13 @@ function site_shop_header_file(): ?string
  * An exact key also matches without (or with) its trailing slash.
  * Returns [from => to], checked; broken entries are logged and skipped.
  */
+/** A full https:// address a site may send visitors to: no wildcard, spaces or quotes. */
+function site_redirect_external_ok(string $to): bool
+{
+    return str_starts_with($to, 'https://') && preg_match('/[\s"\'<>*\\\\]/', $to) === 0
+        && filter_var($to, FILTER_VALIDATE_URL) !== false && (string) parse_url($to, PHP_URL_HOST) !== '';
+}
+
 function site_redirects(): array
 {
     $raw = site_extensions()['redirects'] ?? [];
@@ -198,13 +205,18 @@ function site_redirects(): array
     foreach ($raw as $from => $to) {
         $from = (string) $from;
         $wild = str_ends_with($from, '*');
-        $ok = site_extension_local_path($wild ? substr($from, 0, -1) : $from) !== null
-            && !str_contains($wild ? substr($from, 0, -1) : $from, '*')
-            && is_string($to)
-            && site_extension_local_path(str_ends_with($to, '*') && $wild ? substr($to, 0, -1) : $to) !== null
-            && !str_contains(rtrim($to, '*'), '*') && (!str_ends_with($to, '*') || $wild)
-            && $from !== $to;
-        if (!$ok) { error_log("site_extensions: redirect '$from' needs a path on this site on both sides — skipped"); continue; }
+        $from_ok = site_extension_local_path($wild ? substr($from, 0, -1) : $from) !== null
+            && !str_contains($wild ? substr($from, 0, -1) : $from, '*');
+        // The target is a path on this site, or a full https:// address the site
+        // wrote itself (e.g. a campaign on its own subdomain) — never one that keeps
+        // part of the visitor's address.
+        $to_ok = is_string($to) && (
+            (site_extension_local_path(str_ends_with($to, '*') && $wild ? substr($to, 0, -1) : $to) !== null
+                && !str_contains(rtrim($to, '*'), '*') && (!str_ends_with($to, '*') || $wild))
+            || site_redirect_external_ok($to)
+        );
+        $ok = $from_ok && $to_ok && $from !== $to;
+        if (!$ok) { error_log("site_extensions: redirect '$from' needs a path on this site, and a path or a full https:// address as target — skipped"); continue; }
         $out[$from] = $to;
     }
     return $out;
@@ -238,6 +250,7 @@ function site_redirect_target(string $requestUri): ?string
             }
         }
     }
+    if ($target !== null && site_redirect_external_ok($target)) return $target;   // a full address the site wrote, as written
     // The finished address must still be a path here (the kept rest comes from the visitor).
     if ($target === null || site_extension_local_path($target) === null) return null;
     if ($trim(rawurldecode((string) strtok($target, '?#'))) === $trim($path)) return null;   // already there

@@ -41,7 +41,10 @@ final class SiteRedirectsTest extends TestCase
             '/en/donate/'   => '/en/donation/',
             '/blog/*'       => '/novini/*',
             '/shop-old/*'   => '/magazin/',
-            '/campaign/'    => 'https://other.example/',
+            '/campaign/'    => 'https://campaign.example.org/',
+            '/campaign2/*'  => 'https://campaign.example.org/*',
+            '/plain-http/'  => 'http://other.example/',
+            '/quote/'       => 'https://x.example/"onmouseover',
             '/x/'           => '//evil.example/',
             '/y/'           => '/\\evil.example/',
             '/z/'           => 'javascript:alert(1)',
@@ -51,7 +54,10 @@ final class SiteRedirectsTest extends TestCase
             '/mid*dle/'     => '/a/',
             '/num/'         => 5,
         ]);
-        $this->assertSame(['/en/donate/', '/blog/*', '/shop-old/*'], array_keys(site_redirects()));
+        $this->assertSame(['/en/donate/', '/blog/*', '/shop-old/*', '/campaign/'], array_keys(site_redirects()),
+            'a full https:// address the site wrote is fine; http, a kept rest to another host, quotes are not');
+        $this->assertSame('https://campaign.example.org/', site_redirect_target('/campaign/'));
+        $this->assertSame('https://campaign.example.org/', site_redirect_target('/campaign/?utm=x'), 'an outside address is used exactly as written');
     }
 
     public function test_exact_and_prefix_matching(): void

@@ -93,13 +93,15 @@ return [
     'shop_header' => 'templates/site/shop-header.php',
 
     // Permanent (301) redirects of the site's own — no update overwrites them, so
-    // there is no need to edit the shared .htaccess. Both sides are paths on this
-    // site (never another address). A key ending in * catches everything under
+    // there is no need to edit the shared .htaccess. The key is a path on this
+    // site; the target is a path here or a full https:// address you write out
+    // (e.g. a campaign on your own subdomain). A key ending in * catches everything under
     // it; a target ending in * keeps the rest of the address. The query string
     // is kept. The admin, /api/ and the installer are never redirected.
     'redirects' => [
         '/en/donate/' => '/en/donation/',
         '/blog/*'     => '/novini/*',
         '/old-shop/*' => '/magazin/',
+        '/campaign/'  => 'https://kampaniya.example.org/',
     ],
 ];
