@@ -191,7 +191,7 @@ final class HomeFrameTest extends TestCase
         $this->assertStringNotContainsString('object-position', $html);
         $this->assertStringNotContainsString('data-om-frame=', $html, 'visitors get no editor attributes');
 
-        $ti = $this->render(['id' => 's_ti', 'type' => 'text_image', 'visible' => true, 'fields' => ['image' => '/assets/images/a.jpg']]);
+        $ti = $this->render(['id' => 's_ti', 'type' => 'text_image', 'visible' => true, 'fields' => ['photos' => [self::photo('i_aaaaaa', 'a')]]]);
         $this->assertStringContainsString('grid-template-columns:1fr 1fr', $ti);
         $this->assertStringContainsString('height:auto', $ti);
     }
@@ -215,7 +215,7 @@ final class HomeFrameTest extends TestCase
         $this->assertStringContainsString('grid-template-columns:minmax(0,60fr) minmax(0,40fr)', $html);
 
         $ti = $this->render(['id' => 's_ti', 'type' => 'text_image', 'visible' => true,
-            'fields' => ['image' => '/assets/images/a.jpg', 'image_side' => 'right', 'image_frame' => self::FRAME]]);
+            'fields' => ['photos' => [self::photo('i_aaaaaa', 'a')], 'image_side' => 'right', 'image_frame' => self::FRAME]]);
         // The template sets its columns inline; the shared phone rule still stacks it.
         $this->assertStringContainsString('grid-template-columns:minmax(0,40fr) minmax(0,60fr);', $ti);
     }
@@ -236,5 +236,80 @@ final class HomeFrameTest extends TestCase
                          'image_frame' => ['w' => 99, 'r' => 0.01, 'x' => '50;}body{display:none', 'y' => 1, 'z' => 1]]]);
         $this->assertStringNotContainsString('display:none', $html);
         $this->assertStringNotContainsString('object-position', $html, 'a frame that does not clean is ignored');
+    }
+
+    // ── Текст и снимка: framing with a photo list ─────────────────────────────
+
+    private static function photo(string $id, string $name): array
+    {
+        return ['id' => $id, 'image' => "/assets/images/$name.jpg", 'image_alt' => ['bg' => '', 'en' => '']];
+    }
+
+    public function test_one_photo_in_a_text_block_is_framed_and_editable(): void
+    {
+        $GLOBALS['_show_admin_bar'] = true;
+        $html = $this->render(['id' => 's_ti', 'type' => 'text_image', 'visible' => true,
+            'fields' => ['photos' => [self::photo('i_aaaaaa', 'a')], 'image_frame' => self::FRAME]]);
+        $this->assertStringContainsString('grid-template-columns:minmax(0,60fr) minmax(0,40fr);', $html);
+        $this->assertStringContainsString('html body [data-om-fbox="s_ti"][data-om-fbox]{aspect-ratio:0.75;max-height:90vh}', $html);
+        $this->assertStringContainsString('object-position:30% 20%;transform:scale(1.5)', $html);
+        $this->assertStringContainsString('data-om-frame="', $html, 'one photo offers "Нагласи снимката"');
+        $this->assertStringContainsString('data-cms-field="photos.i_aaaaaa.image"', $html);
+    }
+
+    public function test_several_photos_keep_only_the_column_width_and_show_whole(): void
+    {
+        $GLOBALS['_show_admin_bar'] = true;
+        $html = $this->render(['id' => 's_ti', 'type' => 'text_image', 'visible' => true,
+            'fields' => ['photos' => [self::photo('i_aaaaaa', 'a'), self::photo('i_bbbbbb', 'b')], 'image_frame' => self::FRAME]]);
+        $this->assertStringContainsString('grid-template-columns:minmax(0,60fr) minmax(0,40fr);', $html, 'the width still applies');
+        $this->assertStringNotContainsString('data-om-frame-css', $html, 'no frame shape');
+        $this->assertStringNotContainsString('object-position', $html, 'no crop or zoom');
+        $this->assertStringNotContainsString('data-om-fbox', $html);
+        $this->assertStringNotContainsString('data-om-frame=', $html, 'no framing editor on a photo of several');
+        $this->assertSame(2, substr_count($html, 'height:auto'));
+    }
+
+    public function test_changing_a_text_blocks_only_photo_recentres_its_frame(): void
+    {
+        file_put_contents($this->file, json_encode(['version' => 2, 'rev' => 1, 'sections' => [
+            ['id' => 's_ti', 'type' => 'text_image', 'visible' => true,
+             'fields' => ['photos' => [self::photo('i_aaaaaa', 'a')], 'image_frame' => self::FRAME]],
+        ]]));
+        $save = function (string $name): array {
+            $doc = home_load()['doc'];
+            $r = home_admin_save($doc, ['id' => 's_ti', 'rev' => $doc['rev'], 'f' => ['photos' => [self::photo('i_aaaaaa', $name)]]], [], fn() => '');
+            $this->assertSame('saved', $r['status']);
+            $doc = home_load()['doc'];
+            return $doc['sections'][home_find($doc, 's_ti')]['fields']['image_frame'];
+        };
+        $this->assertEquals(self::FRAME, $save('a'), 'same photo: framing kept');
+        $this->assertEquals(['x' => 50.0, 'y' => 50.0, 'z' => 1.0, 'w' => 60, 'r' => 0.75], $save('b'), 'new photo: same size, centred');
+    }
+
+    public function test_replacing_the_only_photo_on_the_page_recentres_its_frame(): void
+    {
+        file_put_contents($this->file, json_encode(['version' => 2, 'rev' => 1, 'sections' => [
+            ['id' => 's_ti', 'type' => 'text_image', 'visible' => true,
+             'fields' => ['photos' => [self::photo('i_aaaaaa', 'a')], 'image_frame' => self::FRAME]],
+        ]]));
+        $r = home_inline_save('s_ti', ['photos.i_aaaaaa.image' => ['bg' => '/assets/images/b.jpg', 'en' => '/assets/images/b.jpg']]);
+        $this->assertTrue($r['ok']);
+        $doc = home_load()['doc'];
+        $f = $doc['sections'][home_find($doc, 's_ti')]['fields'];
+        $this->assertSame('/assets/images/b.jpg', $f['photos'][0]['image']);
+        $this->assertEquals(['x' => 50.0, 'y' => 50.0, 'z' => 1.0, 'w' => 60, 'r' => 0.75], $f['image_frame']);
+    }
+
+    public function test_an_old_framed_single_photo_keeps_its_frame_after_the_upgrade(): void
+    {
+        file_put_contents($this->file, json_encode(['version' => 2, 'rev' => 1, 'sections' => [
+            ['id' => 's_ti', 'type' => 'text_image', 'visible' => true,
+             'fields' => ['image' => '/assets/images/a.jpg', 'image_frame' => self::FRAME]],
+        ]]));
+        $doc = home_load()['doc'];
+        $f = $doc['sections'][home_find($doc, 's_ti')]['fields'];
+        $this->assertSame('/assets/images/a.jpg', $f['photos'][0]['image']);
+        $this->assertEquals(self::FRAME, $f['image_frame']);
     }
 }

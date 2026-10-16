@@ -553,6 +553,16 @@ function home_frame(mixed $raw): ?array {
     return $out;
 }
 
+/**
+ * The photo a block's framing belongs to: its single `image`, or the only photo of a
+ * `photos` list (with 2–4 photos the framing sets just the column width, so it has none).
+ */
+function home_framed_image(array $fields): string {
+    if (is_string($fields['image'] ?? null)) return $fields['image'];
+    $photos = is_array($fields['photos'] ?? null) ? array_values($fields['photos']) : [];
+    return count($photos) === 1 && is_array($photos[0]) ? (string) ($photos[0]['image'] ?? '') : '';
+}
+
 /** A frame for a new photo: the same size and shape, but centred and not zoomed in. */
 function home_frame_recentre(mixed $frame): array {
     $f = home_frame($frame);
@@ -1210,7 +1220,7 @@ function home_admin_save(array $doc, array $post, array $files, ?callable $fetch
     foreach ($types[$type]['fields'] as $key => $def) {
         if ($def['kind'] !== 'frame') continue;
         $keep = ($in[$key] ?? null) === 'reset' ? [] : (home_frame($old[$key] ?? null) ?? []);
-        if ($keep && ($old['image'] ?? '') !== ($fields['image'] ?? '')) $keep = home_frame_recentre($keep);
+        if ($keep && home_framed_image($old) !== home_framed_image($fields)) $keep = home_frame_recentre($keep);
         $fields[$key] = $keep;
     }
 
