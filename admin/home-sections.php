@@ -351,10 +351,10 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     if (!box) return;
     var path = box.querySelector('[data-hs-path]'), img = box.querySelector('[data-hs-preview]'), file = box.querySelector('input[type=file]');
     if (e.target.closest('[data-hs-pick]')) {
-      openMediaPicker(function (p) { path.value = p; img.src = p; img.style.display = 'block'; file.value = ''; announce('Снимката е избрана.'); });
+      openMediaPicker(function (p) { path.value = p; img.src = p; img.style.display = 'block'; file.value = ''; imageChanged(box); announce('Снимката е избрана.'); });
     }
     if (e.target.closest('[data-hs-clear]')) {
-      path.value = ''; img.removeAttribute('src'); img.style.display = 'none'; file.value = ''; announce('Снимката е премахната.');
+      path.value = ''; img.removeAttribute('src'); img.style.display = 'none'; file.value = ''; imageChanged(box); announce('Снимката е премахната.');
     }
   });
 
@@ -370,6 +370,61 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     img.src = img.dataset.hsObjectUrl;
     img.style.display = 'block';
   });
+
+  // The part of a photo that shows in a fixed-shape frame (field kind "focus"). The value is a JSON rectangle in
+  // the photo's own pixels. It belongs to one photo, so any change of that photo clears it.
+  function focusBoxFor(imageBox) {
+    var row = imageBox.closest('[data-hs-item]'), path = imageBox.querySelector('[data-hs-path]');
+    if (!row || !path) return null;
+    var key = (path.name.match(/\[([^\]]+)\]$/) || [])[1];
+    var boxes = row.querySelectorAll('[data-hs-focus]');
+    for (var i = 0; i < boxes.length; i++) if (boxes[i].dataset.hsFor === key) return boxes[i];
+    return null;
+  }
+  function imageOf(focusBox) {
+    var row = focusBox.closest('[data-hs-item]'), pv = row && row.querySelector('[data-hs-image] [data-hs-preview]');
+    return pv && pv.style.display !== 'none' && pv.getAttribute('src') ? pv.getAttribute('src') : '';
+  }
+  function readFocus(box) { try { return JSON.parse(box.querySelector('[data-hs-focus-value]').value || 'null'); } catch (x) { return null; } }
+  function refreshFocus(box) {
+    var src = imageOf(box), f = readFocus(box), btn = box.querySelector('[data-hs-focus-btn]'),
+        why = box.querySelector('[data-hs-focus-why]'), frame = box.querySelector('[data-hs-focus-frame]'), img = frame.querySelector('img');
+    btn.disabled = src === '';
+    why.textContent = src === '' ? 'Първо изберете снимка.' : (f ? 'Избрана е част от снимката.' : 'Показва се средата на снимката.');
+    if (src === '') { img.style.display = 'none'; img.removeAttribute('src'); return; }
+    img.src = src;
+    img.style.display = 'block';
+    img.style.cssText = f
+      ? 'display:block;position:absolute;max-width:none;width:' + (f.iw / f.w * 100) + '%;height:' + (f.ih / f.h * 100) + '%;left:-' + (f.x / f.w * 100) + '%;top:-' + (f.y / f.h * 100) + '%;'
+      : 'display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 50%;';
+  }
+  function imageChanged(imageBox) {
+    var box = focusBoxFor(imageBox);
+    if (!box) return;
+    box.querySelector('[data-hs-focus-value]').value = '';
+    refreshFocus(box);
+  }
+  document.addEventListener('change', function (e) {   // a new file (after the cropper and the preview script above)
+    var input = e.target;
+    if (input.matches && input.matches('[data-hs-image] input[type=file]') && input.files && input.files[0]) imageChanged(input.closest('[data-hs-image]'));
+  });
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-hs-focus-btn]');
+    if (!btn || btn.disabled || !window.OMCrop) return;
+    var box = btn.closest('[data-hs-focus]'), f = readFocus(box), src = imageOf(box);
+    if (src === '') return;
+    OMCrop.pick(src, { aspectRatio: 3 / 4, data: f ? { x: f.x, y: f.y, width: f.w, height: f.h } : undefined }).then(function (r) {
+      if (r) {
+        var iw = Math.round(r.naturalWidth), ih = Math.round(r.naturalHeight), w = Math.round(r.width), h = Math.round(r.height);
+        var x = Math.max(0, Math.min(Math.round(r.x), iw - w)), y = Math.max(0, Math.min(Math.round(r.y), ih - h));
+        box.querySelector('[data-hs-focus-value]').value = JSON.stringify({ x: x, y: y, w: w, h: h, iw: iw, ih: ih });
+        refreshFocus(box);
+        announce('Избрана е част от снимката.');
+      }
+      btn.focus();
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-hs-focus]'), refreshFocus);
 
   // Drag-to-reorder. The grip ([data-hs-sort-handle]) works three ways: drag it with a
   // mouse or a finger; or focus it, press Space/Enter, move with ↑ ↓ and press Space/Enter
@@ -593,6 +648,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       var row = list.lastElementChild;
       row.querySelector('[data-hs-item-id]').value = 'i_' + Math.random().toString(36).slice(2, 8).padEnd(6, '0');
       Array.prototype.forEach.call(row.querySelectorAll('textarea.hs-rich'), function (t) { initRich('#' + t.id); });
+      Array.prototype.forEach.call(row.querySelectorAll('[data-hs-focus]'), refreshFocus);
       renumber(); sorter.relabel();
       var first = row.querySelector('[aria-required="true"]') || row.querySelector('input:not([type=hidden]):not([type=file]), textarea, select');
       if (first) first.focus();

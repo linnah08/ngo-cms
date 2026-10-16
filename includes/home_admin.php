@@ -105,6 +105,21 @@ function hs_field(string $key, array $def, mixed $val, array $errors, string $nb
                  . '<p id="' . h($id) . '_hint" style="font-size:.82rem;color:var(--text-muted);margin:.3rem 0 0;">Отворете видеото в YouTube или Vimeo, копирайте адреса от браузъра и го поставете тук.</p>'
                  . hs_error_html($id . '_err', $err) . '</div>';
 
+        case 'focus':
+            // Which part of the row's photo shows in the 3:4 frame. The script in admin/home-sections.php drives the button.
+            $f      = home_clean_focus($val, $def['ratio'] ?? [3, 4]);
+            $json   = $f === null ? '' : (string) json_encode($f);
+            $reason = $id . '_why';
+            return '<div class="form-group" data-hs-focus data-hs-for="' . h($def['for']) . '" style="margin-bottom:1.5rem;">'
+                 . '<span id="' . h($id) . '_label" style="display:block;font-weight:600;margin-bottom:.4rem;">' . $label . '</span>'
+                 . '<input type="hidden" name="' . h($name) . '" value="' . h($json) . '" data-hs-focus-value>'
+                 . '<div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">'
+                 . '<div data-hs-focus-frame style="position:relative;overflow:hidden;aspect-ratio:3/4;width:90px;border-radius:6px;background:#eee;flex:none;"><img src="" alt="" style="display:none;"></div>'
+                 . '<div style="flex:1;min-width:200px;">'
+                 . '<button type="button" class="btn btn--outline" style="min-height:44px;" id="' . h($id) . '" data-hs-focus-btn aria-describedby="' . h($reason) . '" disabled>Избери какво да се вижда</button>'
+                 . '<p id="' . h($reason) . '" data-hs-focus-why style="font-size:.9rem;color:var(--text-muted);margin:.4rem 0 0;">Първо изберете снимка.</p>'
+                 . '</div></div>' . $hint . '</div>';
+
         case 'list':
             return hs_list($key, $def, is_array($val) ? $val : [], $errors);
 

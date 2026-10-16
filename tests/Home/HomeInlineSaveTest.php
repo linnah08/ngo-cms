@@ -168,6 +168,25 @@ final class HomeInlineSaveTest extends TestCase
         $this->assertSame(['bg' => 'B', 'en' => 'B'], $p[1]['image_alt']);
     }
 
+    public function test_replacing_a_persons_photo_clears_its_focus(): void
+    {
+        $doc = json_decode(file_get_contents($this->file), true);
+        $doc['sections'][] = ['id' => 's_pe01', 'type' => 'people', 'visible' => true, 'fields' => ['people' => [
+            ['id' => 'i_aaaaaa', 'image' => '/assets/images/a.jpg', 'focus' => ['x' => 0, 'y' => 0, 'w' => 300, 'h' => 400, 'iw' => 600, 'ih' => 800],
+             'name' => ['bg' => 'А', 'en' => ''], 'role' => ['bg' => '', 'en' => ''], 'bio' => ['bg' => '', 'en' => '']],
+            ['id' => 'i_bbbbbb', 'image' => '/assets/images/b.jpg', 'focus' => ['x' => 0, 'y' => 0, 'w' => 300, 'h' => 400, 'iw' => 600, 'ih' => 800],
+             'name' => ['bg' => 'Б', 'en' => ''], 'role' => ['bg' => '', 'en' => ''], 'bio' => ['bg' => '', 'en' => '']],
+        ]]];
+        file_put_contents($this->file, json_encode($doc));
+        $r = home_inline_save('s_pe01', ['people.i_bbbbbb.image' => ['bg' => '/assets/images/c.jpg', 'en' => '']]);
+        $this->assertTrue($r['ok']);
+        $p = $this->section('s_pe01')['fields']['people'];
+        $this->assertSame('/assets/images/c.jpg', $p[1]['image']);
+        $this->assertNull($p[1]['focus']);
+        $this->assertSame('/assets/images/a.jpg', $p[0]['image']);
+        $this->assertSame(300, $p[0]['focus']['w'], 'the neighbour keeps its focus');
+    }
+
     public function test_list_photo_follows_its_id_after_reorder(): void
     {
         $this->seedPhotos(array_reverse($this->twoPhotos()));

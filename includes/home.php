@@ -174,6 +174,16 @@ const HOME_CARD_FIELDS = [
     'link'      => ['kind' => 'link', 'label' => 'Линк', 'hint' => 'Страница от сайта (напр. /za-nas/) или пълен адрес (https://…). По желание.'],
 ];
 
+const HOME_PERSON_FIELDS = [
+    'image'     => ['kind' => 'image', 'label' => 'Снимка'],
+    'focus'     => ['kind' => 'focus', 'label' => 'Коя част от снимката да се вижда', 'for' => 'image', 'ratio' => [3, 4]],
+    'image_alt' => ['kind' => 'alt', 'label' => 'Описание на снимката', 'max' => 200,
+                    'hint' => 'За хора, които не виждат снимката. Ако оставите празно, се чете името. Ако на снимката няма лице или не искате да се вижда, опишете накратко какво има на нея.'],
+    'name'      => ['kind' => 'text', 'label' => 'Име', 'max' => 100, 'required' => true, 'hint' => 'Може и само малко име.'],
+    'role'      => ['kind' => 'text', 'label' => 'Роля или кратък надпис', 'max' => 100],
+    'bio'       => ['kind' => 'html', 'label' => 'Текст', 'max' => 5000],
+];
+
 /**
  * Extra section types a site adds on top of the built-in ones, from the PHP file named by
  * the active theme's 'home_types' key (a path from the site root) — so a fork keeps its own
@@ -282,6 +292,13 @@ function home_types(): array {
                 'plural' => 'карти', 'plural_the' => 'картите', 'min' => 2, 'max' => 4, 'preview' => true,
                 'say' => ['added' => 'Добавена е нова карта.', 'removed' => 'Картата е премахната.', 'moved' => 'Картата е на място %d. Редът се запазва с бутона „Запази“.'],
                 'fields' => HOME_CARD_FIELDS], 'background' => $bg('white')]],
+        'people' => ['builtin' => false, 'icon' => '👥', 'label' => 'Хора',
+            'desc' => 'Списък с хора — снимка, име, роля и кратък текст за всеки. За екип, доброволци или истории.', 'note' => null,
+            'fields' => ['heading' => $head, 'people' => [
+                'kind' => 'list', 'label' => 'Хора', 'item' => 'Човек', 'add' => '+ Добави човек', 'remove' => 'Премахни човека',
+                'plural' => 'души', 'plural_the' => 'хората', 'min' => 1, 'max' => 30, 'preview' => true,
+                'say' => ['added' => 'Добавен е нов човек.', 'removed' => 'Човекът е премахнат.', 'moved' => 'Човекът е на място %d. Редът се запазва с бутона „Запази“.'],
+                'fields' => HOME_PERSON_FIELDS], 'background' => $bg('white')]],
         'video' => ['builtin' => false, 'icon' => '▶️', 'label' => 'Видео',
             'desc' => "Видео от YouTube или Vimeo. Зарежда се едва когато посетителят натисне \u{201E}Пусни\u{201C}.", 'note' => null,
             'fields' => ['heading' => $head,
@@ -365,6 +382,10 @@ function home_clean_field(array $def, mixed $raw, string $key): array {
             if (!is_callable($def['clean'] ?? null)) return [null, [$key => 'Непознато поле.']];
             return ($def['clean'])($raw, $key);
 
+        case 'focus':
+            // Which part of the photo shows in the 3:4 frame. A wrong value is dropped, not an error: the photo is then centred.
+            return [home_clean_focus($raw, $def['ratio'] ?? [3, 4]), []];
+
         case 'list':
             $items = is_array($raw) ? array_values(array_filter($raw, 'is_array')) : [];
             $out = [];
@@ -389,6 +410,31 @@ function home_clean_field(array $def, mixed $raw, string $key): array {
             return [$out, $err];
     }
     return [null, [$key => 'Непознато поле.']];
+}
+
+/** @return ?array{x:int,y:int,w:int,h:int,iw:int,ih:int} the rectangle (image pixels) or null when it is not a sane one of this shape. */
+function home_clean_focus(mixed $raw, array $ratio = [3, 4]): ?array {
+    if (is_string($raw)) $raw = json_decode($raw, true);
+    if (!is_array($raw)) return null;
+    $r = [];
+    foreach (['x', 'y', 'w', 'h', 'iw', 'ih'] as $k) {
+        $v = $raw[$k] ?? null;
+        if (is_string($v) && preg_match('/^\d{1,6}$/', $v)) $v = (int) $v;
+        if (!is_int($v) || $v < 0 || $v > 100000) return null;
+        $r[$k] = $v;
+    }
+    if ($r['w'] < 1 || $r['h'] < 1 || $r['iw'] < 1 || $r['ih'] < 1) return null;
+    if ($r['x'] + $r['w'] > $r['iw'] || $r['y'] + $r['h'] > $r['ih']) return null;
+    if (abs($r['w'] / $r['h'] - $ratio[0] / $ratio[1]) > 0.02) return null;
+    return $r;
+}
+
+/** Inline style of the <img> inside a position:relative;overflow:hidden;aspect-ratio:3/4 frame. */
+function home_focus_style(?array $focus): string {
+    $f = $focus === null ? null : home_clean_focus($focus);
+    if ($f === null) return 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 50%;';
+    return sprintf('position:absolute;max-width:none;width:%.4F%%;height:%.4F%%;left:-%.4F%%;top:-%.4F%%;',
+        $f['iw'] / $f['w'] * 100, $f['ih'] / $f['h'] * 100, $f['x'] / $f['w'] * 100, $f['y'] / $f['h'] * 100);
 }
 
 const HOME_LIST_ID_RE = '/^i_[a-z0-9]{6}$/';
@@ -993,6 +1039,12 @@ function home_inline_save(string $id, array $fields): array {
         if ($item_pos !== null) {
             $list = array_values($doc['sections'][$i]['fields'][$parts[0]]);
             $list[$item_pos][$parts[2]] = $value;
+            // A new photo makes the old choice of visible part meaningless.
+            if ($def['kind'] === 'image') {
+                foreach ($ldef['fields'] as $fk => $fdef) {
+                    if (($fdef['kind'] ?? '') === 'focus' && ($fdef['for'] ?? '') === $parts[2]) $list[$item_pos][$fk] = null;
+                }
+            }
             $doc['sections'][$i]['fields'][$parts[0]] = $list;
         } else {
             $doc['sections'][$i]['fields'][$key] = $value;
