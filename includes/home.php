@@ -407,17 +407,28 @@ function home_list_find(array $items, string $item_id): ?int {
 }
 
 /**
- * The photos of a "Текст и снимка" block, valid images only. A block saved with one `image` reads as one photo.
+ * An old "Текст и снимка" block holds one `image`. Turn it into a one-item `photos` list, with an id
+ * derived from the section id so every request (page, admin form, inline save) sees the same id.
+ * An invalid image path is left alone, so saving still reports it.
+ */
+function home_ti_upgrade(array $fields, string $section_id): array {
+    if (is_array($fields['photos'] ?? null) || !home_valid_image_path((string) ($fields['image'] ?? ''))) return $fields;
+    $fields['photos'] = [[
+        'id' => 'i_' . substr(md5($section_id), 0, 6),
+        'image' => $fields['image'],
+        'image_alt' => home_pair($fields['image_alt'] ?? null),
+    ]];
+    unset($fields['image'], $fields['image_alt']);
+    return $fields;
+}
+
+/**
+ * The photos of a "Текст и снимка" block, valid images only (home_load() has already turned an old single `image` into one photo).
  * @return list<array{id: string, image: string, image_alt: array{bg: string, en: string}}>
  */
 function home_ti_photos(array $f): array {
-    $raw = $f['photos'] ?? null;
-    if (!is_array($raw)) {
-        $raw = home_valid_image_path((string) ($f['image'] ?? ''))
-            ? [['id' => 'i_legacy', 'image' => $f['image'], 'image_alt' => $f['image_alt'] ?? null]] : [];
-    }
     $out = [];
-    foreach ($raw as $p) {
+    foreach (is_array($f['photos'] ?? null) ? $f['photos'] : [] as $p) {
         if (!is_array($p) || !home_valid_image_path((string) ($p['image'] ?? ''))) continue;
         $out[] = ['id' => (string) ($p['id'] ?? ''), 'image' => (string) $p['image'], 'image_alt' => home_pair($p['image_alt'] ?? null)];
     }
@@ -683,6 +694,7 @@ function home_load(): array {
         $s['visible'] = !empty($s['visible']);
         $s['fields']  = is_array($s['fields'] ?? null) ? $s['fields'] : [];
         if ($repair) $s = home_plain_text_fields($s);
+        if ($s['type'] === 'text_image') $s['fields'] = home_ti_upgrade($s['fields'], $s['id']);
     }
     unset($s);
     return ['doc' => $page ? $doc : home_ensure_builtins($doc), 'corrupt' => false, 'exists' => true];

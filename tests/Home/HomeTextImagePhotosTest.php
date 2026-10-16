@@ -5,6 +5,7 @@ use PHPUnit\Framework\TestCase;
 
 require_once dirname(__DIR__, 2) . '/includes/home.php';
 require_once dirname(__DIR__, 2) . '/includes/home_render.php';
+require_once dirname(__DIR__, 2) . '/includes/home_admin.php';
 
 final class HomeTextImagePhotosTest extends TestCase
 {
@@ -30,14 +31,6 @@ final class HomeTextImagePhotosTest extends TestCase
             $out[] = ['id' => 'i_aaaa0' . $i, 'image' => "/assets/images/p$i.jpg", 'image_alt' => ['bg' => "Снимка $i", 'en' => '']];
         }
         return $out;
-    }
-
-    public function test_legacy_single_image_reads_as_one_photo(): void
-    {
-        $p = home_ti_photos(['image' => '/assets/images/a.jpg', 'image_alt' => ['bg' => 'x', 'en' => 'y']]);
-        $this->assertCount(1, $p);
-        $this->assertSame('/assets/images/a.jpg', $p[0]['image']);
-        $this->assertSame(['bg' => 'x', 'en' => 'y'], $p[0]['image_alt']);
     }
 
     public function test_legacy_section_keeps_photo_on_resave(): void
@@ -97,5 +90,72 @@ final class HomeTextImagePhotosTest extends TestCase
         $css = file_get_contents(dirname(__DIR__, 2) . '/includes/home_render.php');
         $this->assertStringContainsString('.home-ti>div.home-ti__text{order:0!important}', $css);
         $this->assertStringContainsString('.home-ti>div{order:1!important}', $css);
+    }
+
+    private function oldDocument(): void
+    {
+        $dir = sys_get_temp_dir() . '/home-ti-' . bin2hex(random_bytes(4));
+        mkdir($dir);
+        $GLOBALS['_om_home_file'] = $dir . '/home.json';
+        file_put_contents($GLOBALS['_om_home_file'], json_encode(['version' => HOME_DOC_VERSION, 'rev' => 3, 'sections' => [[
+            'id' => 's_old1', 'type' => 'text_image', 'visible' => true,
+            'fields' => ['heading' => ['bg' => 'Х', 'en' => ''], 'body' => ['bg' => '<p>т</p>', 'en' => ''],
+                         'image' => '/assets/images/a.jpg', 'image_alt' => ['bg' => 'описание', 'en' => ''], 'image_side' => 'left'],
+        ]]]));
+    }
+
+    protected function tearDown(): void
+    {
+        if (isset($GLOBALS['_om_home_file'])) {
+            foreach (glob(dirname($GLOBALS['_om_home_file']) . '/*') ?: [] as $f) @unlink($f);
+            @rmdir(dirname($GLOBALS['_om_home_file']));
+            unset($GLOBALS['_om_home_file']);
+        }
+    }
+
+    public function test_loading_an_old_block_gives_its_photo_a_stable_valid_id(): void
+    {
+        $this->oldDocument();
+        $a = home_load()['doc']['sections'][0]['fields'];
+        $b = home_load()['doc']['sections'][0]['fields'];
+        $this->assertMatchesRegularExpression(HOME_LIST_ID_RE, $a['photos'][0]['id']);
+        $this->assertSame($a['photos'][0]['id'], $b['photos'][0]['id']);
+        $this->assertArrayNotHasKey('image', $a);
+        $this->assertSame('описание', $a['photos'][0]['image_alt']['bg']);
+    }
+
+    public function test_page_uses_the_same_id_for_replacing_an_old_photo(): void
+    {
+        $this->oldDocument();
+        $GLOBALS['_show_admin_bar'] = true;
+        $doc = home_load()['doc'];
+        $id = $doc['sections'][0]['fields']['photos'][0]['id'];
+        ob_start();
+        home_render($doc, 'bg');
+        $this->assertStringContainsString('data-cms-field="photos.' . $id . '.image"', (string) ob_get_clean());
+    }
+
+    public function test_old_block_keeps_its_photo_through_the_admin_form(): void
+    {
+        $this->oldDocument();
+        $doc    = home_load()['doc'];
+        $fields = $doc['sections'][0]['fields'];
+        $form   = hs_field('photos', home_types()['text_image']['fields']['photos'], $fields['photos'] ?? null, []);
+        $this->assertStringContainsString('value="' . $fields['photos'][0]['id'] . '"', $form);
+        $this->assertStringContainsString('/assets/images/a.jpg', $form);
+        // What the browser posts back for that row.
+        preg_match('#name="f\[photos\]\[0\]\[id\]" value="([^"]+)"#', $form, $id);
+        preg_match('#name="f\[photos\]\[0\]\[image\]" value="([^"]+)"#', $form, $img);
+        $this->assertNotEmpty($id);
+        $this->assertNotEmpty($img);
+        $r = home_admin_save($doc, ['id' => 's_old1', 'rev' => 3, 'f' => [
+            'heading' => ['bg' => 'Х', 'en' => ''], 'body' => ['bg' => '<p>т</p>', 'en' => ''],
+            'photos' => [['id' => $id[1], 'image' => html_entity_decode($img[1]), 'image_alt' => ['bg' => 'описание', 'en' => '']]],
+        ]], []);
+        $this->assertSame('saved', $r['status'], json_encode($r['errors']));
+        $kept = home_load()['doc']['sections'][0]['fields']['photos'];
+        $this->assertCount(1, $kept);
+        $this->assertSame('/assets/images/a.jpg', $kept[0]['image']);
+        $this->assertSame($fields['photos'][0]['id'], $kept[0]['id']);
     }
 }

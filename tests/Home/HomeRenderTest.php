@@ -104,7 +104,7 @@ final class HomeRenderTest extends TestCase
 
     public function test_empty_alt_is_rendered_as_decorative(): void
     {
-        $html = $this->render([$this->s('text_image', ['image' => '/assets/images/a.jpg', 'image_alt' => ['bg' => '', 'en' => '']])]);
+        $html = $this->render([$this->s('text_image', ['photos' => [['id' => 'i_aaaa01', 'image' => '/assets/images/a.jpg', 'image_alt' => ['bg' => '', 'en' => '']]]])]);
         $this->assertStringContainsString('alt=""', $html);
     }
 
