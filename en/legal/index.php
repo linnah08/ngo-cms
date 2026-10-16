@@ -8,7 +8,7 @@ $page_description = 'Legal information of ' . SITE_NAME_EN . '.';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
 
-<section class="section section--grey" style="padding-bottom:2rem;">
+<section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
     <span class="section-label">Legal</span>
     <h1>Legal Information</h1>

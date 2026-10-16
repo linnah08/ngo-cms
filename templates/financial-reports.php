@@ -8,7 +8,7 @@ $_en  = $lang === 'en';
 $_mb  = static fn(?int $b): string => $b === null ? '' : ($b >= 1048576 ? round($b / 1048576) . ' MB' : max(1, (int) round($b / 1024)) . ' KB');
 $_btn = 'min-height:44px;min-width:44px;';
 ?>
-<section class="section section--grey" style="padding-bottom:2rem;">
+<section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
     <h1><?= $_en ? 'Annual reports' : 'Годишни отчети' ?></h1>
     <p class="lead" style="max-width:640px;margin-top:1rem;"><?= $_en

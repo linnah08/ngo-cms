@@ -570,7 +570,7 @@ $subtotal  = $cart_info['subtotal'];
 ?>
 
 <!-- Progress -->
-<section class="section section--grey" style="padding-bottom:1rem;">
+<section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1rem;">
   <div class="container">
     <h1 style="margin-bottom:1rem;"><?= h($page_title) ?></h1>
     <div style="display:flex;gap:.5rem;font-size:.85rem;">

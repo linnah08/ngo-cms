@@ -109,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
 
-<section class="section section--grey" style="padding-bottom:2rem;">
+<section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
     <span class="section-label">Контакти</span>
     <h1>Свържете се с нас</h1>

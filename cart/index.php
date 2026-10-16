@@ -86,7 +86,7 @@ if ($variant_image_ids) {
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
 
-<section class="section section--grey" style="padding-bottom:1.5rem;">
+<section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
     <h1><?= $lang === 'bg' ? 'Количка' : 'Cart' ?></h1>
   </div>

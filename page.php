@@ -70,7 +70,7 @@ if ($_cp_draft): ?>
 </div>
 <?php endif; ?>
 
-<section class="section section--grey" style="padding-bottom:2rem;">
+<section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
     <h1 style="margin:0;"><?= h($page_title) ?></h1>
   </div>

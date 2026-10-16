@@ -27,7 +27,7 @@ $page_description = t_or('donation.page.description', 'Направете дар
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
 
-<section class="section section--grey" style="padding-bottom:2rem;">
+<section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container" style="max-width:760px;">
     <span class="section-label"><?= h(t_or('donation.label', 'Дарение', 'Donation', $lang)) ?></span>
     <h1 data-cms-field="title"

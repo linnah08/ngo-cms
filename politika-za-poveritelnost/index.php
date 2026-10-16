@@ -7,7 +7,7 @@ $content = $pages['legal']['privacy'] ?? '';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
 
-<section class="section section--grey" style="padding-bottom:2rem;">
+<section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
     <span class="section-label">Правна информация</span>
     <h1>Политика за поверителност</h1>

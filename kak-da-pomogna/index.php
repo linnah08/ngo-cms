@@ -9,7 +9,7 @@ $page_head_extra = '<style>@media(max-width:640px){.how-to-help--list-wrapper>di
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
 
-<section class="section section--grey" style="padding-bottom:2rem;">
+<section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
     <span class="section-label">Как да помогна</span>
     <h1><?= h($help['title'] ?? 'Как да помогна?') ?></h1>

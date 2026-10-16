@@ -75,7 +75,7 @@ $page_title = $t['title'];
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
 
-<section class="section section--grey" style="padding-bottom:1.5rem;">
+<section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container" style="text-align:center;max-width:600px;margin:0 auto;">
     <div style="font-size:3rem;margin-bottom:1rem;" aria-hidden="true">❌</div>
     <h1 style="color:#c0392b;"><?= h($t['title']) ?></h1>

@@ -56,7 +56,7 @@ if (!$event):
     $page_description = t_or('events.description', 'Предстоящи събития и билети.', 'Upcoming events and tickets.', $lang);
     require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
-<section class="section section--grey" style="padding-bottom:2rem;">
+<section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container" style="max-width:960px;">
     <span class="section-label"><?= h(t_or('events.label', 'Събития', 'Events', $lang)) ?></span>
     <h1><?= h(t_or('events.heading', 'Предстоящи събития', 'Upcoming events', $lang)) ?></h1>
@@ -119,7 +119,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 $in_style  = 'width:100%;box-sizing:border-box;min-height:48px;padding:.7rem .9rem;border:1.5px solid #8a8f98;border-radius:8px;font-size:1rem;font-family:inherit;background:#fff;color:inherit;';
 $lbl_style = 'display:block;font-weight:600;font-size:.95rem;margin-bottom:.35rem;';
 ?>
-<section class="section section--grey" style="padding-bottom:2rem;">
+<section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container" style="max-width:960px;">
     <a href="<?= h(events_path('list', $lang)) ?>" style="display:inline-block;margin-bottom:.75rem;font-weight:600;">← <?= h(t_or('events.back', 'Всички събития', 'All events', $lang)) ?></a>
     <h1 style="overflow-wrap:anywhere;margin:0 0 1rem;"><?= h($title) ?></h1>

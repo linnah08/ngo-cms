@@ -133,6 +133,12 @@ p:last-child { margin-bottom: 0; }
   padding: var(--space-2xl) 0;
 }
 
+/* The page title band carries its own (inline) padding; the section right
+   after it starts closer so the title isn't stranded above the content. */
+.page-hero + .section {
+  padding-top: var(--space-xl);
+}
+
 .section--grey {
   background: var(--off-white);
 }

@@ -8,7 +8,7 @@ $page_description = 'Terms of use for the ' . SITE_NAME_EN . ' online shop.';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
 
-<section class="section section--grey" style="padding-bottom:2rem;">
+<section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
     <span class="section-label">Legal</span>
     <h1>Terms of Use</h1>

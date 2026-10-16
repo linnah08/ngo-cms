@@ -7,7 +7,7 @@ $content = $pages['legal']['legal_info'] ?? '';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
 
-<section class="section section--grey" style="padding-bottom:2rem;">
+<section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
     <h1>Правна информация</h1>
   </div>
