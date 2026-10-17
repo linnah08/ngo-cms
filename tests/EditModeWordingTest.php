@@ -108,7 +108,7 @@ final class EditModeWordingTest extends TestCase
         $code = '$_SERVER["DOCUMENT_ROOT"] = ' . var_export($root, true) . ';'
               . '$GLOBALS["_om_ui_wording"] = ["bg" => ["footer.nav" => "От страницата"], "en" => []];'
               . 'require ' . var_export($root . '/config.php', true) . ';'
-              . 'echo t("footer.nav"), "|", t_or("footer.nav", "", "", "en");';
+              . 'echo t_or("footer.nav", "", "", "bg"), "|", t_or("footer.nav", "", "", "en");';
         $out = (string) shell_exec(escapeshellarg(PHP_BINARY) . ' -r ' . escapeshellarg($code) . ' 2>/dev/null');
         [$bg, $en] = explode('|', $out) + ['', ''];
         $this->assertSame('От страницата', $bg, 'what was typed on the page wins over strings.json');
@@ -172,5 +172,20 @@ final class EditModeWordingTest extends TestCase
         $this->assertMatchesRegularExpression('/data-cms-article-slug-bg="<\?= h\(\$article\[\'slug\'\] \?\? \'\'\) \?>"\s+data-cms-article-slug-en="">/', $bg);
         $this->assertStringContainsString('<article data-cms-article-slug-bg="" data-cms-article-slug-en="<?= h($article[\'slug\'] ?? \'\') ?>">', $en);
         $this->assertStringContainsString('data-cms-section="article"', $en, 'the EN article is editable too');
+    }
+
+    public function test_a_site_that_kept_an_older_config_php_still_gets_te(): void
+    {
+        // The updater keeps a config.php a site has changed; the v0.32.0 release gate
+        // caught every page failing there because te() lived only in config.php.
+        $root = dirname(__DIR__);
+        $this->assertStringContainsString("require_once ROOT_PATH . '/includes/edit_mode.php';", (string) file_get_contents($root . '/templates/header.php'));
+        $src = (string) file_get_contents($root . '/includes/edit_mode.php');
+        preg_match_all('/^function (\w+)\(/m', $src, $m);
+        $this->assertNotEmpty($m[1]);
+        foreach ($m[1] as $fn) {
+            $this->assertStringContainsString("if (!function_exists('$fn')) {\nfunction $fn(", $src, "$fn must be safe to load twice");
+            $this->assertStringNotContainsString("function $fn(", (string) file_get_contents($root . '/config.php'), "$fn belongs in includes/edit_mode.php");
+        }
     }
 }

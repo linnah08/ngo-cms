@@ -2,6 +2,8 @@
 // templates/header.php
 // Variables expected: $page_title (string), $lang (string)
 if (!defined('SITE_NAME_BG')) require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+// te() / cms_admin(): config.php loads them too, but a site that kept an older config.php does not.
+require_once ROOT_PATH . '/includes/edit_mode.php';
 $lang = get_lang();
 $site_name = $lang === 'bg' ? SITE_NAME_BG : SITE_NAME_EN;
 $other = other_lang();

@@ -389,14 +389,6 @@ function lang_strings(string $lang): array {
         } elseif (file_exists($file)) {
             error_log("lang_strings: content/{$lang}/strings.site.json is not valid JSON — ignored");
         }
-        // Wording an admin changed on the page in Edit mode (includes/ui_wording.php) wins over both.
-        if (array_key_exists('_om_ui_wording', $GLOBALS)) {
-            $edited = (array) ($GLOBALS['_om_ui_wording'][$lang] ?? []);
-        } else {
-            require_once __DIR__ . '/includes/ui_wording.php';
-            $edited = ui_wording_all()[$lang];
-        }
-        $cache[$lang] = $edited + $cache[$lang];
     }
     return $cache[$lang];
 }
@@ -421,71 +413,13 @@ function t(string $key): string {
  * reworded string with a stray "%" can never break the page.
  */
 function t_or(string $key, string $bg, string $en, ?string $lang = null, array $vars = []): string {
-    return t_lookup($key, $bg, $en, $lang, $vars);
+    return t_lookup($key, $bg, $en, $lang, $vars);   // includes/edit_mode.php, loaded below
 }
 
-/** t_or()'s lookup, for t_or() and te(). Call those: their literal keys are what tests check against strings.json. */
-function t_lookup(string $key, string $bg, string $en, ?string $lang = null, array $vars = []): string {
-    $lang = ($lang ?? get_lang()) === 'en' ? 'en' : 'bg';
-    $v    = lang_strings($lang)[$key] ?? null;
-    $text = (is_string($v) && $v !== '') ? $v : ($lang === 'en' ? $en : $bg);
-    if ($vars) {
-        $map = [];
-        foreach ($vars as $k => $val) $map['{' . $k . '}'] = (string) $val;
-        $text = strtr($text, $map);
-    }
-    return $text;
-}
+// t_lookup(), te() and cms_admin() — on-page editing (Edit mode). Declared here, before
+// anything below can print a page.
+require_once __DIR__ . '/includes/edit_mode.php';
 
-/**
- * A UI string the admin can reword on the page in Edit mode: t_or()'s text, escaped,
- * in a <span> the on-page editor saves under $key (section "ui", includes/ui_wording.php).
- *
- * Without $bg/$en the key's text in strings.json is the default. $vars fills {name}
- * placeholders as in t_or(); Edit mode shows the placeholders while editing.
- *
- * Use it for every fixed word a visitor reads in a page's body — titles, labels,
- * headings, form labels and buttons, "nothing here yet" messages. Not inside an
- * attribute, <title> or <option> (no markup there): use t_or() and keep the key.
- * tests/EditModeCoverageTest.php fails for visible text that is neither editable
- * on the page nor marked with cms_admin().
- */
-function te(string $key, string $bg = '', string $en = '', ?string $lang = null, array $vars = []): string {
-    $lang = ($lang ?? get_lang()) === 'en' ? 'en' : 'bg';
-    $out  = '<span data-cms-section="ui" data-cms-field="' . h($key) . '" data-cms-type="text"';
-    // Both languages ride along only for an admin, so switching BG/EN in the bar shows the other one.
-    // With $vars they are the templates ("Остават {n} места."): Edit mode shows and saves those.
-    if ($GLOBALS['_show_admin_bar'] ?? false) {
-        $out .= ' data-cms-bg="' . h(t_lookup($key, $bg, $en, 'bg')) . '" data-cms-en="' . h(t_lookup($key, $bg, $en, 'en')) . '"';
-        if ($vars) $out .= ' data-cms-vars="' . h((string) json_encode(array_map('strval', $vars), JSON_UNESCAPED_UNICODE)) . '"';
-    }
-    return $out . '>' . h(t_lookup($key, $bg, $en, $lang, $vars)) . '</span>';
-}
-
-/**
- * Attributes for something shown on the page but changed elsewhere in the admin —
- * the organisation's email, IBAN, address and social links, a product's name and
- * options. In Edit mode it is outlined and a click says where to change it, with a link.
- *
- * $where: a key of cms_admin_places(), or [label, admin path] for a one-off.
- */
-function cms_admin(string|array $where): string {
-    [$label, $path] = is_array($where) ? $where : (cms_admin_places()[$where] ?? cms_admin_places()['organisation']);
-    return ' data-cms-admin="' . h($label) . '" data-cms-admin-url="' . h($path) . '"';
-}
-
-/** Where things shown on the public pages are changed: key => [what the admin calls it, admin path]. */
-function cms_admin_places(): array {
-    return [
-        'organisation' => ['Организация', '/admin/organisation.php'],
-        'launch'       => ['Пускане на сайта', '/admin/launch.php'],
-        'products'     => ['Продукти', '/admin/products.php'],
-        'articles'     => ['Статии', '/admin/articles.php'],
-        'events'       => ['Събития', '/admin/events.php'],
-        'pages'        => ['Съдържание', '/admin/pages.php'],
-        'menus'        => ['Менюта', '/admin/menus.php'],
-    ];
-}
 
 /**
  * Language of a shop POST handler (cart/add.php, update.php, remove.php).
