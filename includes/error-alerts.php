@@ -67,13 +67,19 @@ function error_alert_capture(string $error_class, string $message, string $file,
     }
 }
 
-/** Was this same error (type, message, file, line) already emailed in the last 24 hours? */
+/**
+ * Was this same error (type, message, file, line) already emailed in the last 24 hours?
+ * A payment error counts as already emailed forever: its message names one order
+ * and the bank's reason, so the first email says all there is — the unpaid-orders
+ * job hitting it again every run until the order is cancelled adds nothing.
+ */
 function error_alert_sent_recently(array $row): bool
 {
+    $window = ($row['error_class'] ?? '') === 'PaymentError' ? '' : ' AND sent_at > NOW() - INTERVAL 1 DAY';
     $stmt = get_pdo()->prepare(
         'SELECT 1 FROM error_alerts
           WHERE id <> ? AND error_class = ? AND message = ? AND file = ? AND line = ?
-            AND sent_at IS NOT NULL AND sent_at > NOW() - INTERVAL 1 DAY
+            AND sent_at IS NOT NULL' . $window . '
           LIMIT 1'
     );
     $stmt->execute([
@@ -103,7 +109,7 @@ function error_alert_send_immediate(array $row, string $email): void
         if ($lastHash === $hash && $lastAt !== '' && (time() - (int)strtotime($lastAt)) < 300) {
             return;
         }
-        // One email a day per identical error. A scheduled job that hits the same
+        // One email a day per identical error (a payment error: one email, ever). A scheduled job that hits the same
         // problem on every run (e.g. the bank not knowing one order's payment)
         // would otherwise mail the admin every 15–30 minutes. Every occurrence is
         // still recorded in error_alerts; only the repeat email is held back.

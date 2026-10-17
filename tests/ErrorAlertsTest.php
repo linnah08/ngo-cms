@@ -113,11 +113,11 @@ final class ErrorAlertsTest extends TestCase
         setting_set('error_alert_last_hash_at', '');
     }
 
-    private function insertAlert(string $message, ?string $sentAt): int
+    private function insertAlert(string $message, ?string $sentAt, string $class = 'TestCapture'): int
     {
         self::$pdo->prepare(
-            "INSERT INTO error_alerts (error_class, message, file, line, sent_at) VALUES ('TestCapture', ?, '/f.php', 9, ?)"
-        )->execute([$message, $sentAt]);
+            "INSERT INTO error_alerts (error_class, message, file, line, sent_at) VALUES (?, ?, '/f.php', 9, ?)"
+        )->execute([$class, $message, $sentAt]);
         return (int) self::$pdo->lastInsertId();
     }
 
@@ -150,6 +150,21 @@ final class ErrorAlertsTest extends TestCase
         // Never emailed before (alerts were only recorded) — the next one still goes out.
         $this->insertAlert('Unsent before', null);
         $this->assertFalse(error_alert_sent_recently($this->alertRow($this->insertAlert('Unsent before', null))));
+    }
+
+    public function testSamePaymentErrorIsEmailedOnlyOnceEver(): void
+    {
+        // A payment error names one order and the bank's reason; one email is enough,
+        // however many days the unpaid-orders job keeps hitting it.
+        $this->insertAlert('Payment OM-1: Order not found', date('Y-m-d H:i:s', time() - 5 * 86400), 'PaymentError');
+        $this->assertTrue(error_alert_sent_recently($this->alertRow(
+            $this->insertAlert('Payment OM-1: Order not found', null, 'PaymentError')
+        )));
+
+        // Another order still gets its own email.
+        $this->assertFalse(error_alert_sent_recently($this->alertRow(
+            $this->insertAlert('Payment OM-2: Order not found', null, 'PaymentError')
+        )));
     }
 
     // ── AI auto-fix groundwork: polling API support ─────────────────────────
