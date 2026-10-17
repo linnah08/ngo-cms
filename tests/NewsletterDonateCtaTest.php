@@ -95,6 +95,14 @@ final class NewsletterDonateCtaTest extends TestCase
 
     // ── Admin switch (Организация) ────────────────────────────────────────────
 
+    /** Without Бюлетин or Дарения the box's fields are hidden in Организация and not saved. */
+    private function skipUnlessTheBoxIsInOrganisation(): void
+    {
+        if (in_array('newsletter_donate_cta', org_hidden_fields(), true)) {
+            $this->markTestSkipped('Newsletter or donations are off on this site, so Организация hides the donation box.');
+        }
+    }
+
     private function orgInput(array $over = []): array
     {
         return array_merge([
@@ -106,6 +114,7 @@ final class NewsletterDonateCtaTest extends TestCase
 
     public function test_admin_switch_saves_an_explicit_on_or_off(): void
     {
+        $this->skipUnlessTheBoxIsInOrganisation();
         $on  = org_validate($this->orgInput(['newsletter_donate_cta' => '1']), array_keys(brand_themes()));
         $off = org_validate($this->orgInput(), array_keys(brand_themes()));
         $bad = org_validate($this->orgInput(['newsletter_donate_cta' => 'yes please']), array_keys(brand_themes()));
@@ -117,6 +126,7 @@ final class NewsletterDonateCtaTest extends TestCase
 
     public function test_admin_wording_has_length_limits(): void
     {
+        $this->skipUnlessTheBoxIsInOrganisation();
         $r = org_validate($this->orgInput([
             'newsletter_donate_heading_en' => str_repeat('x', 121),
             'newsletter_donate_text_bg'    => str_repeat('я', 301),

@@ -406,7 +406,10 @@ final class DistributionTest extends TestCase
         $this->assertStringContainsString('Тестова книга (Червена)', $html);
         $this->assertStringContainsString('Магазин &lt;Б&amp;Б&gt;', $html, 'distributor name is escaped');
         $this->assertStringContainsString('12.00 €', $html, 'line total = 3 × 4.00');
-        $this->assertStringNotContainsString('Лафетки', $html);
+        // The sender is this site's own organisation, never a name written into the template.
+        $own = htmlspecialchars(org_legal_name('bg'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $this->assertStringContainsString('<div class="party-name">' . $own . '</div>', $html);
+        if (!str_contains($own, 'Лафетки')) $this->assertStringNotContainsString('Лафетки', $html);
     }
 
     public function testRecordsProtectProductsAndVariantsFromDeletion(): void

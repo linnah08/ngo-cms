@@ -46,8 +46,9 @@ final class HttpTest extends TestCase
 
     public static function publicPages(): array
     {
-        // The addresses the site really serves (BG and EN pairs). A third value names
-        // the module the page belongs to: with that module off the page is a 404.
+        // The addresses the site really serves (BG and EN pairs). Which module a page
+        // belongs to comes from the modules registry (module_for_path), so a page that
+        // moves to another module can't leave this list expecting the wrong answer.
         return [
             // ── Public BG pages ────────────────────────────────────────────
             ['/', 'Home BG'],
@@ -56,9 +57,9 @@ final class HttpTest extends TestCase
             ['/kak-da-pomogna/', 'How to help BG'],
             ['/kontakti/', 'Contact BG'],
             ['/magazin/', 'Shop BG'],
-            ['/donation/', 'Donation BG', 'donations'],
-            ['/campaign/', 'Campaign BG', 'campaign'],
-            ['/tickets/', 'Tickets', 'campaign'],
+            ['/donation/', 'Donation BG'],
+            ['/campaign/', 'Campaign BG'],
+            ['/tickets/', 'Tickets'],
             ['/novini/', 'News BG'],
             ['/finansovi-otcheti/', 'Financial reports BG'],
             ['/sabitiya/', 'Events BG'],
@@ -69,8 +70,8 @@ final class HttpTest extends TestCase
             ['/en/how-to-help/', 'How to help EN'],
             ['/en/contacts/', 'Contact EN'],
             ['/en/shop/', 'Shop EN'],
-            ['/en/donation/', 'Donation EN', 'donations'],
-            ['/en/campaign/', 'Campaign EN', 'campaign'],
+            ['/en/donation/', 'Donation EN'],
+            ['/en/campaign/', 'Campaign EN'],
             ['/en/news/', 'News EN'],
             ['/en/financial-reports/', 'Financial reports EN'],
             ['/en/events/', 'Events EN'],
@@ -110,9 +111,11 @@ final class HttpTest extends TestCase
     }
 
     #[DataProvider('publicPages')]
-    public function testPageReturns200(string $path, string $label, ?string $module = null): void
+    public function testPageReturns200(string $path, string $label): void
     {
-        $expected = ($module === null || feature_enabled($module)) ? 200 : 404;
+        // With its module off (or a module it needs) the page does not exist.
+        $module   = module_for_path($path);
+        $expected = ($module === null || module_enabled_with_needs($module)) ? 200 : 404;
         $ch = curl_init(self::$base . $path);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);

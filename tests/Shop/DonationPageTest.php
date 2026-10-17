@@ -110,7 +110,12 @@ final class DonationPageTest extends TestCase
 
         $html = home_buttons('s1', ['btn1_label' => ['bg' => 'Дари', 'en' => 'Donate'], 'btn1_url' => ['bg' => '/magazin/#donation', 'en' => '/en/shop/#donation']],
             'en', [['btn', ''], ['btn', '']]);
-        $this->assertStringContainsString('href="/en/donation/"', $html);
+        if (module_enabled_with_needs('donations')) {
+            $this->assertStringContainsString('href="/en/donation/"', $html);
+        } else {
+            // Donations off: the button would lead to a 404, so it is left out.
+            $this->assertSame('', $html);
+        }
     }
 
     public function testDonationPageHasALanguagePairAndIsInTheSitemap(): void
