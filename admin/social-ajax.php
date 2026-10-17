@@ -79,7 +79,9 @@ if ($action === 'save_crop') {
         echo json_encode(['ok' => false, 'error' => 'Изрязването не можа да се запази. Опитайте отново.']);
         exit;
     }
-    echo json_encode(['ok' => true, 'rect' => $clean['rect']]);
+    // Whether Instagram still loses too much of a photo, so the editor can update its warning.
+    $problem = social_insta_cut_problem(social_insta_slides($data, $clean['kind']));
+    echo json_encode(['ok' => true, 'rect' => $clean['rect'], 'problem' => $problem]);
     exit;
 }
 
@@ -270,6 +272,12 @@ if ($action === 'schedule') {
 
     $req = social_fb_insta_request($data, $channel, $is_story);
     _om_log('INFO', "social-ajax schedule/{$channel}: " . count($req['urls']) . ' photo(s)');
+
+    // A photo would lose too much to Instagram's shape: send nothing, say what to do.
+    if ($channel === 'insta' && $req['problem'] !== null) {
+        echo json_encode(['ok' => false, 'error' => social_insta_cut_message($req['problem']), 'problem' => $req['problem']]);
+        exit;
+    }
 
     // Instagram requires an image
     if ($channel === 'insta' && !$req['urls']) {

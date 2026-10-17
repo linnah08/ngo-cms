@@ -196,6 +196,17 @@ final class SocialCropHttpTest extends TestCase
         $this->assertArrayNotHasKey('insta_crops', $this->stored());
     }
 
+    /** Saving a crop reports whether Instagram still loses too much — the author's own crop never does. */
+    public function test_saving_a_crop_reports_the_cut_problem_is_gone(): void
+    {
+        [$jar, $csrf] = $this->login();
+        [, $res] = $this->save($jar, ['csrf_token' => $csrf, 'kind' => 'post', 'src' => self::$src, 'rect' => $this->rect()]);
+        @unlink($jar);
+        $this->assertTrue($res['ok']);
+        $this->assertArrayHasKey('problem', $res);
+        $this->assertNull($res['problem']);
+    }
+
     public function test_a_good_crop_is_stored_on_the_bg_article(): void
     {
         [$jar, $csrf] = $this->login();

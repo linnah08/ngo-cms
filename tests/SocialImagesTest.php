@@ -180,7 +180,7 @@ final class SocialImagesTest extends TestCase
         $b = $this->jpeg('b.jpg', 800, 800);
         $r = social_fb_insta_request(['image' => $a, 'photos' => [['src' => $a, 'caption' => ''], ['src' => $b, 'caption' => '']]], 'insta');
         $this->assertCount(2, $r['urls']);
-        $this->assertMatchesRegularExpression('/a-4x5-[0-9a-f]{8}\.jpg$/', $r['urls'][0]);
+        $this->assertMatchesRegularExpression('/a-car-[0-9a-f]{8}\.jpg$/', $r['urls'][0]);
         // Buffer refuses type: carousel (verified 03.10.2026) — several assets on a post make the carousel.
         $this->assertSame('instagram: { type: post, shouldShareToFeed: true }', $r['metadata']);
     }
@@ -203,9 +203,10 @@ final class SocialImagesTest extends TestCase
 
     public function testInstagramStoryIsTheMainPhotoAloneAsAStory(): void
     {
-        $a = $this->jpeg('a.jpg', 900, 1600);
-        $b = $this->jpeg('b.jpg', 800, 800);
+        $a = $this->jpeg('a.jpg', 800, 800);
+        $b = $this->jpeg('b.jpg', 1000, 1600);   // 9:16 cuts 10% of it — fine
         $r = social_fb_insta_request(['image' => $b, 'photos' => [['src' => $a, 'caption' => ''], ['src' => $b, 'caption' => '']]], 'insta', true);
+        $this->assertNull($r['problem']);
         $this->assertCount(1, $r['urls']);
         $this->assertMatchesRegularExpression('/b-story-[0-9a-f]{8}\.jpg$/', $r['urls'][0]);
         $this->assertSame('instagram: { type: story, shouldShareToFeed: false }', $r['metadata']);
@@ -270,5 +271,95 @@ final class SocialImagesTest extends TestCase
         $p  = $this->phonePhoto('phone.jpg', 2000, 900, 6);
         $pv = social_insta_preview(['image' => $p]);
         $this->assertSame([900, 2000], [$pv['post'][0]['w'], $pv['post'][0]['h']]);
+    }
+
+    // ── The carousel's shape follows its photos; a big cut is refused, not sent ──
+
+    /** The bug: landscape sticker photos went to Instagram cut to 4:5 portrait. */
+    public function testLandscapePhotosMakeALandscapeCarouselUncut(): void
+    {
+        $a = $this->jpeg('s1.jpg', 1500, 1000);
+        $b = $this->jpeg('s2.jpg', 1500, 1000);
+        $c = $this->jpeg('s3.jpg', 1500, 1000);
+        $r = social_fb_insta_request(['image' => $a, 'photos' => [['src' => $a, 'caption' => ''], ['src' => $b, 'caption' => ''], ['src' => $c, 'caption' => '']]], 'insta');
+        $this->assertNull($r['problem']);
+        $this->assertCount(3, $r['urls']);
+        foreach ([$a, $b, $c] as $i => $p) $this->assertSame(social_image_url($p), $r['urls'][$i], 'sent whole, not cut');
+    }
+
+    public function testCarouselShapeIsTheOneThatCutsLeast(): void
+    {
+        $this->assertSame(1.5, social_carousel_aspect([[1500, 1000], [1500, 1000]]));
+        $this->assertSame(0.8, social_carousel_aspect([[800, 1000], [900, 1125]]));
+        $this->assertSame(0.8, social_carousel_aspect([[900, 2000], [900, 1600]]), 'taller than 4:5 is still 4:5');
+        $this->assertSame(1.91, social_carousel_aspect([[3000, 1000], [2000, 1000]]));
+        // One tall and one wide: the middle shape cuts each by the same, smallest amount.
+        $this->assertEqualsWithDelta(sqrt(0.8 * 1.5), social_carousel_aspect([[800, 1000], [1500, 1000]]), 1e-6);
+        // Mostly wide with one square: wide wins over 4:5.
+        $this->assertGreaterThan(1.0, social_carousel_aspect([[1500, 1000], [1500, 1000], [1000, 1000]]));
+    }
+
+    public function testCropLoss(): void
+    {
+        $this->assertEqualsWithDelta(0.0, social_crop_loss(1500, 1000, 1.5), 1e-9);
+        $this->assertEqualsWithDelta(1 - 0.8 / 1.5, social_crop_loss(1500, 1000, 0.8), 1e-9);   // the stickers: 47%
+        $this->assertEqualsWithDelta(0.2, social_crop_loss(1000, 1000, 0.8), 1e-9);
+    }
+
+    public function testATooBigCutIsRefusedWithAdvice(): void
+    {
+        $a = $this->jpeg('wide.jpg', 1500, 1000);
+        $b = $this->jpeg('tall.jpg', 800, 1000);
+        $article = ['image' => $a, 'photos' => [['src' => $a, 'caption' => ''], ['src' => $b, 'caption' => '']]];
+        $r = social_fb_insta_request($article, 'insta');
+        $this->assertSame([], $r['urls'], 'nothing is sent');
+        $this->assertSame([$a, $b], $r['problem']['srcs']);
+        $this->assertStringContainsString('снимки 1 и 2', $r['problem']['lead']);
+        $this->assertStringContainsString('(до 27%)', $r['problem']['lead']);
+        $this->assertCount(3, $r['problem']['tips']);
+        $this->assertStringContainsString('изберете сами', social_insta_cut_message($r['problem']));
+        $this->assertSame([], glob($this->dir . '/*-car-*') ?: [], 'no cut copies are written either');
+        // Facebook is not held back.
+        $this->assertCount(2, social_fb_insta_request($article, 'fb')['urls']);
+        // The editor shows the same problem, and marks both photos.
+        $pv = social_insta_preview($article);
+        $this->assertSame($r['problem'], $pv['post_problem']);
+        $this->assertSame([true, true], array_column($pv['post'], 'too_much'));
+        $this->assertSame([27, 27], array_column($pv['post'], 'cut'));
+    }
+
+    public function testTheAuthorsOwnCropIsAlwaysAccepted(): void
+    {
+        $a = $this->jpeg('wide.jpg', 1500, 1000);
+        $b = $this->jpeg('tall.jpg', 800, 1000);
+        $ar = social_carousel_aspect([[1500, 1000], [800, 1000]]);
+        $article = ['image' => $a, 'photos' => [['src' => $a, 'caption' => ''], ['src' => $b, 'caption' => '']],
+            'insta_crops' => ['post' => [$a => ['x' => 0, 'y' => 0, 'w' => $ar / 1.5, 'h' => 1, 'ar' => $ar]]]];
+        $one = social_insta_cut_problem(social_insta_slides($article, 'post'));
+        $this->assertSame([$b], $one['srcs'], 'only the photo still on automatic is left');
+        $this->assertStringContainsString('снимка 2 ', $one['lead']);
+        $article['insta_crops']['post'][$b] = ['x' => 0, 'y' => 0, 'w' => 1, 'h' => 0.8 / $ar, 'ar' => $ar];
+        $r = social_fb_insta_request($article, 'insta');
+        $this->assertNull($r['problem']);
+        $this->assertCount(2, $r['urls']);
+    }
+
+    public function testASquarePhotoIsTooWideForAStory(): void
+    {
+        $a = $this->jpeg('sq.jpg', 800, 800);
+        $r = social_fb_insta_request(['image' => $a], 'insta', true);
+        $this->assertSame([], $r['urls']);
+        $this->assertStringContainsString('Story-то няма да бъде изпратено', $r['problem']['lead']);
+        $this->assertStringContainsString('висока', implode(' ', $r['problem']['tips']));
+        $this->assertNull(social_fb_insta_request(['image' => $a], 'insta')['problem'], 'the feed post is fine');
+    }
+
+    public function testAVeryWidePanoramaAloneIsRefused(): void
+    {
+        $a = $this->jpeg('pano.jpg', 3000, 1000);   // 1.91:1 cuts 36%
+        $r = social_fb_insta_request(['image' => $a], 'insta');
+        $this->assertNotNull($r['problem']);
+        $this->assertStringContainsString('от снимката (до 36%)', $r['problem']['lead']);
+        $this->assertCount(2, $r['problem']['tips']);
     }
 }
