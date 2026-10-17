@@ -131,8 +131,11 @@ final class HowToHelpCtaTest extends TestCase
             ? $this->assertStringContainsString($campaign, $body, 'the campaign way links to the campaign')
             : $this->assertStringNotContainsString($campaign, $body, 'the campaign is off, so nothing links to it');
 
-        $this->assertStringContainsString($en ? 'Like us on Facebook' : 'Харесайте ни във Facebook', $body, 'the social way shows the follow buttons');
-        if (SOCIAL_FACEBOOK !== '') $this->assertStringContainsString('href="' . h(SOCIAL_FACEBOOK) . '"', $body);
+        if (SOCIAL_FACEBOOK !== '') {
+            $this->assertStringContainsString($en ? 'Like us on Facebook' : 'Харесайте ни във Facebook', $body, 'the social way shows the follow buttons');
+            $this->assertStringContainsString('href="' . h(SOCIAL_FACEBOOK) . '"', $body);
+        }
+        $this->assertStringNotContainsString('href=""', $body, 'no follow button for a network with no profile set');
         if (SOCIAL_INSTAGRAM !== '') $this->assertStringContainsString('href="' . h(SOCIAL_INSTAGRAM) . '"', $body);
     }
 }
