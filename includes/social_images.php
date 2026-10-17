@@ -55,7 +55,7 @@ const SOCIAL_STORY_AR = 9 / 16;
 const SOCIAL_CROP_TOP_BIAS = 0.2;
 /**
  * The shapes an author can pick for an Instagram feed post, as in Instagram's own app.
- * 'auto' (the default) lets social_carousel_aspect() pick from the photos.
+ * 'auto' (the default) follows the main photo — see social_carousel_aspect().
  */
 const SOCIAL_IG_SHAPES = ['portrait' => 0.8, 'square' => 1.0, 'landscape' => 1.91];
 /**
@@ -88,25 +88,15 @@ function social_crop_loss(int $w, int $h, float $ar): float {
 }
 
 /**
- * The one shape every slide of an Instagram carousel shares, from the photos' own
- * shapes ([w, h] each). Instagram takes anything from 4:5 to 1.91:1, so try each photo's
- * own shape and the middle between the narrowest and the widest, and keep the shape that
- * cuts least in total (then the least from the worst-cut slide). So the shape most of
- * the photos have wins — two 1.91:1 banners and one tall photo go out landscape, not
- * as a compromise that cuts all three.
+ * The one shape every slide of an Instagram carousel shares, from the photos' shapes
+ * ([w, h] each, main photo first): the main photo's own shape, clamped to Instagram's
+ * 4:5 … 1.91:1 — the rule Instagram's own app uses (the first photo sets the shape). The
+ * main photo is never cut much; the others fill it or are shown whole on white.
  */
 function social_carousel_aspect(array $sizes): float {
-    $shapes = array_map(static fn(array $s): float => max(SOCIAL_IG_MIN, min(SOCIAL_IG_MAX, $s[0] / $s[1])), $sizes);
-    if (!$shapes) return SOCIAL_IG_MIN;
-    $shapes[] = sqrt(min($shapes) * max($shapes));
-    $best = SOCIAL_IG_MIN; $bestScore = null;
-    foreach ($shapes as $ar) {
-        $ar = round($ar, 6);
-        $loss  = array_map(static fn(array $s): float => social_crop_loss($s[0], $s[1], $ar), $sizes);
-        $score = [round(array_sum($loss), 6), round(max($loss), 6)];
-        if ($bestScore === null || $score < $bestScore) { $best = $ar; $bestScore = $score; }
-    }
-    return $best;
+    if (!$sizes) return SOCIAL_IG_MIN;
+    [$w, $h] = $sizes[0];
+    return round(max(SOCIAL_IG_MIN, min(SOCIAL_IG_MAX, $w / $h)), 6);
 }
 
 /** Which saved crop (insta_crops.post / .story) a mode uses; null for modes nobody can adjust. */

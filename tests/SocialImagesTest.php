@@ -297,16 +297,17 @@ final class SocialImagesTest extends TestCase
         foreach ([$a, $b, $c] as $i => $p) $this->assertSame(social_image_url($p), $r['urls'][$i], 'sent whole, not cut');
     }
 
-    public function testCarouselShapeIsTheOneMostPhotosHave(): void
+    /** As in Instagram's app: the main (first) photo sets the shape. */
+    public function testCarouselShapeIsTheMainPhotos(): void
     {
         $this->assertSame(1.5, social_carousel_aspect([[1500, 1000], [1500, 1000]]));
-        $this->assertSame(0.8, social_carousel_aspect([[800, 1000], [900, 1125]]));
-        $this->assertSame(0.8, social_carousel_aspect([[900, 2000], [900, 1600]]), 'taller than 4:5 is still 4:5');
-        $this->assertSame(1.91, social_carousel_aspect([[3000, 1000], [2000, 1000]]));
-        // The second incident: a tall main photo and two 1.91:1 banners went out as a
-        // ~1.2:1 compromise that cut all three. Two wide photos out of three → wide.
-        $this->assertSame(1.91, social_carousel_aspect([[750, 1000], [1910, 1000], [1910, 1000]]));
-        $this->assertGreaterThan(1.0, social_carousel_aspect([[1500, 1000], [1500, 1000], [1000, 1000]]));
+        $this->assertSame(0.8, social_carousel_aspect([[800, 1000], [1500, 1000]]));
+        $this->assertSame(0.8, social_carousel_aspect([[900, 2000], [1600, 900]]), 'taller than 4:5 is still 4:5');
+        $this->assertSame(1.91, social_carousel_aspect([[3000, 1000], [800, 1000]]));
+        // Lafetki "rrrrr": a 3:4 main photo and two banners — the post goes 4:5, not a wide
+        // strip that keeps only the middle of the main photo.
+        $this->assertSame(0.8, social_carousel_aspect([[1200, 1600], [419, 222], [419, 222]]));
+        $this->assertSame(1.0, social_carousel_aspect([[1000, 1000], [1500, 1000], [1500, 1000]]));
     }
 
     public function testCropLoss(): void
@@ -315,8 +316,8 @@ final class SocialImagesTest extends TestCase
         $this->assertEqualsWithDelta(1 - 0.8 / 1.5, social_crop_loss(1500, 1000, 0.8), 1e-9);
     }
 
-    /** Never refused: whatever the shapes, every photo goes out, cut to the shared shape. */
-    public function testMixedShapesAreCutNotRefused(): void
+    /** Never refused: whatever the shapes, every photo goes out at the main photo's shape. */
+    public function testMixedShapesAreSentNotRefused(): void
     {
         $a = $this->jpeg('tall.jpg', 750, 1000);
         $b = $this->jpeg('ban1.jpg', 1910, 1000);
@@ -324,10 +325,11 @@ final class SocialImagesTest extends TestCase
         $article = ['image' => $a, 'photos' => [['src' => $a, 'caption' => ''], ['src' => $b, 'caption' => ''], ['src' => $c, 'caption' => '']]];
         $r = social_fb_insta_request($article, 'insta');
         $this->assertCount(3, $r['urls']);
-        $this->assertSame([1910, 1000], array_slice(getimagesize($_SERVER['DOCUMENT_ROOT'] . rawurldecode(substr($r['urls'][1], strlen(SITE_URL)))), 0, 2), 'banners whole');
-        [$w, $h] = getimagesize($_SERVER['DOCUMENT_ROOT'] . rawurldecode(substr($r['urls'][0], strlen(SITE_URL))));
-        $this->assertEqualsWithDelta(1.91, $w / $h, 0.01, 'the tall photo is cut to the same landscape shape');
-        $this->assertSame([1.91, 1.91, 1.91], array_column(social_insta_preview($article)['post'], 'ar'));
+        foreach ($r['urls'] as $u) {
+            [$w, $h] = getimagesize($_SERVER['DOCUMENT_ROOT'] . rawurldecode(substr($u, strlen(SITE_URL))));
+            $this->assertEqualsWithDelta(0.8, $w / $h, 0.01, $u);
+        }
+        $this->assertSame([0.8, 0.8, 0.8], array_column(social_insta_preview($article)['post'], 'ar'));
     }
 
     public function testThePickedShapeWins(): void
@@ -370,27 +372,26 @@ final class SocialImagesTest extends TestCase
         return $_SERVER['DOCUMENT_ROOT'] . rawurldecode(substr($url, strlen(SITE_URL)));
     }
 
-    /** The Lafetki post: a 3:4 main photo and two banners nearly 1.91:1. */
-    public function testATallPhotoInALandscapePostIsShownWholeOnWhite(): void
+    /** Lafetki "rrrrr": a 3:4 main photo and two banners nearly 1.91:1. */
+    public function testTheMainPhotoSetsTheShapeAndBannersGoWholeOnWhite(): void
     {
         $m  = $this->jpeg('main.jpg', 1200, 1600);
         $b1 = $this->jpeg('b1.jpg', 419, 222);
         $b2 = $this->jpeg('b2.jpg', 419, 222);
         $article = ['image' => $m, 'photos' => [['src' => $m, 'caption' => ''], ['src' => $b1, 'caption' => ''], ['src' => $b2, 'caption' => '']]];
         $slides = social_insta_slides($article, 'post');
-        $this->assertSame(round(419 / 222, 6), $slides[0]['ar'], 'the banners\' own shape: they go out uncut');
-        $this->assertSame(['whole', 'fill', 'fill'], array_column($slides, 'fit'), 'the tall photo goes whole');
+        $this->assertSame(0.8, $slides[0]['ar']);
+        $this->assertSame(['fill', 'whole', 'whole'], array_column($slides, 'fit'), 'the main photo loses 6%; the banners go whole');
 
         $r = social_fb_insta_request($article, 'insta');
-        $this->assertMatchesRegularExpression('/main-whole-[0-9a-f]{8}\.jpg$/', $r['urls'][0]);
-        $im = imagecreatefromjpeg($this->sent($r['urls'][0]));
-        $this->assertSame([3020, 1600], [imagesx($im), imagesy($im)]);   // 1600 × 419/222
-        $edge = imagecolorsforindex($im, imagecolorat($im, 5, 800));
-        $this->assertGreaterThan(245, $edge['red'], 'left edge is white');
-        $this->assertGreaterThan(245, $edge['blue']);
-        $mid = imagecolorsforindex($im, imagecolorat($im, 1510, 800));
-        $this->assertLessThan(20, $mid['red'], 'the photo itself (black) is in the middle');
-        $this->assertSame(social_image_url($b1), $r['urls'][1], 'a banner goes out as it is');
+        $this->assertSame([1200, 1500], array_slice(getimagesize($this->sent($r['urls'][0])), 0, 2));
+        $this->assertMatchesRegularExpression('/b1-whole-[0-9a-f]{8}\.jpg$/', $r['urls'][1]);
+        $im = imagecreatefromjpeg($this->sent($r['urls'][1]));
+        $this->assertSame([419, 524], [imagesx($im), imagesy($im)]);   // 419 ÷ 0.8
+        $top = imagecolorsforindex($im, imagecolorat($im, 200, 5));
+        $this->assertGreaterThan(245, $top['red'], 'white above the banner');
+        $mid = imagecolorsforindex($im, imagecolorat($im, 200, 262));
+        $this->assertLessThan(20, $mid['red'], 'the banner itself (black) in the middle');
     }
 
     public function testTheAuthorCanSwitchEachPhotoBetweenWholeAndFill(): void
