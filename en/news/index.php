@@ -55,28 +55,47 @@ if ($slug) {
     require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
 
-<article>
+<?php // Only this language's file is saved: the BG article is a separate file with its own text. ?>
+<article data-cms-article-slug-bg="" data-cms-article-slug-en="<?= h($article['slug'] ?? '') ?>">
   <section class="section">
     <div class="container container--narrow">
 
       <div style="margin-bottom:2rem;">
-        <a href="/en/news/" style="font-size:0.85rem;color:var(--text-muted);">← Back to news</a>
+        <a href="/en/news/" style="font-size:0.85rem;color:var(--text-muted);"><?= te('news.back', '← Обратно към новини', '← Back to news') ?></a>
       </div>
 
       <div class="article-meta" style="margin-bottom:1.5rem;">
         <?php if (!empty($article['date'])): ?>
-          <time datetime="<?= h($article['date']) ?>"><?= h(format_date($article['date'], 'en')) ?></time>
+          <time datetime="<?= h($article['date']) ?>"<?= cms_admin('articles') ?>><?= h(format_date($article['date'], 'en')) ?></time>
         <?php endif; ?>
         <?php if (!empty($article['author'])): ?>
-          <span>by <?= h($article['author']) ?></span>
+          <span><?= te('news.by', 'от', 'by') ?> <span<?= cms_admin('articles') ?>><?= h($article['author']) ?></span></span>
         <?php endif; ?>
       </div>
 
-      <h1 style="margin-bottom:2rem;"><?= h($article['title']) ?></h1>
+      <h1 style="margin-bottom:2rem;"
+          data-cms-field="title"
+          data-cms-section="article"
+          data-cms-type="text"
+          data-cms-bg=""
+          data-cms-en="<?= h($article['title'] ?? '') ?>"><?= h($article['title']) ?></h1>
 
-      <?php $lang = 'en'; require $_SERVER['DOCUMENT_ROOT'] . '/templates/article-carousel.php'; ?>
+      <?php $lang = 'en'; ?>
+      <?php if (count(article_photos($article)) <= 1 && !empty($article['image'])): ?>
+        <span class="om-img-wrap" data-cms-field="image" data-cms-section="article">
+          <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/article-carousel.php'; ?>
+          <?php if ($_show_admin_bar): ?><span class="om-img-overlay">📷 Replace</span><?php endif; ?>
+        </span>
+      <?php else: ?>
+        <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/article-carousel.php'; ?>
+      <?php endif; ?>
 
-      <div class="article-content" style="line-height:1.9;font-size:1.05rem;">
+      <div class="article-content" style="line-height:1.9;font-size:1.05rem;"
+           data-cms-field="content"
+           data-cms-section="article"
+           data-cms-type="richtext"
+           data-cms-bg=""
+           data-cms-en="<?= h($article['content'] ?? '') ?>">
         <?= $article['content'] ?? '' ?>
       </div>
 
@@ -87,18 +106,18 @@ if ($slug) {
 <!-- ── Conversion bridge ──────────────────────────────────────────────────── -->
 <section style="background:#f8fafb;border-top:1px solid var(--border);padding:3.5rem 1rem;">
   <div style="max-width:900px;margin:0 auto;text-align:center;">
-    <p style="font-size:.8rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin:0 0 .6rem;font-weight:600;">Support us</p>
-    <h2 style="font-size:1.6rem;margin:0 0 .75rem;line-height:1.3;">Stories like this are possible with your help.</h2>
-    <p style="color:var(--text-muted);font-size:1rem;margin:0 0 2.5rem;max-width:560px;margin-left:auto;margin-right:auto;">Every contribution — large or small — helps us continue our work.</p>
+    <p style="font-size:.8rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin:0 0 .6rem;font-weight:600;"><?= te('news.bridge.label', 'Подкрепете ни', 'Support us') ?></p>
+    <h2 style="font-size:1.6rem;margin:0 0 .75rem;line-height:1.3;"><?= te('news.bridge.heading', 'Истории като тази са възможни с вашата помощ.', 'Stories like this are possible with your help.') ?></h2>
+    <p style="color:var(--text-muted);font-size:1rem;margin:0 0 2.5rem;max-width:560px;margin-left:auto;margin-right:auto;"><?= te('news.bridge.text', 'Всеки принос — голям или малък — ни помага да продължим работата си.', 'Every contribution — large or small — helps us continue our work.') ?></p>
     <div style="display:flex;flex-wrap:wrap;gap:1.25rem;justify-content:center;align-items:stretch;">
 
       <?php if (feature_enabled('donations')): ?>
       <!-- Donate -->
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem 1.75rem;flex:1;min-width:220px;max-width:280px;display:flex;flex-direction:column;align-items:center;gap:1rem;">
         <div style="font-size:2rem;">❤️</div>
-        <h3 style="margin:0;font-size:1.05rem;">Make a donation</h3>
-        <p style="margin:0;font-size:.88rem;color:var(--text-muted);text-align:center;">Support our work directly.</p>
-        <a href="/en/donation/" class="btn btn--primary" style="margin-top:auto;width:100%;text-align:center;justify-content:center;">Donate now</a>
+        <h3 style="margin:0;font-size:1.05rem;"><?= te('news.bridge.donate_title', 'Направи дарение', 'Make a donation') ?></h3>
+        <p style="margin:0;font-size:.88rem;color:var(--text-muted);text-align:center;"><?= te('news.bridge.donate_text', 'Подкрепете пряко работата ни.', 'Support our work directly.') ?></p>
+        <a href="/en/donation/" class="btn btn--primary" style="margin-top:auto;width:100%;text-align:center;justify-content:center;"><?= te('news.bridge.donate_btn', 'Дари сега', 'Donate now') ?></a>
       </div>
       <?php endif; ?>
 
@@ -106,18 +125,18 @@ if ($slug) {
       <!-- Shop -->
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem 1.75rem;flex:1;min-width:220px;max-width:280px;display:flex;flex-direction:column;align-items:center;gap:1rem;">
         <div style="font-size:2rem;">🛍️</div>
-        <h3 style="margin:0;font-size:1.05rem;">Support our mission</h3>
-        <p style="margin:0;font-size:.88rem;color:var(--text-muted);text-align:center;">Buy from our shop and help fund the programmes that make a difference.</p>
-        <a href="/en/shop/" class="btn btn--outline" style="margin-top:auto;width:100%;text-align:center;justify-content:center;">Visit the shop</a>
+        <h3 style="margin:0;font-size:1.05rem;"><?= te('news.bridge.shop_title', 'Подкрепи мисията ни', 'Support our mission') ?></h3>
+        <p style="margin:0;font-size:.88rem;color:var(--text-muted);text-align:center;"><?= te('news.bridge.shop_text', 'Купете продукт от нашия магазин и помогнете за финансирането на програмите ни.', 'Buy from our shop and help fund the programmes that make a difference.') ?></p>
+        <a href="/en/shop/" class="btn btn--outline" style="margin-top:auto;width:100%;text-align:center;justify-content:center;"><?= te('news.bridge.shop_btn', 'Към магазина', 'Visit the shop') ?></a>
       </div>
       <?php endif; ?>
 
       <!-- Partner -->
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem 1.75rem;flex:1;min-width:220px;max-width:280px;display:flex;flex-direction:column;align-items:center;gap:1rem;">
         <div style="font-size:2rem;">🤝</div>
-        <h3 style="margin:0;font-size:1.05rem;">Become a partner</h3>
-        <p style="margin:0;font-size:.88rem;color:var(--text-muted);text-align:center;">An organisation, company or institution? Let's work together.</p>
-        <a href="/en/contacts/" class="btn btn--outline" style="margin-top:auto;width:100%;text-align:center;justify-content:center;">Get in touch</a>
+        <h3 style="margin:0;font-size:1.05rem;"><?= te('news.bridge.partner_title', 'Станете партньор', 'Become a partner') ?></h3>
+        <p style="margin:0;font-size:.88rem;color:var(--text-muted);text-align:center;"><?= te('news.bridge.partner_text', 'Организация, компания или институция? Нека работим заедно.', 'An organisation, company or institution? Let\'s work together.') ?></p>
+        <a href="/en/contacts/" class="btn btn--outline" style="margin-top:auto;width:100%;text-align:center;justify-content:center;"><?= te('news.bridge.partner_btn', 'Свържете се с нас', 'Get in touch') ?></a>
       </div>
 
     </div>
@@ -140,15 +159,15 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
 <section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
-    <h1 style="margin:0;">News &amp; stories</h1>
-    <p class="lead" style="margin-top:1rem;">News and stories from our work.</p>
+    <h1 style="margin:0;"><?= te('news.heading', 'Новини и истории', 'News & stories') ?></h1>
+    <p class="lead" style="margin-top:1rem;"><?= te('news.lead', 'Новини и истории от нашата работа.', 'News and stories from our work.') ?></p>
   </div>
 </section>
 
 <section class="section">
   <div class="container">
     <?php if (empty($articles)): ?>
-      <p style="color:var(--text-muted);">No published articles yet.</p>
+      <p style="color:var(--text-muted);"><?= te('news.empty', 'Все още няма публикувани новини.', 'No published articles yet.') ?></p>
     <?php else: ?>
       <div class="article-grid">
         <?php foreach ($articles as $article): ?>
@@ -162,21 +181,25 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
             <?php endif; ?>
             <div class="card__body">
               <div class="article-meta">
-                <time datetime="<?= h($article['date'] ?? '') ?>">
+                <time datetime="<?= h($article['date'] ?? '') ?>"<?= cms_admin('articles') ?>>
                   <?= h(format_date($article['date'] ?? '', 'en')) ?>
                 </time>
                 <?php if (!empty($article['author'])): ?>
-                  <span>by <?= h($article['author']) ?></span>
+                  <span><?= te('news.by', 'от', 'by') ?> <span<?= cms_admin('articles') ?>><?= h($article['author']) ?></span></span>
                 <?php endif; ?>
               </div>
-              <h2 class="card__title" style="font-size:1.15rem;">
+              <h2 class="card__title" style="font-size:1.15rem;"
+                  data-cms-field="title" data-cms-section="article" data-cms-type="text"
+                  data-cms-id="<?= h($article['slug'] ?? '') ?>" data-cms-bg="" data-cms-en="<?= h($article['title'] ?? '') ?>">
                 <a href="/en/news/<?= h($article['slug']) ?>/"><?= h($article['title']) ?></a>
               </h2>
               <?php if (!empty($article['excerpt'])): ?>
-                <p class="card__excerpt"><?= h($article['excerpt']) ?></p>
+                <p class="card__excerpt"
+                   data-cms-field="excerpt" data-cms-section="article" data-cms-type="text"
+                   data-cms-id="<?= h($article['slug'] ?? '') ?>" data-cms-bg="" data-cms-en="<?= h($article['excerpt'] ?? '') ?>"><?= h($article['excerpt']) ?></p>
               <?php endif; ?>
               <a href="/en/news/<?= h($article['slug']) ?>/" class="btn btn--outline" style="margin-top:1rem;font-size:0.8rem;">
-                Read more
+                <?= te('news.read_more', 'Прочети повече', 'Read more') ?>
               </a>
             </div>
           </article>

@@ -12,17 +12,17 @@
  * reason via aria-describedby — so it reads "Add to cart, dimmed, All variants
  * are sold out" rather than the button silently vanishing.
  */
-$_oos_reason = ($is_variant && count($prod_variants) > 1)
-    ? ($lang === 'bg' ? 'Всички варианти са изчерпани.' : 'All variants are sold out.')
-    : ($lang === 'bg' ? 'Продуктът в момента е изчерпан.' : 'This product is currently sold out.');
+$_oos_reason = ($is_variant && count($prod_variants) > 1)   // HTML: editable on the page (te())
+    ? te('shop.oos.all_variants', 'Всички варианти са изчерпани.', 'All variants are sold out.', $lang)
+    : te('shop.oos.product', 'Продуктът в момента е изчерпан.', 'This product is currently sold out.', $lang);
 ?>
 <div class="product-oos" style="display:flex;flex-direction:column;gap:.75rem;align-items:flex-start;">
   <div id="oosReason" style="align-self:stretch;padding:.75rem 1.25rem;background:#fdf0ef;border:1px solid #f0c4c0;color:#b03a2e;border-radius:var(--radius);">
-    <strong><span aria-hidden="true">⚠ </span><?= $lang === 'bg' ? 'Изчерпан' : 'Out of stock' ?></strong>
-    <span style="display:block;font-size:.9rem;"><?= h($_oos_reason) ?></span>
+    <strong><span aria-hidden="true">⚠ </span><?= te('shop.out_of_stock', 'Изчерпан', 'Out of stock', $lang) ?></strong>
+    <span style="display:block;font-size:.9rem;"><?= $_oos_reason ?></span>
   </div>
   <button type="button" class="btn btn--primary" disabled aria-describedby="oosReason"
           style="font-size:1rem;padding:.8rem 2rem;opacity:.55;cursor:not-allowed;">
-    <?= $lang === 'bg' ? 'Добави в количката' : 'Add to cart' ?>
+    <?= te('shop.add_to_cart', 'Добави в количката', 'Add to cart', $lang) ?>
   </button>
 </div>

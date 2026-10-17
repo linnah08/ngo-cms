@@ -161,6 +161,32 @@ if ($section === 'campaign_settings') {
     save_json_response(['ok' => true]);
 }
 
+// A legal page's body (includes/legal_pages.php): the same text Admin → Съдържание edits.
+if ($section === 'legal') {
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/legal_pages.php';
+    save_json_response(legal_inline_save($fields));
+}
+
+// Как да помогна: the page's title and intro line (pages.json how_to_help), as plain text.
+// A language the editor did not send keeps its text.
+if ($section === 'how_to_help') {
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/ui_wording.php';   // ui_wording_clean()
+    $pages = load_json(CONTENT_PATH . '/pages.json');
+    foreach ($fields as $field => $values) {
+        if (!in_array($field, ['title', 'intro'], true) || !is_array($values)) continue;
+        foreach (['bg' => $field, 'en' => $field . '_en'] as $l => $k) {
+            if (array_key_exists($l, $values)) $pages['how_to_help'][$k] = ui_wording_clean(is_string($values[$l]) ? $values[$l] : '');
+        }
+    }
+    save_json_response(save_json(CONTENT_PATH . '/pages.json', $pages) ? ['ok' => true] : ['ok' => false, 'error' => 'Текстът не се запази. Опитайте отново.']);
+}
+
+// Page wording printed with te(): titles, labels, headings, buttons (includes/ui_wording.php).
+if ($section === 'ui') {
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/ui_wording.php';
+    save_json_response(ui_wording_save($fields));
+}
+
 // Front-page sections (content/home.json): section is "home:<section id>".
 if (str_starts_with($section, 'home:')) {
     require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/home.php';
@@ -237,6 +263,7 @@ $allowed = [
     'donation' => [
         'title' => ['title', 'title_en'],
     ],
+
     'footer' => [
         'tagline'      => ['tagline',      'tagline_en'],
         'social_fb'    => ['social_fb',    'social_fb'],

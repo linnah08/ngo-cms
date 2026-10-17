@@ -50,3 +50,49 @@ function legal_en_identity_lines(bool $with_representative = false): string
     if ($with_representative && legal_const('SITE_MOL') !== '') $lines .= 'Representative: ' . h(legal_const('SITE_MOL')) . "<br>\n";
     return $lines;
 }
+
+/** Where a legal page's text is kept in pages.json['legal']: [BG key, EN key]. '' keys for an unknown page. */
+function legal_storage_keys(string $key): array
+{
+    if (!in_array($key, ['privacy', 'legal_info', 'terms', 'cookies'], true)) return ['', ''];
+    // The cookie policy pages read cookie_policy_bg / cookie_policy_en.
+    return $key === 'cookies' ? ['cookie_policy_bg', 'cookie_policy_en'] : [$key, $key . '_en'];
+}
+
+/**
+ * Attributes that make a legal page's body a rich text block in Edit mode
+ * (section "legal" of admin/inline-save.php, the same text Admin → Съдържание edits).
+ */
+function legal_body_attrs(string $key, ?array $pages = null): string
+{
+    [$kbg, $ken] = legal_storage_keys($key);
+    $out = ' data-cms-section="legal" data-cms-field="' . h($key) . '" data-cms-type="richtext"';
+    if ($kbg !== '' && ($GLOBALS['_show_admin_bar'] ?? false)) {
+        $pages ??= load_json(CONTENT_PATH . '/pages.json');
+        $out .= ' data-cms-bg="' . h((string) ($pages['legal'][$kbg] ?? '')) . '" data-cms-en="' . h((string) ($pages['legal'][$ken] ?? '')) . '"';
+    }
+    return $out;
+}
+
+/**
+ * Save a legal page's text edited on the page: [key => ['bg' => html, 'en' => html]].
+ * A language the editor did not send keeps its text.
+ *
+ * @return array{ok: bool, error?: string}
+ */
+function legal_inline_save(array $fields): array
+{
+    require_once ROOT_PATH . '/includes/home.php';   // home_clean_html()
+    $pages = load_json(CONTENT_PATH . '/pages.json');
+    if (!isset($pages['legal']) || !is_array($pages['legal'])) $pages['legal'] = [];
+    foreach ($fields as $key => $values) {
+        [$kbg, $ken] = legal_storage_keys((string) $key);
+        if ($kbg === '' || !is_array($values)) return ['ok' => false, 'error' => 'unknown section'];
+        foreach (['bg' => $kbg, 'en' => $ken] as $l => $k) {
+            if (!array_key_exists($l, $values)) continue;
+            $pages['legal'][$k] = home_clean_html(is_string($values[$l]) ? $values[$l] : '');
+        }
+    }
+    if (!save_json(CONTENT_PATH . '/pages.json', $pages)) return ['ok' => false, 'error' => 'Текстът не се запази. Опитайте отново.'];
+    return ['ok' => true];
+}

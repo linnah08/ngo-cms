@@ -49,11 +49,11 @@ $_pf_has_success = false;
         <span style="display:flex;gap:.6rem;flex-wrap:wrap;">
           <a href="<?= h(shop_path('cart')) ?>" class="btn btn--outline"
              style="display:inline-flex;align-items:center;min-height:44px;padding:.45rem 1.1rem;font-size:.9rem;">
-            <?= h(t_or('shop.added.view_cart', 'Виж количката', 'View cart')) ?>
+            <?= te('shop.added.view_cart', 'Виж количката', 'View cart') ?>
           </a>
           <a href="<?= h(shop_path('checkout')) ?>" class="btn btn--primary"
              style="display:inline-flex;align-items:center;min-height:44px;padding:.45rem 1.1rem;font-size:.9rem;">
-            <?= h(t_or('shop.added.checkout', 'Завърши поръчката', 'Checkout now')) ?> <span aria-hidden="true">&nbsp;→</span>
+            <?= te('shop.added.checkout', 'Завърши поръчката', 'Checkout now') ?> <span aria-hidden="true">&nbsp;→</span>
           </a>
         </span>
       </div>

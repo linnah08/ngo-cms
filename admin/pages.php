@@ -266,8 +266,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $key   = $_POST['legal_key'] ?? '';
         if (in_array($key, ['privacy', 'legal_info', 'terms', 'cookies'], true)) {
             if (!isset($pages['legal'])) $pages['legal'] = [];
-            // The cookie policy pages read cookie_policy_bg / cookie_policy_en.
-            [$kbg, $ken] = $key === 'cookies' ? ['cookie_policy_bg', 'cookie_policy_en'] : [$key, $key . '_en'];
+            require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/legal_pages.php';
+            [$kbg, $ken] = legal_storage_keys($key);   // the cookie policy uses its own keys
             $pages['legal'][$kbg] = $_POST['legal_content']    ?? '';
             $pages['legal'][$ken] = $_POST['legal_content_en'] ?? '';
             save_json(CONTENT_PATH . '/pages.json', $pages);

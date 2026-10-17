@@ -9,22 +9,22 @@
 if (!function_exists('product_reviews_aggregate')) return;
 
 $is_en = $lang === 'en';
+// Labels are HTML: each is editable on the page in Edit mode (te()).
 $agg   = product_reviews_aggregate($reviews);
 
 $rf            = product_review_flash_get();
 $flash_success = $rf !== null && $rf['type'] === 'success';
 $flash_error   = ($rf !== null && $rf['type'] === 'error') ? $rf['message'] : '';
 
-$label_title    = $is_en ? 'Reviews'                  : 'Отзиви';
-$label_name     = $is_en ? 'Your name'                : 'Твоето име';
-$label_email    = $is_en ? 'Email (not shown publicly)' : 'Имейл (не се показва публично)';
-$label_rating   = $is_en ? 'Your rating'             : 'Твоята оценка';
-$label_review   = $is_en ? 'Your review'             : 'Твоят отзив';
-$label_submit   = $is_en ? 'Post review'            : 'Публикувай отзив';
-$label_pending  = $is_en ? 'Your review has been received and is awaiting moderation. Thank you!'
-                         : 'Отзивът ти е получен и очаква одобрение. Благодарим!';
-$label_none     = $is_en ? 'No reviews yet. Be the first!' : 'Все още няма отзиви. Бъди първият!';
-$label_verified = $is_en ? '✓ Confirmed purchase' : '✓ Потвърдена покупка';
+$label_title = te('reviews.title', 'Отзиви', 'Reviews', $lang);
+$label_name = te('reviews.name', 'Твоето име', 'Your name', $lang);
+$label_email = te('reviews.email', 'Имейл (не се показва публично)', 'Email (not shown publicly)', $lang);
+$label_rating = te('reviews.rating', 'Твоята оценка', 'Your rating', $lang);
+$label_review = te('reviews.review', 'Твоят отзив', 'Your review', $lang);
+$label_submit = te('reviews.submit', 'Публикувай отзив', 'Post review', $lang);
+$label_pending = te('reviews.pending', 'Отзивът ти е получен и очаква одобрение. Благодарим!', 'Your review has been received and is awaiting moderation. Thank you!', $lang);
+$label_none = te('reviews.none', 'Все още няма отзиви. Бъди първият!', 'No reviews yet. Be the first!', $lang);
+$label_verified = te('reviews.verified', '✓ Потвърдена покупка', '✓ Confirmed purchase', $lang);
 
 /** Render filled/empty stars for display (decorative; value announced via aria-label on wrapper). */
 if (!function_exists('pr_stars')) {
@@ -72,14 +72,14 @@ if (!function_exists('pr_stars')) {
         <?php foreach ($reviews as $r): ?>
           <div style="border-left:3px solid var(--teal);padding:.75rem 1rem .75rem 1.25rem;background:var(--off-white);border-radius:0 6px 6px 0;">
             <div style="display:flex;align-items:baseline;gap:.75rem;margin-bottom:.4rem;flex-wrap:wrap;">
-              <strong style="font-size:.95rem;"><?= h($r['author_name']) ?></strong>
+              <strong style="font-size:.95rem;"<?= cms_admin(['Отзиви', '/admin/product-reviews.php']) ?>><?= h($r['author_name']) ?></strong>
               <?php if (!empty($r['verified_purchase'])): ?>
                 <span style="font-size:.75rem;font-weight:600;color:#2d6a35;background:#e6f4ea;border-radius:4px;padding:.15rem .5rem;"><?= $label_verified ?></span>
               <?php endif; ?>
               <span style="letter-spacing:1px;" aria-label="<?= (int)$r['rating'] ?> / 5"><?= pr_stars((float)$r['rating']) ?></span>
-              <time style="font-size:.78rem;color:var(--text-muted);"><?= h(format_date(substr($r['created_at'], 0, 10), $lang)) ?></time>
+              <time style="font-size:.78rem;color:var(--text-muted);"<?= cms_admin(['Отзиви', '/admin/product-reviews.php']) ?>><?= h(format_date(substr($r['created_at'], 0, 10), $lang)) ?></time>
             </div>
-            <p style="margin:0;line-height:1.7;white-space:pre-wrap;"><?= h($r['content']) ?></p>
+            <p style="margin:0;line-height:1.7;white-space:pre-wrap;"<?= cms_admin(['Отзиви', '/admin/product-reviews.php']) ?>><?= h($r['content']) ?></p>
           </div>
         <?php endforeach; ?>
       </div>

@@ -143,7 +143,7 @@ if ($slug) {
 
     <div style="margin-bottom:2rem;">
       <a href="<?= $shop_url ?>" style="font-size:.85rem;color:var(--text-muted);">
-        ← <?= $lang === 'bg' ? 'Обратно към магазина' : 'Back to shop' ?>
+        ← <?= te('shop.back', 'Обратно към магазина', 'Back to shop', $lang) ?>
       </a>
     </div>
 
@@ -237,7 +237,7 @@ if ($slug) {
           <div id="preorderNotice" role="status"
                style="<?= $start_preorder ? '' : 'display:none;' ?>padding:.8rem 1.1rem;background:#fef3c7;border:1px solid #d97706;color:#78350f;border-radius:var(--radius);line-height:1.5;">
             <strong><span aria-hidden="true">⏳ </span><?= h(product_preorder_label($lang)) ?></strong>
-            <span style="display:block;font-size:.92rem;"><?= h(t_or('shop.preorder.page_body', 'В момента е изчерпан, но можете да го поръчате сега.', 'Sold out right now, but you can order it today.', $lang)) ?>
+            <span style="display:block;font-size:.92rem;"><?= te('shop.preorder.page_body', 'В момента е изчерпан, но можете да го поръчате сега.', 'Sold out right now, but you can order it today.', $lang) ?>
               <?= h(product_preorder_text($p, $lang)) ?></span>
           </div>
           <?php endif; ?>
@@ -258,7 +258,7 @@ if ($slug) {
             <!-- Colour selector -->
             <div style="margin-bottom:1rem;">
               <div style="font-size:.85rem;font-weight:600;margin-bottom:.5rem;">
-                <?= $lang === 'bg' ? 'Цвят' : 'Colour' ?>: <span id="colourLabel" style="font-weight:400;"></span>
+                <?= te('shop.product.colour', 'Цвят', 'Colour', $lang) ?>: <span id="colourLabel" style="font-weight:400;"></span>
               </div>
               <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
                 <?php foreach ($print_colours as $ci => $c): ?>
@@ -282,7 +282,7 @@ if ($slug) {
             <!-- Size selector -->
             <div style="margin-bottom:1.25rem;">
               <div style="font-size:.85rem;font-weight:600;margin-bottom:.5rem;">
-                <?= $lang === 'bg' ? 'Размер' : 'Size' ?> *
+                <?= te('shop.product.size', 'Размер', 'Size', $lang) ?> *
               </div>
               <div id="sizeBtns" style="display:flex;gap:.5rem;flex-wrap:wrap;">
                 <?php foreach ($print_sizes as $s): ?>
@@ -297,7 +297,7 @@ if ($slug) {
               <?php if (!empty($size_guide)): ?>
                 <button type="button" onclick="openSizeGuide()"
                         style="margin-top:.5rem;background:none;border:none;padding:0;font-size:.8rem;color:var(--teal);cursor:pointer;text-decoration:underline;">
-                  <?= $lang === 'bg' ? 'Таблица с размери' : 'Size guide' ?>
+                  <?= te('shop.product.size_guide', 'Таблица с размери', 'Size guide', $lang) ?>
                 </button>
               <?php endif; ?>
             </div>
@@ -307,16 +307,16 @@ if ($slug) {
             <!-- Design file upload (canvas is in the image block above) -->
             <div style="margin-bottom:1.25rem;">
               <div style="font-size:.85rem;font-weight:600;margin-bottom:.75rem;">
-                <?= $lang === 'bg' ? 'Твоят дизайн' : 'Your design' ?>
+                <?= te('shop.product.your_design', 'Твоят дизайн', 'Your design', $lang) ?>
               </div>
               <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;">
                 <button type="button" class="btn btn--outline"
                         onclick="document.getElementById('designFileInput').click()">
-                  <?= $lang === 'bg' ? 'Качи твоя дизайн' : 'Upload your design' ?>
+                  <?= te('shop.product.upload_design', 'Качи твоя дизайн', 'Upload your design', $lang) ?>
                 </button>
                 <button type="button" class="btn btn--outline" id="centerBtn"
                         onclick="centerDesign()" style="display:none;">
-                  <?= $lang === 'bg' ? 'Центрирай' : 'Centre' ?>
+                  <?= te('shop.product.centre', 'Центрирай', 'Centre', $lang) ?>
                 </button>
                 <span id="designFileName" style="font-size:.82rem;color:var(--text-muted);"></span>
               </div>
@@ -331,12 +331,12 @@ if ($slug) {
             <button type="submit" id="addToCartBtn" class="btn btn--primary"
                     style="font-size:1rem;padding:.8rem 2rem;"
                     <?= $is_print && !empty($print_sizes) ? 'disabled' : '' ?>>
-              <?= $lang === 'bg' ? 'Добави в количката' : 'Add to cart' ?>
+              <?= te('shop.add_to_cart', 'Добави в количката', 'Add to cart', $lang) ?>
             </button>
             <?php if ($is_print && !empty($print_sizes)): ?>
               <p id="sizeHint" role="alert" style="font-size:.875rem;font-weight:700;color:#b45309;background:#fef3c7;border:2px solid #f59e0b;border-radius:6px;padding:.55rem .85rem;margin-top:.75rem;display:flex;align-items:center;gap:.5rem;">
                 <span aria-hidden="true" style="font-size:1.1rem;">⚠</span>
-                <?= $lang === 'bg' ? 'Изберете размер, за да продължите.' : 'Select a size to continue.' ?>
+                <?= te('shop.product.pick_size', 'Изберете размер, за да продължите.', 'Select a size to continue.', $lang) ?>
               </p>
             <?php endif; ?>
           </form>
@@ -501,7 +501,7 @@ if ($slug) {
 <div id="sizeGuideOverlay" onclick="closeSizeGuide()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;align-items:center;justify-content:center;">
   <div onclick="event.stopPropagation()" style="background:#fff;border-radius:12px;padding:1.25rem;max-width:720px;width:calc(100vw - 2rem);max-height:90vh;overflow-y:auto;position:relative;">
     <button onclick="closeSizeGuide()" style="position:absolute;top:.75rem;right:.75rem;background:none;border:none;font-size:1.4rem;cursor:pointer;line-height:1;color:var(--text-muted);">✕</button>
-    <h3 style="margin:0 0 1rem;font-size:1rem;"><?= $lang === 'bg' ? 'Таблица с размери' : 'Size guide' ?></h3>
+    <h3 style="margin:0 0 1rem;font-size:1rem;"><?= te('shop.product.size_guide', 'Таблица с размери', 'Size guide', $lang) ?></h3>
     <img src="/assets/images/products/<?= h($size_guide) ?>" alt="Size guide" style="width:100%;height:auto;border-radius:6px;display:block;">
   </div>
 </div>
@@ -678,13 +678,13 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 <section class="section">
   <div class="container">
     <div class="section-header" style="margin-bottom:2rem;">
-      <span class="section-label"><?= $lang === 'bg' ? 'Продукти' : 'Products' ?></span>
-      <h2><?= $lang === 'bg' ? 'Нашите продукти' : 'Our products' ?></h2>
+      <span class="section-label"><?= te('shop.products.label', 'Продукти', 'Products', $lang) ?></span>
+      <h2><?= te('shop.products.heading', 'Нашите продукти', 'Our products', $lang) ?></h2>
     </div>
 
     <?php if (empty($products)): ?>
       <p style="color:var(--text-muted);text-align:center;padding:3rem 0;">
-        <?= $lang === 'bg' ? 'Скоро ще добавим продукти.' : 'Products coming soon.' ?>
+        <?= te('shop.products.empty', 'Скоро ще добавим продукти.', 'Products coming soon.', $lang) ?>
       </p>
     <?php else: ?>
     <div class="grid grid--3" style="gap:2rem;align-items:stretch;">
@@ -710,7 +710,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
   <div class="container">
     <div style="max-width:640px;margin:0 auto;text-align:center;">
       <span class="section-label" style="color:rgba(255,255,255,.7);">
-        <?= h(t_or('donation.label', 'Дарение', 'Donation')) ?>
+        <?= te('donation.label', 'Дарение', 'Donation', $lang) ?>
       </span>
       <h2 style="color:#fff;margin-bottom:1rem;"
           data-cms-field="title"
@@ -729,7 +729,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
         <?= $_dp['intro_html'] ?>
       </div>
       <a href="<?= h($_donation_url) ?>" class="btn btn--primary" style="min-width:12rem;justify-content:center;">
-        <?= h(t_or('donation.submit', 'Дари сега', 'Donate now')) ?>
+        <?= te('donation.submit', 'Дари сега', 'Donate now', $lang) ?>
       </a>
     </div>
   </div>

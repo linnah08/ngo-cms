@@ -163,7 +163,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 <!-- ── Hero / Progress ────────────────────────────────────────────────────────── -->
 <section class="campaign-hero">
   <div class="container">
-    <span style="display:inline-block;font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;opacity:.8;margin-bottom:.75rem;"><?= $is_en ? 'Fundraising campaign' : 'Кампания за набиране на средства' ?></span>
+    <span style="display:inline-block;font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;opacity:.8;margin-bottom:.75rem;"><?= te('campaign.kicker', 'Кампания за набиране на средства', 'Fundraising campaign', $lang) ?></span>
     <h1><?= h($title) ?></h1>
 
     <div class="progress-bar">
@@ -173,21 +173,21 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     <div class="stat-row">
       <div class="stat">
         <span class="stat__value"><?= fmt_campaign_amount($raised_eur) ?></span>
-        <span class="stat__label"><?= $is_en ? 'raised of ' : 'набрано от ' ?><?= fmt_campaign_amount($target_eur) ?></span>
+        <span class="stat__label"><?= te('campaign.raised_of', 'набрано от', 'raised of', $lang) ?> <?= fmt_campaign_amount($target_eur) ?></span>
       </div>
       <div class="stat">
         <span class="stat__value"><?= $funders ?></span>
-        <span class="stat__label"><?= $is_en ? 'supporters' : 'поддръжника' ?></span>
+        <span class="stat__label"><?= te('campaign.supporters', 'поддръжника', 'supporters', $lang) ?></span>
       </div>
       <?php if ($days_left !== null): ?>
       <div class="stat">
         <span class="stat__value"><?= $days_left ?></span>
-        <span class="stat__label"><?= $is_en ? 'days remaining' : 'дни оставащи' ?></span>
+        <span class="stat__label"><?= te('campaign.days_left', 'дни оставащи', 'days remaining', $lang) ?></span>
       </div>
       <?php endif; ?>
       <div class="stat">
         <span class="stat__value"><?= round($pct) ?>%</span>
-        <span class="stat__label"><?= $is_en ? 'of goal' : 'от целта' ?></span>
+        <span class="stat__label"><?= te('campaign.of_goal', 'от целта', 'of goal', $lang) ?></span>
       </div>
     </div>
   </div>
@@ -208,7 +208,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
       <!-- Photos -->
       <?php if ($photos): ?>
-      <h2 style="font-size:1.2rem;margin-bottom:0;"><?= $is_en ? 'Photos' : 'Снимки' ?></h2>
+      <h2 style="font-size:1.2rem;margin-bottom:0;"><?= te('campaign.photos', 'Снимки', 'Photos', $lang) ?></h2>
       <div class="c-carousel" id="photoCarousel">
         <div class="c-carousel__track" id="carouselTrack">
           <?php foreach ($photos as $p): ?>
@@ -239,7 +239,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
       <!-- Budget -->
       <?php if ($budget): ?>
-      <h2 style="font-size:1.2rem;margin:2rem 0 0;"><?= $is_en ? 'Where the money goes' : 'За какво са парите' ?></h2>
+      <h2 style="font-size:1.2rem;margin:2rem 0 0;"><?= te('campaign.budget.heading', 'За какво са парите', 'Where the money goes', $lang) ?></h2>
       <table class="budget-table">
         <tbody>
           <?php foreach ($budget as $row): ?>
@@ -251,7 +251,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
         </tbody>
         <tfoot>
           <tr>
-            <td><?= $is_en ? 'Total' : 'Общо' ?></td>
+            <td><?= te('campaign.budget.total', 'Общо', 'Total', $lang) ?></td>
             <td><?= fmt_campaign_amount(array_sum(array_column($budget, 'amount_eur'))) ?></td>
           </tr>
         </tfoot>
@@ -260,7 +260,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
       <!-- FAQ -->
       <?php if ($faq): ?>
-      <h2 style="font-size:1.2rem;margin:2.5rem 0 .5rem;"><?= $is_en ? 'FAQ' : 'Въпроси и отговори' ?></h2>
+      <h2 style="font-size:1.2rem;margin:2.5rem 0 .5rem;"><?= te('campaign.faq.heading', 'Въпроси и отговори', 'FAQ', $lang) ?></h2>
       <div>
         <?php foreach ($faq as $item): ?>
         <div class="faq-item">
@@ -283,7 +283,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
         $share_text = urlencode($title . ' — ' . $share_url);
       ?>
       <div class="share-row">
-        <span style="font-size:.85rem;font-weight:600;color:#6b6560;"><?= $is_en ? 'Share:' : 'Сподели:' ?></span>
+        <span style="font-size:.85rem;font-weight:600;color:#6b6560;"><?= te('campaign.share', 'Сподели:', 'Share:', $lang) ?></span>
 
         <!-- Facebook -->
         <a href="https://www.facebook.com/sharer/sharer.php?u=<?= $share_enc ?>"
@@ -328,7 +328,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
         <button id="copyLinkBtn" class="share-btn"
                 style="background:#fff;color:#333;border:1px solid #d1d5db;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-          <?= $is_en ? 'Copy link' : 'Копирай линк' ?>
+          <?= te('campaign.copy_link', 'Копирай линк', 'Copy link', $lang) ?>
         </button>
       </div>
 
@@ -337,7 +337,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     <!-- ── Right column: funding form ────────────────────────────────────────── -->
     <div style="position:sticky;top:1.5rem;">
       <div class="form-card">
-        <h2 style="margin:0 0 1.25rem;font-size:1.15rem;"><?= $is_en ? 'Support the campaign' : 'Подкрепи кампанията' ?></h2>
+        <h2 style="margin:0 0 1.25rem;font-size:1.15rem;"><?= te('campaign.support', 'Подкрепи кампанията', 'Support the campaign', $lang) ?></h2>
 
         <!-- Reward selection -->
         <?php if ($rewards): ?>
@@ -350,7 +350,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
           </div>
           <?php endforeach; ?>
         </div>
-        <div style="text-align:center;font-size:.82rem;color:#9b9590;margin-bottom:.75rem;">— <?= $is_en ? 'or' : 'или' ?> —</div>
+        <div style="text-align:center;font-size:.82rem;color:#9b9590;margin-bottom:.75rem;">— <?= te('campaign.or', 'или', 'or', $lang) ?> —</div>
         <?php endif; ?>
 
         <form method="POST" action="/campaign/checkout.php" id="pledgeForm">
@@ -359,13 +359,13 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
           <input type="hidden" name="reward_id" id="rewardIdInput" value="0">
 
           <div class="form-field">
-            <label><?= $is_en ? 'Amount (EUR)' : 'Сума (EUR)' ?></label>
+            <label><?= te('campaign.form.amount', 'Сума (EUR)', 'Amount (EUR)', $lang) ?></label>
             <input type="number" name="amount_eur" id="amountEurInput"
                    min="1" step="0.01" placeholder="<?= $is_en ? 'e.g. 25.00' : 'напр. 25.00' ?>" required>
           </div>
 
           <div class="form-field">
-            <label><?= $is_en ? 'Your name' : 'Вашето име' ?></label>
+            <label><?= te('campaign.form.name', 'Вашето име', 'Your name', $lang) ?></label>
             <input type="text" name="name" required autocomplete="name"
                    placeholder="<?= $is_en ? 'First and last name' : 'Собствено и фамилно' ?>">
           </div>
@@ -379,17 +379,16 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
           <!-- Reward delivery note — delivery is selected at checkout step 2 -->
           <div id="deliverySection" style="display:none;">
             <div style="background:#f0faf9;border:1px solid #b2dbd7;border-radius:6px;padding:.85rem;margin-bottom:1rem;font-size:.85rem;color:#2d6a35;">
-              <?= $is_en ? 'You will choose the delivery method in the next step.' : 'В следващата стъпка ще изберете начин на доставка.' ?>
+              <?= te('campaign.form.delivery_note', 'В следващата стъпка ще изберете начин на доставка.', 'You will choose the delivery method in the next step.', $lang) ?>
             </div>
           </div>
 
           <button type="submit" class="btn btn--primary" style="width:100%;padding:.8rem;font-size:1rem;margin-top:.5rem;">
-            <?= $is_en ? 'Continue to payment →' : 'Продължи към плащане →' ?>
+            <?= te('campaign.form.submit', 'Продължи към плащане →', 'Continue to payment →', $lang) ?>
           </button>
           <p style="font-size:.76rem;color:#9b9590;text-align:center;margin:.75rem 0 0;">
-            <?= $is_en
-              ? 'Payment is processed securely by DSK Bank.<br>You will receive a donation certificate by email.'
-              : 'Плащането се обработва сигурно от DSK Bank.<br>Ще получите сертификат за дарение по имейл.' ?>
+            <?= te('campaign.form.secure', 'Плащането се обработва сигурно от DSK Bank.', 'Payment is processed securely by DSK Bank.', $lang) ?><br>
+            <?= te('campaign.form.certificate', 'Ще получите сертификат за дарение по имейл.', 'You will receive a donation certificate by email.', $lang) ?>
           </p>
         </form>
       </div>
@@ -411,7 +410,7 @@ if (module_enabled_with_needs('events')) {
 <?php if ($_campaign_events): ?>
 <section aria-labelledby="campaign-events-title" style="background:linear-gradient(135deg,#e4f0f5 0%,#f0f9f8 100%);border-top:1px solid #c8e0e8;border-bottom:1px solid #c8e0e8;padding:2.5rem 0;">
   <div class="container">
-    <h2 id="campaign-events-title" style="font-size:1.5rem;margin:0 0 1.25rem;"><?= h(t_or('campaign.events.title', 'Ела на събитието', 'Come to the event', $lang)) ?></h2>
+    <h2 id="campaign-events-title" style="font-size:1.5rem;margin:0 0 1.25rem;"><?= te('campaign.events.title', 'Ела на събитието', 'Come to the event', $lang) ?></h2>
     <ul style="list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:1rem;">
       <?php foreach ($_campaign_events as $_ev): ?>
       <li style="background:#fff;border:1px solid #c8e0e8;border-radius:12px;padding:1.15rem 1.25rem;display:flex;flex-direction:column;gap:.4rem;min-width:0;">
@@ -419,7 +418,7 @@ if (module_enabled_with_needs('events')) {
         <?php if ($_w = event_when($_ev, $lang)): ?><span><?= h($_w) ?></span><?php endif; ?>
         <?php if ($_p = event_text($_ev, 'place', $lang)): ?><span style="overflow-wrap:anywhere;"><?= h($_p) ?></span><?php endif; ?>
         <a href="<?= h(event_url($_ev, $lang)) ?>" class="btn btn--primary" style="margin-top:.5rem;display:inline-flex;align-items:center;justify-content:center;min-height:44px;">
-          <?= h(t_or('campaign.events.buy', 'Купи билет', 'Buy a ticket', $lang)) ?> · <?= h(number_format((float) $_ev['price_eur'], 2, '.', ' ')) ?> EUR
+          <?= te('campaign.events.buy', 'Купи билет', 'Buy a ticket', $lang) ?> · <?= h(number_format((float) $_ev['price_eur'], 2, '.', ' ')) ?> EUR
         </a>
       </li>
       <?php endforeach; ?>

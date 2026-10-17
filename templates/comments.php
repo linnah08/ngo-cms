@@ -10,6 +10,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 
 $is_en = $lang === 'en';
+// Labels are HTML: each is editable on the page in Edit mode (te()).
 
 // ── Load approved comments ─────────────────────────────────────────────────────
 $comments = [];
@@ -52,14 +53,13 @@ foreach (flash_get() as $f) {
     }
 }
 
-$label_title    = $is_en ? 'Comments'                         : 'Коментари';
-$label_name     = $is_en ? 'Your name'                        : 'Вашето име';
-$label_email    = $is_en ? 'Email (not shown publicly)'       : 'Имейл (не се показва публично)';
-$label_comment  = $is_en ? 'Comment'                         : 'Коментар';
-$label_submit   = $is_en ? 'Post comment'                    : 'Публикувай коментар';
-$label_pending  = $is_en ? 'Your comment has been received and is awaiting moderation. Thank you!'
-                         : 'Коментарът ви е получен и очаква одобрение. Благодарим!';
-$label_none     = $is_en ? 'No comments yet. Be the first!'  : 'Все още няма коментари. Бъди първият!';
+$label_title = te('comments.title', 'Коментари', 'Comments', $lang);
+$label_name = te('comments.name', 'Вашето име', 'Your name', $lang);
+$label_email = te('comments.email', 'Имейл (не се показва публично)', 'Email (not shown publicly)', $lang);
+$label_comment = te('comments.comment', 'Коментар', 'Comment', $lang);
+$label_submit = te('comments.submit', 'Публикувай коментар', 'Post comment', $lang);
+$label_pending = te('comments.pending', 'Коментарът ви е получен и очаква одобрение. Благодарим!', 'Your comment has been received and is awaiting moderation. Thank you!', $lang);
+$label_none = te('comments.none', 'Все още няма коментари. Бъди първият!', 'No comments yet. Be the first!', $lang);
 ?>
 
 <section class="section" id="comments" style="border-top:1px solid var(--border);padding-top:3rem;">
@@ -90,12 +90,12 @@ $label_none     = $is_en ? 'No comments yet. Be the first!'  : 'Все още н
         <?php foreach ($comments as $c): ?>
           <div style="border-left:3px solid var(--teal);padding:.75rem 1rem .75rem 1.25rem;background:var(--off-white);border-radius:0 6px 6px 0;">
             <div style="display:flex;align-items:baseline;gap:.75rem;margin-bottom:.5rem;">
-              <strong style="font-size:.95rem;"><?= h($c['author_name']) ?></strong>
-              <time style="font-size:.78rem;color:var(--text-muted);">
+              <strong style="font-size:.95rem;"<?= cms_admin(['Коментари', '/admin/comments.php']) ?>><?= h($c['author_name']) ?></strong>
+              <time style="font-size:.78rem;color:var(--text-muted);"<?= cms_admin(['Коментари', '/admin/comments.php']) ?>>
                 <?= h(format_date(substr($c['created_at'], 0, 10), $lang)) ?>
               </time>
             </div>
-            <p style="margin:0;line-height:1.7;white-space:pre-wrap;"><?= h($c['content']) ?></p>
+            <p style="margin:0;line-height:1.7;white-space:pre-wrap;"<?= cms_admin(['Коментари', '/admin/comments.php']) ?>><?= h($c['content']) ?></p>
           </div>
         <?php endforeach; ?>
       </div>

@@ -10,15 +10,16 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
 <section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
-    <h1 style="margin:0;">Privacy Policy</h1>
+    <h1 style="margin:0;"><?= te('legal.privacy.title', 'Политика за поверителност', 'Privacy Policy') ?></h1>
     <?php if ($admin_en === ''): ?>
-    <p style="margin-top:0.5rem;color:var(--text-muted);font-size:0.9rem;">Last updated: 5 October 2025</p>
+    <p style="margin-top:0.5rem;color:var(--text-muted);font-size:0.9rem;"><?= te('legal.updated_builtin', 'Последна актуализация: 5 октомври 2025', 'Last updated: 5 October 2025') ?></p>
     <?php endif; ?>
   </div>
 </section>
 
 <section class="section">
   <div class="container container--narrow">
+<div<?= legal_body_attrs('privacy') ?>>
 <?php if ($admin_en !== ''): ?>
     <?= $admin_en ?>
 <?php else: ?>
@@ -84,6 +85,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
     </p>
 
 <?php endif; ?>
+</div>
   </div>
 </section>
 

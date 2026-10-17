@@ -41,9 +41,9 @@ foreach ($_sh_targets as $_sh):
 <?php endforeach; ?>
   <button type="button" class="btn btn--outline om-share-copy" data-url="<?= h($share_url) ?>"
           style="font-size:.8rem;padding:.45rem .9rem;display:inline-flex;align-items:center;gap:.4rem;cursor:pointer;"
-          aria-label="<?= $_sh_lang === 'en' ? 'Copy link' : 'Копирай линк' ?>"><svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="flex-shrink:0;"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg><span><?= $_sh_lang === 'en' ? 'Copy link' : 'Копирай линк' ?></span></button>
+          aria-label="<?= h(t_or('share.copy', 'Копирай линк', 'Copy link', $_sh_lang)) ?>"><svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="flex-shrink:0;"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg><?= te('share.copy', 'Копирай линк', 'Copy link', $_sh_lang) ?></button>
   <span class="om-share-copied" role="status" aria-live="polite"
-        style="display:none;font-size:.8rem;color:var(--teal);align-self:center;"><?= $_sh_lang === 'en' ? 'Copied!' : 'Копирано!' ?></span>
+        style="display:none;font-size:.8rem;color:var(--teal);align-self:center;"><?= te('share.copied', 'Копирано!', 'Copied!', $_sh_lang) ?></span>
 <?php if (empty($GLOBALS['__om_share_js'])): $GLOBALS['__om_share_js'] = true; ?>
 <script>
 (function(){

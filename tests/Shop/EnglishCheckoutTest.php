@@ -148,12 +148,14 @@ final class EnglishCheckoutTest extends TestCase
             // default — but it must not be empty and must keep the {placeholders}.
             foreach (['bg' => $bg, 'en' => $en] as $l => $strings) {
                 $this->assertNotSame('', trim((string) $strings[$c['key']]), "$l {$c['key']} is empty");
+                if ($c[$l] === null) continue;   // te('key'): no default of its own to compare
                 preg_match_all('/\{\w+\}/', $c[$l], $want);
                 preg_match_all('/\{\w+\}/', (string) $strings[$c['key']], $have);
                 sort($want[0]);
                 sort($have[0]);
                 $this->assertSame($want[0], $have[0], "$l {$c['key']} in strings.json lost or gained a {placeholder} ($where)");
             }
+            if ($c['bg'] === null) continue;
             $this->assertDoesNotMatchRegularExpression('/[\x{0400}-\x{04FF}]/u', $c['en'], "EN text for {$c['key']} is not English");
             if (isset($seen[$c['key']])) {
                 $this->assertSame($seen[$c['key']], [$c['bg'], $c['en']], "{$c['key']} has two different defaults ($where)");
@@ -202,7 +204,7 @@ final class EnglishCheckoutTest extends TestCase
         $bad = [];
         foreach (explode("\n", $code) as $i => $line) {
             if (!preg_match('/[\x{0400}-\x{04FF}]/u', $line)) continue;
-            if (str_contains($line, 't_or(')) continue;
+            if (str_contains($line, 't_or(') || preg_match('/\bte\(/', $line)) continue;
             if (str_starts_with(ltrim($line), '//')) continue;             // a JS comment inside <script>
             if (preg_match("/\\\$lang === '(bg|en)' \\?/", $line)) continue; // an inline BG/EN pair
             foreach (self::ALLOWED as $ok) {
@@ -307,8 +309,8 @@ final class EnglishCheckoutTest extends TestCase
         require self::root() . '/templates/product-flash.php';
         $html = (string) ob_get_clean();
 
-        $this->assertMatchesRegularExpression('#<a href="/en/cart/"[^>]*>\s*View cart#', $html);
-        $this->assertMatchesRegularExpression('#<a href="/en/checkout/"[^>]*>\s*Checkout now#', $html);
+        $this->assertMatchesRegularExpression('#<a href="/en/cart/"[^>]*>\s*(?:<span[^>]*>)?View cart#', $html);
+        $this->assertMatchesRegularExpression('#<a href="/en/checkout/"[^>]*>\s*(?:<span[^>]*>)?Checkout now#', $html);
         $this->assertStringContainsString('aria-label="Dismiss message"', $html);
         $this->assertDoesNotMatchRegularExpression('/[\x{0400}-\x{04FF}]/u', $html);
     }

@@ -111,7 +111,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
 <section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
-    <h1 style="margin:0;">Свържете се с нас</h1>
+    <h1 style="margin:0;"><?= te('contact.heading', 'Свържете се с нас', 'Get in touch') ?></h1>
   </div>
 </section>
 
@@ -121,24 +121,24 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
       <!-- Contact info -->
       <div>
-        <h3 style="margin-bottom:1.5rem;">Информация за контакт</h3>
+        <h3 style="margin-bottom:1.5rem;"><?= te('contact.info.title', 'Информация за контакт', 'Contact information') ?></h3>
         <div style="display:flex;flex-direction:column;gap:1.5rem;">
           <?php if (site_phone_public() !== ''): ?>
           <div>
-            <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:0.35rem;">Телефон</div>
-            <a href="tel:<?= h(site_phone_public()) ?>" style="font-size:1.1rem;"><?= h(site_phone_public()) ?></a>
+            <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:0.35rem;"><?= te('contact.info.phone', 'Телефон', 'Phone') ?></div>
+            <a href="tel:<?= h(site_phone_public()) ?>" style="font-size:1.1rem;"<?= cms_admin('organisation') ?>><?= h(site_phone_public()) ?></a>
           </div>
           <?php endif; ?>
           <div>
-            <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:0.35rem;">Имейл</div>
-            <a href="mailto:<?= SITE_EMAIL ?>" style="font-size:1.1rem;"><?= SITE_EMAIL ?></a>
+            <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:0.35rem;"><?= te('contact.info.email', 'Имейл', 'Email') ?></div>
+            <a href="mailto:<?= SITE_EMAIL ?>" style="font-size:1.1rem;"<?= cms_admin('organisation') ?>><?= SITE_EMAIL ?></a>
           </div>
           <div>
-            <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:0.35rem;">Дарения (IBAN)</div>
-            <div style="font-family:monospace;font-size:1rem;"><?= SITE_IBAN ?></div>
+            <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:0.35rem;"><?= te('contact.info.iban', 'Дарения (IBAN)', 'Donations (IBAN)') ?></div>
+            <div style="font-family:monospace;font-size:1rem;"<?= cms_admin('organisation') ?>><?= h(SITE_IBAN) ?></div>
           </div>
           <div>
-            <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:0.75rem;">Социални мрежи</div>
+            <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:0.75rem;"><?= te('contact.info.social', 'Социални мрежи', 'Social media') ?></div>
             <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
               <?php $social_variant = 'outline'; require $_SERVER['DOCUMENT_ROOT'] . '/templates/social-links.php'; ?>
             </div>
@@ -148,11 +148,11 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
       <!-- Contact form -->
       <div>
-        <h3 style="margin-bottom:1.5rem;">Изпратете съобщение</h3>
+        <h3 style="margin-bottom:1.5rem;"><?= te('contact.form.title', 'Изпратете съобщение', 'Send a message') ?></h3>
 
         <?php if ($sent): ?>
           <div style="background:var(--teal-light);border:1px solid var(--teal);border-radius:8px;padding:1.5rem;color:var(--teal);">
-            Благодарим! Ще се свържем с вас скоро.
+            <?= te('contact.form.thanks', 'Благодарим! Ще се свържем с вас скоро.', 'Thank you! We will be in touch soon.') ?>
           </div>
         <?php else: ?>
           <?php if ($error): ?>
@@ -168,19 +168,19 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
               <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
             </div>
             <div class="form-group">
-              <label for="name">Имена</label>
+              <label for="name"><?= te('contact.form.name', 'Имена', 'Full name') ?></label>
               <input type="text" id="name" name="name"
                      value="<?= h($_POST['name'] ?? '') ?>"
                      required autocomplete="name">
             </div>
             <div class="form-group">
-              <label for="email">Имейл</label>
+              <label for="email"><?= te('contact.form.email', 'Имейл', 'Email') ?></label>
               <input type="email" id="email" name="email"
                      value="<?= h($_POST['email'] ?? '') ?>"
                      required autocomplete="email">
             </div>
             <div class="form-group">
-              <label for="topic">Как можете да помогнете?</label>
+              <label for="topic"><?= te('contact.form.topic', 'Как можете да помогнете?', 'How can you help?') ?></label>
               <select id="topic" name="topic" required
                       style="width:100%;padding:.55rem .75rem;border:1px solid var(--border);border-radius:var(--radius);font-size:1rem;background:#fff;">
                 <option value="" disabled <?= (empty($_POST['topic']) && $_preselect_topic === '') ? 'selected' : '' ?>>— Изберете тема —</option>
@@ -190,11 +190,11 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
               </select>
             </div>
             <div class="form-group">
-              <label for="message">Съобщение</label>
+              <label for="message"><?= te('contact.form.message', 'Съобщение', 'Message') ?></label>
               <textarea id="message" name="message" required><?= h($_POST['message'] ?? '') ?></textarea>
             </div>
             <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/turnstile-widget.php'; ?>
-            <button type="submit" class="btn btn--primary">Изпрати съобщение</button>
+            <button type="submit" class="btn btn--primary"><?= te('contact.form.submit', 'Изпрати съобщение', 'Send message') ?></button>
           </form>
         <?php endif; ?>
       </div>

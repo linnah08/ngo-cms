@@ -4,9 +4,10 @@ declare(strict_types=1);
 /**
  * Finds every t_or('key', 'bg default', 'en default', ...) call in the site's
  * PHP (not vendor/, node_modules/ or tests/), so tests can check the defaults
- * against content/{bg,en}/strings.json.
+ * against content/{bg,en}/strings.json. te() (the same text, editable on the page)
+ * counts too; te('key') with no defaults gives bg/en null — its text is strings.json's.
  *
- * @return list<array{key:string,bg:string,en:string,file:string,line:int}>
+ * @return list<array{key:string,bg:?string,en:?string,file:string,line:int}>
  */
 function t_or_scan(string $root): array
 {
@@ -32,11 +33,16 @@ function t_or_scan(string $root): array
         $n = count($tokens);
         for ($i = 0; $i < $n; $i++) {
             $t = $tokens[$i];
-            if (!is_array($t) || $t[0] !== T_STRING || $t[1] !== 't_or') continue;
+            if (!is_array($t) || $t[0] !== T_STRING || !in_array($t[1], ['t_or', 'te'], true)) continue;
             // Skip the definition itself: `function t_or(`.
             $prev = $tokens[$i - 1] ?? null;
             if (is_array($prev) && $prev[0] === T_FUNCTION) continue;
             if (($tokens[$i + 1] ?? null) !== '(') continue;
+            $first = $tokens[$i + 2] ?? null;
+            if ($t[1] === 'te' && is_array($first) && $first[0] === T_CONSTANT_ENCAPSED_STRING && ($tokens[$i + 3] ?? null) === ')') {
+                $calls[] = ['key' => substr($first[1], 1, -1), 'bg' => null, 'en' => null, 'file' => $path, 'line' => $t[2]];
+                continue;
+            }
             $args = [];
             $j = $i + 2;
             for ($a = 0; $a < 3; $a++) {

@@ -45,14 +45,26 @@ window.OmCMS = (function () {
       }
       el.setAttribute('contenteditable', 'true');
       el.addEventListener('blur', _onBlur);
+      // Wording with a number in it ("Остават {n} места."): edit the template, not today's number.
+      if (el.dataset.cmsVars) el.textContent = el.dataset['cms' + _cap(activeLang)] || el.textContent;
+    });
+    // Shown here, changed in the admin (cms_admin()): reachable by Tab, a click says where.
+    _ensureAdminHintStyle();
+    document.querySelectorAll('[data-cms-admin]').forEach(function (el) {
+      if (!el.hasAttribute('tabindex')) { el.setAttribute('tabindex', '0'); el.dataset.omTab = '1'; }
     });
     _injectAddRemoveControls();
   }
 
   function _deactivateEditables() {
+    document.querySelectorAll('[data-cms-admin]').forEach(function (el) {
+      if (el.dataset.omTab) { el.removeAttribute('tabindex'); delete el.dataset.omTab; }
+    });
+    _closeAdminHint(false);
     document.querySelectorAll('[data-cms-field]').forEach(function (el) {
       el.removeAttribute('contenteditable');
       el.removeEventListener('blur', _onBlur);
+      if (el.dataset.cmsVars) el.textContent = _fillVars(el.textContent, el.dataset.cmsVars);
       if (el.dataset.omTab) { el.removeAttribute('tabindex'); delete el.dataset.omTab; }
     });
     document.querySelectorAll('.om-img-wrap[role="button"]').forEach(function (el) {
@@ -104,6 +116,12 @@ window.OmCMS = (function () {
     document.getElementById('om-btn-en').classList.toggle('om-active', lang === 'en');
   }
 
+  function _fillVars(text, json) {
+    var vars = {};
+    try { vars = JSON.parse(json) || {}; } catch (e) {}
+    return text.replace(/\{(\w+)\}/g, function (m, k) { return Object.prototype.hasOwnProperty.call(vars, k) ? vars[k] : m; });
+  }
+
   function _cap(s) {
     return s.charAt(0).toUpperCase() + s.slice(1);
   }
@@ -116,22 +134,38 @@ window.OmCMS = (function () {
     const section = el.dataset.cmsSection;
     _dirtyEntry(section, field, el)[activeLang] = el.innerHTML;
     el.dataset['cms' + _cap(activeLang)] = el.innerHTML;
+    // The same wording can show more than once (a button on every product card): keep them alike.
+    if (section === 'ui') {
+      document.querySelectorAll('[data-cms-section="ui"]').forEach(function (other) {
+        if (other !== el && other.dataset.cmsField === field) {
+          other.innerHTML = el.innerHTML;
+          other.dataset['cms' + _cap(activeLang)] = el.innerHTML;
+        }
+      });
+    }
     _showSaveBtn();
   }
 
   // The first edit of a field creates its entry. Both languages start from the
   // stored values the page carries (data-cms-bg / data-cms-en), so saving an edit
   // made in one language never blanks the other one.
+  // A list shows many products or articles at once: data-cms-id (product id, article
+  // slug) keeps each card's edits apart, and save() sends them to that item only.
+  function _dirtyKey(section, field, el) {
+    const id = (el && el.dataset.cmsId) || '';
+    return section + (id ? '#' + id : '') + '.' + field;
+  }
+
   function _dirtyEntry(section, field, el) {
-    const key = section + '.' + field;
+    if (!el) {
+      el = Array.prototype.find.call(document.querySelectorAll('[data-cms-field]'), function (c) {
+        return c.dataset.cmsSection === section && c.dataset.cmsField === field;
+      }) || null;
+    }
+    const key = _dirtyKey(section, field, el);
     if (!dirtyFields[key]) {
-      if (!el) {
-        el = Array.prototype.find.call(document.querySelectorAll('[data-cms-field]'), function (c) {
-          return c.dataset.cmsSection === section && c.dataset.cmsField === field;
-        }) || null;
-      }
       dirtyFields[key] = {
-        section: section, field: field,
+        section: section, field: field, id: (el && el.dataset.cmsId) || '',
         bg: (el && el.dataset.cmsBg) || '',
         en: (el && el.dataset.cmsEn) || ''
       };
@@ -729,7 +763,7 @@ window.OmCMS = (function () {
       img.style.transform = 'scale(1)';
     }
     // A frame already waiting to be saved would bring the old photo's focus point back.
-    if (dirtyFields[wrap.dataset.cmsSection + '.image_frame']) {
+    if (dirtyFields[_dirtyKey(wrap.dataset.cmsSection, 'image_frame', wrap)]) {
       markDirty(wrap.dataset.cmsSection, 'image_frame', 'bg', fr, wrap);
       markDirty(wrap.dataset.cmsSection, 'image_frame', 'en', fr, wrap);
     }
@@ -910,14 +944,31 @@ window.OmCMS = (function () {
     btn.classList.add('om-saving');
     btn.textContent = 'Saving…';
 
-    // Group dirty fields by section
+    // Group dirty fields by section — and by item, for a list of products or articles.
     const bySection = {};
+    const requests = [];
     Object.values(dirtyFields).forEach(function (f) {
-      if (!bySection[f.section]) bySection[f.section] = {};
+      if (f.id && (f.section === 'product' || f.section === 'article')) {
+        const gk = f.section + '#' + f.id;
+        if (!bySection[gk]) {
+          bySection[gk] = {};
+          // One request per item, carrying which item it is.
+          if (f.section === 'product') bySection[gk]['id'] = { bg: f.id, en: f.id };
+          // BG and EN articles are separate files: a card saves its own page's language only.
+          else bySection[gk]['slug'] = { bg: activeLang === 'bg' ? f.id : '', en: activeLang === 'en' ? f.id : '' };
+          requests.push([f.section, bySection[gk]]);
+        }
+        bySection[gk][f.field] = { bg: f.bg, en: f.en };
+        return;
+      }
+      if (!bySection[f.section]) {
+        bySection[f.section] = {};
+        requests.push([f.section, bySection[f.section]]);
+      }
       bySection[f.section][f.field] = { bg: f.bg, en: f.en };
     });
 
-    // Inject article slug if article section is dirty
+    // A single article's page: its slug comes from the page.
     if (bySection['article']) {
       const slugEl = document.querySelector('[data-cms-article-slug-bg]');
       if (slugEl) {
@@ -925,15 +976,6 @@ window.OmCMS = (function () {
           bg: slugEl.dataset.cmsArticleSlugBg || '',
           en: slugEl.dataset.cmsArticleSlugEn || ''
         };
-      }
-    }
-
-    // Inject product id if product section is dirty
-    if (bySection['product']) {
-      const prodEl = document.querySelector('[data-cms-section="product"][data-cms-id]');
-      if (prodEl) {
-        const pid = prodEl.dataset.cmsId || '';
-        bySection['product']['id'] = { bg: pid, en: pid };
       }
     }
 
@@ -951,10 +993,10 @@ window.OmCMS = (function () {
         menusPayload[menuKey].bg[idx] = { label: bgVal };
         menusPayload[menuKey].en[idx] = { label: enVal };
       });
-      bySection['menus'] = menusPayload;
+      requests.forEach(function (r) { if (r[0] === 'menus') r[1] = menusPayload; });
     }
 
-    const promises = Object.entries(bySection).map(function (entry) {
+    const promises = requests.map(function (entry) {
       const section = entry[0];
       const fields = entry[1];
       const endpoint = _endpointFor(section);
@@ -971,7 +1013,7 @@ window.OmCMS = (function () {
       if (failed.length) {
         btn.classList.remove('om-saving');
         btn.classList.add('om-error');
-        btn.textContent = '✗ Save failed — check console';
+        btn.textContent = '✗ Не се запази: ' + _saveErrorText(failed[0].error);
         console.error('Inline CMS save errors:', failed);
       } else {
         dirtyFields = {};
@@ -981,7 +1023,7 @@ window.OmCMS = (function () {
     }).catch(function (err) {
       btn.classList.remove('om-saving');
       btn.classList.add('om-error');
-      btn.textContent = '✗ Network error';
+      btn.textContent = '✗ Няма връзка — опитайте отново';
       console.error(err);
     });
   }
@@ -991,6 +1033,133 @@ window.OmCMS = (function () {
     if (section === 'article') return base + '/inline-save-article.php';
     if (section === 'product') return base + '/inline-save-product.php';
     return base + '/inline-save.php';
+  }
+
+  // The endpoint's short codes, in words an admin can act on; its Bulgarian messages as they are.
+  function _saveErrorText(code) {
+    var known = {
+      unauthorized: 'изтекла сесия — влезте отново в админа и опитайте пак.',
+      csrf: 'страницата е отворена твърде дълго — презаредете я и опитайте пак.',
+      'unknown section': 'този текст не може да се променя оттук.',
+      'unknown page': 'страницата не е намерена — презаредете я.',
+      'invalid input': 'нещо в текста не е наред — презаредете страницата.'
+    };
+    return known[code] || code || 'неизвестна грешка.';
+  }
+
+  // ── Clicks and keys while editing ─────────────────────────────────────────
+
+  // Editable text inside (or holding) a link, a button or a form label: a click edits
+  // it — it never follows the link, sends the form or jumps to the label's field.
+  // One-line texts and "changed in the admin" items also keep the click from the page's
+  // own handlers (a whole news card opens its article on click).
+  document.addEventListener('click', function (e) {
+    if (!editMode || !e.target.closest) return;
+    var item = e.target.closest('[data-cms-field], [data-cms-admin]');
+    if (!item) return;
+    if (e.target.closest('a, button, label, summary')) e.preventDefault();
+    var isAdmin = item.matches('[data-cms-admin]') && !item.closest('[data-cms-field]');
+    if (isAdmin || item.dataset.cmsType === 'text') e.stopPropagation();
+    if (isAdmin) {
+      e.preventDefault();
+      _showAdminHint(item);
+    }
+  }, true);
+  document.addEventListener('submit', function (e) {
+    if (editMode) e.preventDefault();
+  }, true);
+  document.addEventListener('keydown', function (e) {
+    if (!editMode || !e.target.closest) return;
+    var item = e.target.closest('[data-cms-field]');
+    // One-line texts: Enter finishes the edit instead of breaking the line;
+    // Space inside a button types a space instead of pressing the button.
+    if (item && item.isContentEditable && item.dataset.cmsType !== 'richtext') {
+      if (e.key === 'Enter') { e.preventDefault(); item.blur(); }
+      return;
+    }
+    var hint = e.target.closest('[data-cms-admin]');
+    if (hint && e.target === hint && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      _showAdminHint(hint);
+    }
+  }, true);
+
+  // ── "Changed in the admin" note ───────────────────────────────────────────
+
+  var _hint = null;
+
+  function _ensureAdminHintStyle() {
+    if (document.getElementById('om-admin-hint-style')) return;
+    var st = document.createElement('style');
+    st.id = 'om-admin-hint-style';
+    st.textContent =
+      'body.om-edit-mode [data-cms-admin]{outline:2px dotted #64748b;outline-offset:2px;cursor:help;border-radius:3px}' +
+      'body.om-edit-mode [data-cms-admin]:hover,body.om-edit-mode [data-cms-admin]:focus-visible{outline:2px solid #334155;background:rgba(100,116,139,.12)}';
+    document.head.appendChild(st);
+  }
+
+  function _closeAdminHint(returnFocus) {
+    if (!_hint) return;
+    var from = _hint.from;
+    document.removeEventListener('keydown', _hint.onKey, true);
+    document.removeEventListener('mousedown', _hint.onOutside, true);
+    _hint.box.remove();
+    _hint = null;
+    if (returnFocus && from && from.focus) from.focus();
+  }
+
+  function _showAdminHint(el) {
+    _closeAdminHint(false);
+    var label = el.dataset.cmsAdmin || 'Админ';
+    var path = (el.dataset.cmsAdminUrl || '/admin/').replace(/^\/admin/, '');
+    var url = (window._omAdminBase || '/admin') + path;
+
+    var box = document.createElement('div');
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-label', 'Къде се променя');
+    box.style.cssText = 'position:fixed;z-index:100001;max-width:min(320px,calc(100vw - 32px));background:#1e293b;color:#f8fafc;' +
+      'border-radius:8px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,.3);font:15px/1.45 system-ui,sans-serif;text-align:left;';
+    var p = document.createElement('p');
+    p.style.cssText = 'margin:0 0 12px;color:#f8fafc;';
+    p.textContent = 'Това не се пише тук. Променя се в Админ → ' + label + '.';
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
+    var a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.textContent = 'Отвори ' + label + ' (нов раздел)';
+    a.style.cssText = 'display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:6px;background:#a78bfa;color:#1e1b4b;font-weight:700;text-decoration:none;';
+    var close = document.createElement('button');
+    close.type = 'button';
+    close.textContent = 'Затвори';
+    close.style.cssText = 'min-height:44px;padding:0 14px;border-radius:6px;border:1px solid #94a3b8;background:transparent;color:#f8fafc;font:inherit;cursor:pointer;';
+    row.appendChild(a);
+    row.appendChild(close);
+    box.appendChild(p);
+    box.appendChild(row);
+    document.body.appendChild(box);
+
+    var r = el.getBoundingClientRect();
+    var top = r.bottom + 8;
+    if (top + box.offsetHeight > window.innerHeight - 8) top = Math.max(8, r.top - box.offsetHeight - 8);
+    box.style.top = top + 'px';
+    box.style.left = Math.max(16, Math.min(r.left, window.innerWidth - box.offsetWidth - 16)) + 'px';
+
+    var onKey = function (e) {
+      if (e.key === 'Escape') { e.preventDefault(); _closeAdminHint(true); return; }
+      if (e.key === 'Tab') {   // keep Tab inside the note while it is open
+        var first = a, last = close;
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    var onOutside = function (e) { if (!box.contains(e.target)) _closeAdminHint(false); };
+    close.addEventListener('click', function () { _closeAdminHint(true); });
+    document.addEventListener('keydown', onKey, true);
+    document.addEventListener('mousedown', onOutside, true);
+    _hint = { box: box, from: el, onKey: onKey, onOutside: onOutside };
+    a.focus();
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────

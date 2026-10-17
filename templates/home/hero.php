@@ -5,7 +5,7 @@ $fp  = home_frame_parts($sid, $f, false, 900, $show_admin);
 <section class="hero"><?= $img !== '' ? $fp['css'] : '' ?>
   <div class="container"<?= $img !== '' ? $fp['grid'] : '' ?>>
     <div class="hero__text">
-      <span class="section-label"><?= h($lang === 'bg' ? SITE_NAME_BG : SITE_NAME_EN) ?></span>
+      <span class="section-label"<?= cms_admin('organisation') ?>><?= h($lang === 'bg' ? SITE_NAME_BG : SITE_NAME_EN) ?></span>
       <h1<?= home_cms_attrs($sid, 'title', $f) ?>><?= h(hf($f, 'title', $lang)) ?></h1>
       <?php if (hf($f, 'text', $lang) !== '' || $show_admin): ?>
       <p<?= home_cms_attrs($sid, 'text', $f) ?>><?= h(hf($f, 'text', $lang)) ?></p>

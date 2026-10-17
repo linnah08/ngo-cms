@@ -139,7 +139,7 @@ final class ProductVariantChooserTest extends TestCase
     {
         $html = $this->render([$this->variant(5), $this->variant(6)], 'bg');
 
-        $this->assertMatchesRegularExpression('/<fieldset class="pv-choices">\s*<legend>Избери вариант<\/legend>/', $html);
+        $this->assertMatchesRegularExpression('/<fieldset class="pv-choices">\s*<legend>(?:<span[^>]*>)?Избери вариант(?:<\/span>)?<\/legend>/', $html);
         $this->assertSame(2, substr_count($html, 'type="radio"'));
         $this->assertStringContainsString('for="pvr-5"', $html);
         $this->assertStringContainsString('id="pvr-5"', $html);
@@ -152,8 +152,8 @@ final class ProductVariantChooserTest extends TestCase
     {
         $html = $this->render([$this->variant(5), $this->variant(6)], 'en');
 
-        $this->assertStringContainsString('<legend>Choose variant</legend>', $html);
-        $this->assertStringContainsString('✓ Selected', $html);
+        $this->assertMatchesRegularExpression('#<legend>(?:<span[^>]*>)?Choose variant(?:</span>)?</legend>#', $html);
+        $this->assertMatchesRegularExpression('/✓ (?:<span[^>]*>)?Selected/', $html);
     }
 
     public function test_selected_variant_is_marked_in_text_not_only_colour(): void
@@ -161,7 +161,7 @@ final class ProductVariantChooserTest extends TestCase
         $html = $this->render([$this->variant(5), $this->variant(6)], 'bg');
 
         $this->assertMatchesRegularExpression('/id="pvr-5" value="5"\s+checked/', $html);
-        $this->assertStringContainsString('✓ Избран', $html);
+        $this->assertMatchesRegularExpression('/✓ (?:<span[^>]*>)?Избран/u', $html);
     }
 
     // ── preselection skips sold-out variants ─────────────────────────────────

@@ -60,7 +60,7 @@ $desc_text = trim(preg_replace("/[ \t]*\n\s*\n\s*/", "\n\n", str_replace("\u{00A
 
     <div class="home-spot__actions">
       <?php if ($p['type'] === 'variant' && !$single_vid): ?>
-        <a href="<?= $prod_url ?>" class="btn btn--primary"><?= $lang === 'bg' ? 'Избери вариант' : 'Choose variant' ?></a>
+        <a href="<?= $prod_url ?>" class="btn btn--primary"><?= te('shop.choose_variant', 'Избери вариант', 'Choose variant', $lang) ?></a>
       <?php elseif ($stock > 0): ?>
         <form method="POST" action="/cart/add.php">
           <?= csrf_field() ?>
@@ -70,12 +70,12 @@ $desc_text = trim(preg_replace("/[ \t]*\n\s*\n\s*/", "\n\n", str_replace("\u{00A
           <?php endif; ?>
           <input type="hidden" name="redirect" value="<?= h($card_redirect) ?>">
           <input type="hidden" name="_lang" value="<?= h($lang) ?>">
-          <button type="submit" class="btn btn--primary"><?= $lang === 'bg' ? 'Добави в количката' : 'Add to cart' ?></button>
+          <button type="submit" class="btn btn--primary"><?= te('shop.add_to_cart', 'Добави в количката', 'Add to cart', $lang) ?></button>
         </form>
       <?php else: ?>
-        <p class="home-spot__soldout"><?= $lang === 'bg' ? 'Изчерпан' : 'Out of stock' ?></p>
+        <p class="home-spot__soldout"><?= te('shop.out_of_stock', 'Изчерпан', 'Out of stock', $lang) ?></p>
       <?php endif; ?>
-      <a href="<?= $prod_url ?>" class="btn btn--outline"><?= $lang === 'bg' ? 'Виж детайли' : 'View details' ?></a>
+      <a href="<?= $prod_url ?>" class="btn btn--outline"><?= te('shop.view_details', 'Виж детайли', 'View details', $lang) ?></a>
     </div>
   </div>
 </div>

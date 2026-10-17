@@ -19,7 +19,7 @@ $cta = $pick('cta') ?: ($lang === 'bg' ? 'Подкрепи →' : 'Support →')
       </div>
       <?php endif; ?>
       <div style="display:flex;flex-direction:column;gap:1.5rem;">
-        <span style="font-size:.75rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);"><?= $lang === 'bg' ? 'Кампания' : 'Campaign' ?></span>
+        <span style="font-size:.75rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);"><?= te('home.campaign.label', 'Кампания', 'Campaign', $lang) ?></span>
         <h2 style="margin:0;" data-cms-field="title" data-cms-section="campaign" data-cms-type="text"
             data-cms-bg="<?= h($campaign['title'] ?? '') ?>" data-cms-en="<?= h($campaign['title_en'] ?? '') ?>"><?= h($title) ?></h2>
         <p style="color:var(--text-muted);line-height:1.7;margin:0;" data-cms-field="text" data-cms-section="campaign" data-cms-type="text"

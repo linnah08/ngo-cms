@@ -6,7 +6,7 @@ declare(strict_types=1);
  *
  * Without it, `php -S` answers an address it doesn't know with the home page and
  * a 200, so a smoke test of a page that doesn't exist passes. Here, as in
- * production: real files and folders are served, the four slug rewrites go to
+ * production: real files and folders are served, the slug rewrites go to
  * their list page, and anything else gets errors/404.php with a 404.
  */
 $root = dirname(__DIR__, 2);
@@ -27,6 +27,8 @@ $rewrites = [
     '#^/en/news/[^/]+/?$#' => '/en/news/index.php',
     '#^/magazin/[^/]+/?$#' => '/magazin/index.php',
     '#^/en/shop/[^/]+/?$#' => '/magazin/index.php',
+    '#^/sabitiya/[^/]+/?$#'  => '/sabitiya/index.php',
+    '#^/en/events/[^/]+/?$#' => '/en/events/index.php',
 ];
 $target = '/errors/404.php';
 foreach ($rewrites as $pattern => $script) {

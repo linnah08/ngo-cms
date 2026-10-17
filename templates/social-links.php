@@ -59,5 +59,5 @@ foreach ($_social_links as $_sl_i => $_sl):
     ?>
   <a href="<?= h($_sl['url']) ?>" target="_blank" rel="noopener"
      <?= $_sl_cls ? 'class="' . $_sl_cls . '"' : '' ?> style="<?= $_sl_style ?>"
-     aria-label="<?= h($_sl['aria']) ?>"><svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="flex-shrink:0;"><path d="<?= $_sl['path'] ?>"/></svg><?php if (!$_sl_icon_only): ?><?= $_sl['label'] ?><?php endif; ?></a>
+     aria-label="<?= h($_sl['aria']) ?>"<?= cms_admin('organisation') ?>><svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="flex-shrink:0;"><path d="<?= $_sl['path'] ?>"/></svg><?php if (!$_sl_icon_only): ?><?= $_sl['label'] ?><?php endif; ?></a>
 <?php endforeach; ?>

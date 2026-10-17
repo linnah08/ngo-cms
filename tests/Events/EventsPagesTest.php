@@ -264,7 +264,7 @@ PHP;
         $this->assertSame(302, $code);
         $this->assertStringStartsWith('/en/events/' . $closed['slug'] . '/', $loc);
         [, , $back] = $this->http($loc, [], $jar);
-        $this->assertMatchesRegularExpression('/role="alert"[^>]*>\s*<strong>The ticket was not bought\.<\/strong>/', $back, 'the reason is shown, persistently');
+        $this->assertMatchesRegularExpression('/role="alert"[^>]*>\s*<strong>(?:<span[^>]*>)?The ticket was not bought\.(?:<\/span>)?<\/strong>/', $back, 'the reason is shown, persistently');
         @unlink($jar);
         $this->assertSame(0, (int) $this->db()->query('SELECT COUNT(*) FROM campaign_pledges WHERE event_id = ' . (int) $closed['id'])->fetchColumn());
 

@@ -103,7 +103,7 @@ $single_vid     = $p['type'] === 'variant' ? (int)($variant_single[$p['id']] ?? 
     ?>
     <?php if ($in_stock_count > 0 && $in_stock_count <= 5): ?>
       <p style="font-size:.78rem;color:#b45309;font-weight:600;margin:0 0 .5rem;">
-        ⚠ <?= $lang === 'bg' ? "Само {$in_stock_count} бр. налични" : "Only {$in_stock_count} left" ?>
+        ⚠ <?= te('shop.low_stock', 'Само {n} бр. налични', 'Only {n} left', $lang, ['n' => $in_stock_count]) ?>
       </p>
     <?php elseif ($card_preorder): ?>
       <p style="font-size:.78rem;color:#92400e;font-weight:600;margin:0 0 .5rem;">
@@ -124,7 +124,7 @@ $single_vid     = $p['type'] === 'variant' ? (int)($variant_single[$p['id']] ?? 
       <?php if ($p['type'] === 'variant' && !$single_vid): ?>
         <a href="<?= $prod_url ?>" class="btn btn--primary"
            style="width:100%;justify-content:center;font-size:.9rem;padding:.65rem 1rem;text-align:center;box-sizing:border-box;">
-          <?= $lang === 'bg' ? 'Избери вариант' : 'Choose variant' ?>
+          <?= te('shop.choose_variant', 'Избери вариант', 'Choose variant', $lang) ?>
         </a>
       <?php elseif ($in_stock_count > 0 || $card_preorder): ?>
         <form method="POST" action="/cart/add.php">
@@ -138,19 +138,19 @@ $single_vid     = $p['type'] === 'variant' ? (int)($variant_single[$p['id']] ?? 
           <button type="submit" class="btn btn--primary"
                   style="width:100%;justify-content:center;font-size:.9rem;padding:.65rem 1rem;">
             <?= $card_preorder
-                ? h(t_or('shop.preorder.button', 'Поръчай предварително', 'Pre-order now', $lang))
-                : ($lang === 'bg' ? 'Добави в количката' : 'Add to cart') ?>
+                ? te('shop.preorder.button', 'Поръчай предварително', 'Pre-order now', $lang)
+                : te('shop.add_to_cart', 'Добави в количката', 'Add to cart', $lang) ?>
           </button>
         </form>
       <?php else: ?>
         <div style="width:100%;text-align:center;padding:.65rem 1rem;border-radius:var(--radius);
                     background:#fdf0ef;border:1px solid #f0c4c0;color:#c0392b;font-size:.875rem;font-weight:600;">
-          <?= $lang === 'bg' ? 'Изчерпан' : 'Out of stock' ?>
+          <?= te('shop.out_of_stock', 'Изчерпан', 'Out of stock', $lang) ?>
         </div>
       <?php endif; ?>
       <a href="<?= $prod_url ?>" class="btn btn--outline"
          style="width:100%;justify-content:center;font-size:.9rem;padding:.65rem 1rem;text-align:center;box-sizing:border-box;">
-        <?= $lang === 'bg' ? 'Виж детайли' : 'View details' ?>
+        <?= te('shop.view_details', 'Виж детайли', 'View details', $lang) ?>
       </a>
     </div>
   </div>

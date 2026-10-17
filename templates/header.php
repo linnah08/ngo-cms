@@ -202,7 +202,7 @@ require ROOT_PATH . '/templates/tinymce-base.php';
               color:var(--text,#1a1916);">
     <p style="max-width:1200px;margin:0 auto;padding:.75rem 1rem;
               font-size:.95rem;font-weight:600;line-height:1.4;text-align:center;">
-      <?= h(launch_banner_text(get_lang())) ?>
+      <span<?= cms_admin('launch') ?>><?= h(launch_banner_text(get_lang())) ?></span>
     </p>
   </div>
   <?php endif; ?>
@@ -211,13 +211,13 @@ require ROOT_PATH . '/templates/tinymce-base.php';
     <div class="container">
       <div class="header-top__contact">
         <?php if (site_phone_public() !== ''): ?>
-        <a href="tel:<?= h(site_phone_public()) ?>"><?= h(site_phone_public()) ?></a>
+        <a href="tel:<?= h(site_phone_public()) ?>"<?= cms_admin('organisation') ?>><?= h(site_phone_public()) ?></a>
         <?php endif; ?>
-        <a href="mailto:<?= SITE_EMAIL ?>"><?= SITE_EMAIL ?></a>
+        <a href="mailto:<?= SITE_EMAIL ?>"<?= cms_admin('organisation') ?>><?= SITE_EMAIL ?></a>
       </div>
       <div class="header-top__right">
         <?php if (feature_enabled('donations') && trim((string) SITE_IBAN) !== ''): ?>
-        <span><?= t('header.donate_iban') ?>: <strong><?= h(SITE_IBAN) ?></strong></span>
+        <span><?= te('header.donate_iban') ?>: <strong<?= cms_admin('organisation') ?>><?= h(SITE_IBAN) ?></strong></span>
         <?php endif; ?>
         <span class="header-top__social">
           <?php $social_variant = 'bar'; require __DIR__ . '/social-links.php'; ?>
@@ -266,7 +266,7 @@ require ROOT_PATH . '/templates/tinymce-base.php';
           <?php // Shop link and cart only while „Магазин“ is on (Admin → Модули). ?>
           <?php if (module_enabled_with_needs('shop')): ?>
           <li class="nav-cta">
-            <a href="<?= $shop_url ?>"><?= t('nav.shop') ?></a>
+            <a href="<?= $shop_url ?>"><?= te('nav.shop') ?></a>
           </li>
           <li>
             <a href="<?= h(shop_path('cart', $lang)) ?>" class="cart-link" aria-label="<?= h($cart_label) ?>">

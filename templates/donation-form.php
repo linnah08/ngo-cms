@@ -48,7 +48,7 @@ $_donation_pay_default = isset($_donation_pay_methods[$_don_old['payment_method'
   <div id="donationErrors" role="alert" tabindex="-1"
        style="margin:0 0 1.25rem;padding:.9rem 1.1rem;border:2px solid #c0392b;border-radius:var(--radius);background:#fdf0ef;color:#a93226;font-size:.9rem;">
     <p style="margin:0 0 .4rem;font-weight:700;">
-      <span aria-hidden="true">⚠ </span><?= h(t_or('donation.err.title', 'Дарението не е изпратено. Моля, поправете:', 'Your donation was not sent. Please fix the following:')) ?>
+      <span aria-hidden="true">⚠ </span><?= te('donation.err.title', 'Дарението не е изпратено. Моля, поправете:', 'Your donation was not sent. Please fix the following:', $lang) ?>
     </p>
     <ul style="margin:0;padding-left:1.25rem;">
       <?php foreach ($_don['errors'] as $_e): ?>
@@ -63,7 +63,7 @@ $_donation_pay_default = isset($_donation_pay_methods[$_don_old['payment_method'
 
   <div class="form-group">
     <label for="donAmount" style="font-weight:600;font-size:.875rem;">
-      <?= h(t_or('donation.amount', 'Сума', 'Amount')) ?> (€) *
+      <?= te('donation.amount', 'Сума', 'Amount', $lang) ?> (€) *
     </label>
     <div style="position:relative;">
       <input type="number" id="donAmount" name="amount" min="1" max="50000" step="1" required
@@ -75,21 +75,21 @@ $_donation_pay_default = isset($_donation_pay_methods[$_don_old['payment_method'
   </div>
   <div class="form-group">
     <label for="donName" style="font-weight:600;font-size:.875rem;">
-      <?= h(t_or('donation.name', 'Вашите имена', 'Your name')) ?> *
+      <?= te('donation.name', 'Вашите имена', 'Your name', $lang) ?> *
     </label>
     <input type="text" id="donName" name="donor_name" required autocomplete="name"
            value="<?= $_don_val('donor_name') ?>" style="width:100%;box-sizing:border-box;">
   </div>
   <div class="form-group">
     <label for="donEmail" style="font-weight:600;font-size:.875rem;">
-      <?= h(t_or('donation.email', 'Имейл', 'Email')) ?> *
+      <?= te('donation.email', 'Имейл', 'Email', $lang) ?> *
     </label>
     <input type="email" id="donEmail" name="donor_email" required autocomplete="email"
            value="<?= $_don_val('donor_email') ?>" style="width:100%;box-sizing:border-box;">
   </div>
   <div class="form-group">
     <label for="donMessage" style="font-weight:600;font-size:.875rem;">
-      <?= h(t_or('donation.message', 'Съобщение или посвещение (по желание)', 'Message or dedication (optional)')) ?>
+      <?= te('donation.message', 'Съобщение или посвещение (по желание)', 'Message or dedication (optional)', $lang) ?>
     </label>
     <textarea id="donMessage" name="donation_message" rows="3"
               style="width:100%;box-sizing:border-box;padding:.6rem .75rem;border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font-body);font-size:.95rem;resize:vertical;"><?= $_don_val('donation_message') ?></textarea>
@@ -99,20 +99,20 @@ $_donation_pay_default = isset($_donation_pay_methods[$_don_old['payment_method'
   <!-- Donor type -->
   <fieldset style="border:none;padding:0;margin:0 0 1.25rem;">
     <legend style="font-weight:600;font-size:.875rem;display:block;margin-bottom:.5rem;padding:0;">
-      <?= h(t_or('donation.donor_type', 'Вид дарител', 'Donor type')) ?>
+      <?= te('donation.donor_type', 'Вид дарител', 'Donor type', $lang) ?>
     </legend>
     <div style="display:flex;gap:1.25rem;flex-wrap:wrap;">
       <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem;min-height:44px;">
         <input type="radio" name="donor_type" value="individual" <?= $_don_company ? '' : 'checked' ?>
                aria-controls="donorCompanyFields"
                onchange="toggleDonorCompany(false)" style="accent-color:var(--teal);">
-        <?= h(t_or('donation.individual', 'Физическо лице', 'Individual')) ?>
+        <?= te('donation.individual', 'Физическо лице', 'Individual', $lang) ?>
       </label>
       <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem;min-height:44px;">
         <input type="radio" name="donor_type" value="company" <?= $_don_company ? 'checked' : '' ?>
                aria-controls="donorCompanyFields"
                onchange="toggleDonorCompany(true)" style="accent-color:var(--teal);">
-        <?= h(t_or('donation.company', 'Юридическо лице (фирма)', 'Legal entity (company)')) ?>
+        <?= te('donation.company', 'Юридическо лице (фирма)', 'Legal entity (company)', $lang) ?>
       </label>
     </div>
   </fieldset>
@@ -121,7 +121,7 @@ $_donation_pay_default = isset($_donation_pay_methods[$_don_old['payment_method'
   <div id="donorCompanyFields" style="<?= $_don_company ? '' : 'display:none;' ?>">
     <div class="form-group">
       <label for="donCompany" style="font-weight:600;font-size:.875rem;">
-        <?= h(t_or('donation.company_name', 'Наименование на фирмата', 'Company name')) ?> *
+        <?= te('donation.company_name', 'Наименование на фирмата', 'Company name', $lang) ?> *
       </label>
       <input type="text" id="donCompany" name="invoice_company" autocomplete="organization"
              value="<?= $_don_val('invoice_company') ?>" style="width:100%;box-sizing:border-box;">
@@ -129,15 +129,15 @@ $_donation_pay_default = isset($_donation_pay_methods[$_don_old['payment_method'
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;" class="company-fields-grid">
       <div class="form-group" style="margin-bottom:0;">
         <label for="donEik" style="font-weight:600;font-size:.875rem;">
-          <?= h(t_or('donation.eik', 'ЕИК / Булстат', 'Company ID (EIK)')) ?> *
+          <?= te('donation.eik', 'ЕИК / Булстат', 'Company ID (EIK)', $lang) ?> *
         </label>
         <input type="text" id="donEik" name="invoice_eik"
                value="<?= $_don_val('invoice_eik') ?>" style="width:100%;box-sizing:border-box;">
       </div>
       <div class="form-group" style="margin-bottom:0;">
         <label for="donVat" style="font-weight:600;font-size:.875rem;">
-          <?= h(t_or('donation.vat', 'ДДС номер', 'VAT number')) ?>
-          <span style="font-weight:400;opacity:.7;">(<?= h(t_or('donation.if_applicable', 'ако е приложимо', 'if applicable')) ?>)</span>
+          <?= te('donation.vat', 'ДДС номер', 'VAT number', $lang) ?>
+          <span style="font-weight:400;opacity:.7;">(<?= te('donation.if_applicable', 'ако е приложимо', 'if applicable', $lang) ?>)</span>
         </label>
         <input type="text" id="donVat" name="invoice_vat"
                value="<?= $_don_val('invoice_vat') ?>" style="width:100%;box-sizing:border-box;">
@@ -148,11 +148,11 @@ $_donation_pay_default = isset($_donation_pay_methods[$_don_old['payment_method'
   <!-- Payment method -->
   <fieldset style="border:none;padding:0;margin:0 0 1.5rem;">
     <legend style="font-weight:600;font-size:.875rem;display:block;margin-bottom:.5rem;padding:0;">
-      <?= h(t_or('donation.pay.legend', 'Начин на плащане', 'Payment method')) ?>
+      <?= te('donation.pay.legend', 'Начин на плащане', 'Payment method', $lang) ?>
     </legend>
     <?php if (empty($_donation_pay_methods)): ?>
     <p style="padding:.85rem 1rem;border:2px solid var(--border);border-radius:var(--radius);color:#c0392b;font-size:.9rem;">
-      <span aria-hidden="true">⚠ </span><?= h(t_or('donation.pay.unavailable', 'Онлайн плащането не е налично в момента. Моля свържете се с нас.', 'Online payment is not available right now. Please get in touch with us.')) ?>
+      <span aria-hidden="true">⚠ </span><?= te('donation.pay.unavailable', 'Онлайн плащането не е налично в момента. Моля свържете се с нас.', 'Online payment is not available right now. Please get in touch with us.', $lang) ?>
     </p>
     <?php endif; ?>
     <div style="display:flex;flex-direction:column;gap:.6rem;">
@@ -171,7 +171,7 @@ $_donation_pay_default = isset($_donation_pay_methods[$_don_old['payment_method'
   </fieldset>
 
   <button type="submit" class="btn btn--primary" style="width:100%;justify-content:center;margin-top:1rem;">
-    <?= h(t_or('donation.submit', 'Дари сега', 'Donate now')) ?>
+    <?= te('donation.submit', 'Дари сега', 'Donate now', $lang) ?>
   </button>
 
   <script>

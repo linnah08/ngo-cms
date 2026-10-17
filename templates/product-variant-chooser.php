@@ -38,36 +38,38 @@ $_pv_describe = function (array $pv) use ($lang): array {
 
 $_preorder_on = !empty($p_preorder_on);
 $_single_pv   = product_single_variant($prod_variants);
+// The options' names and details are the product's own: changed on its admin page.
+$_pv_admin    = cms_admin(['Продукти', '/admin/product-edit.php?id=' . (int) ($p['id'] ?? 0)]);
 ?>
 <?php if ($_single_pv): ?>
   <?php $d = $_pv_describe($_single_pv); ?>
   <div class="pv-single" style="margin-bottom:1rem;">
     <div style="font-size:.85rem;font-weight:600;margin-bottom:.6rem;">
-      <?= $lang === 'bg' ? 'Вариант' : 'Variant' ?>
+      <?= te('shop.variant', 'Вариант', 'Variant', $lang) ?>
     </div>
     <div style="display:flex;align-items:center;gap:.75rem;padding:.6rem .9rem;border:2px solid var(--border);border-radius:8px;">
       <?php if ($d['img']): ?>
         <img class="pv-thumb" src="<?= h($d['img']) ?>" alt="">
       <?php endif; ?>
       <div style="flex:1;min-width:0;">
-        <div style="font-weight:600;font-size:.95rem;"><?= h($d['label']) ?></div>
+        <div style="font-weight:600;font-size:.95rem;"<?= $_pv_admin ?>><?= h($d['label']) ?></div>
         <?php if ($d['attrs']): ?>
-          <div style="font-size:.78rem;color:var(--text-muted);"><?= $d['attrs'] ?></div>
+          <div style="font-size:.78rem;color:var(--text-muted);"<?= $_pv_admin ?>><?= $d['attrs'] ?></div>
         <?php endif; ?>
       </div>
       <?php if ($d['in_stock']): ?>
         <div style="font-size:.8rem;flex-shrink:0;color:var(--teal);">
-          <?= (int)$_single_pv['stock'] . ($lang === 'bg' ? ' бр.' : ' left') ?>
+          <?= te('shop.stock_left', '{n} бр.', '{n} left', $lang, ['n' => (int) $_single_pv['stock']]) ?>
         </div>
       <?php elseif ($_preorder_on): ?>
-        <div style="font-size:.8rem;flex-shrink:0;color:#92400e;font-weight:600;">⏳ <?= h(product_preorder_label($lang)) ?></div>
+        <div style="font-size:.8rem;flex-shrink:0;color:#92400e;font-weight:600;">⏳ <?= te('shop.preorder.label', 'Предварителна поръчка', 'Pre-order', $lang) ?></div>
       <?php endif; ?>
     </div>
   </div>
 <?php else: ?>
   <?php $_default_pv = product_default_variant($prod_variants, $_preorder_on); ?>
   <fieldset class="pv-choices">
-    <legend><?= $lang === 'bg' ? 'Избери вариант' : 'Choose variant' ?></legend>
+    <legend><?= te('shop.choose_variant', 'Избери вариант', 'Choose variant', $lang) ?></legend>
     <div style="display:flex;flex-direction:column;gap:.5rem;">
       <?php foreach ($prod_variants as $pv): ?>
         <?php
@@ -88,18 +90,18 @@ $_single_pv   = product_single_variant($prod_variants);
           <?php endif; ?>
           <span style="display:block;flex:1;min-width:0;">
             <span style="display:block;font-weight:600;font-size:.95rem;">
-              <?= h($d['label']) ?>
+              <span<?= $_pv_admin ?>><?= h($d['label']) ?></span>
               <?php /* Visible, non-colour "selected" marker; the radio's own checked state is what a screen reader announces. */ ?>
-              <span class="pv-selected" aria-hidden="true">✓ <?= $lang === 'bg' ? 'Избран' : 'Selected' ?></span>
+              <span class="pv-selected" aria-hidden="true">✓ <?= te('shop.variant_selected', 'Избран', 'Selected', $lang) ?></span>
             </span>
             <?php if ($d['attrs']): ?>
-              <span style="display:block;font-size:.78rem;color:var(--text-muted);"><?= $d['attrs'] ?></span>
+              <span style="display:block;font-size:.78rem;color:var(--text-muted);"<?= $_pv_admin ?>><?= $d['attrs'] ?></span>
             <?php endif; ?>
           </span>
           <span style="font-size:.8rem;flex-shrink:0;<?= $d['in_stock'] ? 'color:var(--teal);' : ($_preorder_on ? 'color:#92400e;font-weight:600;' : 'color:#b03a2e;font-weight:600;') ?>">
             <?= $d['in_stock']
-                ? (int)$pv['stock'] . ($lang === 'bg' ? ' бр.' : ' left')
-                : ($_preorder_on ? '⏳ ' . h(product_preorder_label($lang)) : ($lang === 'bg' ? 'Изчерпан' : 'Out of stock')) ?>
+                ? te('shop.stock_left', '{n} бр.', '{n} left', $lang, ['n' => (int) $pv['stock']])
+                : ($_preorder_on ? '⏳ ' . te('shop.preorder.label', 'Предварителна поръчка', 'Pre-order', $lang) : te('shop.out_of_stock', 'Изчерпан', 'Out of stock', $lang)) ?>
           </span>
         </label>
       <?php endforeach; ?>

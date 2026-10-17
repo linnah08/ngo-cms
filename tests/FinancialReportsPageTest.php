@@ -34,13 +34,13 @@ final class FinancialReportsPageTest extends TestCase
         $this->assertStringContainsString('<h2', $html);
         $this->assertStringContainsString('2025', $html);
         $this->assertStringContainsString('data-report-open="/assets/files/reports/2025-aaaaaaaa.pdf"', $html);
-        $this->assertMatchesRegularExpression('#href="/assets/files/reports/2025-aaaaaaaa\.pdf"[^>]*>\s*Изтегли \(PDF, 12 MB\)#u', $html);
+        $this->assertMatchesRegularExpression('#href="/assets/files/reports/2025-aaaaaaaa\.pdf"[^>]*>\s*(?:<span[^>]*>)?Изтегли(?:</span>)? \(PDF, 12 MB\)#u', $html);
     }
 
     public function testEnglishSaysTheDocumentIsInBulgarian(): void
     {
         $html = $this->render($this->one(), 'en');
-        $this->assertStringContainsString('Download (PDF, 12 MB, in Bulgarian)', $html);
+        $this->assertStringContainsString('Download (PDF, 12 MB, in Bulgarian)', strip_tags($html));   // the words are editable spans
         $this->assertStringContainsString('>Open<', $html);
     }
 

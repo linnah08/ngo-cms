@@ -54,13 +54,13 @@ $_show_nl_banner = module_enabled_with_needs('newsletter') && empty($_COOKIE['om
       <input type="hidden" name="lang" value="<?= h($lang) ?>">
       <?php $nl_on_dark = true; require $_SERVER['DOCUMENT_ROOT'] . '/templates/newsletter-topics.php'; ?>
       <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;">
-        <label for="nlBannerEmail" class="sr-only"><?= h(t('newsletter.banner.placeholder')) ?></label>
+        <label for="nlBannerEmail" class="sr-only"><?= te('newsletter.banner.placeholder') ?></label>
         <input type="email" name="email" id="nlBannerEmail" required autocomplete="email"
                placeholder="<?= h(t('newsletter.banner.placeholder')) ?>"
                style="padding:.6rem 1rem;border:none;border-radius:4px;font-size:1rem;font-family:inherit;width:280px;max-width:100%;box-sizing:border-box;">
         <button type="submit" class="btn btn--primary"
                 style="background:var(--newsletter-fg,#fff);color:var(--newsletter-bg,#037F9B);border:none;font-weight:700;padding:.6rem 1.5rem;">
-          <?= t('newsletter.banner.submit') ?>
+          <?= te('newsletter.banner.submit') ?>
         </button>
       </div>
     </form>
@@ -84,16 +84,16 @@ $_show_nl_banner = module_enabled_with_needs('newsletter') && empty($_COOKIE['om
         <?php if (feature_enabled('donations') && trim((string) SITE_IBAN) !== ''): ?>
         <div style="margin-top:1.5rem;">
           <div style="font-size:0.8rem;opacity:0.7;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.5rem;">
-            <?= t('footer.donate') ?>
+            <?= te('footer.donate') ?>
           </div>
-          <div class="footer-iban"><?= h(SITE_IBAN) ?></div>
+          <div class="footer-iban"<?= cms_admin('organisation') ?>><?= h(SITE_IBAN) ?></div>
         </div>
         <?php endif; ?>
       </div>
 
       <!-- Navigation -->
       <div class="footer-col">
-        <h4><?= t('footer.nav') ?></h4>
+        <h4><?= te('footer.nav') ?></h4>
         <ul>
           <?php foreach ($_fnav as $i => $item): ?>
           <li><a href="<?= h($item['url']) ?>"
@@ -110,7 +110,7 @@ $_show_nl_banner = module_enabled_with_needs('newsletter') && empty($_COOKIE['om
 
       <!-- Help -->
       <div class="footer-col">
-        <h4><?= t('footer.help') ?></h4>
+        <h4><?= te('footer.help') ?></h4>
         <ul>
           <?php foreach ($_fhelp as $i => $item): ?>
           <li><a href="<?= h($item['url']) ?>"
@@ -127,12 +127,12 @@ $_show_nl_banner = module_enabled_with_needs('newsletter') && empty($_COOKIE['om
 
       <!-- Contact -->
       <div class="footer-col">
-        <h4><?= t('footer.contact') ?></h4>
+        <h4><?= te('footer.contact') ?></h4>
         <ul>
           <?php if (site_phone_public() !== ''): ?>
-          <li><a href="tel:<?= h(site_phone_public()) ?>"><?= h(site_phone_public()) ?></a></li>
+          <li><a href="tel:<?= h(site_phone_public()) ?>"<?= cms_admin('organisation') ?>><?= h(site_phone_public()) ?></a></li>
           <?php endif; ?>
-          <li><a href="mailto:<?= SITE_EMAIL ?>"><?= SITE_EMAIL ?></a></li>
+          <li><a href="mailto:<?= SITE_EMAIL ?>"<?= cms_admin('organisation') ?>><?= SITE_EMAIL ?></a></li>
         </ul>
         <!-- Social profile URLs live in config.php (SOCIAL_* constants) -->
         <div style="margin-top:1.5rem;display:flex;gap:0.75rem;flex-wrap:wrap;">
@@ -144,15 +144,15 @@ $_show_nl_banner = module_enabled_with_needs('newsletter') && empty($_COOKIE['om
 
     <!-- Bottom bar -->
     <div class="footer-bottom">
-      <div>© <?= date('Y') ?> <?= h($site_name) ?></div>
+      <div>© <?= date('Y') ?> <span<?= cms_admin('organisation') ?>><?= h($site_name) ?></span></div>
       <div class="footer-legal">
-        <a href="<?= $lang === 'bg' ? '/politika-za-poveritelnost/' : '/en/privacy-policy/' ?>"><?= t('footer.privacy') ?></a>
-        <a href="<?= $lang === 'bg' ? '/pravna-informaciya/' : '/en/legal/' ?>"><?= t('footer.legal') ?></a>
-        <a href="<?= $lang === 'bg' ? '/usloviya/' : '/en/terms/' ?>"><?= t('footer.terms') ?></a>
+        <a href="<?= $lang === 'bg' ? '/politika-za-poveritelnost/' : '/en/privacy-policy/' ?>"><?= te('footer.privacy') ?></a>
+        <a href="<?= $lang === 'bg' ? '/pravna-informaciya/' : '/en/legal/' ?>"><?= te('footer.legal') ?></a>
+        <a href="<?= $lang === 'bg' ? '/usloviya/' : '/en/terms/' ?>"><?= te('footer.terms') ?></a>
         <?php require_once ROOT_PATH . '/includes/financial_reports.php'; if (module_enabled_with_needs('annual_reports') && reports_any_published()): ?>
-        <a href="<?= $lang === 'bg' ? '/finansovi-otcheti/' : '/en/financial-reports/' ?>"><?= t('footer.reports') ?></a>
+        <a href="<?= $lang === 'bg' ? '/finansovi-otcheti/' : '/en/financial-reports/' ?>"><?= te('footer.reports') ?></a>
         <?php endif; ?>
-        <a href="<?= $lang === 'bg' ? '/politika-za-biskvitki/' : '/en/cookie-policy/' ?>"><?= t('footer.cookies') ?></a>
+        <a href="<?= $lang === 'bg' ? '/politika-za-biskvitki/' : '/en/cookie-policy/' ?>"><?= te('footer.cookies') ?></a>
       </div>
     </div>
   </div>
@@ -164,20 +164,20 @@ $_show_nl_banner = module_enabled_with_needs('newsletter') && empty($_COOKIE['om
 <div id="cookieBanner"
      style="position:fixed;bottom:0;left:0;right:0;z-index:9990;background:#1a1a1a;color:#f0f0f0;padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;box-shadow:0 -2px 12px rgba(0,0,0,.35);">
   <p style="margin:0;font-size:.875rem;line-height:1.5;flex:1;min-width:200px;">
-    <?= h(t('cookies.banner.text')) ?>
+    <?= te('cookies.banner.text') ?>
     <a href="<?= $lang === 'bg' ? '/politika-za-biskvitki/' : '/en/cookie-policy/' ?>"
-       style="color:var(--banner-accent,#4dc8e0);white-space:nowrap;margin-left:.35rem;"><?= h(t('cookies.banner.learn_more')) ?></a>
+       style="color:var(--banner-accent,#4dc8e0);white-space:nowrap;margin-left:.35rem;"><?= te('cookies.banner.learn_more') ?></a>
   </p>
   <div style="display:flex;gap:.5rem;flex-shrink:0;">
     <button onclick="cookieConsent('essential')"
             style="padding:.45rem 1rem;border:1px solid #555;border-radius:5px;background:transparent;color:#f0f0f0;cursor:pointer;font-size:.85rem;font-family:inherit;">
-      <?= h(t('cookies.banner.decline')) ?>
+      <?= te('cookies.banner.decline') ?>
     </button>
     <?php // The banner sits on near-black: a theme with a dark primary sets
           // --banner-accent / --banner-accent-fg so the button does not vanish into it. ?>
     <button onclick="cookieConsent('all')"
             style="padding:.45rem 1rem;border:none;border-radius:5px;background:var(--banner-accent,#0387A5);color:var(--banner-accent-fg,#fff);cursor:pointer;font-size:.85rem;font-weight:600;font-family:inherit;">
-      <?= h(t('cookies.banner.accept')) ?>
+      <?= te('cookies.banner.accept') ?>
     </button>
   </div>
 </div>

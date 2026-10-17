@@ -10,7 +10,10 @@ $base = $lang === 'bg' ? '/novini/' : '/en/news/';
       <?= home_buttons($sid, $f, $lang, [['btn btn--outline', '']]) ?>
     </div>
     <div class="article-grid">
-      <?php foreach ($articles as $article): $url = $base . rawurlencode((string) $article['slug']) . '/'; ?>
+      <?php foreach ($articles as $article): $url = $base . rawurlencode((string) $article['slug']) . '/';
+        // Title and excerpt are edited on the page like on the news list: saved to this article, this language only.
+        $_acms = static fn(string $f): string => ' data-cms-field="' . $f . '" data-cms-section="article" data-cms-type="text" data-cms-id="' . h((string) $article['slug']) . '"'
+            . ($show_admin ? ' data-cms-bg="' . ($lang === 'bg' ? h((string) ($article[$f] ?? '')) : '') . '" data-cms-en="' . ($lang === 'en' ? h((string) ($article[$f] ?? '')) : '') . '"' : ''); ?>
         <article class="card">
           <?php if (!empty($article['image'])): ?>
             <div class="card__image">
@@ -21,12 +24,12 @@ $base = $lang === 'bg' ? '/novini/' : '/en/news/';
           <?php endif; ?>
           <div class="card__body">
             <div class="article-meta">
-              <time datetime="<?= h($article['date'] ?? '') ?>"><?= h(format_date($article['date'] ?? '', $lang)) ?></time>
-              <?php if (!empty($article['author'])): ?><span><?= t('news.by') ?> <?= h($article['author']) ?></span><?php endif; ?>
+              <time datetime="<?= h($article['date'] ?? '') ?>"<?= cms_admin('articles') ?>><?= h(format_date($article['date'] ?? '', $lang)) ?></time>
+              <?php if (!empty($article['author'])): ?><span><?= te('news.by', 'от', 'by', $lang) ?> <span<?= cms_admin('articles') ?>><?= h($article['author']) ?></span></span><?php endif; ?>
             </div>
-            <h3 class="card__title"><a href="<?= h($url) ?>"><?= h($article['title']) ?></a></h3>
-            <?php if (!empty($article['excerpt'])): ?><p class="card__excerpt"><?= h($article['excerpt']) ?></p><?php endif; ?>
-            <a href="<?= h($url) ?>" class="btn btn--outline" style="margin-top:1rem;font-size:0.8rem;"><?= t('news.read_more') ?><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;">: <?= h($article['title']) ?></span></a>
+            <h3 class="card__title"<?= $_acms('title') ?>><a href="<?= h($url) ?>"><?= h($article['title']) ?></a></h3>
+            <?php if (!empty($article['excerpt'])): ?><p class="card__excerpt"<?= $_acms('excerpt') ?>><?= h($article['excerpt']) ?></p><?php endif; ?>
+            <a href="<?= h($url) ?>" class="btn btn--outline" style="margin-top:1rem;font-size:0.8rem;"><?= te('news.read_more', 'Прочети повече', 'Read more', $lang) ?><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;">: <?= h($article['title']) ?></span></a>
           </div>
         </article>
       <?php endforeach; ?>

@@ -216,7 +216,7 @@ final class EnglishDonationTest extends TestCase
         $bad = [];
         foreach (array_slice(explode("\n", $code), $offset, null, true) as $i => $line) {
             if (!preg_match('/[\x{0400}-\x{04FF}]/u', $line)) continue;
-            if (str_contains($line, 't_or(')) continue;
+            if (str_contains($line, 't_or(') || preg_match('/\bte\(/', $line)) continue;
             if (str_starts_with(ltrim($line), '//')) continue;
             if (preg_match("/\\\$lang === '(bg|en)' \\?/", $line)) continue; // an inline BG/EN pair
             foreach (self::ALLOWED as $ok) {

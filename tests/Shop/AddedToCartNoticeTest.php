@@ -61,8 +61,8 @@ final class AddedToCartNoticeTest extends TestCase
         $html = $this->render([['type' => 'success', 'message' => 'Добавено в количката!']]);
 
         $this->assertStringContainsString('Добавено в количката!', $html);
-        $this->assertMatchesRegularExpression('#<a href="/cart/"[^>]*>\s*Виж количката#u', $html);
-        $this->assertMatchesRegularExpression('#<a href="/checkout/"[^>]*>\s*Завърши поръчката#u', $html);
+        $this->assertMatchesRegularExpression('#<a href="/cart/"[^>]*>\s*(?:<span[^>]*>)?Виж количката#u', $html);
+        $this->assertMatchesRegularExpression('#<a href="/checkout/"[^>]*>\s*(?:<span[^>]*>)?Завърши поръчката#u', $html);
     }
 
     public function testSuccessIsAnnouncedFocusedAndDismissible(): void

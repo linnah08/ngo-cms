@@ -9,7 +9,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
 <section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
-    <h1 style="margin:0;">Нашите проекти</h1>
+    <h1 style="margin:0;"><?= te('projects.heading', 'Нашите проекти', 'Our projects') ?></h1>
   </div>
 </section>
 
@@ -17,13 +17,13 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
   <div class="container">
     <div style="display:flex;flex-direction:column;gap:0;">
       <?php foreach ($projects as $i => $project): ?>
-        <div style="padding:3rem 0;<?= $i > 0 ? 'border-top:1px solid var(--border);' : '' ?>">
+        <div style="padding:3rem 0;<?= $i > 0 ? 'border-top:1px solid var(--border);' : '' ?>"<?= cms_admin(['Съдържание → Проекти', '/admin/pages.php?page=projects']) ?>>
           <h2 style="margin-bottom:1.5rem;"><?= h($project['title']) ?></h2>
           <div class="rich-text" style="max-width:800px;"><?= $project['text'] ?></div>
           <?php if (!empty($project['images'])): ?>
             <div style="display:flex;gap:1rem;margin-top:1.5rem;flex-wrap:wrap;">
               <?php foreach ($project['images'] as $img): ?>
-                <img src="<?= h($img) ?>" loading="lazy"
+                <img src="<?= h($img) ?>" alt="" loading="lazy"
                      style="height:220px;width:auto;border-radius:8px;object-fit:cover;">
               <?php endforeach; ?>
             </div>

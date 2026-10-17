@@ -12,7 +12,7 @@ $_dr_id       = $_dr_id ?? 'donRecipient';
 ?>
 <fieldset style="border:none;padding:0;margin:0 0 1.25rem;">
   <legend style="font-weight:600;font-size:.875rem;display:block;margin-bottom:.5rem;padding:0;">
-    <?= h(t_or('donation.recipient', 'За кого е дарението', 'Who is the donation for', $lang)) ?>
+    <?= te('donation.recipient', 'За кого е дарението', 'Who is the donation for', $lang) ?>
   </legend>
   <div style="display:grid;gap:.5rem;">
 <?php foreach (donation_recipients() as $_dr_key => $_dr): ?>
@@ -25,7 +25,7 @@ $_dr_id       = $_dr_id ?? 'donRecipient';
 <?php   if ($_dr_hint !== ''): ?>
         <span style="display:block;font-size:.85rem;color:var(--text-muted);text-transform:none;letter-spacing:normal;font-weight:400;margin-top:.15rem;"><?= h($_dr_hint) ?>
 <?php     if ($_dr['hint_url'] !== ''): ?>
-          <a href="<?= h($_dr['hint_url']) ?>" target="_blank" rel="noopener"><?= h(t_or('donation.recipient_more', 'Научете повече', 'Learn more', $lang)) ?></a>
+          <a href="<?= h($_dr['hint_url']) ?>" target="_blank" rel="noopener"><?= te('donation.recipient_more', 'Научете повече', 'Learn more', $lang) ?></a>
 <?php     endif; ?>
         </span>
 <?php   endif; ?>
