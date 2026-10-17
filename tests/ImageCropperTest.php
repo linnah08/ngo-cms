@@ -39,7 +39,7 @@ final class ImageCropperTest extends TestCase
 
     public function testTinymceFilePickerWiredToCropper(): void
     {
-        $h = $this->read('admin/includes/admin-header.php');
+        $h = $this->read('templates/tinymce-base.php');   // the shared config, printed by admin-header.php
         $this->assertStringContainsString('file_picker_callback', $h);
         $this->assertStringContainsString('window.OMCrop', $h);
     }

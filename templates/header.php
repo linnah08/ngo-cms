@@ -171,7 +171,16 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
   window._omCsrf = <?= json_encode(csrf_token()) ?>;
   window._omLang = <?= json_encode(get_lang()) ?>;
   window._omAdminBase = <?= json_encode(SITE_URL . '/admin') ?>;
+  window._csrfToken = window._omCsrf;
 </script>
+<?php
+// Edit mode opens rich text blocks (front page texts, За нас, product descriptions…)
+// in TinyMCE, so the editor and its shared config load with the admin bar too.
+// Without them a click on such a block did nothing at all.
+require_once ROOT_PATH . '/includes/settings.php';
+echo tinymce_script_tag();
+require ROOT_PATH . '/templates/tinymce-base.php';
+?>
 <script src="<?= SITE_URL ?>/assets/js/inline-cms.js"></script>
 <?php endif; ?>
 

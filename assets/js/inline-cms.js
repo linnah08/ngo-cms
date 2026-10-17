@@ -30,7 +30,11 @@ window.OmCMS = (function () {
 
   function _activateEditables() {
     document.querySelectorAll('[data-cms-field]').forEach(function (el) {
-      if (el.dataset.cmsType === 'richtext') return; // TinyMCE handles these
+      // TinyMCE opens these on click or focus; tabindex lets a keyboard user reach them.
+      if (el.dataset.cmsType === 'richtext') {
+        if (!el.hasAttribute('tabindex')) { el.setAttribute('tabindex', '0'); el.dataset.omTab = '1'; }
+        return;
+      }
       // A photo is changed through its dialog, never typed into: a typed-in wrap marked the
       // image dirty with its HTML on blur. It acts as a button instead, so keys reach it too.
       if (el.classList.contains('om-img-wrap')) {
@@ -49,6 +53,7 @@ window.OmCMS = (function () {
     document.querySelectorAll('[data-cms-field]').forEach(function (el) {
       el.removeAttribute('contenteditable');
       el.removeEventListener('blur', _onBlur);
+      if (el.dataset.omTab) { el.removeAttribute('tabindex'); delete el.dataset.omTab; }
     });
     document.querySelectorAll('.om-img-wrap[role="button"]').forEach(function (el) {
       el.removeAttribute('tabindex');
@@ -57,7 +62,7 @@ window.OmCMS = (function () {
     });
     // Destroy TinyMCE inline instances
     if (window.tinymce) {
-      tinymce.editors.slice().forEach(function (ed) { ed.remove(); });
+      tinymce.get().slice().forEach(function (ed) { ed.remove(); }); // get() with no id: every editor (TinyMCE 6+ has no .editors)
     }
     _removeAddRemoveControls();
   }
@@ -149,13 +154,21 @@ window.OmCMS = (function () {
 
   // ── TinyMCE inline ────────────────────────────────────────────────────────
 
+  let _rtWarned = false;
+
   function _initRichText(el) {
-    if (!window.tinymce) return;
+    if (!window.tinymce) {
+      // Never a silent no-op: say why the text cannot be edited here.
+      if (!_rtWarned) { _rtWarned = true; alert('Редакторът на текст не се зареди (проверете интернет връзката) — презаредете страницата. Текстът може да се промени и от Админ панела.'); }
+      return;
+    }
     if (!el.id) el.id = 'om-rt-' + Math.random().toString(36).slice(2);
 
     const cfg = Object.assign({}, window._tinyBase, {
       selector: '#' + el.id,
       inline: true,
+      // The click or Tab that opened the editor should land the caret in it.
+      init_instance_callback: function (ed) { ed.focus(); },
       setup: function (ed) {
         if (window._tinyBase && typeof window._tinyBase.setup === 'function') {
           window._tinyBase.setup(ed);
@@ -169,14 +182,16 @@ window.OmCMS = (function () {
     tinymce.init(cfg);
   }
 
-  // Click-to-init rich text fields
-  document.addEventListener('click', function (e) {
+  // Click- or focus-to-init rich text fields
+  function _onRichTextActivate(e) {
     if (!editMode) return;
     const el = e.target.closest('[data-cms-type="richtext"]');
     if (!el) return;
     if (window.tinymce && tinymce.get(el.id)) return; // already inited
     _initRichText(el);
-  });
+  }
+  document.addEventListener('click', _onRichTextActivate);
+  document.addEventListener('focusin', _onRichTextActivate);
 
   // ── Image replacement ─────────────────────────────────────────────────────
 
