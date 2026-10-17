@@ -184,4 +184,14 @@ final class HomeRenderTest extends TestCase
         }
         $this->assertMatchesRegularExpression('/\.section:not\(\.section--grey\):not\(\.section--teal\):not\(\.section--warm\)\+\.section:not\(\.section--grey\):not\(\.section--teal\):not\(\.section--warm\)[^{]*\{padding-top:0\}/', $css);
     }
+
+    public function test_first_block_under_a_page_title_starts_close_to_it(): void
+    {
+        $head = home_shared_head();
+        $this->assertStringContainsString('.page-hero+style+script+.section{padding-top:2.5rem}', $head);
+        // The selector leans on the shared head being exactly one <style> then one <script>.
+        $this->assertMatchesRegularExpression('#^<style id="home-sections-css">.*</style>\s*<script>.*</script>\s*$#s', $head);
+        $this->assertSame(1, substr_count($head, '<style'));
+        $this->assertSame(1, substr_count($head, '<script'));
+    }
 }

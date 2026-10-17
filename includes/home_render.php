@@ -181,6 +181,9 @@ function home_shared_head(): string {
    top padding, so the gap between them is one block's padding, not two. */
 .section:not(.section--grey):not(.section--teal):not(.section--warm)+.section:not(.section--grey):not(.section--teal):not(.section--warm),
 .section--grey+.section--grey,.section--teal+.section--teal,.section--warm+.section--warm{padding-top:0}
+/* On a page built from blocks this style and the script below sit between the title band
+   and the first block, so main.css's .page-hero+.section never matches; same rule here. */
+.page-hero+style+script+.section{padding-top:2.5rem}
 /* Single-product spotlight (templates/home/product-spotlight.php). A site theme
    stylesheet restyles it without touching this shared file: set the --spot-* variables
    on .home-spot, or override a part with one extra class (.home-spot .home-spot__title). */
