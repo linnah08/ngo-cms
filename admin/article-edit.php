@@ -582,6 +582,16 @@ $ig_preview = social_insta_preview($article);
     <?php if (!$_items): ?>
       <p style="margin:0;font-size:.82rem;color:var(--text-muted);">Добавете снимка към статията, за да видите как ще изглежда в Instagram.</p>
     <?php else: ?>
+      <?php if ($_kind === 'post'): ?>
+      <div role="group" aria-label="Форма на публикацията в Instagram" style="display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;margin-bottom:.6rem;">
+        <span aria-hidden="true" style="font-size:.82rem;font-weight:600;margin-right:.2rem;">Форма:</span>
+        <?php foreach (['auto' => 'Автоматично', 'landscape' => '▭ Хоризонтална', 'square' => '□ Квадрат', 'portrait' => '▯ Вертикална'] as $_sv => $_sl):
+            $_on = $ig_preview['shape'] === $_sv; ?>
+        <button type="button" class="ig-shape-btn btn <?= $_on ? 'btn--primary' : 'btn--outline' ?>" data-shape="<?= $_sv ?>" aria-pressed="<?= $_on ? 'true' : 'false' ?>"
+                style="font-size:.78rem;min-height:44px;padding:.3rem .7rem;"><?= h($_sl) ?></button>
+        <?php endforeach; ?>
+      </div>
+      <?php endif; ?>
       <div role="list" aria-label="<?= $_kind === 'story' ? 'Снимка за Instagram Story' : 'Снимки за публикацията в Instagram' ?>" style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:flex-end;margin-bottom:.4rem;">
         <?php foreach ($_items as $_i => $_p):
             $_h  = $_kind === 'story' ? 128 : 104;
@@ -589,30 +599,21 @@ $ig_preview = social_insta_preview($article);
             $_r  = $_p['rect'];
             $_lbl = $_kind === 'story'
                 ? 'Главната снимка в Story. Натиснете, за да изберете коя част да се вижда.'
-                : 'Снимка ' . ($_i + 1) . ' от ' . count($_items) . ($_i === 0 ? ' (главна)' : '') . '. Натиснете, за да изберете коя част да се вижда.';
-            if ($_p['too_much']) $_lbl .= ' Внимание: Instagram ще отреже ' . $_p['cut'] . '% от нея.'; ?>
+                : 'Снимка ' . ($_i + 1) . ' от ' . count($_items) . ($_i === 0 ? ' (главна)' : '') . '. Натиснете, за да изберете коя част да се вижда.';; ?>
         <div role="listitem" style="display:flex;flex-direction:column;align-items:center;gap:.2rem;">
           <button type="button" class="ig-crop-thumb" aria-label="<?= h($_lbl) ?>"
-                  data-src="<?= h($_p['src']) ?>" data-cut="<?= (int) $_p['cut'] ?>" data-w="<?= (int) $_p['w'] ?>" data-h="<?= (int) $_p['h'] ?>" data-ar="<?= h((string) $_p['ar']) ?>" data-rect="<?= h(json_encode($_r)) ?>"
-                  style="display:block;padding:0;margin:0;border:2px solid <?= $_p['too_much'] ? '#c0392b' : 'var(--border,#e8ddd5)' ?>;border-radius:6px;background:#f3efe9;cursor:pointer;width:<?= $_w + 4 ?>px;height:<?= $_h + 4 ?>px;overflow:hidden;">
+                  data-src="<?= h($_p['src']) ?>" data-w="<?= (int) $_p['w'] ?>" data-h="<?= (int) $_p['h'] ?>" data-ar="<?= h((string) $_p['ar']) ?>" data-rect="<?= h(json_encode($_r)) ?>"
+                  style="display:block;padding:0;margin:0;border:2px solid var(--border,#e8ddd5);border-radius:6px;background:#f3efe9;cursor:pointer;width:<?= $_w + 4 ?>px;height:<?= $_h + 4 ?>px;overflow:hidden;">
             <span style="display:block;position:relative;width:<?= $_w ?>px;height:<?= $_h ?>px;overflow:hidden;">
               <img src="<?= h($_p['src']) ?>" alt="" loading="lazy" draggable="false"
                    style="position:absolute;display:block;max-width:none;margin:0;width:<?= round(100 / $_r['w'], 4) ?>%;height:<?= round(100 / $_r['h'], 4) ?>%;left:<?= round(-100 * $_r['x'] / $_r['w'], 4) ?>%;top:<?= round(-100 * $_r['y'] / $_r['h'], 4) ?>%;">
             </span>
           </button>
           <span aria-hidden="true" style="font-size:.72rem;color:var(--text-muted);"><?= $_kind === 'story' ? '9:16' : ($_i === 0 ? 'Главна' : (string) ($_i + 1)) ?></span>
-          <span class="ig-cut-flag" aria-hidden="true" style="<?= $_p['too_much'] ? '' : 'display:none;' ?>font-size:.72rem;font-weight:600;color:#b91c1c;">⚠ −<?= (int) $_p['cut'] ?>%</span>
         </div>
         <?php endforeach; ?>
       </div>
       <p style="margin:0;font-size:.8rem;color:var(--text-muted);">Натиснете снимка, за да изберете коя част да се вижда в Instagram.</p>
-      <?php $_prob = $ig_preview[$_kind . '_problem']; ?>
-      <div class="ig-cut-problem" style="<?= $_prob ? '' : 'display:none;' ?>margin:.5rem 0 0;padding:.6rem .75rem;border:2px solid #c0392b;border-radius:6px;background:#fdecea;color:#7f1d1d;font-size:.82rem;">
-        <p style="margin:0 0 .3rem;font-weight:600;"><span aria-hidden="true">⚠ </span><span class="ig-cut-lead"><?= h($_prob['lead'] ?? '') ?></span></p>
-        <ul class="ig-cut-tips" style="margin:0;padding-left:1.1rem;">
-          <?php foreach ($_prob['tips'] ?? [] as $_t): ?><li><?= h($_t) ?></li><?php endforeach; ?>
-        </ul>
-      </div>
       <p class="ig-crop-sched-note" style="<?= $_sched ? '' : 'display:none;' ?>margin:.25rem 0 0;font-size:.8rem;color:#92400e;">
         <?= $_kind === 'story' ? 'Story-то вече е планирано.' : 'Публикацията вече е планирана.' ?> Ако промените изрязването, натиснете отново „Планирай в Instagram“, за да стигне промяната до Instagram.
       </p>
@@ -1388,26 +1389,46 @@ if (translateBtn) {
     img.style.top    = (-100 * r.y / r.h) + '%';
     btn.dataset.rect = JSON.stringify({ x: r.x, y: r.y, w: r.w, h: r.h });
   }
-  // The red note under the photos and the ⚠ on each photo Instagram would cut too much.
-  function _igShowProblem(box, problem) {
-    var bad = (problem && problem.srcs) || [];
-    box.querySelectorAll('.ig-crop-thumb').forEach(function (b) {
-      var flagged = bad.indexOf(b.dataset.src) !== -1;
-      b.style.borderColor = flagged ? '#c0392b' : 'var(--border,#e8ddd5)';
-      var flag = b.parentNode.querySelector('.ig-cut-flag');
-      if (flag) flag.style.display = flagged ? '' : 'none';
-      b.setAttribute('aria-label', b.getAttribute('aria-label').replace(/ Внимание: .*$/, '')
-        + (flagged ? ' Внимание: Instagram ще отреже ' + b.dataset.cut + '% от нея.' : ''));
+  // Redraw the post's photos at a new shape (after 'Форма' changes): size and part shown.
+  function _igRedraw(items) {
+    var btns = document.querySelectorAll('#igCropPost .ig-crop-thumb');
+    items.forEach(function (it, i) {
+      var b = btns[i];
+      if (!b || b.dataset.src !== it.src) return;
+      var w = Math.round(104 * it.ar);
+      b.dataset.ar = it.ar;
+      b.style.width = (w + 4) + 'px';
+      b.querySelector('span').style.width = w + 'px';
+      _igPlace(b, it.rect);
     });
-    var note = box.querySelector('.ig-cut-problem');
-    if (!note) return;
-    note.style.display = problem ? '' : 'none';
-    if (!problem) return;
-    note.querySelector('.ig-cut-lead').textContent = problem.lead;
-    var ul = note.querySelector('.ig-cut-tips');
-    ul.textContent = '';
-    problem.tips.forEach(function (t) { var li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
   }
+  document.querySelectorAll('.ig-shape-btn').forEach(function (sb) {
+    sb.addEventListener('click', function () {
+      var all = document.querySelectorAll('.ig-shape-btn');
+      var prev = document.querySelector('.ig-shape-btn[aria-pressed="true"]');
+      var press = function (on) {
+        all.forEach(function (x) {
+          var p = x === on;
+          x.setAttribute('aria-pressed', p ? 'true' : 'false');
+          x.classList.toggle('btn--primary', p);
+          x.classList.toggle('btn--outline', !p);
+        });
+      };
+      press(sb);
+      cropError.style.display = 'none';
+      cropStatus.textContent = 'Запазва се…';
+      socPost({ action: 'save_shape', shape: sb.dataset.shape }).then(function (res) {
+        if (!res.ok) { var err = new Error(res.error || ''); err.fromServer = true; throw err; }
+        _igRedraw(res.post || []);
+        cropStatus.textContent = 'Запазено. Instagram ще получи снимките в тази форма.';
+      }).catch(function (e) {
+        press(prev);
+        cropStatus.textContent = '';
+        cropError.textContent = (e && e.fromServer && e.message) || 'Формата не можа да се запази. Проверете връзката и опитайте отново.';
+        cropError.style.display = '';
+      });
+    });
+  });
   document.querySelectorAll('.ig-crop-thumb').forEach(function (btn) {
     btn.addEventListener('click', function () {
       if (!window.OMCrop || !OMCrop.pick) return;
@@ -1427,10 +1448,7 @@ if (translateBtn) {
         return socPost({ action: 'save_crop', kind: kind, src: btn.dataset.src, rect: rect }).then(function (res) {
           if (!res.ok) { var err = new Error(res.error || ''); err.fromServer = true; throw err; }
           _igPlace(btn, res.rect);
-          _igShowProblem(btn.closest('[data-kind]'), res.problem || null);
-          cropStatus.textContent = res.problem
-            ? 'Запазено. Има още снимки, от които Instagram ще отреже твърде много — вижте червената бележка.'
-            : 'Запазено. Instagram ще покаже тази част от снимката.';
+          cropStatus.textContent = 'Запазено. Instagram ще покаже тази част от снимката.';
         }).catch(function (e) {
           _igPlace(btn, cur);   // not saved — show what Instagram will really get
           throw e;

@@ -54,22 +54,21 @@ const SOCIAL_STORY_AR = 9 / 16;
 /** How far down the spare height an automatic crop starts — faces sit near the top, not the middle. */
 const SOCIAL_CROP_TOP_BIAS = 0.2;
 /**
- * An automatic crop may cut away at most this share of a photo. More than that and the
- * post is not sent to Instagram until the author picks the part to show themselves —
- * landscape sticker photos once went out cut to portrait, with half of every sticker gone.
+ * The shapes an author can pick for an Instagram feed post, as in Instagram's own app.
+ * 'auto' (the default) lets social_carousel_aspect() pick from the photos.
  */
-const SOCIAL_IG_MAX_CUT = 0.2;
+const SOCIAL_IG_SHAPES = ['portrait' => 0.8, 'square' => 1.0, 'landscape' => 1.91];
 
 /**
  * The shape (width ÷ height) a $w×$h photo is sent at in $mode, or null when $mode
  * doesn't crop. 'carousel': $shared, the one shape every slide has (see
- * social_carousel_aspect(); 4:5 when not given). 'insta': the photo's own shape, clamped
- * to 4:5 … 1.91:1. 'story': 9:16. 'square': 1:1 (LinkedIn's document pages).
+ * social_carousel_aspect(); 4:5 when not given). 'insta': the shape the author picked
+ * ($shared), else the photo's own shape, clamped to 4:5 … 1.91:1. 'story': 9:16. 'square': 1:1 (LinkedIn's document pages).
  */
 function social_target_aspect(int $w, int $h, string $mode, ?float $shared = null): ?float {
     return match ($mode) {
         'carousel' => $shared ?? SOCIAL_IG_MIN,
-        'insta'    => max(SOCIAL_IG_MIN, min(SOCIAL_IG_MAX, $w / $h)),
+        'insta'    => $shared ?? max(SOCIAL_IG_MIN, min(SOCIAL_IG_MAX, $w / $h)),
         'story'    => SOCIAL_STORY_AR,
         'square'   => 1.0,
         default    => null,
@@ -85,9 +84,10 @@ function social_crop_loss(int $w, int $h, float $ar): float {
 /**
  * The one shape every slide of an Instagram carousel shares, from the photos' own
  * shapes ([w, h] each). Instagram takes anything from 4:5 to 1.91:1, so try each photo's
- * own shape and the middle between the narrowest and the widest, and keep the shape
- * whose worst-cut slide loses least (then the least in total): wide photos make a wide
- * carousel, tall ones a 4:5 one.
+ * own shape and the middle between the narrowest and the widest, and keep the shape that
+ * cuts least in total (then the least from the worst-cut slide). So the shape most of
+ * the photos have wins — two 1.91:1 banners and one tall photo go out landscape, not
+ * as a compromise that cuts all three.
  */
 function social_carousel_aspect(array $sizes): float {
     $shapes = array_map(static fn(array $s): float => max(SOCIAL_IG_MIN, min(SOCIAL_IG_MAX, $s[0] / $s[1])), $sizes);
@@ -97,7 +97,7 @@ function social_carousel_aspect(array $sizes): float {
     foreach ($shapes as $ar) {
         $ar = round($ar, 6);
         $loss  = array_map(static fn(array $s): float => social_crop_loss($s[0], $s[1], $ar), $sizes);
-        $score = [round(max($loss), 6), round(array_sum($loss), 6)];
+        $score = [round(array_sum($loss), 6), round(max($loss), 6)];
         if ($bestScore === null || $score < $bestScore) { $best = $ar; $bestScore = $score; }
     }
     return $best;
@@ -231,13 +231,19 @@ function social_crop_clean(array $article, array $body, ?callable $exists = null
             'rect' => ['x' => $x, 'y' => $y, 'w' => $w, 'h' => $h, 'ar' => round($v['ar'], 6)]];
 }
 
+/** The feed-post shape the author picked on the article: 'auto' or a SOCIAL_IG_SHAPES key. */
+function social_insta_shape(array $article): string {
+    $s = $article['insta_shape'] ?? 'auto';
+    return is_string($s) && isset(SOCIAL_IG_SHAPES[$s]) ? $s : 'auto';
+}
+
 /**
  * Every photo Instagram gets for a feed post ($kind 'post') or a story ('story'), main
  * first, and how each is cut: src, w, h (upright), mode, ar (its shape), shared (the
- * carousel's shape, or null), rect (the author's own crop, when it still fits, else
- * null), box ([x, y, w, h] pixels sent), cut (share of the photo cut away; 0 for the
- * author's own crop — they chose it) and too_much (cut over SOCIAL_IG_MAX_CUT).
- * The preview, the check and the photos sent all come from here, so they always agree.
+ * shape all slides share, or null), rect (the author's own crop, when it still fits,
+ * else null) and box ([x, y, w, h] pixels sent). A feed post goes at the shape the
+ * author picked; on 'auto' one photo keeps its own shape and several share the shape
+ * that cuts them least. The preview and the photos sent both come from here.
  */
 function social_insta_slides(array $article, string $kind): array {
     $paths = social_photo_paths($article);
@@ -248,99 +254,56 @@ function social_insta_slides(array $article, string $kind): array {
         if ($size) $photos[] = [$p, $size[0], $size[1]];
     }
     $mode   = $kind === 'story' ? 'story' : (count($photos) > 1 ? 'carousel' : 'insta');
-    $shared = $mode === 'carousel'
-        ? social_carousel_aspect(array_map(static fn(array $ph): array => [$ph[1], $ph[2]], $photos))
-        : null;
+    $picked = social_insta_shape($article);
+    $shared = null;
+    if ($mode !== 'story' && $picked !== 'auto') {
+        $shared = SOCIAL_IG_SHAPES[$picked];
+    } elseif ($mode === 'carousel') {
+        $shared = social_carousel_aspect(array_map(static fn(array $ph): array => [$ph[1], $ph[2]], $photos));
+    }
     $out = [];
     foreach ($photos as [$p, $w, $h]) {
         $ar   = social_target_aspect($w, $h, $mode, $shared);
         $rect = social_saved_crop($article, $kind, $p);
         if (!social_crop_rect_fits($rect, $w, $h, $ar)) $rect = null;
-        $cut  = $rect === null ? social_crop_loss($w, $h, $ar) : 0.0;
         $out[] = [
             'src' => $p, 'w' => $w, 'h' => $h, 'mode' => $mode, 'ar' => round($ar, 6), 'shared' => $shared,
             'rect' => $rect, 'box' => social_crop_box($w, $h, $mode, $rect, $shared),
-            'cut' => $cut, 'too_much' => $cut > SOCIAL_IG_MAX_CUT + 1e-9,
         ];
     }
     return $out;
 }
 
 /**
- * When Instagram would lose too much of a photo: a plain-language explanation and what
- * the author can do, for the editor and for the refused schedule request. Null when
- * every photo is fine. ['lead' => ..., 'tips' => [...], 'srcs' => [photos to fix]]
- */
-function social_insta_cut_problem(array $slides): ?array {
-    $bad = array_keys(array_filter($slides, static fn(array $s): bool => $s['too_much']));
-    if (!$bad) return null;
-    $story = ($slides[0]['mode'] ?? '') === 'story';
-    $worst = (int) round(100 * max(array_map(static fn(int $i): float => $slides[$i]['cut'], $bad)));
-    if ($story || count($slides) === 1) {
-        $what = 'снимката';
-    } else {
-        $nums = array_map(static fn(int $i): string => (string) ($i + 1), $bad);
-        $last = array_pop($nums);
-        $what = $nums ? 'снимки ' . implode(', ', $nums) . ' и ' . $last : 'снимка ' . $last;
-    }
-    $lead = "Instagram ще отреже твърде голяма част от {$what} (до {$worst}%), затова "
-          . ($story ? 'Story-то няма да бъде изпратено' : 'публикацията няма да бъде изпратена')
-          . ', докато не изберете какво да се вижда.';
-    $tips = ['Натиснете снимката тук и изберете сами коя част да се вижда.'];
-    if (!$story && count($slides) > 1) {
-        $tips[] = 'Или сложете в публикацията снимки с еднаква форма — всички широки или всички високи.';
-        $tips[] = 'Или махнете тази снимка от статията.';
-    } else {
-        $tips[] = $story
-            ? 'Или изберете за главна снимка, която е висока (портретна).'
-            : 'Или сложете снимка, която не е толкова широка или толкова висока.';
-    }
-    return ['lead' => $lead, 'tips' => $tips, 'srcs' => array_map(static fn(int $i): string => $slides[$i]['src'], $bad)];
-}
-
-/** The same problem as one sentence-run, for an error line. */
-function social_insta_cut_message(array $problem): string {
-    return $problem['lead'] . ' ' . implode(' ', $problem['tips']);
-}
-
-/**
  * What the Instagram preview in the post editor needs: every photo Instagram will get
- * (main first) with its pixel size, the shape it goes at, the part shown (fractions) and
- * how much is cut away, plus the problem to show when a cut is too big.
+ * (main first) with its pixel size, the shape it goes at and the part shown (fractions),
+ * plus the feed-post shape picked ('shape').
  */
 function social_insta_preview(array $article): array {
-    $out = [];
+    $out = ['shape' => social_insta_shape($article)];
     foreach (['post', 'story'] as $kind) {
-        $slides = social_insta_slides($article, $kind);
         $out[$kind] = array_map(static function (array $s): array {
             [$x, $y, $bw, $bh] = $s['box'];
             return [
                 'src' => $s['src'], 'w' => $s['w'], 'h' => $s['h'], 'ar' => $s['ar'],
                 'rect' => ['x' => $x / $s['w'], 'y' => $y / $s['h'], 'w' => $bw / $s['w'], 'h' => $bh / $s['h']],
-                'cut' => (int) round(100 * $s['cut']), 'too_much' => $s['too_much'],
             ];
-        }, $slides);
-        $out[$kind . '_problem'] = social_insta_cut_problem($slides);
+        }, social_insta_slides($article, $kind));
     }
     return $out;
 }
 
 /**
  * What social-ajax.php sends Buffer for Facebook or Instagram: the photo URLs (main
- * first), the metadata and, for Instagram, 'problem' (see social_insta_cut_problem —
- * when set, the caller must not send). Instagram with several photos is a carousel
- * sharing one shape picked from the photos; an Instagram story is the main photo alone,
+ * first) and the metadata. Instagram photos are cut to the shape from
+ * social_insta_slides() — never refused; an Instagram story is the main photo alone,
  * cropped to 9:16. The author's own crops (insta_crops) are used where they still fit.
  */
 function social_fb_insta_request(array $article, string $channel, bool $is_story = false): array {
     $is_story = $is_story && $channel === 'insta';
     $urls = [];
-    $problem = null;
     if ($channel === 'insta') {
-        $slides  = social_insta_slides($article, $is_story ? 'story' : 'post');
-        $problem = social_insta_cut_problem($slides);
-        foreach ($slides as $s) {
-            if ($problem !== null) break;   // nothing is cut or sent while a photo would lose too much
+        foreach (social_insta_slides($article, $is_story ? 'story' : 'post') as $s) {
             $ready = social_prepare_image($s['src'], $s['mode'], $s['rect'], $s['shared']);
             if ($ready !== null) $urls[] = social_image_url($ready);
         }
@@ -357,7 +320,7 @@ function social_fb_insta_request(array $article, string $channel, bool $is_story
     } else {
         $metadata = 'instagram: { type: post, shouldShareToFeed: true }';   // several assets make the carousel; Buffer refuses type: carousel
     }
-    return ['urls' => $urls, 'metadata' => $metadata, 'problem' => $problem];
+    return ['urls' => $urls, 'metadata' => $metadata];
 }
 
 /**

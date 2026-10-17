@@ -110,6 +110,10 @@ function article_build_bg_data(array $f, array $existing = []): array {
         }
     }
     if ($crops) $data['insta_crops'] = $crops;
+    // The Instagram post shape the author picked (social-ajax.php save_shape).
+    if (is_string($existing['insta_shape'] ?? null) && $existing['insta_shape'] !== 'auto') {
+        $data['insta_shape'] = $existing['insta_shape'];
+    }
     return $data;
 }
 

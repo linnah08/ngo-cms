@@ -3,7 +3,7 @@
  * Facebook / Instagram post AJAX handler.
  *
  * POST body (JSON):
- *   action      'generate' | 'schedule' | 'save_crop'
+ *   action      'generate' | 'schedule' | 'save_crop' | 'save_shape'
  *   csrf_token  string
  *   slug        string   — BG article slug
  *
@@ -19,6 +19,9 @@
  *   kind  string — 'post' or 'story'
  *   src   string — one of the article's own photos
  *   rect  object — {x, y, w, h} fractions of the photo, ar = the shape it was made for
+ *
+ * For 'save_shape':
+ *   shape string — 'auto', 'portrait', 'square' or 'landscape' (the Instagram post's shape)
  */
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
@@ -79,9 +82,27 @@ if ($action === 'save_crop') {
         echo json_encode(['ok' => false, 'error' => 'Изрязването не можа да се запази. Опитайте отново.']);
         exit;
     }
-    // Whether Instagram still loses too much of a photo, so the editor can update its warning.
-    $problem = social_insta_cut_problem(social_insta_slides($data, $clean['kind']));
-    echo json_encode(['ok' => true, 'rect' => $clean['rect'], 'problem' => $problem]);
+    echo json_encode(['ok' => true, 'rect' => $clean['rect']]);
+    exit;
+}
+
+// ── Pick the Instagram post shape ─────────────────────────────────────────────
+// 'auto', 'portrait', 'square' or 'landscape', stored on the BG article as insta_shape.
+// Answers with the new preview, so the editor can redraw the photos at that shape.
+if ($action === 'save_shape') {
+    $shape = $body['shape'] ?? null;
+    if (!is_string($shape) || ($shape !== 'auto' && !isset(SOCIAL_IG_SHAPES[$shape]))) {
+        echo json_encode(['ok' => false, 'error' => 'Невалидна форма.']);
+        exit;
+    }
+    $data = load_json($file);
+    $data['insta_shape'] = $shape;
+    if (!save_json($file, $data)) {
+        _om_log('ERROR', "social-ajax save_shape: failed to save {$file}");
+        echo json_encode(['ok' => false, 'error' => 'Формата не можа да се запази. Опитайте отново.']);
+        exit;
+    }
+    echo json_encode(['ok' => true, 'shape' => $shape, 'post' => social_insta_preview($data)['post']]);
     exit;
 }
 
@@ -272,12 +293,6 @@ if ($action === 'schedule') {
 
     $req = social_fb_insta_request($data, $channel, $is_story);
     _om_log('INFO', "social-ajax schedule/{$channel}: " . count($req['urls']) . ' photo(s)');
-
-    // A photo would lose too much to Instagram's shape: send nothing, say what to do.
-    if ($channel === 'insta' && $req['problem'] !== null) {
-        echo json_encode(['ok' => false, 'error' => social_insta_cut_message($req['problem']), 'problem' => $req['problem']]);
-        exit;
-    }
 
     // Instagram requires an image
     if ($channel === 'insta' && !$req['urls']) {

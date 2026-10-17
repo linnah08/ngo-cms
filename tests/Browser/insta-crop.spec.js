@@ -41,7 +41,7 @@ test.afterAll(() => {
 
 const rectOf = (loc) => loc.evaluate((el) => JSON.parse(el.dataset.rect));
 
-test('previews show the shared carousel shape, flag big cuts and a chosen crop is saved and kept', async ({ page }) => {
+test('previews show the carousel shape, a picked shape redraws them, and a chosen crop is saved and kept', async ({ page }) => {
   await page.goto('/admin/article-edit.php?slug=' + SLUG + '&tab=social');
   test.skip(await page.locator('#socialPanel').count() === 0, 'Social panels need a Claude key in this database');
 
@@ -50,17 +50,20 @@ test('previews show the shared carousel shape, flag big cuts and a chosen crop i
   await expect(thumbs).toHaveCount(2);
   await expect(thumbs.nth(0)).toHaveAttribute('data-src', WIDE);   // main photo first
   await expect(thumbs.nth(0)).toHaveAccessibleName(/Снимка 1 от 2 \(главна\)/);
-  const box = await thumbs.nth(1).locator('span').boundingBox();
+  // Automatic: one wide and one very tall photo — wide cuts less, so both go 3:2.
+  const shapes = page.getByRole('group', { name: 'Форма на публикацията в Instagram' });
+  await expect(shapes.getByRole('button', { name: 'Автоматично' })).toHaveAttribute('aria-pressed', 'true');
+  let box = await thumbs.nth(1).locator('span').boundingBox();
+  expect(box && box.width / box.height).toBeCloseTo(1.5, 1);
+  // Like Instagram's own app: pick a shape and every photo is cut to it, nothing refused.
+  await shapes.getByRole('button', { name: /Вертикална/ }).click();
+  await expect(page.locator('#igCropStatus')).toHaveText(/Запазено/);
+  await expect(shapes.getByRole('button', { name: /Вертикална/ })).toHaveAttribute('aria-pressed', 'true');
+  expect(JSON.parse(fs.readFileSync(BG_FILE, 'utf8')).insta_shape).toBe('portrait');
+  box = await thumbs.nth(1).locator('span').boundingBox();
   expect(box && box.width / box.height).toBeCloseTo(0.8, 1);
   // Automatic crop of the tall photo starts 20% down the spare height, not mid-way.
   expect((await rectOf(thumbs.nth(1))).y).toBeCloseTo(175 / 2000, 4);
-  // A wide and a very tall photo can't share a shape without losing a lot of both: a red
-  // note says so and what to do, and each photo carries a ⚠ with how much is cut.
-  const note = page.locator('#igCropPost .ig-cut-problem');
-  await expect(note).toBeVisible();
-  await expect(note).toContainText('снимки 1 и 2');
-  await expect(note.getByRole('listitem')).toHaveCount(3);
-  await expect(thumbs.nth(1)).toHaveAccessibleName(/Внимание: Instagram ще отреже 44%/);
 
   // Keyboard: open, move the frame down, done.
   await thumbs.nth(1).focus();
@@ -79,11 +82,6 @@ test('previews show the shared carousel shape, flag big cuts and a chosen crop i
   await expect(dialog).toHaveCount(0);
   await expect(page.locator('#igCropStatus')).toHaveText(/Запазено/);
   await expect(thumbs.nth(1)).toBeFocused();   // focus comes back to the photo
-  // The chosen crop is fine; only the wide photo is still flagged.
-  await expect(note).toContainText('снимка 1 ');
-  await expect(thumbs.nth(1)).not.toHaveAccessibleName(/Внимание/);
-  await expect(post.locator('.ig-cut-flag').nth(1)).toBeHidden();
-  await expect(post.locator('.ig-cut-flag').nth(0)).toBeVisible();
 
   const saved = JSON.parse(fs.readFileSync(BG_FILE, 'utf8')).insta_crops.post[TALL];
   expect(saved.ar).toBeCloseTo(0.8, 5);
@@ -105,8 +103,6 @@ test('Story mode shows the main photo alone at 9:16', async ({ page }) => {
   await expect(story).toHaveAttribute('data-src', WIDE);
   const box = await story.locator('span').boundingBox();
   expect(box && box.width / box.height).toBeCloseTo(9 / 16, 1);
-  // A 3:2 photo loses 62% to 9:16 — the Story is held back until a part is chosen.
-  await expect(page.locator('#igCropStory .ig-cut-problem')).toContainText('Story-то няма да бъде изпратено');
 });
 
 test('landscape photos make a landscape carousel with nothing to fix', async ({ page }) => {
@@ -123,5 +119,13 @@ test('landscape photos make a landscape carousel with nothing to fix', async ({ 
     const box = await thumbs.nth(i).locator('span').boundingBox();
     expect(box && box.width / box.height).toBeCloseTo(1.5, 1);
   }
-  await expect(page.locator('#igCropPost .ig-cut-problem')).toBeHidden();
+  // Square: both redrawn square at once, and back to automatic.
+  const shapes = page.getByRole('group', { name: 'Форма на публикацията в Instagram' });
+  await shapes.getByRole('button', { name: /Квадрат/ }).click();
+  await expect(page.locator('#igCropStatus')).toHaveText(/Запазено/);
+  const sq = await thumbs.nth(0).locator('span').boundingBox();
+  expect(sq && sq.width / sq.height).toBeCloseTo(1, 1);
+  await shapes.getByRole('button', { name: 'Автоматично' }).click();
+  await expect(shapes.getByRole('button', { name: 'Автоматично' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.ig-cut-problem')).toHaveCount(0);
 });

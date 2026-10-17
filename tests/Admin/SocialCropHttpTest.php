@@ -196,15 +196,27 @@ final class SocialCropHttpTest extends TestCase
         $this->assertArrayNotHasKey('insta_crops', $this->stored());
     }
 
-    /** Saving a crop reports whether Instagram still loses too much — the author's own crop never does. */
-    public function test_saving_a_crop_reports_the_cut_problem_is_gone(): void
+    /** The Instagram post shape: only the four known values; answered with the new preview. */
+    public function test_the_post_shape_is_saved_and_checked(): void
     {
         [$jar, $csrf] = $this->login();
-        [, $res] = $this->save($jar, ['csrf_token' => $csrf, 'kind' => 'post', 'src' => self::$src, 'rect' => $this->rect()]);
+        $send = fn(array $b) => json_decode($this->http('/admin/social-ajax.php', $jar,
+            json_encode(['action' => 'save_shape', 'slug' => self::$slug] + $b))[1], true);
+        $bad     = $send(['csrf_token' => $csrf, 'shape' => 'huge']);
+        $noCsrf  = $send(['shape' => 'square']);
+        $this->assertArrayNotHasKey('insta_shape', $this->stored());
+        $ok      = $send(['csrf_token' => $csrf, 'shape' => 'square']);
+        $square  = $this->stored()['insta_shape'] ?? null;
+        $back    = $send(['csrf_token' => $csrf, 'shape' => 'auto']);
         @unlink($jar);
-        $this->assertTrue($res['ok']);
-        $this->assertArrayHasKey('problem', $res);
-        $this->assertNull($res['problem']);
+        $this->assertFalse($bad['ok']);
+        $this->assertFalse($noCsrf['ok']);
+        $this->assertTrue($ok['ok']);
+        $this->assertSame('square', $square);
+        $this->assertEqualsWithDelta(1.0, $ok['post'][0]['ar'], 1e-9);
+        $this->assertTrue($back['ok']);
+        $this->assertEqualsWithDelta(0.8, $back['post'][0]['ar'], 1e-9, 'a tall photo alone goes back to 4:5');
+        $this->assertSame('Crop test', $this->stored()['title'], 'the rest of the article is untouched');
     }
 
     public function test_a_good_crop_is_stored_on_the_bg_article(): void

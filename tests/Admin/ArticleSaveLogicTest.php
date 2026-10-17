@@ -119,6 +119,15 @@ final class ArticleSaveLogicTest extends TestCase
         $this->assertArrayNotHasKey('insta_crops', $none);
     }
 
+    public function testBgDataKeepsTheInstagramShapePicked(): void
+    {
+        $f = ['title' => 'T', 'slug' => 's', 'slug_en' => 'se', 'date' => '2026-10-17', 'author' => 'A',
+              'status' => 'published', 'excerpt' => '', 'image' => '', 'tags' => [], 'content' => ''];
+        $this->assertSame('landscape', article_build_bg_data($f, ['insta_shape' => 'landscape'])['insta_shape']);
+        $this->assertArrayNotHasKey('insta_shape', article_build_bg_data($f, ['insta_shape' => 'auto']));
+        $this->assertArrayNotHasKey('insta_shape', article_build_bg_data($f, []));
+    }
+
     public function testBgDataDefaultsMissingMetadataToEmptyStringForNewArticle(): void
     {
         $data = article_build_bg_data([
