@@ -47,6 +47,10 @@ $current_user = admin_user();
     branding: false,
     plugins: 'lists link code emoticons anchor image table charmap wordcount autoresize',
     min_height: 120,
+    // autoresize sizes the editor to the text as it wraps when the editor first appears.
+    // An editor that starts out narrow keeps that tall height after it widens, leaving a
+    // long blank stretch to scroll past. Past this height the text scrolls inside the box.
+    max_height: 600,
     toolbar: 'bold italic underline strikethrough | fontsize | blocks | bullist numlist | link unlink anchor | image table | charmap emoticons | hr removeformat | code',
     toolbar_mode: 'wrap',
     font_size_formats: '10pt 12pt 14pt 16pt 18pt 24pt 30pt 36pt',
