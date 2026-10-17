@@ -59,7 +59,8 @@ function donation_payment_description(string $order_number, string $lang): strin
  * (empty when it is fine), in $lang.
  */
 function donation_validate(float $amount, string $name, string $email, string $donor_type,
-                           string $company, string $eik, string $lang): array {
+                           string $company, string $eik, string $lang, string $vat = ''): array {
+    require_once __DIR__ . '/form_validation.php';
     $errors = [];
     if ($amount < 1) {
         $errors[] = t_or('donation.err.amount_min', 'Сумата трябва да е поне 1 €.', 'The amount must be at least 1 €.', $lang);
@@ -79,6 +80,11 @@ function donation_validate(float $amount, string $name, string $email, string $d
         }
         if ($eik === '') {
             $errors[] = t_or('donation.err.eik', 'Въведете ЕИК / Булстат.', 'Please enter the company ID (EIK / BULSTAT).', $lang);
+        } elseif (org_eik_normalize($eik) === null) {
+            $errors[] = t_or('donation.err.eik_invalid', 'ЕИК / Булстат трябва да е 9 или 13 цифри. Моля проверете го.', 'The company ID (EIK / BULSTAT) should be 9 or 13 digits. Please check it.', $lang);
+        }
+        if ($vat !== '' && form_vat_normalize($vat) === null) {
+            $errors[] = t_or('donation.err.vat_invalid', 'ДДС номерът започва с кода на държавата, например BG123456789.', 'The VAT number starts with the country code, e.g. BG123456789.', $lang);
         }
     }
     return $errors;

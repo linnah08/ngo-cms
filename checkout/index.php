@@ -6,6 +6,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/site_extensions.php';   // donation recipients
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/form_validation.php';
 start_session();
 
 // Module switched off in Admin → Модули — the shop does not exist (site's 404).
@@ -104,14 +105,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $name  = trim($_POST['customer_name']  ?? '');
         $email = trim($_POST['customer_email'] ?? '');
         $phone = trim($_POST['customer_phone'] ?? '');
-        if (!$name)  $errors[] = t_or('checkout.err.name', 'Моля въведете имена.', 'Please enter your name.');
+        if (!$name) {
+            $errors[] = t_or('checkout.err.name', 'Моля въведете имена.', 'Please enter your name.');
+        } elseif (!form_person_name_valid($name)) {
+            $errors[] = t_or('checkout.err.name_full', 'Моля въведете име и фамилия, например „Иван Петров“.', 'Please enter your first and last name, e.g. "Anna Smith".');
+        }
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = t_or('checkout.err.email', 'Невалиден имейл.', 'Please enter a valid email address.');
         if (!$phone) {
             $errors[] = t_or('checkout.err.phone_required', 'Телефонът е задължителен.', 'Phone number is required.');
         } else {
-            $phone_digits = preg_replace('/\D/', '', $phone);
-            $digit_count  = strlen($phone_digits);
-            if ($digit_count < 7 || $digit_count > 15) {
+            if (!form_phone_valid($phone)) {
                 $errors[] = t_or('checkout.err.phone_invalid', 'Моля въведете валиден телефонен номер.', 'Please enter a valid phone number.');
             }
         }
@@ -126,7 +129,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $c_address = trim($_POST['invoice_address']  ?? '');
             if (!$company)   $errors[] = t_or('checkout.err.company', 'Въведете наименование на фирмата.', 'Please enter the company name.');
             if (!$mol)       $errors[] = t_or('checkout.err.mol', 'Въведете МОЛ (отговорно лице).', 'Please enter the person responsible (MOL).');
-            if (!$eik)       $errors[] = t_or('checkout.err.eik', 'Въведете ЕИК / Булстат.', 'Please enter the company ID (EIK / BULSTAT).');
+            if (!$eik) {
+                $errors[] = t_or('checkout.err.eik', 'Въведете ЕИК / Булстат.', 'Please enter the company ID (EIK / BULSTAT).');
+            } elseif (($eik_clean = org_eik_normalize($eik)) === null) {
+                $errors[] = t_or('checkout.err.eik_invalid', 'ЕИК / Булстат трябва да е 9 или 13 цифри. Моля проверете го.', 'The company ID (EIK / BULSTAT) should be 9 or 13 digits. Please check it.');
+            } else {
+                $eik = $eik_clean;
+            }
+            if ($vat !== '') {
+                if (($vat_clean = form_vat_normalize($vat)) === null) {
+                    $errors[] = t_or('checkout.err.vat_invalid', 'ДДС номерът започва с кода на държавата, например BG123456789.', 'The VAT number starts with the country code, e.g. BG123456789.');
+                } else {
+                    $vat = $vat_clean;
+                }
+            }
             if (!$c_address) $errors[] = t_or('checkout.err.company_address', 'Въведете адрес на фирмата.', 'Please enter the company address.');
             if (!$errors) {
                 $invoice_data = [
@@ -150,6 +166,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: ' . shop_path('checkout') . '?step=2');
             exit;
         }
+        // Show the form again with what they typed, not emptied
+        $contact_redisplay = [
+            'customer_name'  => $name,
+            'customer_email' => $email,
+            'customer_phone' => $phone,
+            'invoice_data'   => empty($_POST['needs_invoice']) ? null : [
+                'needs_invoice'   => true,
+                'company_name'    => $company,
+                'mol'             => $mol,
+                'eik'             => $eik,
+                'vat_number'      => $vat,
+                'company_address' => $c_address,
+            ],
+        ];
         $step = 1;
     }
 
@@ -562,6 +592,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $d = $_SESSION['checkout_data'] ?? [];
+if (!empty($contact_redisplay)) $d = array_merge($d, $contact_redisplay);
 $page_title = t_or('checkout.title', 'Поръчка', 'Checkout');
 $page_head_extra = '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@23/build/css/intlTelInput.min.css"><style>@media(max-width:640px){table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;}.checkout-form-row{grid-template-columns:1fr!important;}}.iti{width:100%;}.iti__flag-container+input{width:100%;}</style>';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
@@ -1508,6 +1539,7 @@ if (savedBoxnowName) {
     const iti = window.intlTelInput(input, {
         initialCountry: <?= json_encode($lang === 'en' ? 'auto' : 'bg') ?>,
         separateDialCode: true,
+        strictMode: true,
         utilsScript: 'https://cdn.jsdelivr.net/npm/intl-tel-input@23/build/js/utils.js',
         <?php if ($lang === 'en'): ?>
         geoIpLookup: function(cb) {
@@ -1531,7 +1563,7 @@ if (savedBoxnowName) {
 
     input.addEventListener('blur', function () {
         if (input.value.trim() === '') { clearError(); return; }
-        iti.isValidNumber() ? markValid() : showError();
+        iti.isValidNumberPrecise() ? markValid() : showError();
     });
     input.addEventListener('input', clearError);
 
@@ -1543,7 +1575,9 @@ if (savedBoxnowName) {
     if (form) {
         form.addEventListener('submit', function (e) {
             if (input.value.trim() === '') return;
-            if (!iti.isValidNumber()) {
+            // isValidNumberPrecise(), not isValidNumber(): the latter only
+            // checks the length, so +359 888 12345 (a digit short) passed.
+            if (!iti.isValidNumberPrecise()) {
                 e.preventDefault();
                 showError();
                 input.focus();

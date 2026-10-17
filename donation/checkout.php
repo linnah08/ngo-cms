@@ -55,21 +55,26 @@ if ($payment_method === '') {
 $invoice_data = ['donor_type' => $donor_type];
 $company = trim($_POST['invoice_company'] ?? '');
 $eik     = trim($_POST['invoice_eik']     ?? '');
+$vat     = trim($_POST['invoice_vat']     ?? '');
 if ($donor_type === 'company') {
     $invoice_data += [
         'company_name'    => $company,
         'mol'             => trim($_POST['invoice_mol'] ?? ''),
         'eik'             => $eik,
-        'vat_number'      => trim($_POST['invoice_vat'] ?? '') ?: null,
+        'vat_number'      => $vat ?: null,
         'company_address' => trim($_POST['invoice_address'] ?? ''),
     ];
 }
 
-$errors = donation_validate($amount, $name, $email, $donor_type, $company, $eik, $order_lang);
+$errors = donation_validate($amount, $name, $email, $donor_type, $company, $eik, $order_lang, $vat);
 if ($errors) {
     donation_form_fail($errors, $_POST);
     header('Location: ' . $form_url);
     exit;
+}
+if ($donor_type === 'company') {   // store them the way the certificate prints them
+    $invoice_data['eik'] = org_eik_normalize($eik);
+    if ($vat !== '') $invoice_data['vat_number'] = form_vat_normalize($vat);
 }
 
 $pdo          = get_pdo();

@@ -67,7 +67,16 @@ final class EnglishDonationTest extends TestCase
     public function testValidDonationHasNoErrors(): void
     {
         $this->assertSame([], donation_validate(20, 'Ann', 'ann@example.com', 'individual', '', '', 'en'));
-        $this->assertSame([], donation_validate(20, 'Ann', 'ann@example.com', 'company', 'Acme', '123', 'bg'));
+        $this->assertSame([], donation_validate(20, 'Ann', 'ann@example.com', 'company', 'Acme', '000696327', 'bg'));
+        $this->assertSame([], donation_validate(20, 'Ann', 'ann@example.com', 'company', 'Acme', '000696327', 'bg', 'BG000696327'));
+    }
+
+    public function testCompanyIdAndVatNumberAreChecked(): void
+    {
+        $this->assertSame(['The company ID (EIK / BULSTAT) should be 9 or 13 digits. Please check it.'],
+            donation_validate(20, 'Ann', 'ann@example.com', 'company', 'Acme', '123', 'en'));
+        $this->assertSame(['ДДС номерът започва с кода на държавата, например BG123456789.'],
+            donation_validate(20, 'Ann', 'ann@example.com', 'company', 'Acme', '000696327', 'bg', '000696327'));
     }
 
     public function testValidationErrorsAreInTheDonorsLanguage(): void
