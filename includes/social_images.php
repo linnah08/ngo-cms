@@ -58,6 +58,12 @@ const SOCIAL_CROP_TOP_BIAS = 0.2;
  * 'auto' (the default) lets social_carousel_aspect() pick from the photos.
  */
 const SOCIAL_IG_SHAPES = ['portrait' => 0.8, 'square' => 1.0, 'landscape' => 1.91];
+/**
+ * A photo whose shape is this close to the post's (share cut away) fills the frame by
+ * default — a 3:4 phone photo in a 4:5 post loses 6%, not worth white strips; any other
+ * is shown whole on a white border, as Instagram's own "Mixed" does.
+ */
+const SOCIAL_FIT_TOLERANCE = 0.1;
 
 /**
  * The shape (width ÷ height) a $w×$h photo is sent at in $mode, or null when $mode
@@ -160,11 +166,12 @@ function social_saved_crop(array $article, ?string $kind, string $src): ?array {
  * The file to send for one photo. 'fit': at most 4800px wide (Buffer's limit is 5000).
  * 'insta', 'carousel', 'story', 'square': also cut to that mode's shape — see
  * social_target_aspect() and social_crop_box(). $rect is the author's own crop, when
- * there is one; $shared the carousel's shape. The file name carries a short hash of the crop, so a changed crop is a
+ * there is one; $shared the carousel's shape. $whole: the whole photo, centred on a white
+ * frame of that shape, instead of cut to it. The file name carries a short hash of the crop, so a changed crop is a
  * new URL and Buffer/Instagram never reuse a stale copy. Returns a site path, or null
  * if unreadable.
  */
-function social_prepare_image(string $path, string $mode, ?array $rect = null, ?float $shared = null): ?string {
+function social_prepare_image(string $path, string $mode, ?array $rect = null, ?float $shared = null, bool $whole = false): ?string {
     $abs = $_SERVER['DOCUMENT_ROOT'] . $path;
     // Sizes and crops are of the photo as the author sees it in the browser: upright.
     $size = image_upright_size($abs);
@@ -173,6 +180,9 @@ function social_prepare_image(string $path, string $mode, ?array $rect = null, ?
     [$w, $h] = $size;
     $orientation = image_exif_orientation($abs);
 
+    if ($whole && ($ar = social_target_aspect($w, $h, $mode, $shared)) !== null) {
+        return _social_prepare_whole($path, $abs, strtolower(pathinfo($abs, PATHINFO_EXTENSION)), $w, $h, $ar);
+    }
     $scale = $w > 4800 ? 4800 / $w : 1.0;
     [$cx, $cy, $cw, $ch] = social_crop_box($w, $h, $mode, $rect, $shared);
     // A photo with a rotate flag is always re-saved upright — Instagram doesn't obey the flag.
@@ -195,6 +205,57 @@ function social_prepare_image(string $path, string $mode, ?array $rect = null, ?
     $ok = _social_gd_save($dst, $_SERVER['DOCUMENT_ROOT'] . $outPath, $ext);
     imagedestroy($src); imagedestroy($dst);
     return $ok ? $outPath : $path;
+}
+
+/** The white frame of shape $ar that holds a whole $w×$h photo: [width, height] in photo pixels. */
+function social_whole_frame(int $w, int $h, float $ar): array {
+    return $w / $h > $ar ? [$w, (int) round($w / $ar)] : [(int) round($h * $ar), $h];
+}
+
+/** social_prepare_image() for a photo shown whole: centred on white, at most 4800px wide. */
+function _social_prepare_whole(string $path, string $abs, string $ext, int $w, int $h, float $ar): ?string {
+    [$fw, $fh] = social_whole_frame($w, $h, $ar);
+    $scale = $fw > 4800 ? 4800 / $fw : 1.0;
+    $dw = (int) round($fw * $scale); $dh = (int) round($fh * $scale);
+    $pw = (int) round($w * $scale);  $ph = (int) round($h * $scale);
+    $orientation = image_exif_orientation($abs);
+    $key = "whole,{$dw},{$dh},{$pw},{$ph}" . ($orientation === 1 ? '' : ",o{$orientation}");
+    $outPath = preg_replace('/\.' . preg_quote($ext, '/') . '$/i', '-whole-' . substr(md5($key), 0, 8) . '.' . $ext, $path);
+    if ($outPath === null || $outPath === $path) return $path;
+    $src = _social_gd_open($abs, $ext);
+    if (!$src) return $path;
+    $dst = imagecreatetruecolor($dw, $dh);
+    imagefill($dst, 0, 0, imagecolorallocate($dst, 255, 255, 255));
+    imagecopyresampled($dst, $src, intdiv($dw - $pw, 2), intdiv($dh - $ph, 2), 0, 0, $pw, $ph, $w, $h);
+    $ok = _social_gd_save($dst, $_SERVER['DOCUMENT_ROOT'] . $outPath, $ext);
+    imagedestroy($src); imagedestroy($dst);
+    return $ok ? $outPath : $path;
+}
+
+/**
+ * How a photo sits in a feed post's frame: 'fill' (cut to the shape) or 'whole' (all of it,
+ * on a white border). The author's choice (insta_fit.post) wins; a crop they picked means
+ * 'fill'; otherwise a photo that nearly fits fills and any other is shown whole.
+ */
+function social_insta_fit(array $article, string $src, int $w, int $h, float $ar, bool $hasCrop): string {
+    $saved = $article['insta_fit']['post'][$src] ?? null;
+    if ($saved === 'fill' || $saved === 'whole') return $saved;
+    if ($hasCrop) return 'fill';
+    return social_crop_loss($w, $h, $ar) <= SOCIAL_FIT_TOLERANCE ? 'fill' : 'whole';
+}
+
+/**
+ * Check a fill/whole choice the editor wants to save (social-ajax.php 'save_fit'):
+ * ['ok' => true, 'src' => ..., 'fit' => ...] or ['ok' => false, 'error' => ...].
+ */
+function social_fit_clean(array $article, array $body, ?callable $exists = null): array {
+    $src = $body['src'] ?? null;
+    if (!is_string($src) || !in_array($src, array_column(article_photos($article, $exists), 'src'), true)) {
+        return ['ok' => false, 'error' => 'Тази снимка не е от статията. Презаредете страницата и опитайте отново.'];
+    }
+    $fit = $body['fit'] ?? null;
+    if ($fit !== 'fill' && $fit !== 'whole') return ['ok' => false, 'error' => 'Невалиден избор.'];
+    return ['ok' => true, 'src' => $src, 'fit' => $fit];
 }
 
 /**
@@ -241,7 +302,8 @@ function social_insta_shape(array $article): string {
  * Every photo Instagram gets for a feed post ($kind 'post') or a story ('story'), main
  * first, and how each is cut: src, w, h (upright), mode, ar (its shape), shared (the
  * shape all slides share, or null), rect (the author's own crop, when it still fits,
- * else null) and box ([x, y, w, h] pixels sent). A feed post goes at the shape the
+ * else null), box ([x, y, w, h] pixels sent when filling) and fit ('fill' or 'whole',
+ * see social_insta_fit(); a story always fills). A feed post goes at the shape the
  * author picked; on 'auto' one photo keeps its own shape and several share the shape
  * that cuts them least. The preview and the photos sent both come from here.
  */
@@ -266,9 +328,10 @@ function social_insta_slides(array $article, string $kind): array {
         $ar   = social_target_aspect($w, $h, $mode, $shared);
         $rect = social_saved_crop($article, $kind, $p);
         if (!social_crop_rect_fits($rect, $w, $h, $ar)) $rect = null;
+        $fit  = $kind === 'story' ? 'fill' : social_insta_fit($article, $p, $w, $h, $ar, $rect !== null);
         $out[] = [
             'src' => $p, 'w' => $w, 'h' => $h, 'mode' => $mode, 'ar' => round($ar, 6), 'shared' => $shared,
-            'rect' => $rect, 'box' => social_crop_box($w, $h, $mode, $rect, $shared),
+            'rect' => $rect, 'box' => social_crop_box($w, $h, $mode, $rect, $shared), 'fit' => $fit,
         ];
     }
     return $out;
@@ -276,17 +339,23 @@ function social_insta_slides(array $article, string $kind): array {
 
 /**
  * What the Instagram preview in the post editor needs: every photo Instagram will get
- * (main first) with its pixel size, the shape it goes at and the part shown (fractions),
- * plus the feed-post shape picked ('shape').
+ * (main first) with its pixel size, the shape it goes at, fit ('fill' or 'whole'), the
+ * frame as fractions of the photo ('rect'; past 0…1 when shown whole on white) and the
+ * part a fill would show ('fill_rect'), plus the feed-post shape picked ('shape').
  */
 function social_insta_preview(array $article): array {
     $out = ['shape' => social_insta_shape($article)];
     foreach (['post', 'story'] as $kind) {
         $out[$kind] = array_map(static function (array $s): array {
             [$x, $y, $bw, $bh] = $s['box'];
+            $fill = ['x' => $x / $s['w'], 'y' => $y / $s['h'], 'w' => $bw / $s['w'], 'h' => $bh / $s['h']];
+            // Shown whole: the frame is bigger than the photo, so the rectangle reaches past it.
+            [$fw, $fh] = social_whole_frame($s['w'], $s['h'], $s['ar']);
+            $whole = ['x' => -($fw - $s['w']) / 2 / $s['w'], 'y' => -($fh - $s['h']) / 2 / $s['h'],
+                      'w' => $fw / $s['w'], 'h' => $fh / $s['h']];
             return [
-                'src' => $s['src'], 'w' => $s['w'], 'h' => $s['h'], 'ar' => $s['ar'],
-                'rect' => ['x' => $x / $s['w'], 'y' => $y / $s['h'], 'w' => $bw / $s['w'], 'h' => $bh / $s['h']],
+                'src' => $s['src'], 'w' => $s['w'], 'h' => $s['h'], 'ar' => $s['ar'], 'fit' => $s['fit'],
+                'rect' => $s['fit'] === 'whole' ? $whole : $fill, 'fill_rect' => $fill,
             ];
         }, social_insta_slides($article, $kind));
     }
@@ -296,7 +365,8 @@ function social_insta_preview(array $article): array {
 /**
  * What social-ajax.php sends Buffer for Facebook or Instagram: the photo URLs (main
  * first) and the metadata. Instagram photos are cut to the shape from
- * social_insta_slides() — never refused; an Instagram story is the main photo alone,
+ * social_insta_slides(), or shown whole on white where that photo is set to 'whole' —
+ * never refused; an Instagram story is the main photo alone,
  * cropped to 9:16. The author's own crops (insta_crops) are used where they still fit.
  */
 function social_fb_insta_request(array $article, string $channel, bool $is_story = false): array {
@@ -304,7 +374,7 @@ function social_fb_insta_request(array $article, string $channel, bool $is_story
     $urls = [];
     if ($channel === 'insta') {
         foreach (social_insta_slides($article, $is_story ? 'story' : 'post') as $s) {
-            $ready = social_prepare_image($s['src'], $s['mode'], $s['rect'], $s['shared']);
+            $ready = social_prepare_image($s['src'], $s['mode'], $s['rect'], $s['shared'], $s['fit'] === 'whole');
             if ($ready !== null) $urls[] = social_image_url($ready);
         }
     } else {

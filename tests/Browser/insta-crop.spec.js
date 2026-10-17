@@ -46,8 +46,13 @@ test('previews show the carousel shape, a picked shape redraws them, and a chose
   test.skip(await page.locator('#socialPanel').count() === 0, 'Social panels need a Claude key in this database');
 
   const post  = page.getByRole('list', { name: 'Снимки за публикацията в Instagram' });
-  const thumbs = post.getByRole('button');
+  const thumbs = post.locator('.ig-crop-thumb');
+  const wholeBtns = post.getByRole('button', { name: /покажи цялата снимка/ });
   await expect(thumbs).toHaveCount(2);
+  // The wide photo fills the 3:2 frame; the very tall one doesn't fit, so it is shown whole on white.
+  await expect(wholeBtns.nth(0)).toHaveAttribute('aria-pressed', 'false');
+  await expect(wholeBtns.nth(1)).toHaveAttribute('aria-pressed', 'true');
+  expect((await rectOf(thumbs.nth(1))).w).toBeGreaterThan(1);
   await expect(thumbs.nth(0)).toHaveAttribute('data-src', WIDE);   // main photo first
   await expect(thumbs.nth(0)).toHaveAccessibleName(/Снимка 1 от 2 \(главна\)/);
   // Automatic: one wide and one very tall photo — wide cuts less, so both go 3:2.
@@ -62,8 +67,17 @@ test('previews show the carousel shape, a picked shape redraws them, and a chose
   expect(JSON.parse(fs.readFileSync(BG_FILE, 'utf8')).insta_shape).toBe('portrait');
   box = await thumbs.nth(1).locator('span').boundingBox();
   expect(box && box.width / box.height).toBeCloseTo(0.8, 1);
+  // Still too tall for 4:5, so still whole; "Цялата снимка" off makes it fill the frame.
+  await expect(wholeBtns.nth(1)).toHaveAttribute('aria-pressed', 'true');
+  await wholeBtns.nth(1).click();
+  await expect(page.locator('#igCropStatus')).toHaveText(/запълни рамката/);
+  await expect(wholeBtns.nth(1)).toHaveAttribute('aria-pressed', 'false');
+  expect(JSON.parse(fs.readFileSync(BG_FILE, 'utf8')).insta_fit.post[TALL]).toBe('fill');
   // Automatic crop of the tall photo starts 20% down the spare height, not mid-way.
   expect((await rectOf(thumbs.nth(1))).y).toBeCloseTo(175 / 2000, 4);
+  // And back to whole, then a chosen crop switches it to fill by itself.
+  await wholeBtns.nth(1).click();
+  await expect(wholeBtns.nth(1)).toHaveAttribute('aria-pressed', 'true');
 
   // Keyboard: open, move the frame down, done.
   await thumbs.nth(1).focus();
@@ -82,6 +96,7 @@ test('previews show the carousel shape, a picked shape redraws them, and a chose
   await expect(dialog).toHaveCount(0);
   await expect(page.locator('#igCropStatus')).toHaveText(/Запазено/);
   await expect(thumbs.nth(1)).toBeFocused();   // focus comes back to the photo
+  await expect(wholeBtns.nth(1)).toHaveAttribute('aria-pressed', 'false');
 
   const saved = JSON.parse(fs.readFileSync(BG_FILE, 'utf8')).insta_crops.post[TALL];
   expect(saved.ar).toBeCloseTo(0.8, 5);
@@ -113,7 +128,7 @@ test('landscape photos make a landscape carousel with nothing to fix', async ({ 
   await page.goto('/admin/article-edit.php?slug=' + SLUG + '&tab=social');
   test.skip(await page.locator('#socialPanel').count() === 0, 'Social panels need a Claude key in this database');
 
-  const thumbs = page.getByRole('list', { name: 'Снимки за публикацията в Instagram' }).getByRole('button');
+  const thumbs = page.getByRole('list', { name: 'Снимки за публикацията в Instagram' }).locator('.ig-crop-thumb');
   await expect(thumbs).toHaveCount(2);
   for (const i of [0, 1]) {
     const box = await thumbs.nth(i).locator('span').boundingBox();

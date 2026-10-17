@@ -128,11 +128,14 @@ final class SocialImagesTest extends TestCase
         // One wide, one very tall: wide cuts less in total, so both go at the wide photo's 3:2.
         $this->assertSame([1.5, 1.5], array_column($pv['post'], 'ar'));
         $this->assertEqualsWithDelta(['x' => 0.0, 'y' => 0.0, 'w' => 1.0, 'h' => 1.0], $pv['post'][0]['rect'], 1e-9);
-        $this->assertEqualsWithDelta(['x' => 0.0, 'y' => (2000 - 600) * 0.2 / 2000, 'w' => 1.0, 'h' => 0.3], $pv['post'][1]['rect'], 1e-9);
+        $this->assertSame(['fill', 'whole'], array_column($pv['post'], 'fit'));
+        // The tall photo is shown whole: a 3000×2000 white frame around the 900×2000 photo.
+        $this->assertEqualsWithDelta(['x' => -1050 / 900, 'y' => 0.0, 'w' => 3000 / 900, 'h' => 1.0], $pv['post'][1]['rect'], 1e-9);
+        $this->assertEqualsWithDelta(['x' => 0.0, 'y' => (2000 - 600) * 0.2 / 2000, 'w' => 1.0, 'h' => 0.3], $pv['post'][1]['fill_rect'], 1e-9);
         // Picking Portrait gives the old 4:5, the tall photo cut from 20% down.
         $pv = social_insta_preview(['image' => $b, 'insta_shape' => 'portrait', 'photos' => [['src' => $a, 'caption' => ''], ['src' => $b, 'caption' => '']]]);
         $this->assertSame([0.8, 0.8], array_column($pv['post'], 'ar'));
-        $this->assertEqualsWithDelta(['x' => 0.0, 'y' => 0.0875, 'w' => 1.0, 'h' => 0.5625], $pv['post'][1]['rect'], 1e-9);
+        $this->assertEqualsWithDelta(['x' => 0.0, 'y' => 0.0875, 'w' => 1.0, 'h' => 0.5625], $pv['post'][1]['fill_rect'], 1e-9);
         $this->assertCount(1, $pv['story']);
         $this->assertSame($b, $pv['story'][0]['src']);
         // One photo: its own shape, clamped.
@@ -189,7 +192,7 @@ final class SocialImagesTest extends TestCase
         $this->assertCount(2, $r['urls']);
         // 3:2 and square cut the same in total; the main photo's 3:2 wins the tie and goes whole.
         $this->assertStringEndsWith('/a.jpg', $r['urls'][0]);
-        $this->assertMatchesRegularExpression('/b-car-[0-9a-f]{8}\.jpg$/', $r['urls'][1]);
+        $this->assertMatchesRegularExpression('/b-whole-[0-9a-f]{8}\.jpg$/', $r['urls'][1], 'the square photo is shown whole');
         // Buffer refuses type: carousel (verified 03.10.2026) — several assets on a post make the carousel.
         $this->assertSame('instagram: { type: post, shouldShareToFeed: true }', $r['metadata']);
     }
@@ -358,5 +361,79 @@ final class SocialImagesTest extends TestCase
         $this->assertNull(social_insta_slides($article, 'post')[0]['rect']);
         unset($article['insta_shape']);
         $this->assertNotNull(social_insta_slides($article, 'post')[0]['rect']);
+    }
+
+    // ── A photo that doesn't fit the shape is shown whole on white, or fills if the author says so ──
+
+    private function sent(string $url): string
+    {
+        return $_SERVER['DOCUMENT_ROOT'] . rawurldecode(substr($url, strlen(SITE_URL)));
+    }
+
+    /** The Lafetki post: a 3:4 main photo and two banners nearly 1.91:1. */
+    public function testATallPhotoInALandscapePostIsShownWholeOnWhite(): void
+    {
+        $m  = $this->jpeg('main.jpg', 1200, 1600);
+        $b1 = $this->jpeg('b1.jpg', 419, 222);
+        $b2 = $this->jpeg('b2.jpg', 419, 222);
+        $article = ['image' => $m, 'photos' => [['src' => $m, 'caption' => ''], ['src' => $b1, 'caption' => ''], ['src' => $b2, 'caption' => '']]];
+        $slides = social_insta_slides($article, 'post');
+        $this->assertSame(round(419 / 222, 6), $slides[0]['ar'], 'the banners\' own shape: they go out uncut');
+        $this->assertSame(['whole', 'fill', 'fill'], array_column($slides, 'fit'), 'the tall photo goes whole');
+
+        $r = social_fb_insta_request($article, 'insta');
+        $this->assertMatchesRegularExpression('/main-whole-[0-9a-f]{8}\.jpg$/', $r['urls'][0]);
+        $im = imagecreatefromjpeg($this->sent($r['urls'][0]));
+        $this->assertSame([3020, 1600], [imagesx($im), imagesy($im)]);   // 1600 × 419/222
+        $edge = imagecolorsforindex($im, imagecolorat($im, 5, 800));
+        $this->assertGreaterThan(245, $edge['red'], 'left edge is white');
+        $this->assertGreaterThan(245, $edge['blue']);
+        $mid = imagecolorsforindex($im, imagecolorat($im, 1510, 800));
+        $this->assertLessThan(20, $mid['red'], 'the photo itself (black) is in the middle');
+        $this->assertSame(social_image_url($b1), $r['urls'][1], 'a banner goes out as it is');
+    }
+
+    public function testTheAuthorCanSwitchEachPhotoBetweenWholeAndFill(): void
+    {
+        $m  = $this->jpeg('main.jpg', 1200, 1600);
+        $b1 = $this->jpeg('b1.jpg', 1910, 1000);
+        $article = ['image' => $m, 'photos' => [['src' => $m, 'caption' => ''], ['src' => $b1, 'caption' => '']],
+                    'insta_shape' => 'landscape',
+                    'insta_fit' => ['post' => [$m => 'fill', $b1 => 'whole']]];
+        $this->assertSame(['fill', 'whole'], array_column(social_insta_slides($article, 'post'), 'fit'));
+        $r = social_fb_insta_request($article, 'insta');
+        $this->assertMatchesRegularExpression('/main-car-[0-9a-f]{8}\.jpg$/', $r['urls'][0]);
+        [$w, $h] = getimagesize($this->sent($r['urls'][0]));
+        $this->assertEqualsWithDelta(1.91, $w / $h, 0.01);
+        // Nonsense values fall back to the default.
+        $article['insta_fit']['post'][$m] = 'stretch';
+        $this->assertSame('whole', social_insta_slides($article, 'post')[0]['fit']);
+    }
+
+    public function testAChosenCropMeansFillAndStoriesAlwaysFill(): void
+    {
+        $m = $this->jpeg('main.jpg', 1200, 1600);
+        $b = $this->jpeg('b.jpg', 1910, 1000);
+        $article = ['image' => $m, 'photos' => [['src' => $m, 'caption' => ''], ['src' => $b, 'caption' => '']],
+            'insta_crops' => ['post' => [$m => ['x' => 0, 'y' => 0.2, 'w' => 1, 'h' => 1200 / 1.91 / 1600, 'ar' => 1.91]]]];
+        $this->assertSame('fill', social_insta_slides($article, 'post')[0]['fit']);
+        $this->assertSame('fill', social_insta_slides($article, 'story')[0]['fit']);
+    }
+
+    public function testAPhotoAloneKeepsItsShapeAndFills(): void
+    {
+        $m = $this->jpeg('main.jpg', 1200, 1600);
+        $this->assertSame('fill', social_insta_slides(['image' => $m], 'post')[0]['fit']);
+        $this->assertSame('whole', social_insta_slides(['image' => $m, 'insta_shape' => 'landscape'], 'post')[0]['fit']);
+    }
+
+    public function testFitValidation(): void
+    {
+        $m = $this->jpeg('main.jpg', 1200, 1600);
+        $article = ['image' => $m, 'photos' => [['src' => $m, 'caption' => '']]];
+        $this->assertSame(['ok' => true, 'src' => $m, 'fit' => 'whole'], social_fit_clean($article, ['src' => $m, 'fit' => 'whole']));
+        $this->assertFalse(social_fit_clean($article, ['src' => $m, 'fit' => 'stretch'])['ok']);
+        $this->assertFalse(social_fit_clean($article, ['src' => '/assets/images/other.jpg', 'fit' => 'fill'])['ok']);
+        $this->assertFalse(social_fit_clean($article, ['src' => ['x'], 'fit' => 'fill'])['ok']);
     }
 }

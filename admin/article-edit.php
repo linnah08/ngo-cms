@@ -599,21 +599,27 @@ $ig_preview = social_insta_preview($article);
             $_r  = $_p['rect'];
             $_lbl = $_kind === 'story'
                 ? 'Главната снимка в Story. Натиснете, за да изберете коя част да се вижда.'
-                : 'Снимка ' . ($_i + 1) . ' от ' . count($_items) . ($_i === 0 ? ' (главна)' : '') . '. Натиснете, за да изберете коя част да се вижда.';; ?>
+                : 'Снимка ' . ($_i + 1) . ' от ' . count($_items) . ($_i === 0 ? ' (главна)' : '') . '. Натиснете, за да изберете коя част да се вижда.';
+            $_fit = $_p['fit'] ?? 'fill'; ?>
         <div role="listitem" style="display:flex;flex-direction:column;align-items:center;gap:.2rem;">
           <button type="button" class="ig-crop-thumb" aria-label="<?= h($_lbl) ?>"
-                  data-src="<?= h($_p['src']) ?>" data-w="<?= (int) $_p['w'] ?>" data-h="<?= (int) $_p['h'] ?>" data-ar="<?= h((string) $_p['ar']) ?>" data-rect="<?= h(json_encode($_r)) ?>"
+                  data-src="<?= h($_p['src']) ?>" data-w="<?= (int) $_p['w'] ?>" data-h="<?= (int) $_p['h'] ?>" data-ar="<?= h((string) $_p['ar']) ?>" data-rect="<?= h(json_encode($_r)) ?>" data-fit="<?= h($_fit) ?>" data-fill-rect="<?= h(json_encode($_p['fill_rect'] ?? $_r)) ?>"
                   style="display:block;padding:0;margin:0;border:2px solid var(--border,#e8ddd5);border-radius:6px;background:#f3efe9;cursor:pointer;width:<?= $_w + 4 ?>px;height:<?= $_h + 4 ?>px;overflow:hidden;">
-            <span style="display:block;position:relative;width:<?= $_w ?>px;height:<?= $_h ?>px;overflow:hidden;">
+            <span style="display:block;position:relative;width:<?= $_w ?>px;height:<?= $_h ?>px;overflow:hidden;background:#fff;">
               <img src="<?= h($_p['src']) ?>" alt="" loading="lazy" draggable="false"
                    style="position:absolute;display:block;max-width:none;margin:0;width:<?= round(100 / $_r['w'], 4) ?>%;height:<?= round(100 / $_r['h'], 4) ?>%;left:<?= round(-100 * $_r['x'] / $_r['w'], 4) ?>%;top:<?= round(-100 * $_r['y'] / $_r['h'], 4) ?>%;">
             </span>
           </button>
           <span aria-hidden="true" style="font-size:.72rem;color:var(--text-muted);"><?= $_kind === 'story' ? '9:16' : ($_i === 0 ? 'Главна' : (string) ($_i + 1)) ?></span>
+          <?php if ($_kind === 'post'): ?>
+          <button type="button" class="ig-fit-btn btn <?= $_fit === 'whole' ? 'btn--primary' : 'btn--outline' ?>" aria-pressed="<?= $_fit === 'whole' ? 'true' : 'false' ?>"
+                  aria-label="Снимка <?= $_i + 1 ?>: покажи цялата снимка, с бяла рамка" data-src="<?= h($_p['src']) ?>"
+                  style="font-size:.72rem;min-height:44px;padding:.2rem .55rem;white-space:nowrap;"><span class="ig-fit-tick" aria-hidden="true"><?= $_fit === 'whole' ? '✓ ' : '' ?></span>Цялата снимка</button>
+          <?php endif; ?>
         </div>
         <?php endforeach; ?>
       </div>
-      <p style="margin:0;font-size:.8rem;color:var(--text-muted);">Натиснете снимка, за да изберете коя част да се вижда в Instagram.</p>
+      <p style="margin:0;font-size:.8rem;color:var(--text-muted);">Натиснете снимка, за да изберете коя част да се вижда в Instagram.<?php if ($_kind === 'post'): ?> „Цялата снимка“ я показва цяла, с бяла рамка отстрани — като „Mixed“ в Instagram.<?php endif; ?></p>
       <p class="ig-crop-sched-note" style="<?= $_sched ? '' : 'display:none;' ?>margin:.25rem 0 0;font-size:.8rem;color:#92400e;">
         <?= $_kind === 'story' ? 'Story-то вече е планирано.' : 'Публикацията вече е планирана.' ?> Ако промените изрязването, натиснете отново „Планирай в Instagram“, за да стигне промяната до Instagram.
       </p>
@@ -1389,7 +1395,8 @@ if (translateBtn) {
     img.style.top    = (-100 * r.y / r.h) + '%';
     btn.dataset.rect = JSON.stringify({ x: r.x, y: r.y, w: r.w, h: r.h });
   }
-  // Redraw the post's photos at a new shape (after 'Форма' changes): size and part shown.
+  // Redraw the post's photos from a fresh preview (after the shape, a crop or "whole"
+  // changes): size, part shown, and whether each is shown whole on white.
   function _igRedraw(items) {
     var btns = document.querySelectorAll('#igCropPost .ig-crop-thumb');
     items.forEach(function (it, i) {
@@ -1397,11 +1404,39 @@ if (translateBtn) {
       if (!b || b.dataset.src !== it.src) return;
       var w = Math.round(104 * it.ar);
       b.dataset.ar = it.ar;
+      b.dataset.fit = it.fit;
+      b.dataset.fillRect = JSON.stringify(it.fill_rect);
       b.style.width = (w + 4) + 'px';
       b.querySelector('span').style.width = w + 'px';
       _igPlace(b, it.rect);
+      var fb = b.parentNode.querySelector('.ig-fit-btn');
+      if (fb) {
+        var whole = it.fit === 'whole';
+        fb.setAttribute('aria-pressed', whole ? 'true' : 'false');
+        fb.classList.toggle('btn--primary', whole);
+        fb.classList.toggle('btn--outline', !whole);
+        fb.querySelector('.ig-fit-tick').textContent = whole ? '✓ ' : '';
+      }
     });
   }
+  document.querySelectorAll('.ig-fit-btn').forEach(function (fb) {
+    fb.addEventListener('click', function () {
+      var fit = fb.getAttribute('aria-pressed') === 'true' ? 'fill' : 'whole';
+      cropError.style.display = 'none';
+      cropStatus.textContent = 'Запазва се…';
+      socPost({ action: 'save_fit', src: fb.dataset.src, fit: fit }).then(function (res) {
+        if (!res.ok) { var err = new Error(res.error || ''); err.fromServer = true; throw err; }
+        _igRedraw(res.post || []);
+        cropStatus.textContent = fit === 'whole'
+          ? 'Запазено. Instagram ще покаже цялата снимка, с бяла рамка.'
+          : 'Запазено. Снимката ще запълни рамката.';
+      }).catch(function (e) {
+        cropStatus.textContent = '';
+        cropError.textContent = (e && e.fromServer && e.message) || 'Изборът не можа да се запази. Проверете връзката и опитайте отново.';
+        cropError.style.display = '';
+      });
+    });
+  });
   document.querySelectorAll('.ig-shape-btn').forEach(function (sb) {
     sb.addEventListener('click', function () {
       var all = document.querySelectorAll('.ig-shape-btn');
@@ -1435,10 +1470,12 @@ if (translateBtn) {
       var kind = btn.closest('[data-kind]').dataset.kind;
       var w = +btn.dataset.w, h = +btn.dataset.h, ar = +btn.dataset.ar;
       var cur = JSON.parse(btn.dataset.rect);   // what Instagram gets now, as fractions
+      // Shown whole: the cropper starts from the part a fill would show.
+      var start = btn.dataset.fit === 'whole' ? JSON.parse(btn.dataset.fillRect) : cur;
       cropError.style.display = 'none';
       OMCrop.pick(btn.dataset.src, {
         aspectRatio: ar,
-        data: { x: cur.x * w, y: cur.y * h, width: cur.w * w, height: cur.h * h }
+        data: { x: start.x * w, y: start.y * h, width: start.w * w, height: start.h * h }
       }).then(function (d) {
         if (!d) return;
         var nw = d.naturalWidth || w, nh = d.naturalHeight || h;
@@ -1448,6 +1485,7 @@ if (translateBtn) {
         return socPost({ action: 'save_crop', kind: kind, src: btn.dataset.src, rect: rect }).then(function (res) {
           if (!res.ok) { var err = new Error(res.error || ''); err.fromServer = true; throw err; }
           _igPlace(btn, res.rect);
+          if (res.post) _igRedraw(res.post);   // a chosen crop means the photo fills the frame
           cropStatus.textContent = 'Запазено. Instagram ще покаже тази част от снимката.';
         }).catch(function (e) {
           _igPlace(btn, cur);   // not saved — show what Instagram will really get

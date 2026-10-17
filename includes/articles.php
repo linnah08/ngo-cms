@@ -110,6 +110,12 @@ function article_build_bg_data(array $f, array $existing = []): array {
         }
     }
     if ($crops) $data['insta_crops'] = $crops;
+    // Whole photo or fill the frame (social-ajax.php save_fit), for photos still on the post.
+    $fits = [];
+    foreach ((array) ($existing['insta_fit']['post'] ?? []) as $src => $fit) {
+        if (($fit === 'fill' || $fit === 'whole') && in_array((string) $src, $srcs, true)) $fits[(string) $src] = $fit;
+    }
+    if ($fits) $data['insta_fit'] = ['post' => $fits];
     // The Instagram post shape the author picked (social-ajax.php save_shape).
     if (is_string($existing['insta_shape'] ?? null) && $existing['insta_shape'] !== 'auto') {
         $data['insta_shape'] = $existing['insta_shape'];

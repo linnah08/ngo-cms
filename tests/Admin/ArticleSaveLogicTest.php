@@ -119,6 +119,17 @@ final class ArticleSaveLogicTest extends TestCase
         $this->assertArrayNotHasKey('insta_crops', $none);
     }
 
+    public function testBgDataKeepsWholeOrFillForPhotosStillOnThePost(): void
+    {
+        $f = ['title' => 'T', 'slug' => 's', 'slug_en' => 'se', 'date' => '2026-10-17', 'author' => 'A',
+              'status' => 'published', 'excerpt' => '', 'image' => '/assets/images/a.jpg', 'tags' => [], 'content' => '',
+              'photos' => [['src' => '/assets/images/a.jpg', 'caption' => '']]];
+        $data = article_build_bg_data($f, ['insta_fit' => ['post' => [
+            '/assets/images/a.jpg' => 'whole', '/assets/images/gone.jpg' => 'fill']]]);
+        $this->assertSame(['post' => ['/assets/images/a.jpg' => 'whole']], $data['insta_fit']);
+        $this->assertArrayNotHasKey('insta_fit', article_build_bg_data($f, ['insta_fit' => 'junk']));
+    }
+
     public function testBgDataKeepsTheInstagramShapePicked(): void
     {
         $f = ['title' => 'T', 'slug' => 's', 'slug_en' => 'se', 'date' => '2026-10-17', 'author' => 'A',

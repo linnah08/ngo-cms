@@ -3,7 +3,7 @@
  * Facebook / Instagram post AJAX handler.
  *
  * POST body (JSON):
- *   action      'generate' | 'schedule' | 'save_crop' | 'save_shape'
+ *   action      'generate' | 'schedule' | 'save_crop' | 'save_shape' | 'save_fit'
  *   csrf_token  string
  *   slug        string   — BG article slug
  *
@@ -22,6 +22,10 @@
  *
  * For 'save_shape':
  *   shape string — 'auto', 'portrait', 'square' or 'landscape' (the Instagram post's shape)
+ *
+ * For 'save_fit':
+ *   src   string — one of the article's own photos
+ *   fit   string — 'fill' (cut to the post's shape) or 'whole' (all of it, on white)
  */
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
@@ -77,12 +81,43 @@ if ($action === 'save_crop') {
     if (!is_array($crops[$clean['kind']] ?? null)) $crops[$clean['kind']] = [];
     $crops[$clean['kind']][$clean['src']] = $clean['rect'];
     $data['insta_crops'] = $crops;
+    // Choosing the part to show means the photo fills the frame.
+    if ($clean['kind'] === 'post') {
+        $fits = is_array($data['insta_fit'] ?? null) ? $data['insta_fit'] : [];
+        if (!is_array($fits['post'] ?? null)) $fits['post'] = [];
+        $fits['post'][$clean['src']] = 'fill';
+        $data['insta_fit'] = $fits;
+    }
     if (!save_json($file, $data)) {
         _om_log('ERROR', "social-ajax save_crop: failed to save {$file}");
         echo json_encode(['ok' => false, 'error' => 'Изрязването не можа да се запази. Опитайте отново.']);
         exit;
     }
-    echo json_encode(['ok' => true, 'rect' => $clean['rect']]);
+    echo json_encode(['ok' => true, 'rect' => $clean['rect'],
+        'post' => $clean['kind'] === 'post' ? social_insta_preview($data)['post'] : null]);
+    exit;
+}
+
+// ── Whole photo or fill the frame ─────────────────────────────────────────────
+// Per photo of the Instagram post: insta_fit.post.{src} = 'fill' | 'whole' on the BG
+// article. Answers with the new preview, so the editor can redraw the photos.
+if ($action === 'save_fit') {
+    $data  = load_json($file);
+    $clean = social_fit_clean($data, $body);
+    if (!$clean['ok']) {
+        echo json_encode(['ok' => false, 'error' => $clean['error']]);
+        exit;
+    }
+    $fits = is_array($data['insta_fit'] ?? null) ? $data['insta_fit'] : [];
+    if (!is_array($fits['post'] ?? null)) $fits['post'] = [];
+    $fits['post'][$clean['src']] = $clean['fit'];
+    $data['insta_fit'] = $fits;
+    if (!save_json($file, $data)) {
+        _om_log('ERROR', "social-ajax save_fit: failed to save {$file}");
+        echo json_encode(['ok' => false, 'error' => 'Изборът не можа да се запази. Опитайте отново.']);
+        exit;
+    }
+    echo json_encode(['ok' => true, 'post' => social_insta_preview($data)['post']]);
     exit;
 }
 

@@ -219,6 +219,28 @@ final class SocialCropHttpTest extends TestCase
         $this->assertSame('Crop test', $this->stored()['title'], 'the rest of the article is untouched');
     }
 
+    /** Whole photo or fill, per photo: only the post's own photos and the two values. */
+    public function test_whole_or_fill_is_saved_and_checked(): void
+    {
+        [$jar, $csrf] = $this->login();
+        $send = fn(array $b) => json_decode($this->http('/admin/social-ajax.php', $jar,
+            json_encode(['action' => 'save_fit', 'slug' => self::$slug] + $b))[1], true);
+        $bad     = $send(['csrf_token' => $csrf, 'src' => self::$src, 'fit' => 'stretch']);
+        $foreign = $send(['csrf_token' => $csrf, 'src' => '/assets/images/logo.png', 'fit' => 'whole']);
+        $noCsrf  = $send(['src' => self::$src, 'fit' => 'whole']);
+        $this->assertArrayNotHasKey('insta_fit', $this->stored());
+        $ok = $send(['csrf_token' => $csrf, 'src' => self::$src, 'fit' => 'whole']);
+        @unlink($jar);
+        $this->assertFalse($bad['ok']);
+        $this->assertFalse($foreign['ok']);
+        $this->assertFalse($noCsrf['ok']);
+        $this->assertTrue($ok['ok']);
+        $this->assertSame('whole', $this->stored()['insta_fit']['post'][self::$src]);
+        $this->assertSame('whole', $ok['post'][0]['fit']);
+        $d = $this->stored(); unset($d['insta_fit']);
+        file_put_contents(self::$file, json_encode($d));   // the next tests start without it
+    }
+
     public function test_a_good_crop_is_stored_on_the_bg_article(): void
     {
         [$jar, $csrf] = $this->login();
@@ -233,5 +255,7 @@ final class SocialCropHttpTest extends TestCase
         $this->assertEqualsWithDelta(['x' => 0, 'y' => 0.3, 'w' => 1, 'h' => 0.5625, 'ar' => 0.8], $crops['post'][self::$src], 1e-9);
         $this->assertEqualsWithDelta(0.5625, $crops['story'][self::$src]['ar'], 1e-9);
         $this->assertSame('Crop test', $this->stored()['title'], 'the rest of the article is untouched');
+        $this->assertSame('fill', $this->stored()['insta_fit']['post'][self::$src], 'a chosen crop means fill');
+        $this->assertSame('fill', $res['post'][0]['fit']);
     }
 }
