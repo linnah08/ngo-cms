@@ -173,8 +173,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
 <section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
-    <span class="section-label">Новини</span>
-    <h1>Новини и истории</h1>
+    <h1 style="margin:0;">Новини и истории</h1>
     <p class="lead" style="margin-top:1rem;">Новини и истории от нашата работа.</p>
   </div>
 </section>

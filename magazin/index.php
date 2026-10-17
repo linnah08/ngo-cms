@@ -643,7 +643,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 <!-- Hero -->
 <section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
-    <span class="section-label"><?= $lang === 'bg' ? 'Магазин' : 'Shop' ?></span>
 <?php
     // Editable on the page (inline CMS). The defaults don't mention donating
     // unless the site takes donations (Админ → Модули).
@@ -656,7 +655,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
             : 'Every purchase supports our cause.'),
     ];
 ?>
-    <h1 data-cms-field="hero_title" data-cms-section="shop" data-cms-type="text"
+    <h1 style="margin:0;" data-cms-field="hero_title" data-cms-section="shop" data-cms-type="text"
         data-cms-bg="<?= h($pages['shop']['hero_title_bg'] ?? '') ?>"
         data-cms-en="<?= h($pages['shop']['hero_title_en'] ?? '') ?>"><?= h($_shop_hero['title']) ?></h1>
     <p class="lead" style="margin-top:1rem;max-width:640px;"

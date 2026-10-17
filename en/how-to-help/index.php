@@ -11,8 +11,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
 <section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
-    <span class="section-label">How to help</span>
-    <h1><?= h($how['title_en'] ?? 'How can I help?') ?></h1>
+    <h1 style="margin:0;"><?= h($how['title_en'] ?? 'How can I help?') ?></h1>
     <p class="lead" style="margin-top:1rem;"><?= h($how['intro_en'] ?? "Everyone can get involved! Here's how:") ?></p>
   </div>
 </section>

@@ -10,7 +10,6 @@ $page_description = about_has_team($_bp_page)
     : 'Learn more about ' . SITE_NAME_EN . ' and our story.';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
-$_bp_label = 'About us';
 $_bp_draft = false;
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/block-page.php';
 

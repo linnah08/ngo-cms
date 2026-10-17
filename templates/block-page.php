@@ -7,12 +7,10 @@
  * Expects:
  *   $_bp_page   the page (cpage_normalize() shape)
  *   $lang       'bg' | 'en'
- *   $_bp_label  small label above the title ('За нас'), or '' for none
  *   $_bp_draft  true: show the draft bar with the Publish button (Admin role only)
  */
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/home_render.php';
 
-$_bp_label = (string) ($_bp_label ?? '');
 $_bp_title = cpage_title($_bp_page, $lang);
 
 if (!empty($_bp_draft)): ?>
@@ -38,13 +36,10 @@ if (!empty($_bp_draft)): ?>
 
 <section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
-    <?php if ($_bp_label !== ''): ?><span class="section-label"><?= h($_bp_label) ?></span><?php endif; ?>
     <h1 data-cms-section="pagetitle:<?= h($_bp_page['id']) ?>" data-cms-field="title" data-cms-type="text"<?php
       // The stored BG/EN titles ride along only for an admin, so saving one language never blanks the other.
       if ($GLOBALS['_show_admin_bar'] ?? false): ?> data-cms-bg="<?= h($_bp_page['title_bg']) ?>" data-cms-en="<?= h($_bp_page['title_en']) ?>"<?php endif;
-      // Under a label the title keeps its usual spacing (as the old За нас page had it).
-      if ($_bp_label === ''): ?> style="margin:0;"<?php endif;
-    ?>><?= h($_bp_title) ?></h1>
+    ?> style="margin:0;"><?= h($_bp_title) ?></h1>
   </div>
 </section>
 

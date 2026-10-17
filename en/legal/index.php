@@ -10,8 +10,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
 <section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
-    <span class="section-label">Legal</span>
-    <h1>Legal Information</h1>
+    <h1 style="margin:0;">Legal Information</h1>
     <?php if ($admin_en === ''): ?>
     <p style="margin-top:0.5rem;color:var(--text-muted);font-size:0.9rem;">Last updated: 5 October 2025</p>
     <?php endif; ?>

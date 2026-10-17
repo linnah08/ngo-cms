@@ -29,12 +29,12 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
 <section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container" style="max-width:760px;">
-    <span class="section-label"><?= h(t_or('donation.label', 'Дарение', 'Donation', $lang)) ?></span>
     <h1 data-cms-field="title"
         data-cms-section="donation"
         data-cms-type="text"
         data-cms-bg="<?= h($pages['donation']['title'] ?? '') ?>"
-        data-cms-en="<?= h($pages['donation']['title_en'] ?? '') ?>"><?= h($_dp['title']) ?></h1>
+        data-cms-en="<?= h($pages['donation']['title_en'] ?? '') ?>"
+        style="margin:0;"><?= h($_dp['title']) ?></h1>
     <div class="rich-text lead" style="margin-top:1rem;"
          data-cms-field="donation_text"
          data-cms-section="shop"

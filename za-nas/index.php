@@ -10,7 +10,6 @@ $page_description = about_has_team($_bp_page)
     : 'Научете повече за ' . SITE_NAME_BG . ' и нашата история.';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
-$_bp_label = 'За нас';
 $_bp_draft = false;
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/block-page.php';
 

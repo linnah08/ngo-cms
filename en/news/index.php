@@ -140,8 +140,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
 <section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
-    <span class="section-label">News</span>
-    <h1>News &amp; stories</h1>
+    <h1 style="margin:0;">News &amp; stories</h1>
     <p class="lead" style="margin-top:1rem;">News and stories from our work.</p>
   </div>
 </section>

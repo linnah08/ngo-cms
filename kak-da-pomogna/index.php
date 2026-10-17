@@ -11,8 +11,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
 <section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
-    <span class="section-label">Как да помогна</span>
-    <h1><?= h($help['title'] ?? 'Как да помогна?') ?></h1>
+    <h1 style="margin:0;"><?= h($help['title'] ?? 'Как да помогна?') ?></h1>
     <?php if (!empty($help['intro'])): ?>
       <p class="lead" style="margin-top:1rem;"><?= h($help['intro']) ?></p>
     <?php endif; ?>

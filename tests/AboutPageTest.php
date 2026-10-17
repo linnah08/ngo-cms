@@ -216,7 +216,7 @@ final class AboutPageTest extends CreatedPagesTestCase
         $this->putAbout($this->threeMembers());
         [$bg, $code] = $this->request('za-nas/index.php', '/za-nas/');
         $this->assertSame(200, $code, $bg);
-        foreach (['<span class="section-label">За нас</span>', 'Нашата история', 'Историята на продукта.',
+        foreach (['Нашата история', 'Историята на продукта.',
                   'Защо го правим?', 'Мария', 'Ivan', 'Петя', 'Основател', 'Био БГ', 'нашия екип'] as $want) {
             $this->assertStringContainsString($want, $bg);
         }
@@ -224,14 +224,16 @@ final class AboutPageTest extends CreatedPagesTestCase
         $this->assertStringNotContainsString('alert(1)', $bg);
         $this->assertStringNotContainsString('javascript:x', $bg);
         $this->assertSame(1, substr_count($bg, '<h1'), 'one page title');
+        $this->assertStringNotContainsString('class="section-label"', $bg, 'no small label above the title');
 
         [$en, $code] = $this->request('en/about/index.php', '/en/about/');
         $this->assertSame(200, $code, $en);
-        foreach (['<span class="section-label">About us</span>', 'Our story', 'The story of the product.',
+        foreach (['Our story', 'The story of the product.',
                   'Why we do it', 'Maria', 'Ivan', 'Петя', 'Founder', 'Bio EN', 'За Иван', 'our team'] as $want) {
             $this->assertStringContainsString($want, $en);
         }
         $this->assertStringNotContainsString('👤', $en);
+        $this->assertStringNotContainsString('class="section-label"', $en, 'no small label above the title');
     }
 
     public function test_story_only_page_has_no_team_section_in_either_language(): void

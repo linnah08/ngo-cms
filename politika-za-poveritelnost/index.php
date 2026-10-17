@@ -9,8 +9,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
 <section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container">
-    <span class="section-label">Правна информация</span>
-    <h1>Политика за поверителност</h1>
+    <h1 style="margin:0;">Политика за поверителност</h1>
   </div>
 </section>
 

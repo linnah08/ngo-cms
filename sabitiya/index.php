@@ -58,8 +58,7 @@ if (!$event):
 ?>
 <section class="section section--grey page-hero" style="padding-top:3rem;padding-bottom:1.5rem;">
   <div class="container" style="max-width:960px;">
-    <span class="section-label"><?= h(t_or('events.label', 'Събития', 'Events', $lang)) ?></span>
-    <h1><?= h(t_or('events.heading', 'Предстоящи събития', 'Upcoming events', $lang)) ?></h1>
+    <h1 style="margin:0;"><?= h(t_or('events.heading', 'Предстоящи събития', 'Upcoming events', $lang)) ?></h1>
   </div>
 </section>
 

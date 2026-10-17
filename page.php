@@ -48,7 +48,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
 // Draft bar, title and sections: shared with the built-in pages built from blocks (За нас).
 $_bp_page  = $_cp_page;
-$_bp_label = '';
 $_bp_draft = $_cp_draft;
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/block-page.php';
 
