@@ -89,8 +89,17 @@ if ($section === 'lf_ui') {
 }
 
 if ($section === 'centre') {
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/ui_wording.php';   // ui_wording_clean()
     $centres = load_json(CENTRES_FILE);
     foreach ($fields as $field => $values) {
+        // A centre's name or description: name_<idx> / description_<idx>, plain text.
+        // A language the editor did not send keeps its text.
+        if (preg_match('/^(name|description)_(\d+)$/', (string) $field, $m) && is_array($values) && isset($centres[(int) $m[2]])) {
+            foreach (['bg', 'en'] as $l) {
+                if (array_key_exists($l, $values)) $centres[(int) $m[2]][$m[1] . '_' . $l] = ui_wording_clean(is_string($values[$l]) ? $values[$l] : '');
+            }
+            continue;
+        }
         if (!preg_match('/^image_(\d+)$/', $field, $m)) continue;
         $idx  = (int)$m[1];
         $path = trim(strip_tags($values['bg'] ?? ''));
@@ -100,6 +109,30 @@ if ($section === 'centre') {
     }
     save_json(CENTRES_FILE, $centres);
     save_json_response(['ok' => true]);
+}
+
+// Impact numbers (content/impact.json): number_<idx> (one value for both languages)
+// and label_<idx> (BG and EN), plain text. Items can't be added or moved from here.
+if ($section === 'impact') {
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/ui_wording.php';   // ui_wording_clean()
+    $impact = load_json(IMPACT_FILE);
+    foreach ($fields as $field => $values) {
+        if (!preg_match('/^(number|label)_(\d+)$/', (string) $field, $m) || !is_array($values)) continue;
+        $idx = (int) $m[2];
+        if (!isset($impact[$idx])) continue;
+        $clean = static fn(string $l): ?string => array_key_exists($l, $values) ? ui_wording_clean(is_string($values[$l]) ? $values[$l] : '') : null;
+        if ($m[1] === 'number') {
+            // Edited in one language, carried in the other unchanged: the one that differs is the new number.
+            $old = (string) ($impact[$idx]['number'] ?? '');
+            $bg = $clean('bg'); $en = $clean('en');
+            $new = ($bg !== null && $bg !== $old) ? $bg : (($en !== null && $en !== $old) ? $en : $old);
+            if ($new !== '') $impact[$idx]['number'] = $new;
+        } else {
+            if (($v = $clean('bg')) !== null) $impact[$idx]['label_bg'] = $v;
+            if (($v = $clean('en')) !== null) $impact[$idx]['label_en'] = $v;
+        }
+    }
+    save_json_response(save_json(IMPACT_FILE, $impact) ? ['ok' => true] : ['ok' => false, 'error' => 'Текстът не се запази. Опитайте отново.']);
 }
 
 if ($section === 'partner') {

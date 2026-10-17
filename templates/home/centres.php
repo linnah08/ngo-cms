@@ -24,9 +24,9 @@ $intro = hf($f, 'intro', $lang);
             </div>
           <?php endif; ?>
           <div class="centre-card__body">
-            <h3 data-cms-field="name" data-cms-section="centre" data-cms-type="text"
+            <h3 data-cms-field="name" data-cms-section="centre" data-cms-type="text" data-cms-id="<?= $i ?>"
                 data-cms-bg="<?= h($centre['name_bg'] ?? '') ?>" data-cms-en="<?= h($centre['name_en'] ?? '') ?>"><?= h($cname) ?></h3>
-            <p data-cms-field="description" data-cms-section="centre" data-cms-type="text"
+            <p data-cms-field="description" data-cms-section="centre" data-cms-type="text" data-cms-id="<?= $i ?>"
                data-cms-bg="<?= h($centre['description_bg'] ?? '') ?>" data-cms-en="<?= h($centre['description_en'] ?? '') ?>"><?= h($cdesc) ?></p>
           </div>
         </div>

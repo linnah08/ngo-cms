@@ -188,4 +188,56 @@ final class EditModeWordingTest extends TestCase
             $this->assertStringNotContainsString("function $fn(", (string) file_get_contents($root . '/config.php'), "$fn belongs in includes/edit_mode.php");
         }
     }
+
+    public function test_centre_names_and_impact_numbers_save_to_their_own_item(): void
+    {
+        $files = [CENTRES_FILE, IMPACT_FILE];
+        $before = array_map(fn($f) => is_file($f) ? (string) file_get_contents($f) : null, $files);
+        try {
+            save_json(CENTRES_FILE, [['name_bg' => 'А', 'name_en' => 'A', 'image' => '/x.png'], ['name_bg' => 'Б', 'name_en' => 'B']]);
+            save_json(IMPACT_FILE, [['number' => '10', 'label_bg' => 'деца', 'label_en' => 'children'], ['number' => '5', 'label_bg' => 'центъра', 'label_en' => 'centres']]);
+            $this->assertSame(['ok' => true], $this->save(['section' => 'centre', 'fields' => ['name_1' => ['bg' => 'Нов &amp; център', 'en' => 'B']]]));
+            $this->assertSame(['ok' => true], $this->save(['section' => 'impact', 'fields' => [
+                'number_1' => ['bg' => '7', 'en' => '5'], 'label_0' => ['bg' => 'деца<br>', 'en' => 'kids'],
+            ]]));
+            $c = load_json(CENTRES_FILE);
+            $this->assertSame(['А', 'Нов & център'], array_column($c, 'name_bg'));
+            $this->assertSame('/x.png', $c[0]['image']);
+            $i = load_json(IMPACT_FILE);
+            $this->assertSame(['10', '7'], array_column($i, 'number'));
+            $this->assertSame(['деца', 'kids'], [$i[0]['label_bg'], $i[0]['label_en']]);
+        } finally {
+            foreach ($files as $k => $f) { if ($before[$k] === null) @unlink($f); else file_put_contents($f, $before[$k]); }
+        }
+    }
+
+    public function test_every_editable_section_on_the_pages_has_somewhere_to_save(): void
+    {
+        // A marker the save endpoint doesn't know made Edit mode look editable while
+        // saving failed or did nothing (impact numbers, centre names until v0.32.2).
+        $root = dirname(__DIR__);
+        $save = (string) file_get_contents($root . '/admin/inline-save.php');
+        $js   = (string) file_get_contents($root . '/assets/js/inline-cms.js');
+        $found = [];
+        $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS));
+        foreach ($it as $f) {
+            $path = $f->getPathname();
+            if ($f->getExtension() !== 'php' || preg_match('#/(vendor|node_modules|tests|admin)/#', $path)) continue;
+            preg_match_all('/data-cms-section="([a-z_]+)"/', (string) file_get_contents($path), $m);
+            foreach ($m[1] as $sec) $found[$sec][] = str_replace($root . '/', '', $path);
+        }
+        $this->assertNotEmpty($found);
+        foreach ($found as $sec => $where) {
+            $handled = str_contains($save, "\$section === '$sec'") || preg_match("/^    '$sec' => \\[/m", $save)
+                || str_contains($js, "if (section === '$sec') return base + ");
+            $this->assertTrue((bool) $handled, "data-cms-section=\"$sec\" (" . implode(', ', array_unique($where)) . ') has no save handler');
+        }
+    }
+
+    public function test_donation_payment_labels_are_editable(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__) . '/templates/donation-form.php');
+        $this->assertStringContainsString("te('donation.pay.card',", $src);
+        $this->assertStringContainsString('<?= $_info[1] ?>', $src);
+    }
 }

@@ -948,6 +948,15 @@ window.OmCMS = (function () {
     const bySection = {};
     const requests = [];
     Object.values(dirtyFields).forEach(function (f) {
+      // Impact numbers and centres are saved together, each field named by its item's position.
+      if (f.id && (f.section === 'impact' || f.section === 'centre')) {
+        if (!bySection[f.section]) {
+          bySection[f.section] = {};
+          requests.push([f.section, bySection[f.section]]);
+        }
+        bySection[f.section][f.field + '_' + f.id] = { bg: f.bg, en: f.en };
+        return;
+      }
       if (f.id && (f.section === 'product' || f.section === 'article')) {
         const gk = f.section + '#' + f.id;
         if (!bySection[gk]) {

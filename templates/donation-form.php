@@ -17,16 +17,17 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/IRISPayment.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/donation.php';
 
+// [icon, name, hint] — name and hint are HTML: editable on the page in Edit mode (te()).
 $_donation_pay_methods = [];
 if (DSKBankPayment::isEnabled()) {
     $_donation_pay_methods['card'] = ['💳',
-        t_or('donation.pay.card', 'Плащане с карта', 'Card payment', $lang),
-        t_or('donation.pay.card_hint', 'Visa / Mastercard през DSK Bank', 'Visa / Mastercard via DSK Bank', $lang)];
+        te('donation.pay.card', 'Плащане с карта', 'Card payment', $lang),
+        te('donation.pay.card_hint', 'Visa / Mastercard през DSK Bank', 'Visa / Mastercard via DSK Bank', $lang)];
 }
 if (IRISPayment::isEnabled()) {
     $_donation_pay_methods['iris'] = ['🏦',
-        t_or('donation.pay.iris', 'Банков превод (Pay by Bank)', 'Bank transfer (Pay by Bank)', $lang),
-        t_or('donation.pay.iris_hint', 'Директно от сметката ви през IRIS', 'Directly from your bank account via IRIS', $lang)];
+        te('donation.pay.iris', 'Банков превод (Pay by Bank)', 'Bank transfer (Pay by Bank)', $lang),
+        te('donation.pay.iris_hint', 'Директно от сметката ви през IRIS', 'Directly from your bank account via IRIS', $lang)];
 }
 // After a rejected submission: the reasons (shown inside the form) and what the donor typed.
 $_don      = donation_form_state();
@@ -162,8 +163,8 @@ $_donation_pay_default = isset($_donation_pay_methods[$_don_old['payment_method'
                style="width:1.05rem;height:1.05rem;accent-color:var(--teal);">
         <span aria-hidden="true" style="font-size:1.2rem;line-height:1;"><?= $_info[0] ?></span>
         <span>
-          <span style="display:block;font-weight:600;"><?= h($_info[1]) ?></span>
-          <span style="display:block;font-size:.8rem;color:var(--text-muted);"><?= h($_info[2]) ?></span>
+          <span style="display:block;font-weight:600;"><?= $_info[1] ?></span>
+          <span style="display:block;font-size:.8rem;color:var(--text-muted);"><?= $_info[2] ?></span>
         </span>
       </label>
       <?php endforeach; ?>
