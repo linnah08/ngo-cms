@@ -410,6 +410,69 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </div>
   </section>
 
+  <!-- ── Google ────────────────────────────────────────────────────────────── -->
+  <?php
+  /** Like $fattr, for a field that also has a hint (hint-<field>): both describe it. */
+  $gattr = static function (string $k, bool $hasHint = true) use ($errors, $bad_css): string {
+      $ids = trim(($hasHint ? 'hint-' . $k : '') . (isset($errors[$k]) ? ' err-' . $k : ''));
+      return ($ids !== '' ? ' aria-describedby="' . h($ids) . '"' : '')
+           . (isset($errors[$k]) ? ' aria-invalid="true" style="' . $bad_css . '"' : '');
+  };
+  ?>
+  <section class="admin-card" style="<?= $card ?>" aria-labelledby="google-title">
+    <h2 class="admin-card__title" id="google-title">Google</h2>
+    <p class="admin-meta" style="margin:0 0 1rem;line-height:1.6;">
+      Свързва сайта с услугите на Google. Всички полета са по желание — оставете празно това, което не ползвате.
+      Статистиката и рекламите се включват само за посетители, които са приели бисквитките.
+    </p>
+
+    <label class="admin-checkbox" id="f-site_noindex" style="margin-bottom:.25rem;">
+      <input type="checkbox" name="site_noindex" value="1" aria-describedby="hint-site_noindex" <?= $val('site_noindex') === '1' ? 'checked' : '' ?>>
+      Скрий сайта от търсачките
+    </label>
+    <small id="hint-site_noindex" style="<?= $hint ?>margin-bottom:1.25rem;">
+      Докато е отметнато, Google и другите търсачки не показват сайта в резултатите си — полезно, докато сайтът още не е готов.
+      Махнете отметката, за да могат хората да ви намират в Google. Появяването в резултатите отнема от няколко дни до няколко седмици.
+    </small>
+
+    <div class="admin-form-grid">
+      <label id="f-google_site_verification" style="grid-column:1/-1;">Код за потвърждение от Google Search Console
+        <input type="text" name="google_site_verification" value="<?= h($val('google_site_verification')) ?>" maxlength="300"
+               spellcheck="false" autocomplete="off"<?= $gattr('google_site_verification') ?>>
+        <?= $ferr('google_site_verification') ?>
+        <small id="hint-google_site_verification" style="<?= $hint ?>">
+          В <a href="https://search.google.com/search-console" target="_blank" rel="noopener">Google Search Console</a>
+          добавете адреса на сайта (<?= h(rtrim(SITE_URL, '/')) ?>/), изберете начин за потвърждение „HTML маркер“ (HTML tag)
+          и поставете тук целия ред, който Google показва. Запазете и след това натиснете „Потвърждаване“ в Search Console.
+          После там добавете картата на сайта: <?= h(rtrim(SITE_URL, '/')) ?>/sitemap.xml
+        </small>
+      </label>
+      <label id="f-ga4_id">Google Analytics — идентификатор (G-…)
+        <input type="text" name="ga4_id" value="<?= h($val('ga4_id')) ?>" maxlength="30" placeholder="G-AB12CD34EF"
+               spellcheck="false" autocomplete="off"<?= $gattr('ga4_id') ?>>
+        <?= $ferr('ga4_id') ?>
+        <small id="hint-ga4_id" style="<?= $hint ?>">В Google Analytics: Администриране → Потоци от данни → вашият сайт → „Идентификатор на измерването“.</small>
+      </label>
+      <label id="f-gtm_id">Google Tag Manager (GTM-…)
+        <input type="text" name="gtm_id" value="<?= h($val('gtm_id')) ?>" maxlength="20" placeholder="GTM-AB12CD3"
+               spellcheck="false" autocomplete="off"<?= $gattr('gtm_id') ?>>
+        <?= $ferr('gtm_id') ?>
+        <small id="hint-gtm_id" style="<?= $hint ?>">Само ако някой ви е настроил Tag Manager. За обикновена статистика стига Google Analytics.</small>
+      </label>
+      <label id="f-google_ads_id">Google Ads — номер (AW-…)
+        <input type="text" name="google_ads_id" value="<?= h($val('google_ads_id')) ?>" maxlength="20" placeholder="AW-123456789"
+               spellcheck="false" autocomplete="off"<?= $gattr('google_ads_id', false) ?>>
+        <?= $ferr('google_ads_id') ?>
+      </label>
+      <label id="f-google_ads_purchase_label">Google Ads — етикет за реализация
+        <input type="text" name="google_ads_purchase_label" value="<?= h($val('google_ads_purchase_label')) ?>" maxlength="64"
+               spellcheck="false" autocomplete="off"<?= $gattr('google_ads_purchase_label') ?>>
+        <?= $ferr('google_ads_purchase_label') ?>
+        <small id="hint-google_ads_purchase_label" style="<?= $hint ?>">Отчита добавянето на продукт в количката като реализация. Нужен е само ако правите реклами в Google Ads.</small>
+      </label>
+    </div>
+  </section>
+
   <!-- ── Pre-launch notice ─────────────────────────────────────────────────── -->
   <section class="admin-card" style="<?= $card ?>">
     <h2 class="admin-card__title">Съобщение в началото на сайта</h2>

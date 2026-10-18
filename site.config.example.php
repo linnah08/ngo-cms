@@ -57,6 +57,8 @@ define('SOCIAL_INSTAGRAM', '');
 define('SOCIAL_LINKEDIN',  '');
 
 // ── Analytics / ads (leave '' to disable that tag entirely) ───────────────────
+// Also set in Admin → Организация → Google, which wins over this file, as does
+// the Search Console code (GOOGLE_SITE_VERIFICATION) there.
 define('GTM_ID',                    '');  // Google Tag Manager container
 define('GA4_ID',                    '');  // GA4 measurement ID
 define('GOOGLE_ADS_ID',             '');  // Google Ads conversion ID
@@ -108,5 +110,6 @@ define('SITE_LAUNCH_BANNER_BG', '');
 define('SITE_LAUNCH_BANNER_EN', '');
 
 // Keep every public page out of search results (a robots "noindex, nofollow"
-// tag) while the site is publicly reachable but not finished. Remove on launch.
+// tag) while the site is publicly reachable but not finished. Remove on launch,
+// or untick „Скрий сайта от търсачките“ in Admin → Организация → Google.
 // define('SITE_NOINDEX', true);

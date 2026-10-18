@@ -47,6 +47,8 @@ ErrorDocument 503 /errors/503.php
 
   # Dynamic XML sitemap
   RewriteRule ^sitemap\.xml$ /sitemap.php [L]
+  # robots.txt names the sitemap by its full address, which only SITE_URL knows
+  RewriteRule ^robots\.txt$ /robots.php [L]
 
   # ── Legacy URL redirects (post-WooCommerce/WordPress migration) ──────────
   # Reclaim search ranking from old URLs that now 404. Specific product slugs

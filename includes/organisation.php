@@ -52,6 +52,13 @@ function org_fields(): array
         'newsletter_donate_heading_en' => 'NEWSLETTER_DONATE_HEADING_EN',
         'newsletter_donate_text_bg'    => 'NEWSLETTER_DONATE_TEXT_BG',
         'newsletter_donate_text_en'    => 'NEWSLETTER_DONATE_TEXT_EN',
+        // Google: Search Console proof of ownership, statistics and ads (see org_google_validate()).
+        'google_site_verification'  => 'GOOGLE_SITE_VERIFICATION',
+        'ga4_id'                    => 'GA4_ID',
+        'gtm_id'                    => 'GTM_ID',
+        'google_ads_id'             => 'GOOGLE_ADS_ID',
+        'google_ads_purchase_label' => 'GOOGLE_ADS_PURCHASE_LABEL',
+        'site_noindex'     => 'SITE_NOINDEX',      // '1': ask search engines not to list the site (includes/seo.php)
         'site_launched'    => 'SITE_LAUNCHED',     // set by „Пусни сайта“ (admin/launch.php), not by the form
     ] + org_module_fields();
 }
@@ -426,10 +433,77 @@ function org_validate(array $in, array $themeKeys): array
         }
     }
 
+    foreach (org_google_validate($v) as $k => $msg) $e[$k] = $msg;
+    $v['site_noindex'] = ($in['site_noindex'] ?? '') === '1' ? '1' : '0';
+
     // Sections the page hides because their module is off are not posted:
     // leave them out, so org_save_overrides() keeps what is saved for them.
     foreach (org_hidden_fields() as $k) unset($v[$k], $e[$k]);
     return ['values' => $v, 'errors' => $e];
+}
+
+/**
+ * The Search Console code from what an admin pasted: the code itself, Google's
+ * whole <meta name="google-site-verification" content="…"> tag, or the DNS
+ * record "google-site-verification=…". null when it is none of these.
+ */
+function org_google_verification_code(string $in): ?string
+{
+    $in = trim($in);
+    if (preg_match('/content\s*=\s*["\']([^"\']*)["\']/i', $in, $m)) {
+        $in = trim($m[1]);
+    } elseif (preg_match('/^google-site-verification\s*[=:]\s*(.*)$/i', $in, $m)) {
+        $in = trim($m[1]);
+    }
+    return preg_match('/^[A-Za-z0-9_\-]{20,100}$/', $in) ? $in : null;
+}
+
+/**
+ * Clean the Google fields in $v in place (codes upper-cased, the verification
+ * code pulled out of a pasted tag); returns [field => plain-Bulgarian error].
+ * The format checks also keep anything but the expected letters and digits out
+ * of the <script> where these IDs are printed.
+ */
+function org_google_validate(array &$v): array
+{
+    $e = [];
+    foreach (['google_site_verification', 'ga4_id', 'gtm_id', 'google_ads_id', 'google_ads_purchase_label'] as $k) {
+        $v[$k] = trim((string) ($v[$k] ?? ''));
+    }
+
+    if ($v['google_site_verification'] !== '') {
+        $code = org_google_verification_code($v['google_site_verification']);
+        if ($code === null) {
+            $e['google_site_verification'] = 'Това не прилича на код от Google Search Console. Изберете там начина „HTML маркер“ (HTML tag) и поставете тук целия ред, който Google показва.';
+        } else {
+            $v['google_site_verification'] = $code;
+        }
+    }
+
+    if ($v['ga4_id'] !== '') {
+        $v['ga4_id'] = strtoupper($v['ga4_id']);
+        if (str_starts_with($v['ga4_id'], 'UA-')) {
+            $e['ga4_id'] = 'Номерата, започващи с UA-, са от старата версия на Google Analytics, която вече не работи. Създайте свойство в Google Analytics 4 и поставете номера му, започващ с G-.';
+        } elseif (!preg_match('/^G-[A-Z0-9]{4,20}$/', $v['ga4_id'])) {
+            $e['ga4_id'] = 'Номерът за Google Analytics започва с G- и продължава с латински букви и цифри, например G-AB12CD34EF.';
+        }
+    }
+    if ($v['gtm_id'] !== '') {
+        $v['gtm_id'] = strtoupper($v['gtm_id']);
+        if (!preg_match('/^GTM-[A-Z0-9]{4,12}$/', $v['gtm_id'])) {
+            $e['gtm_id'] = 'Номерът за Google Tag Manager започва с GTM- и продължава с латински букви и цифри, например GTM-AB12CD3.';
+        }
+    }
+    if ($v['google_ads_id'] !== '') {
+        $v['google_ads_id'] = strtoupper($v['google_ads_id']);
+        if (!preg_match('/^AW-\d{6,15}$/', $v['google_ads_id'])) {
+            $e['google_ads_id'] = 'Номерът за Google Ads започва с AW- и продължава с цифри, например AW-123456789.';
+        }
+    }
+    if ($v['google_ads_purchase_label'] !== '' && !preg_match('/^[A-Za-z0-9_\-]{1,64}$/', $v['google_ads_purchase_label'])) {
+        $e['google_ads_purchase_label'] = 'Етикетът за покупка съдържа само латински букви, цифри, - и _. Копирайте го от Google Ads — частта след наклонената черта.';
+    }
+    return $e;
 }
 
 // ── Saving ─────────────────────────────────────────────────────────────────────

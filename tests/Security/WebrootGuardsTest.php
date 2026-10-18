@@ -141,6 +141,7 @@ final class WebrootGuardsTest extends TestCase
     private const ROOT_PUBLIC = [
         'index.php'   => 'the front page',
         'sitemap.php' => 'sitemap.xml, read by search engines',
+        'robots.php'  => 'robots.txt, read by search engines',
         'page.php'    => 'the pages admins create (Admin → Страници); drafts 404 for visitors',
     ];
 

@@ -79,6 +79,13 @@ function seo_render_meta(array $ctx): void {
         echo "  <meta name=\"robots\" content=\"noindex, nofollow\">\n";
     }
 
+    // Search Console's proof that the site is ours (Admin → Организация → Google).
+    // Shown while the site is still hidden too, so it can be verified before launch.
+    $gsv = defined('GOOGLE_SITE_VERIFICATION') ? trim((string) GOOGLE_SITE_VERIFICATION) : '';
+    if ($gsv !== '') {
+        echo '  <meta name="google-site-verification" content="' . $h($gsv) . "\">\n";
+    }
+
     echo '  <link rel="canonical" href="' . $h($url) . "\">\n";
     foreach ($alts as $lg => $u) {
         echo '  <link rel="alternate" hreflang="' . $h($lg) . '" href="' . $h($u) . "\">\n";
