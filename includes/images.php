@@ -119,3 +119,29 @@ function image_resize_to_fit(string $path, int $maxDim = 2000, int $jpegQuality 
     imagedestroy($dst);
     return $ok;
 }
+
+/** "8M" / "512K" / "1G" (php.ini shorthand) → bytes. 0 or unparsable → 0 (no limit). */
+function ini_size_bytes(string $v): int
+{
+    $v = trim($v);
+    if (!preg_match('/^(\d+)\s*([KMG]?)$/i', $v, $m)) return 0;
+    $n = (int)$m[1];
+    return match (strtoupper($m[2])) { 'G' => $n << 30, 'M' => $n << 20, 'K' => $n << 10, default => $n };
+}
+
+/** Largest single upload the server accepts: the smaller of upload_max_filesize and post_max_size. */
+function upload_max_bytes(): int
+{
+    $limits = array_filter([
+        ini_size_bytes((string)ini_get('upload_max_filesize')),
+        ini_size_bytes((string)ini_get('post_max_size')),
+    ]);
+    return $limits ? min($limits) : 0;
+}
+
+/** "8 MB" — for messages; rounds down so the stated limit is never more than the real one. */
+function upload_max_label(): string
+{
+    $b = upload_max_bytes();
+    return $b >= 1 << 20 ? floor($b / (1 << 20)) . ' MB' : max(1, (int)floor($b / 1024)) . ' KB';
+}

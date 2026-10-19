@@ -133,4 +133,38 @@ class InlineUploadTest extends TestCase
     {
         $this->assertSame('assets/images/pages', $this->dir_for_section('unknown_section'));
     }
+
+    // ── size limits (so a too-big phone photo is reported as too big) ───────
+
+    public function test_ini_size_bytes_parses_php_shorthand(): void
+    {
+        require_once __DIR__ . '/../includes/images.php';
+        $this->assertSame(8 << 20, ini_size_bytes('8M'));
+        $this->assertSame(512 << 10, ini_size_bytes('512k'));
+        $this->assertSame(1 << 30, ini_size_bytes('1G'));
+        $this->assertSame(2048, ini_size_bytes('2048'));
+        $this->assertSame(0, ini_size_bytes(''));
+        $this->assertSame(0, ini_size_bytes('lots'));
+    }
+
+    public function test_upload_max_is_the_smaller_ini_limit(): void
+    {
+        require_once __DIR__ . '/../includes/images.php';
+        $expected = min(array_filter([
+            ini_size_bytes((string)ini_get('upload_max_filesize')),
+            ini_size_bytes((string)ini_get('post_max_size')),
+        ]) ?: [0]);
+        $this->assertSame($expected, upload_max_bytes());
+        $this->assertMatchesRegularExpression('/^\d+ (MB|KB)$/', upload_max_label());
+    }
+
+    public function test_endpoint_says_why_an_upload_failed(): void
+    {
+        $src = file_get_contents(__DIR__ . '/../admin/inline-upload.php');
+        // Too-big files must not fall through to the "wrong type" / generic answer.
+        $this->assertStringContainsString("UPLOAD_ERR_INI_SIZE", $src);
+        $this->assertStringContainsString("upload_fail('too large', 'size')", $src);
+        $this->assertStringContainsString("upload_fail('invalid file type', 'type')", $src);
+        $this->assertStringNotContainsString("'error' => 'no file']);", $src);
+    }
 }

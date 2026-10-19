@@ -810,6 +810,7 @@ document.getElementById('tagsInput').addEventListener('input', function () {
 // cropped and can repeat when the same library picture is added twice.
 (function () {
   var MAX = 10;
+  var MAX_BYTES = <?= (int)upload_max_bytes() ?>, MAX_LABEL = <?= json_encode(upload_max_label(), JSON_UNESCAPED_UNICODE) ?>;
   var OK_PATH = /^\/assets\/images\/[a-zA-Z0-9_\-][a-zA-Z0-9\/_.\-]*$/;   // same rule as article_photo_path_ok()
   var grid = document.getElementById('apGrid'), tpl = document.getElementById('apRowTpl');
   var enList = document.getElementById('apEnCaps'), mainInput = document.getElementById('apMain');
@@ -875,12 +876,29 @@ document.getElementById('tagsInput').addEventListener('input', function () {
     return true;
   }
 
+  // Rejects with the reason (size | type | server) so the summary can say what went wrong.
   function upload(file) {
+    if (MAX_BYTES && file.size > MAX_BYTES) return Promise.reject('size');
     var fd = new FormData();
     fd.append('image', file); fd.append('section', 'article'); fd.append('csrf_token', csrf);
     return fetch('/admin/inline-upload.php', { method: 'POST', body: fd, credentials: 'same-origin' })
-      .then(function (r) { return r.json(); })
-      .then(function (d) { if (!d.ok) throw new Error(d.error || 'upload'); return d.path; });
+      .then(function (r) { return r.json(); }, function () { throw 'server'; })
+      .then(function (d) { if (!d.ok) throw (d.reason || 'server'); return d.path; },
+            function (e) { throw (typeof e === 'string' ? e : 'server'); });
+  }
+
+  function failMessage(why) {
+    var parts = [];
+    if (why.size) parts.push(why.size === 1
+      ? '1 снимка е твърде голяма — най-много ' + MAX_LABEL + '. Изберете по-малка снимка.'
+      : why.size + ' снимки са твърде големи — най-много ' + MAX_LABEL + ' всяка. Изберете по-малки снимки.');
+    if (why.type) parts.push(why.type === 1
+      ? '1 файл не е снимка във формат JPEG, PNG или WebP.'
+      : why.type + ' файла не са снимки във формат JPEG, PNG или WebP.');
+    if (why.server) parts.push(why.server === 1
+      ? '1 снимка не можа да се качи. Опитайте отново.'
+      : why.server + ' снимки не можаха да се качат. Опитайте отново.');
+    return parts.join(' ');
   }
 
   // Saving while photos are still uploading would silently leave them out.
@@ -898,19 +916,19 @@ document.getElementById('tagsInput').addEventListener('input', function () {
     files = files.slice(0, Math.max(0, room));
     if (!files.length) return;
     showError('');
-    var failed = 0, done = 0;
+    var failed = 0, done = 0, why = { size: 0, type: 0, server: 0 };
     uploading += files.length;
     say('Качване на ' + files.length + (files.length === 1 ? ' снимка…' : ' снимки…'));
     files.reduce(function (p, f) {
       return p.then(function () {
-        return upload(f).then(function (path) { addRow(path); }, function () { failed++; })
+        return upload(f).then(function (path) { addRow(path); }, function (r) { failed++; why[why.hasOwnProperty(r) ? r : 'server']++; })
           .then(function () { uploading--; done++; if (done < files.length) say('Качване: ' + done + ' от ' + files.length); });
       });
     }, Promise.resolve()).then(function () {
       sync();
       var ok = files.length - failed;
       say(ok === 1 ? 'Добавена е 1 снимка' : 'Добавени са ' + ok + ' снимки');
-      if (failed) showError(failed + (failed === 1 ? ' снимка не можа' : ' снимки не можаха') + ' да се качи. Позволени са JPEG, PNG и WebP.');
+      if (failed) showError(failMessage(why));
       else if (err.textContent.indexOf('Изчакайте') === 0) showError('');
     });
   });

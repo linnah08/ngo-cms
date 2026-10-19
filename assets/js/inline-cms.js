@@ -427,12 +427,12 @@ window.OmCMS = (function () {
     fetch('/admin/inline-upload.php', { method: 'POST', body: fd })
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        if (!data.ok) { alert('Upload failed: ' + (data.error || 'unknown error')); return; }
+        if (!data.ok) { alert(data.message || 'Снимката не можа да се качи. Опитайте отново.'); return; }
         // After upload, add to cache so it appears next time library is opened
         if (_libCache) _libCache.push({ path: data.path, cat: wrap.dataset.cmsSection || 'pages' });
         _applyImagePath(data.path, wrap);
       })
-      .catch(function () { alert('Upload failed'); });
+      .catch(function () { alert('Снимката не можа да се качи. Опитайте отново.'); });
   }
 
   // ── Photo framing ("Нагласи снимката") ────────────────────────────────────
