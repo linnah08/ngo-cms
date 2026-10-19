@@ -14,6 +14,10 @@ require_once __DIR__ . '/../config.php'; // slug(), ascii_slug()
 /**
  * Convert HTML to plain text, turning <strong>/<b> into Unicode bold sans-serif.
  * Used to pre-fill the social textareas from article content.
+ *
+ * Paragraphs and headings are separated by one empty line, <br> becomes a line
+ * break and list items become "• " lines — strip_tags() alone glued paragraphs
+ * together and lost every empty line of the post's layout.
  */
 function html_to_social_text(string $html): string {
     static $bold_map = null;
@@ -31,7 +35,18 @@ function html_to_social_text(string $html): string {
         },
         $html
     );
-    return html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    // Newlines in the HTML source are only formatting; the tags carry the layout.
+    $html = preg_replace('/\s*\n\s*/', ' ', $html);
+    $html = preg_replace('/<br\s*\/?>/i', "\n", $html);
+    $html = preg_replace('/<li(?:\s[^>]*)?>/i', '• ', $html);
+    $html = preg_replace('/<\/li>/i', "\n", $html);
+    $html = preg_replace('/<\/(?:p|div|h[1-6]|blockquote|ul|ol|table|tr)>/i', "\n\n", $html);
+
+    $text = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = str_replace("\u{00A0}", ' ', $text);
+    $text = preg_replace('/[ \t]*\n[ \t]*/', "\n", $text);
+    $text = preg_replace('/\n{3,}/', "\n\n", $text);
+    return trim($text);
 }
 
 /**

@@ -792,6 +792,23 @@ function _tinyGet(id) {
   var el = document.getElementById(id);
   return el ? el.value : '';
 }
+// Plain text for a social post, keeping the layout — mirrors html_to_social_text()
+// in includes/articles.php (paragraphs → empty line, <br> → line, <li> → "• ").
+function _htmlToSocialText(html) {
+  html = String(html || '')
+    .replace(/\s*\n\s*/g, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<li(?:\s[^>]*)?>/gi, '• ')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<\/(?:p|div|h[1-6]|blockquote|ul|ol|table|tr)>/gi, '\n\n');
+  var tmp = document.createElement('textarea');
+  tmp.innerHTML = html.replace(/<[^>]*>/g, '');
+  return tmp.value
+    .replace(/ /g, ' ')
+    .replace(/[ \t]*\n[ \t]*/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
 function _tinySet(id, html) {
   var ed = tinymce.get(id);
   if (ed) { ed.setContent(html); return; }
@@ -1287,8 +1304,7 @@ if (translateBtn) {
     var enContent = _tinyGet('content_en');
     var bgContent = _tinyGet('content');
     var rawHtml   = enContent.trim() || bgContent.trim();
-    var tmp = document.createElement('div'); tmp.innerHTML = rawHtml;
-    var bodyText = (tmp.textContent || tmp.innerText || '').trim();
+    var bodyText  = _htmlToSocialText(rawHtml);
     return useTitle + (bodyText ? '\n\n' + bodyText : '');
   }
 
@@ -1540,9 +1556,7 @@ if (translateBtn) {
     var text = fbText.value.trim();
     if (text) return text;
     var title   = (document.getElementById('title') || {}).value || '';
-    var rawHtml = _tinyGet('content');
-    var tmp = document.createElement('div'); tmp.innerHTML = rawHtml;
-    var bodyText = (tmp.textContent || tmp.innerText || '').trim();
+    var bodyText = _htmlToSocialText(_tinyGet('content'));
     return title.trim() + (bodyText ? '\n\n' + bodyText : '');
   }
 

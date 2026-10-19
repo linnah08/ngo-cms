@@ -242,6 +242,26 @@ final class ArticleSaveLogicTest extends TestCase
         $this->assertSame('Tom & Jerry', html_to_social_text('Tom &amp; Jerry'));
     }
 
+    public function testHtmlToSocialTextKeepsAnEmptyLineBetweenParagraphs(): void
+    {
+        // TinyMCE puts a single newline (or none) between paragraphs; the post
+        // must still show them as separate paragraphs.
+        $this->assertSame("First\n\nSecond\n\nThird",
+            html_to_social_text("<p>First</p>\n<p>Second</p><p>Third</p>"));
+    }
+
+    public function testHtmlToSocialTextTurnsLineBreaksAndListsIntoLines(): void
+    {
+        $this->assertSame("Line one\nLine two\n\n• a\n• b\n\nAfter",
+            html_to_social_text('<p>Line one<br>Line two</p><ul><li>a</li><li>b</li></ul><p>After</p>'));
+    }
+
+    public function testHtmlToSocialTextSquashesEmptyParagraphsToOneEmptyLine(): void
+    {
+        $this->assertSame("Top\n\nBottom",
+            html_to_social_text("<h2>Top</h2>\n<p>&nbsp;</p>\n<p></p>\n<p>Bottom</p>"));
+    }
+
     public function testBuildersCarryThePhotoList(): void
     {
         $photos = [['src' => '/assets/images/articles/a.jpg', 'caption' => 'Лагер']];
