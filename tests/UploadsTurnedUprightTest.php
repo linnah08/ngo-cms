@@ -15,6 +15,7 @@ final class UploadsTurnedUprightTest extends TestCase
 {
     private const EXEMPT = [
         'includes/financial_reports.php' => 'annual reports are PDFs',
+        'includes/files.php'             => 'takes PDFs only (file_is_pdf())',
     ];
 
     public function testEveryPhotoUploadTurnsPhotosUpright(): void

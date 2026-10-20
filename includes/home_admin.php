@@ -31,6 +31,14 @@ function hs_error_html(string $id, ?string $msg): string {
     return $msg === null ? '' : '<p id="' . h($id) . '" style="color:#b91c1c;font-weight:600;margin:.35rem 0 0;"><span aria-hidden="true">⚠ </span>' . h($msg) . '</p>';
 }
 
+/** „Качи PDF“ under a link field: uploads a PDF and puts its address in the field (script in templates/tinymce-base.php). */
+function hs_pdf_button(string $field_id, string $field_label): string {
+    return '<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-top:.4rem;">'
+         . '<button type="button" class="btn btn--outline" style="min-height:44px;" data-pdf-upload="' . h($field_id) . '"'
+         . ' aria-label="' . h('Качи PDF файл за „' . $field_label . '“') . '"><span aria-hidden="true">📎 </span>Качи PDF</button>'
+         . '<span role="status" data-pdf-status style="font-size:.85rem;"></span></div>';
+}
+
 /**
  * One field of a section form.
  * $nb: name base ("f" or "f[cards][2]"), $ib: id base ("f" or "f_cards_2"),
@@ -61,7 +69,7 @@ function hs_field(string $key, array $def, mixed $val, array $errors, string $nb
                 $control = match ($def['kind']) {
                     'textarea' => "<textarea{$attrs} rows=\"3\">{$v}</textarea>",
                     'html'     => "<textarea{$attrs} rows=\"8\" class=\"hs-rich\">{$v}</textarea>",
-                    'link'     => "<input type=\"text\" inputmode=\"url\" autocomplete=\"off\"{$attrs} value=\"{$v}\">",
+                    'link'     => "<input type=\"text\" inputmode=\"url\" autocomplete=\"off\"{$attrs} value=\"{$v}\">" . hs_pdf_button($fid, $def['label'] . ' (' . strtoupper($l) . ')'),
                     default    => "<input type=\"text\"{$attrs} value=\"{$v}\">",
                 };
                 $cols .= '<div class="form-group" style="margin:0;"><label for="' . h($fid) . '">' . $label . hs_badge($l) . '</label>'

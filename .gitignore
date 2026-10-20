@@ -9,6 +9,8 @@ deploy.php
 php_errors.log
 .DS_Store
 /assets/images/uploads/
+# PDFs admins upload to link to (includes/files.php)
+/assets/files/uploads/*.pdf
 admin/setup.php
 git-reset.php
 run-migrate.php
