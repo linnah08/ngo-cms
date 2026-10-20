@@ -73,13 +73,6 @@ $stmt   = $pdo->prepare($sql);
 $stmt->execute($filter['params']);
 $orders = $stmt->fetchAll();
 
-$status_labels = [
-    'new'       => ['Нова',      'badge--published'],
-    'confirmed' => ['Потвърдена','badge--published'],
-    'shipped'   => ['Изпратена', 'badge--published'],
-    'delivered' => ['Доставена', 'badge--published'],
-    'cancelled' => ['Отменена',  'badge--draft'],
-];
 $type_labels = ['physical' => 'Продукт', 'donation' => 'Дарение', 'ticket' => 'Билет'];
 
 $boxnow_ready = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE courier='boxnow' AND type='physical' AND payment_status='paid' AND status IN ('new','confirmed')")->fetchColumn();
@@ -260,8 +253,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
             <?= $o['courier'] ? h(ucfirst($o['courier'])) : '—' ?>
           </td>
           <td style="cursor:pointer;" onclick="location='/admin/order-view.php?id=<?= (int)$o['id'] ?>'">
-            <?php [$slabel, $sclass] = $status_labels[$o['status']] ?? [$o['status'], 'badge--draft']; ?>
-            <span class="badge <?= $sclass ?>"><?= h($slabel) ?></span>
+            <?php [$skey, $slabel] = order_status_display($o, (int)$o['age_minutes']); ?>
+            <span class="badge <?= in_array($skey, ['cancelled', 'awaiting_payment'], true) ? 'badge--draft' : 'badge--published' ?>"><?= h($slabel) ?></span>
             <?php if (order_is_unpaid($o, (int)$o['age_minutes'])): ?>
               <br><span class="badge" style="margin-top:2px;background:#fdecea;color:#b42318;border:1px solid #f5c2c0;font-weight:600;"
                         title="Клиентът не е платил<?= $o['unpaid_cancelled_at'] ? ' — отменена автоматично след ' . unpaid_cancel_days() . ' дни, продуктите са върнати в наличност' : '' ?>">

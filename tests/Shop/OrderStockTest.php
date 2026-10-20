@@ -256,10 +256,10 @@ final class OrderStockTest extends TestCase
     {
         $this->requireDb();
         require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/unpaid_orders.php';
-        // Declined at the bank: cancelled, still unpaid, waiting for the auto-cancel.
+        // Declined at the bank: still open and unpaid, waiting for the auto-cancel.
         $pid   = $this->insertProduct(0);
-        $order = $this->insertOrder('cancelled', [['product_id' => $pid, 'quantity' => 1]]);
-        self::$pdo->prepare("UPDATE orders SET payment_status = 'pending' WHERE id = ?")->execute([$order['id']]);
+        $order = $this->insertOrder('new', [['product_id' => $pid, 'quantity' => 1]]);
+        self::$pdo->prepare("UPDATE orders SET payment_status = 'pending', payment_failed_email_at = NOW() WHERE id = ?")->execute([$order['id']]);
 
         $this->assertTrue(order_stock_on_delete(self::$pdo, $this->reload((int)$order['id'])));
         $this->assertSame(1, $this->stock('products', $pid));

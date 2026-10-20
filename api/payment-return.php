@@ -45,9 +45,9 @@ if (isset($_GET['retry'])) {
         header('Location: ' . $confirm_url);
         exit;
     }
-    // Cancelled (automatically after 3 days unpaid, or by an admin) and its items
-    // are back in stock, so it can't be paid any more — the shopper orders again.
-    if (!empty($order['unpaid_cancelled_at']) || !empty($order['stock_returned_at'])) {
+    // Cancelled (automatically after 3 days unpaid, or by an admin), so it can't
+    // be paid any more — the shopper orders again.
+    if (!order_can_retry_payment($order)) {
         header('Location: ' . $failed_url . '&expired=1');
         exit;
     }

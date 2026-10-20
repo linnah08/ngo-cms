@@ -134,8 +134,23 @@ final class UnpaidOrdersTest extends TestCase
 
     public function testDeclinedOrderIsUnpaidImmediately(): void
     {
-        $o = ['type' => 'donation', 'status' => 'cancelled', 'payment_method' => 'card', 'payment_status' => 'pending'];
+        // A decline emails the shopper right away; the order stays open.
+        $o = ['type' => 'donation', 'status' => 'new', 'payment_method' => 'card', 'payment_status' => 'pending',
+              'payment_failed_email_at' => '2026-10-20 10:00:00'];
         $this->assertTrue(order_is_unpaid($o, 1));
+        $this->assertTrue(order_can_retry_payment($o));
+    }
+
+    public function testOpenUnpaidOrderShowsAsAwaitingPayment(): void
+    {
+        $o = ['type' => 'physical', 'status' => 'new', 'payment_method' => 'card', 'payment_status' => 'pending'];
+        $this->assertSame(['new', 'Нова'], order_status_display($o, 10), 'Not overdue yet');
+        $this->assertSame(['awaiting_payment', 'Чака плащане'], order_status_display($o, 60));
+        $this->assertSame(['awaiting_payment', 'Чака плащане'], order_status_display(['payment_failed_email_at' => '2026-10-20 10:00:00'] + $o, 1));
+        $this->assertSame(['cancelled', 'Отменена'],
+            order_status_display(['status' => 'cancelled', 'unpaid_cancelled_at' => '2026-10-23 10:00:00'] + $o, 5000), 'After the 3-day cancel');
+        $this->assertSame(['shipped', 'Изпратена'], order_status_display(['status' => 'shipped'] + $o, 5000));
+        $this->assertSame(['new', 'Нова'], order_status_display(['payment_method' => 'cod'] + $o, 5000));
     }
 
     public function testPaidOrOfflineOrTicketOrdersAreNeverUnpaid(): void
@@ -164,6 +179,8 @@ final class UnpaidOrdersTest extends TestCase
         $this->assertFalse(order_can_retry_payment(['stock_returned_at' => '2026-09-19 10:00:00'] + $o));
         $this->assertFalse(order_can_retry_payment(['unpaid_cancelled_at' => '2026-09-19 10:00:00'] + $o));
         $this->assertFalse(order_can_retry_payment(['type' => 'ticket'] + $o));
+        $this->assertFalse(order_can_retry_payment(['type' => 'donation', 'status' => 'cancelled'] + $o), 'Cancelled by the admin');
+        $this->assertTrue(order_can_retry_payment(['status' => 'shipped'] + $o), 'Shipped before it was paid');
     }
 
     public function testRetryButtonIsInTheOrdersLanguage(): void
@@ -534,17 +551,29 @@ final class UnpaidOrdersTest extends TestCase
         $this->assertNotNull($fresh['unpaid_cancelled_at']);
     }
 
-    public function testDeclinedOrderIsStillRestockedAfterThreeDays(): void
+    public function testDeclinedOrderStaysOpenThenIsCancelledAndRestockedAfterThreeDays(): void
     {
         $this->requireDb();
         $pid   = $this->insertProduct(0);
-        $order = $this->insertOrder(73 * 60, [
-            'status' => 'cancelled',
-            'items'  => json_encode([['product_id' => $pid, 'quantity' => 1]]),
-        ]);
+        $order = $this->insertOrder(73 * 60, ['items' => json_encode([['product_id' => $pid, 'quantity' => 1]])]);
+        self::$pdo->prepare('UPDATE orders SET payment_failed_email_at = created_at WHERE id = ?')->execute([$order['id']]);
+        $order = $this->reload((int)$order['id']);
+        $this->assertSame('new', $order['status'], 'A decline leaves the order open');
 
+        $this->assertContains($order['order_number'], $this->dueNumbers('to_cancel'));
         $this->assertTrue(cancel_unpaid_order(self::$pdo, $order));
         $this->assertSame(1, $this->stock('products', $pid));
+        $this->assertFalse(order_can_retry_payment($this->reload((int)$order['id'])));
+    }
+
+    public function testDonationCancelledByTheAdminIsClosed(): void
+    {
+        $this->requireDb();
+        $order = $this->insertOrder(73 * 60, ['type' => 'donation', 'status' => 'cancelled', 'items' => '[]']);
+
+        $this->assertNotContains($order['order_number'], $this->dueNumbers('to_cancel'));
+        $this->assertFalse(cancel_unpaid_order(self::$pdo, $order));
+        $this->assertFalse(order_can_retry_payment($order), 'No "Опитай отново" for a cancelled donation');
     }
 
     public function testAutoCancelAlsoCancelsTheSpeedyShipment(): void

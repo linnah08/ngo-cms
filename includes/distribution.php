@@ -203,11 +203,16 @@ function distribution_set_online_stock(PDO $pdo, int $product_id, ?int $variant_
 /**
  * Items ordered through the website and not cancelled — for reference only, it
  * is never subtracted from anything (shop sales already come out of live stock).
+ * An unpaid order the shopper was told failed (a declined card stays open for
+ * a retry) doesn't count either.
  */
 function distribution_shop_ordered_qty(PDO $pdo, int $product_id, ?int $variant_id, bool $whole = false): int
 {
     $stmt = $pdo->prepare(
-        "SELECT items FROM orders WHERE status != 'cancelled' AND JSON_CONTAINS(items, ?)"
+        "SELECT items FROM orders
+          WHERE status != 'cancelled'
+            AND NOT (payment_status = 'pending' AND payment_failed_email_at IS NOT NULL)
+            AND JSON_CONTAINS(items, ?)"
     );
     $stmt->execute([json_encode([['product_id' => $product_id]])]);
 

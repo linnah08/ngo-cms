@@ -304,13 +304,14 @@ final class ProcessPaymentTest extends TestCase
 
     // ── donation: declined ────────────────────────────────────────────────────
 
-    public function testDonationDeclinedSetsStatusToCancelled(): void
+    public function testDonationDeclinedStaysOpenForARetry(): void
     {
         $order = $this->insertDonationOrder();
         process_dsk_result(self::$pdo, $order, 'dsk-uuid-005', $this->declinedStatus($order));
 
         $fresh = $this->freshOrder((int)$order['id']);
-        $this->assertSame('cancelled', $fresh['status']);
+        $this->assertSame('new', $fresh['status'], 'A decline leaves the order open until the 3-day cancel');
+        $this->assertTrue(order_can_retry_payment($fresh));
     }
 
     public function testDonationDeclinedDoesNotMarkAsPaid(): void
@@ -364,13 +365,14 @@ final class ProcessPaymentTest extends TestCase
         $this->assertSame('confirmed', $fresh['status']);
     }
 
-    public function testPhysicalOrderDeclinedSetsStatusToCancelled(): void
+    public function testPhysicalOrderDeclinedStaysOpenForARetry(): void
     {
         $order = $this->insertPhysicalOrder();
         process_dsk_result(self::$pdo, $order, 'dsk-uuid-011', $this->declinedStatus($order));
 
         $fresh = $this->freshOrder((int)$order['id']);
-        $this->assertSame('cancelled', $fresh['status']);
+        $this->assertSame('new', $fresh['status'], 'A decline leaves the order open until the 3-day cancel');
+        $this->assertTrue(order_can_retry_payment($fresh));
     }
 
     // ── pre-auth approved (orderStatus=1) ────────────────────────────────────

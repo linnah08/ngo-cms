@@ -120,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $new_status = $_POST['status'] ?? '';
         $tracking   = trim($_POST['tracking_number'] ?? '');
         $notes      = trim($_POST['notes']           ?? '');
-        $valid_statuses = ['new','confirmed','shipped','delivered','cancelled'];
+        $valid_statuses = array_keys(ORDER_STATUS_LABELS);
 
         if (!in_array($new_status, $valid_statuses)) {
             $errors[] = 'Невалиден статус.';
@@ -459,7 +459,9 @@ if ($can_sign) {
 
 $_age_stmt = $pdo->prepare('SELECT TIMESTAMPDIFF(MINUTE, created_at, NOW()) FROM orders WHERE id = ?');
 $_age_stmt->execute([$id]);
-$is_unpaid = order_is_unpaid($order, (int)$_age_stmt->fetchColumn());
+$_age_minutes = (int)$_age_stmt->fetchColumn();
+$is_unpaid    = order_is_unpaid($order, $_age_minutes);
+[$status_key, $status_label] = order_status_display($order, $_age_minutes);
 
 $page_title_admin = 'Поръчка #' . $order['order_number'];
 $active_nav       = 'orders';
@@ -482,7 +484,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
 <?php if ($is_unpaid): ?>
   <div style="background:#fdecea;border:1px solid #f5c2c0;color:#b42318;border-radius:8px;padding:1rem 1.25rem;margin-bottom:1.5rem;line-height:1.6;">
-    <strong style="font-size:1.05rem;">Неплатена поръчка</strong><br>
+    <strong style="font-size:1.05rem;"><?= $status_key === 'awaiting_payment' ? 'Чака плащане' : 'Неплатена поръчка' ?></strong><br>
     Клиентът избра <strong><?= h(payment_method_label($order['payment_method'])) ?></strong>, но плащането не е получено.
     <?php if ($order['unpaid_cancelled_at']): ?>
       Поръчката е отменена автоматично на <?= h(substr($order['unpaid_cancelled_at'], 0, 16)) ?><?= $order['type'] === 'physical' ? ' и продуктите са върнати в наличност' : '' ?>. Не я изпращайте.
@@ -795,11 +797,12 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <?= csrf_field() ?>
         <input type="hidden" name="action" value="update_status">
         <div class="form-group" style="margin-bottom:.75rem;">
-          <label style="font-size:.875rem;font-weight:600;display:block;margin-bottom:.35rem;">Статус</label>
-          <select name="status" onchange="toggleTracking(this.value)"
+          <label for="orderStatus" style="font-size:.875rem;font-weight:600;display:block;margin-bottom:.35rem;">Статус</label>
+          <select name="status" id="orderStatus" onchange="toggleTracking(this.value)"
                   style="width:100%;padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;font-family:inherit;">
             <?php
-            $statuses = ['new'=>'Нова','confirmed'=>'Потвърдена','shipped'=>'Изпратена','delivered'=>'Доставена','cancelled'=>'Отменена'];
+            // An open order the shopper hasn't paid yet reads "Чака плащане", not "Нова".
+            $statuses = ['new' => $status_key === 'awaiting_payment' ? $status_label : ORDER_STATUS_LABELS['new']] + ORDER_STATUS_LABELS;
             foreach ($statuses as $v => $l): ?>
               <option value="<?= $v ?>" <?= $order['status'] === $v ? 'selected' : '' ?>><?= $l ?></option>
             <?php endforeach; ?>

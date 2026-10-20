@@ -111,10 +111,9 @@ function process_dsk_result(PDO $pdo, array $order, string $dskOrderId, array $s
             notify_order_paid($order);
         }
     } elseif ($orderStatus === 6 || $orderStatus === 3) {
-        // Declined, or the hold was cancelled before the order was paid
-        $stmt = $pdo->prepare("UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = ? AND payment_status = 'pending'");
-        $stmt->execute([$order['id']]);
-        if ($stmt->rowCount() > 0) order_cancel_shipment_or_alert($pdo, $order);
+        // Declined, or the hold was cancelled before the order was paid. The
+        // order stays open: the shopper can still pay it with "Опитай отново"
+        // until the unpaid-order cron cancels it (see unpaid_orders.php).
         send_payment_failed_email($pdo, $order);
     }
 }

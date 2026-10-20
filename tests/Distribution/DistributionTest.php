@@ -351,6 +351,14 @@ final class DistributionTest extends TestCase
                 json_encode([['product_id' => $pid, 'variant_id' => $vid, 'quantity' => $qty]])]);
             self::$order_ids[] = (int) self::$pdo->lastInsertId();
         }
+        // A declined card stays 'new' (open for a retry) but doesn't count.
+        self::$pdo->prepare(
+            "INSERT INTO orders (order_number,type,status,customer_name,customer_email,items,subtotal_eur,shipping_eur,total_eur,payment_method,payment_status,payment_failed_email_at)
+             VALUES (?, 'physical', 'new', 'Тест', 't@example.test', ?, 10, 0, 10, 'card', 'pending', NOW())"
+        )->execute(['D' . substr(bin2hex(random_bytes(7)), 0, 13),
+            json_encode([['product_id' => $pid, 'variant_id' => $va, 'quantity' => 4]])]);
+        self::$order_ids[] = (int) self::$pdo->lastInsertId();
+
         $this->assertSame(2, distribution_shop_ordered_qty(self::$pdo, $pid, $va));
         $this->assertSame(3, distribution_shop_ordered_qty(self::$pdo, $pid, $vb));
         $this->assertSame(5, distribution_shop_ordered_qty(self::$pdo, $pid, null, true));

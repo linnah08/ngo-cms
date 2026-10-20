@@ -5,9 +5,10 @@
  * - A label may only be created for an order that is paid (or cash on
  *   delivery, which is paid when the parcel arrives) and not cancelled —
  *   otherwise the courier bills us for a parcel nobody paid for.
- * - When an order is cancelled — by the admin, a declined card, a failed
- *   IRIS payment or the unpaid-order cron — its Speedy / BoxNow shipment is
- *   cancelled with the courier too, so it doesn't land on the monthly invoice.
+ * - When an order is cancelled — by the admin or the unpaid-order cron (a
+ *   declined card or failed IRIS payment stays open until then) — its
+ *   Speedy / BoxNow shipment is cancelled with the courier too, so it doesn't
+ *   land on the monthly invoice.
  */
 
 /**

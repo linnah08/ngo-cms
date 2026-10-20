@@ -2,6 +2,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/donation.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/unpaid_orders.php';
 start_session();
 
 $order_number = trim($_GET['order'] ?? '');
@@ -45,7 +46,8 @@ if ($lang !== get_lang()) {
     header('Location: ' . shop_path('payment-failed', $lang) . ($qs !== '' ? '?' . $qs : ''));
     exit;
 }
-$expired = !empty($order['unpaid_cancelled_at']) || !empty($order['stock_returned_at']);
+// Cancelled — automatically after 3 days unpaid, or by an admin.
+$expired = !order_can_retry_payment($order);
 $is_iris = $order['payment_method'] === 'iris';
 
 $retry_url = ($is_iris ? '/api/iris-payment-return.php' : '/api/payment-return.php')

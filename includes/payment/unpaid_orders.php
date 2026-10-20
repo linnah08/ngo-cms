@@ -10,6 +10,10 @@
  *     "try again" link (on decline right away, on abandon via cron),
  *   - auto-cancels the order after 3 days unpaid and puts its items back in stock.
  *
+ * Until that cancel the order stays 'new' — a decline doesn't cancel it, so the
+ * shopper can still pay with "Опитай отново". The admin shows such an order as
+ * "Чака плащане" (order_status_display()).
+ *
  * Covers shop orders ('physical') and donations. Cron entry point:
  * cron/unpaid-orders-cron.php.
  */
@@ -43,7 +47,7 @@ const UNPAID_ORDER_TYPES = ['physical', 'donation'];
 
 /**
  * True when the order is an online payment that should have been paid by now:
- * still pending and either declined (status cancelled), already emailed, or
+ * still pending and either already emailed (a decline emails right away) or
  * past its method's wait time.
  */
 function order_is_unpaid(array $order, int $age_minutes): bool
@@ -54,8 +58,7 @@ function order_is_unpaid(array $order, int $age_minutes): bool
     $after = UNPAID_AFTER_MINUTES[$order['payment_method'] ?? ''] ?? null;
     if ($after === null) return false;
 
-    return ($order['status'] ?? '') === 'cancelled'
-        || !empty($order['payment_failed_email_at'])
+    return !empty($order['payment_failed_email_at'])
         || $age_minutes >= $after;
 }
 
@@ -73,8 +76,31 @@ function unpaid_orders_sql_condition(): string
     $methods = "'" . implode("','", array_keys(UNPAID_AFTER_MINUTES)) . "'";
 
     return "(payment_status = 'pending' AND type IN ($types) AND payment_method IN ($methods)"
-         . " AND (status = 'cancelled' OR payment_failed_email_at IS NOT NULL OR " . implode(' OR ', $by_age) . '))';
+         . " AND (payment_failed_email_at IS NOT NULL OR " . implode(' OR ', $by_age) . '))';
 }
+
+/**
+ * Status for the admin's list and order page: [key, label]. An online order
+ * that is still open but unpaid shows "Чака плащане" instead of "Нова", so
+ * nobody ships it or takes it for cancelled while the shopper can still pay.
+ */
+function order_status_display(array $order, int $age_minutes): array
+{
+    $status = (string)($order['status'] ?? '');
+    if ($status === 'new' && order_is_unpaid($order, $age_minutes)) {
+        return ['awaiting_payment', 'Чака плащане'];
+    }
+    return [$status, ORDER_STATUS_LABELS[$status] ?? ucfirst($status)];
+}
+
+/** Admin names of the order statuses. */
+const ORDER_STATUS_LABELS = [
+    'new'       => 'Нова',
+    'confirmed' => 'Потвърдена',
+    'shipped'   => 'Изпратена',
+    'delivered' => 'Доставена',
+    'cancelled' => 'Отменена',
+];
 
 /** Plain-language payment method name for the admin. */
 function payment_method_label(?string $method): string
@@ -109,10 +135,15 @@ function payment_retry_url(array $order): string
     return SITE_URL . $endpoint . '?retry=1&order=' . urlencode((string)$order['order_number']);
 }
 
-/** True while the shopper can still pay this order via payment_retry_url(). */
+/**
+ * True while the shopper can still pay this order via payment_retry_url().
+ * A cancelled order is closed — also one the admin cancelled by hand, even a
+ * donation, which has no stock to mark as returned.
+ */
 function order_can_retry_payment(array $order): bool
 {
-    return ($order['payment_status'] ?? '') === 'pending'
+    return ($order['status'] ?? '') !== 'cancelled'
+        && ($order['payment_status'] ?? '') === 'pending'
         && in_array($order['type'] ?? '', UNPAID_ORDER_TYPES, true)
         && isset(UNPAID_AFTER_MINUTES[$order['payment_method'] ?? ''])
         && empty($order['unpaid_cancelled_at'])
@@ -202,7 +233,7 @@ function cancel_unpaid_order(PDO $pdo, array $order, ?callable $cancel_shipment 
         $stmt = $pdo->prepare(
             "UPDATE orders SET status = 'cancelled', unpaid_cancelled_at = NOW(), updated_at = NOW()
              WHERE id = ? AND payment_status = 'pending' AND unpaid_cancelled_at IS NULL
-               AND stock_returned_at IS NULL AND status IN ('new', 'cancelled')"
+               AND stock_returned_at IS NULL AND status = 'new'"
         );
         $stmt->execute([$order['id']]);
         if ($stmt->rowCount() === 0) {
@@ -230,7 +261,7 @@ function unpaid_orders_due(PDO $pdo): array
     $types   = "'" . implode("','", UNPAID_ORDER_TYPES) . "'";
     $methods = "'" . implode("','", array_keys(UNPAID_AFTER_MINUTES)) . "'";
     $base    = "payment_status = 'pending' AND type IN ($types) AND payment_method IN ($methods)"
-             . " AND unpaid_cancelled_at IS NULL AND stock_returned_at IS NULL AND status IN ('new', 'cancelled')"
+             . " AND unpaid_cancelled_at IS NULL AND stock_returned_at IS NULL AND status = 'new'"
              . ' AND created_at > NOW() - INTERVAL ' . UNPAID_CRON_LOOKBACK_MINUTES . ' MINUTE';
 
     $by_age = [];

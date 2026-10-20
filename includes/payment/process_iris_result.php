@@ -5,7 +5,8 @@
  * Called from api/iris-payment-callback.php with the AUTHORITATIVE status fetched
  * via IRISPayment::getStatus() — never with the (untrusted) callback status param.
  * Marks the order paid only if IRIS reports CONFIRMED for the exact amount and
- * recipient IBAN we registered; cancels on FAILED; leaves WAITING pending.
+ * recipient IBAN we registered; on FAILED emails the shopper a "try again"
+ * link (the order stays open); leaves WAITING pending.
  *
  * Reuses notify_order_paid() from process_payment.php so shop/donation orders are
  * notified identically to the DSK Bank flow.
@@ -53,12 +54,8 @@ function process_iris_result(PDO $pdo, array $order, array $status): void
             notify_order_paid($order);
         }
     } elseif ($state === 'FAILED') {
-        $stmt = $pdo->prepare(
-            "UPDATE orders SET status = 'cancelled', updated_at = NOW()
-             WHERE id = ? AND payment_status = 'pending'"
-        );
-        $stmt->execute([$order['id']]);
-        if ($stmt->rowCount() > 0) order_cancel_shipment_or_alert($pdo, $order);
+        // The order stays open until the unpaid-order cron cancels it — the
+        // shopper can still pay it with "Опитай отново".
         send_payment_failed_email($pdo, $order);
     }
     // WAITING (or anything else) → leave the order pending.

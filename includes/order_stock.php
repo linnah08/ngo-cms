@@ -199,10 +199,8 @@ function order_stock_on_status_change(PDO $pdo, array $order, string $new_status
 /**
  * Stock side of deleting an order — call BEFORE the DELETE. Deleting must not
  * lose items that the order is still holding:
- *   - new / confirmed orders give their items back;
- *   - a cancelled online order that is still unpaid and waiting for the
- *     unpaid-order auto-cancel (declined / abandoned at the bank) gives them
- *     back too — the cron would have restocked it;
+ *   - new / confirmed orders give their items back — including an online
+ *     order still waiting for payment (declined / abandoned at the bank);
  *   - shipped / delivered orders, and old cancelled orders from before stock
  *     was tracked, are left alone.
  *
@@ -212,20 +210,8 @@ function order_stock_on_delete(PDO $pdo, array $order): bool
 {
     if (!order_stock_lines($order) || !empty($order['stock_returned_at'])) return false;
 
-    $status = $order['status'] ?? '';
-    if (in_array($status, ['new', 'confirmed'], true)) {
-        return order_return_stock($pdo, $order);
-    }
-
-    if ($status === 'cancelled' && ($order['payment_status'] ?? '') === 'pending'
-        && defined('UNPAID_AFTER_MINUTES') && isset(UNPAID_AFTER_MINUTES[$order['payment_method'] ?? ''])) {
-        $recent = $pdo->prepare('SELECT created_at > NOW() - INTERVAL ? MINUTE FROM orders WHERE id = ?');
-        $recent->execute([UNPAID_CRON_LOOKBACK_MINUTES, $order['id']]);
-        if ((bool)$recent->fetchColumn()) {
-            return order_return_stock($pdo, $order);
-        }
-    }
-    return false;
+    return in_array($order['status'] ?? '', ['new', 'confirmed'], true)
+        && order_return_stock($pdo, $order);
 }
 
 /**
