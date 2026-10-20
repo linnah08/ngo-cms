@@ -33,6 +33,29 @@ final class MailerTest extends TestCase
         $this->assertStringContainsString('charset="UTF-8"', $html);
     }
 
+    public function test_email_logo_keeps_its_proportions(): void
+    {
+        $f = sys_get_temp_dir() . '/mailer-logo-' . getmypid() . '.png';
+        $im = imagecreatetruecolor(900, 375);
+        imagepng($im, $f);
+        $this->assertSame([115, 48], email_logo_size($f));
+        $wide = imagecreatetruecolor(1000, 100);
+        imagepng($wide, $f);
+        $this->assertSame([240, 24], email_logo_size($f), 'a very wide logo is capped in width');
+        unlink($f);
+    }
+
+    public function test_email_logo_falls_back_when_file_missing(): void
+    {
+        $this->assertSame([48, 48], email_logo_size('/nonexistent/logo.png'));
+    }
+
+    public function test_email_wrap_logo_has_size_attributes(): void
+    {
+        $html = email_wrap('<p>test</p>');
+        $this->assertMatchesRegularExpression('/<img [^>]*width="\d+" height="\d+"/', $html);
+    }
+
     // ── email_tpl_get ─────────────────────────────────────────────────────────
 
     public function test_tpl_subject_is_valid_utf8_bg(): void

@@ -7,8 +7,20 @@ if (is_file($_mailer_root . '/graph.config.php')) require_once $_mailer_root . '
 if (!function_exists('setting_get')) require_once $_mailer_root . '/includes/settings.php';
 require_once $_mailer_root . '/includes/email-templates.php';
 
+// Pixel size the header logo is shown at: 48px tall, at most 240px wide, keeping the
+// file's own proportions. Both are written as width/height attributes as well as CSS,
+// because mail clients that drop or override CSS (Apple Mail with max-width:100%,
+// Outlook) otherwise stretch the logo across the column and squash it.
+function email_logo_size(string $file, int $max_h = 48, int $max_w = 240): array {
+    $dim = is_file($file) ? @getimagesize($file) : false;
+    if (!$dim || $dim[0] < 1 || $dim[1] < 1) return [$max_h, $max_h];
+    $scale = min($max_h / $dim[1], $max_w / $dim[0]);
+    return [max(1, (int)round($dim[0] * $scale)), max(1, (int)round($dim[1] * $scale))];
+}
+
 function email_wrap(string $content): string {
     $logo = (defined('SITE_URL') ? SITE_URL : '') . '/assets/images/logo.png';
+    [$logo_w, $logo_h] = email_logo_size(($_SERVER['DOCUMENT_ROOT'] ?: dirname(__DIR__)) . '/assets/images/logo.png');
     $name = defined('SITE_NAME_BG') ? SITE_NAME_BG : 'Your Organisation';
     $email = defined('SITE_EMAIL') ? SITE_EMAIL : '';
     return <<<HTML
@@ -21,7 +33,6 @@ function email_wrap(string $content): string {
   body{font-family:Arial,sans-serif;background:#f8f6f2;margin:0;padding:20px;color:#1a1916;}
   .ew{max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);}
   .eh{background:#f8f6f2;padding:24px 32px;text-align:center;}
-  .eh img{height:48px;}
   .eb{padding:32px;line-height:1.75;}
   h2{color:#0387A5;margin-top:0;}
   .ef{background:#f8f6f2;padding:16px 32px;font-size:12px;color:#9b9590;text-align:center;border-top:1px solid #e8ddd5;}
@@ -41,7 +52,7 @@ function email_wrap(string $content): string {
 </head>
 <body style="font-family:Arial,sans-serif;background:#f8f6f2;margin:0;padding:20px;color:#1a1916;">
 <div class="ew" style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
-  <div class="eh" style="background:#f8f6f2;padding:24px 32px;text-align:center;"><img src="{$logo}" alt="{$name}" style="height:48px;display:block;margin:0 auto;"></div>
+  <div class="eh" style="background:#f8f6f2;padding:24px 32px;text-align:center;"><img src="{$logo}" alt="{$name}" width="{$logo_w}" height="{$logo_h}" style="width:{$logo_w}px;height:{$logo_h}px;max-width:100%;display:block;margin:0 auto;border:0;"></div>
   <div class="eb" style="padding:32px;line-height:1.75;background:#ffffff;color:#1a1916;">{$content}</div>
   <div class="ef" style="background:#f8f6f2;padding:16px 32px;font-size:12px;color:#9b9590;text-align:center;border-top:1px solid #e8ddd5;">{$name} &bull; <a href="mailto:{$email}" style="color:#0387A5;">{$email}</a></div>
 </div>
