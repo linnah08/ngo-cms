@@ -465,7 +465,7 @@ function checkout_delivery_type_labels(?string $lang = null): array {
         'office'  => t_or('checkout.type.office',  'До офис',             'To an office',           $lang),
         'apt'     => t_or('checkout.type.apt',     'До автомат',          'To a parcel locker',     $lang),
         'address' => t_or('checkout.type.address', 'До врата',            'To your door',           $lang),
-        'locker'  => t_or('checkout.type.locker',  'До автомат (BoxNow)', 'To a BoxNow locker',     $lang),
+        'locker'  => t_or('checkout.type.locker',  'До автомат',          'To a parcel locker',     $lang),
     ];
 }
 

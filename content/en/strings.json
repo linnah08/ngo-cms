@@ -82,7 +82,7 @@
   "checkout.type.office": "To an office",
   "checkout.type.apt": "To a parcel locker",
   "checkout.type.address": "To your door",
-  "checkout.type.locker": "To a BoxNow locker",
+  "checkout.type.locker": "To a parcel locker",
   "checkout.err.name": "Please enter your name.",
   "checkout.err.name_full": "Please enter your first and last name, e.g. \"Anna Smith\".",
   "checkout.err.email": "Please enter a valid email address.",

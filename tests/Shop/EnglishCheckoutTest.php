@@ -119,6 +119,9 @@ final class EnglishCheckoutTest extends TestCase
         $this->assertSame(['office', 'apt', 'address', 'locker'], array_keys($en));
         $this->assertSame('To your door', $en['address']);
         $this->assertSame('До врата', $bg['address']);
+        // The courier is always named next to the type — don't repeat it here.
+        $this->assertStringNotContainsString('BoxNow', $bg['locker']);
+        $this->assertStringNotContainsString('BoxNow', $en['locker']);
     }
 
     public function testBankPaymentTextsFollowTheOrderLanguage(): void

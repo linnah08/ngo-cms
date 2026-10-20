@@ -82,7 +82,7 @@
   "checkout.type.office": "До офис",
   "checkout.type.apt": "До автомат",
   "checkout.type.address": "До врата",
-  "checkout.type.locker": "До автомат (BoxNow)",
+  "checkout.type.locker": "До автомат",
   "checkout.err.name": "Моля въведете имена.",
   "checkout.err.name_full": "Моля въведете име и фамилия, например „Иван Петров“.",
   "checkout.err.email": "Невалиден имейл.",
