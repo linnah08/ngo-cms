@@ -206,6 +206,57 @@ function article_due_for_publish(array $a, ?int $mtime, string $today): bool {
     return article_is_scheduled($a, $mtime) && $a['date'] <= $today;
 }
 
+/**
+ * A social post links to the site post, so a draft goes live with it: published now
+ * when the social post goes out today, else scheduled for the morning run of
+ * admin/publish-scheduled.php (06:00, see includes/scheduled_jobs.php) before it.
+ * The hour of slack keeps a post due at 06:30 from beating that run.
+ * Returns the article plus 'now', the publish date, or null (already published).
+ */
+function article_go_live_with_social(array $a, int $social_ts, string $today): array {
+    if (($a['status'] ?? '') !== 'draft') return ['article' => $a, 'when' => null];
+
+    $need = date('Y-m-d', $social_ts - 7 * 3600);
+    if ($need <= $today) {
+        $a['status']    = 'published';
+        $a['scheduled'] = false;
+        if (($a['date'] ?? '') > $today) $a['date'] = $today;
+        return ['article' => $a, 'when' => 'now'];
+    }
+    if (!article_is_scheduled($a) || ($a['date'] ?? '') > $need) {
+        $a['date']      = $need;
+        $a['scheduled'] = true;
+    }
+    return ['article' => $a, 'when' => $a['date']];
+}
+
+/**
+ * Apply article_go_live_with_social() to the BG post and its EN twin (status and
+ * date are shared) and return the message for the editor, or null when the post
+ * was already live. $label names the network: "Facebook", "Instagram", "LinkedIn".
+ */
+function article_publish_with_social(string $slug, int $social_ts, string $label, string $dir = ARTICLES_PATH): ?string {
+    $bg_file = $dir . '/bg/' . $slug . '.json';
+    $bg = json_decode((string) @file_get_contents($bg_file), true);
+    if (!is_array($bg)) return null;
+
+    $r = article_go_live_with_social($bg, $social_ts, date('Y-m-d'));
+    if ($r['when'] === null) return null;
+    save_json($bg_file, $r['article']);
+
+    $en_file = $dir . '/en/' . (($bg['slug_en'] ?? '') ?: $slug) . '.json';
+    $en = is_file($en_file) ? json_decode((string) file_get_contents($en_file), true) : null;
+    if (is_array($en)) {
+        foreach (['status', 'scheduled', 'date'] as $k) $en[$k] = $r['article'][$k];
+        save_json($en_file, $en);
+    }
+
+    return $r['when'] === 'now'
+        ? "Статията също е публикувана на сайта, за да работи линкът в {$label}."
+        : 'Статията на сайта ще се публикува автоматично на ' . date('d.m', strtotime($r['when']))
+          . " сутринта, преди публикацията в {$label}.";
+}
+
 /** Most photos a post can have — Instagram's carousel limit, so nothing is dropped on the way there. */
 const ARTICLE_PHOTOS_MAX = 10;
 

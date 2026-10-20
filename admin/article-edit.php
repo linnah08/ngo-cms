@@ -462,6 +462,31 @@ $ig_default_story = !$insta_sched && $insta_story_sched;
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/social_images.php';
 $ig_preview = social_insta_preview($article);
 ?>
+<!-- A social post links to the site post, so a draft goes live with it
+     (article_publish_with_social). Say so up front, and say what happened. -->
+<p id="siteNotice" <?= ($article['status'] ?? '') === 'draft' ? '' : 'hidden' ?>
+   style="border:2px solid #1d4ed8;background:#eff6ff;color:#1e3a8a;border-radius:8px;padding:.75rem 1rem;margin:0 0 1.5rem;font-weight:600;">
+  ℹ Статията е чернова. Когато планирате или публикувате пост тук, статията ще се публикува на сайта заедно с него.</p>
+<script>
+// Show the server's message at the top and right under the button that was clicked.
+window._showSiteNotice = function (msg, afterEl) {
+  if (!msg) return;
+  var top = document.getElementById('siteNotice');
+  top.textContent = '✓ ' + msg;
+  top.style.borderColor = '#166534'; top.style.background = '#f0fdf4'; top.style.color = '#14532d';
+  top.hidden = false;
+  if (!afterEl) return;
+  var near = afterEl.parentNode.querySelector('.site-notice-near');
+  if (!near) {
+    near = document.createElement('p');
+    near.className = 'site-notice-near';
+    near.setAttribute('role', 'status');
+    near.style.cssText = 'margin:.5rem 0 0;font-size:.85rem;font-weight:600;color:#14532d;';
+    afterEl.parentNode.insertBefore(near, afterEl.nextSibling);
+  }
+  near.textContent = '✓ ' + msg;
+};
+</script>
 <!-- ── FB / Insta panel ───────────────────────────────────────────────────── -->
 <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;" id="socialPanel">
   <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap;">
@@ -1331,6 +1356,7 @@ if (translateBtn) {
         } else {
           badge.innerHTML = '<span style="color:#2e7d32;">✓ Публикувано сега</span>';
         }
+        _showSiteNotice(data.site_notice, errEl);
       }
     } catch(e) {
       errEl.textContent   = 'Грешка при свързване.';
@@ -1373,6 +1399,7 @@ if (translateBtn) {
           if (url) html += ' — <a href="' + url.replace(/"/g,'&quot;') + '" target="_blank" rel="noopener" style="color:#0a66c2;">Виж →</a>';
           badge.innerHTML       = html + '</span>';
           saveUrlBtn.textContent = '✓ Запазено';
+          _showSiteNotice(data.site_notice, saveUrlBtn);
         }
       } catch(e) { alert('Грешка при запис.'); }
       saveUrlBtn.disabled = false;
@@ -1702,6 +1729,7 @@ if (translateBtn) {
           document.getElementById(badgeId).innerHTML =
             '<span style="color:#2e7d32;">✓ ' + label + ': Публикувано сега</span>';
         }
+        _showSiteNotice(data.site_notice, errEl);
       }
     } catch(e) {
       errEl.textContent   = 'Грешка при свързване.';

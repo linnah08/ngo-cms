@@ -32,6 +32,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/social_images.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/buffer.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/articles.php';
 admin_require_login();
 module_ajax_guard('social');
 
@@ -375,7 +376,8 @@ if ($action === 'schedule') {
                 echo json_encode(['ok' => false, 'error' => 'Планирано в Buffer, но грешка при запис на файла.']);
                 exit;
             }
-            echo json_encode(['ok' => true, 'buffer_post_id' => $old_buffer_post_id, 'due_at' => $due_at, 'scheduled_at' => $scheduled_at]);
+            echo json_encode(['ok' => true, 'buffer_post_id' => $old_buffer_post_id, 'due_at' => $due_at, 'scheduled_at' => $scheduled_at,
+                'site_notice' => article_publish_with_social($slug, $ts, $channel_label)]);
             exit;
         }
 
@@ -447,7 +449,8 @@ if ($action === 'schedule') {
             exit;
         }
 
-        echo json_encode(['ok' => true, 'buffer_post_id' => $buffer_post_id, 'due_at' => $due_at, 'scheduled_at' => $scheduled_at]);
+        echo json_encode(['ok' => true, 'buffer_post_id' => $buffer_post_id, 'due_at' => $due_at, 'scheduled_at' => $scheduled_at,
+            'site_notice' => article_publish_with_social($slug, $ts, $channel_label)]);
         exit;
     }
 

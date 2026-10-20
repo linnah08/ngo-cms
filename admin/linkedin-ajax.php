@@ -19,6 +19,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/social_images.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/buffer.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/articles.php';
 admin_require_login();
 module_ajax_guard('social');
 
@@ -203,7 +204,9 @@ if ($action === 'save_post') {
     }
 
     if (save_json($file, $data)) {
-        echo json_encode(['ok' => true, 'posted_at' => $data['linkedin_posted_at']]);
+        // Already on LinkedIn, so its link has to work from now on.
+        echo json_encode(['ok' => true, 'posted_at' => $data['linkedin_posted_at'],
+            'site_notice' => $url !== '' ? article_publish_with_social($slug, time(), 'LinkedIn') : null]);
     } else {
         echo json_encode(['ok' => false, 'error' => 'Грешка при запис.']);
     }
@@ -298,6 +301,7 @@ if ($action === 'schedule') {
                 'buffer_post_id' => $old_buffer_post_id,
                 'due_at'         => $due_at,
                 'scheduled_at'   => $scheduled_at,
+                'site_notice'    => article_publish_with_social($slug, $ts, 'LinkedIn'),
             ]);
             exit;
         }
@@ -375,6 +379,7 @@ if ($action === 'schedule') {
                 'buffer_post_id' => $buffer_post_id,
                 'due_at'       => $due_at,
                 'scheduled_at' => $scheduled_at,
+                'site_notice'  => article_publish_with_social($slug, $ts, 'LinkedIn'),
             ]);
         } else {
             echo json_encode(['ok' => false, 'error' => 'Публикувано в Buffer, но грешка при запис на файла.']);

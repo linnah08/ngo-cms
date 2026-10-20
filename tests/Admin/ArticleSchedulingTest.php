@@ -77,4 +77,79 @@ final class ArticleSchedulingTest extends TestCase
         unset($f['scheduled']);
         $this->assertFalse(article_build_bg_data($f)['scheduled'], 'unticked checkbox');
     }
+
+    // ── A draft goes live with its social post ─────────────────────────────────
+
+    public function test_social_post_going_out_today_publishes_the_draft_now(): void
+    {
+        $r = article_go_live_with_social($this->draft(['date' => '2026-10-25']), strtotime('2026-10-20 15:00'), '2026-10-20');
+        $this->assertSame('now', $r['when']);
+        $this->assertSame('published', $r['article']['status']);
+        $this->assertFalse($r['article']['scheduled']);
+        $this->assertSame('2026-10-20', $r['article']['date'], 'a future date would hide it');
+    }
+
+    public function test_social_post_before_the_morning_run_publishes_now(): void
+    {
+        // Tomorrow 05:00 comes before tomorrow's 06:00 run — publish today, not too late.
+        $r = article_go_live_with_social($this->draft(), strtotime('2026-10-21 05:00'), '2026-10-20');
+        $this->assertSame('now', $r['when']);
+    }
+
+    public function test_later_social_post_schedules_the_draft_for_that_morning(): void
+    {
+        $r = article_go_live_with_social($this->draft(), strtotime('2026-10-24 11:00'), '2026-10-20');
+        $this->assertSame('2026-10-24', $r['when']);
+        $this->assertSame('draft', $r['article']['status']);
+        $this->assertTrue($r['article']['scheduled']);
+        $this->assertTrue(article_due_for_publish($r['article'], null, '2026-10-24'));
+    }
+
+    public function test_social_post_at_dawn_schedules_the_day_before(): void
+    {
+        $r = article_go_live_with_social($this->draft(), strtotime('2026-10-24 06:30'), '2026-10-20');
+        $this->assertSame('2026-10-23', $r['when']);
+    }
+
+    public function test_an_earlier_planned_publish_date_is_kept(): void
+    {
+        $a = $this->draft(['date' => '2026-10-22', 'scheduled' => true]);
+        $this->assertSame('2026-10-22', article_go_live_with_social($a, strtotime('2026-10-24 11:00'), '2026-10-20')['when']);
+    }
+
+    public function test_a_later_planned_publish_date_is_brought_forward(): void
+    {
+        $a = $this->draft(['date' => '2026-10-30', 'scheduled' => true]);
+        $this->assertSame('2026-10-24', article_go_live_with_social($a, strtotime('2026-10-24 11:00'), '2026-10-20')['when']);
+    }
+
+    public function test_published_post_is_left_alone(): void
+    {
+        $a = ['status' => 'published', 'date' => '2026-10-01'];
+        $r = article_go_live_with_social($a, strtotime('2026-10-24 11:00'), '2026-10-20');
+        $this->assertNull($r['when']);
+        $this->assertSame($a, $r['article']);
+    }
+
+    public function test_publish_with_social_updates_bg_and_en_and_says_so(): void
+    {
+        $dir = sys_get_temp_dir() . '/art-' . bin2hex(random_bytes(4));
+        mkdir($dir . '/bg', 0777, true);
+        mkdir($dir . '/en', 0777, true);
+        file_put_contents($dir . '/bg/novina.json', json_encode(['status' => 'draft', 'date' => '2026-10-01', 'slug_en' => 'news']));
+        file_put_contents($dir . '/en/news.json', json_encode(['status' => 'draft', 'date' => '2026-10-01', 'title' => 'News']));
+
+        $msg = article_publish_with_social('novina', time() + 120, 'Facebook', $dir);
+        $this->assertStringContainsString('публикувана на сайта', (string) $msg);
+        $this->assertStringContainsString('Facebook', (string) $msg);
+        $this->assertSame('published', json_decode(file_get_contents($dir . '/bg/novina.json'), true)['status']);
+        $en = json_decode(file_get_contents($dir . '/en/news.json'), true);
+        $this->assertSame('published', $en['status']);
+        $this->assertSame('News', $en['title']);
+
+        $this->assertNull(article_publish_with_social('novina', time() + 120, 'Facebook', $dir), 'already live → no message');
+
+        array_map('unlink', glob($dir . '/*/*.json'));
+        rmdir($dir . '/bg'); rmdir($dir . '/en'); rmdir($dir);
+    }
 }
