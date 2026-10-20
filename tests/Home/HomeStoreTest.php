@@ -235,6 +235,43 @@ final class HomeStoreTest extends TestCase
         $this->assertSame('{not json', file_get_contents($copies[0]));
     }
 
+    public function test_every_save_keeps_a_dated_copy_of_what_was_saved(): void
+    {
+        $this->assertTrue(home_save(home_load()['doc'], 0)['ok']);
+        $copies = glob($GLOBALS['_om_home_file'] . '.bak-*');
+        $this->assertCount(1, $copies);
+        $this->assertMatchesRegularExpression('/\.bak-\d{14}$/', $copies[0]);
+        $this->assertSame(file_get_contents($GLOBALS['_om_home_file']), file_get_contents($copies[0]));
+    }
+
+    public function test_only_the_newest_ten_copies_are_kept(): void
+    {
+        $file = $GLOBALS['_om_home_file'];
+        for ($i = 0; $i < 12; $i++) file_put_contents($file . '.bak-201901010000' . sprintf('%02d', $i), 'old ' . $i);
+        $this->assertTrue(home_save(home_load()['doc'], 0)['ok']);
+
+        $copies = glob($file . '.bak-*');
+        sort($copies);
+        $this->assertCount(10, $copies);
+        $this->assertFileDoesNotExist($file . '.bak-20190101000002', 'the oldest go first');
+        $this->assertFileExists($file . '.bak-20190101000003');
+        $this->assertSame(file_get_contents($file), file_get_contents(end($copies)), 'the newest is what was just saved');
+    }
+
+    public function test_a_refused_save_keeps_no_copy(): void
+    {
+        $this->assertSame('conflict', home_save(home_load()['doc'], 5)['error']);
+        $this->assertSame([], glob($GLOBALS['_om_home_file'] . '.bak-*'));
+    }
+
+    public function test_a_copy_that_cannot_be_written_does_not_fail_the_save(): void
+    {
+        mkdir($GLOBALS['_om_home_file'] . '.bak-' . date('YmdHis'));   // a folder where the copy would go
+        $this->assertTrue(@home_save(home_load()['doc'], 0)['ok']);
+        $this->assertSame(1, home_load()['doc']['rev']);
+        foreach (glob($GLOBALS['_om_home_file'] . '.bak-*') as $f) is_dir($f) ? rmdir($f) : unlink($f);
+    }
+
     public function test_a_file_without_sections_counts_as_damaged_and_is_backed_up(): void
     {
         file_put_contents($GLOBALS['_om_home_file'], '{"rev":0,"sections":"oops"}');

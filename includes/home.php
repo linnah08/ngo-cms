@@ -824,6 +824,7 @@ function home_save(array $doc, int $expected_rev): array {
             @unlink($tmp);
             return ['ok' => false, 'error' => 'write'];
         }
+        content_keep_copy($path, $json);
         if (home_is_page()) cpage_cache_reset();
         return ['ok' => true, 'error' => null, 'doc' => $doc];
     } finally {

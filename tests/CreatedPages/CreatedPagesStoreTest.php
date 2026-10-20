@@ -198,6 +198,31 @@ final class CreatedPagesStoreTest extends CreatedPagesTestCase
         $this->assertSame('draft', $p['status']);
     }
 
+    public function testEverySaveOfAPageKeepsADatedCopyThatTheListIgnores(): void
+    {
+        $this->storyPage('draft');
+        $path = (string) cpage_file('p_abcd1234');
+        home_target_page('p_abcd1234');
+        $doc = home_load()['doc'];
+        $doc['sections'][0]['fields']['heading']['bg'] = 'Ново';
+        $this->assertTrue(home_save($doc, (int) $doc['rev'])['ok']);
+
+        $copies = glob($path . '.bak-*');
+        $this->assertNotEmpty($copies);
+        $this->assertSame(file_get_contents($path), file_get_contents(end($copies)));
+        cpage_cache_reset();
+        $this->assertSame(['p_abcd1234'], array_column(cpage_all(), 'id'));
+    }
+
+    public function testStatusChangeKeepsACopyToo(): void
+    {
+        $this->storyPage('draft');
+        $this->assertTrue(cpage_set_status('p_abcd1234', 'published')['ok']);
+        $copies = glob((string) cpage_file('p_abcd1234') . '.bak-*');
+        $this->assertCount(1, $copies);
+        $this->assertSame('published', json_decode(file_get_contents($copies[0]), true)['status']);
+    }
+
     public function testSectionEditorNeverWritesAnotherDocumentIntoAPage(): void
     {
         $this->storyPage();

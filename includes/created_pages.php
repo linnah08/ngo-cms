@@ -261,8 +261,29 @@ function cpage_write_file(string $path, array $page): bool
         @unlink($tmp);
         return false;
     }
+    content_keep_copy($path, $json);
     cpage_cache_reset();
     return true;
+}
+
+const CONTENT_COPIES_KEEP = 10;
+
+/**
+ * Keep a dated copy of what was just saved beside it (<file>.bak-YYYYmmddHHMMSS),
+ * and only the newest CONTENT_COPIES_KEEP of them. The front page and created pages
+ * live only on the server — not in git, not in the pre-update backup — so these copies
+ * are what a lost or wrongly overwritten file is restored from. A copy that can't be
+ * written never fails the save; two saves in one second leave the later one.
+ */
+function content_keep_copy(string $path, string $json): void
+{
+    if (@file_put_contents($path . '.bak-' . date('YmdHis'), $json) === false) {
+        error_log('could not keep a copy of ' . basename($path));
+        return;
+    }
+    $copies = glob(str_replace(['[', '*', '?'], ['[[]', '[*]', '[?]'], $path) . '.bak-*') ?: [];
+    sort($copies);
+    foreach (array_slice($copies, 0, max(0, count($copies) - CONTENT_COPIES_KEEP)) as $old) @unlink($old);
 }
 
 /**

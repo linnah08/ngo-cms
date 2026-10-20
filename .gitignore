@@ -48,6 +48,7 @@ package-lock.json
 /content/home.json.lock
 /content/home.json.tmp-*
 /content/home.json.corrupt-*
+/content/home.json.bak-*
 /assets/images/pages/home/
 /content/menus.json
 # Pages created in Admin → Страници, and their images
