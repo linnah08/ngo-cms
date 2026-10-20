@@ -926,12 +926,14 @@ function home_apply_action(array $doc, string $action, string $id): array {
 /**
  * Put the sections in the order the admin dragged them into. $order must name every
  * current section exactly once — anything else means the list on screen is out of date.
+ * With $visible_only it names just the sections shown on the site (the admin list folds the
+ * hidden ones away): those take the new order, and each hidden section keeps its place.
  * $moved is the section that was dragged, used only for the message.
  * @return array{ok: bool, doc: array, message: string, focus: ?string}
  */
-function home_apply_reorder(array $doc, array $order, string $moved): array {
+function home_apply_reorder(array $doc, array $order, string $moved, bool $visible_only = false): array {
     $order   = array_values($order);
-    $current = array_column($doc['sections'], 'id');
+    $current = array_column($visible_only ? array_filter($doc['sections'], fn($s) => !empty($s['visible'])) : $doc['sections'], 'id');
     $valid   = count($order) === count($current)
             && array_filter($order, 'is_string') === $order
             && count(array_unique($order)) === count($order)
@@ -941,7 +943,10 @@ function home_apply_reorder(array $doc, array $order, string $moved): array {
                 'message' => 'Списъкът със секции на екрана не е актуален. Презаредете страницата и опитайте отново.'];
     }
     $by_id = array_column($doc['sections'], null, 'id');
-    $doc['sections'] = array_map(fn($id) => $by_id[$id], $order);
+    $next = 0;
+    foreach ($doc['sections'] as $i => $s) {
+        if (!$visible_only || !empty($s['visible'])) $doc['sections'][$i] = $by_id[$order[$next++]];
+    }
     $pos = array_search($moved, $order, true);
     $msg = $pos === false
         ? 'Новият ред на секциите е запазен.'

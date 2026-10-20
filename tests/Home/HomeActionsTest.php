@@ -36,6 +36,23 @@ final class HomeActionsTest extends TestCase
         $this->assertSame('Новият ред на секциите е запазен.', $r['message']);
     }
 
+    public function test_reorder_of_shown_sections_keeps_hidden_ones_in_their_places(): void
+    {
+        $doc = $this->doc();
+        $doc['sections'][] = ['id' => 's_ef56', 'type' => 'richtext', 'visible' => true, 'fields' => []];
+        // hero, ab12, (cd34 hidden), ef56 — the admin drags ef56 to the top of the shown list
+        $r = home_apply_reorder($doc, ['s_ef56', 's_hero', 's_ab12'], 's_ef56', true);
+        $this->assertTrue($r['ok']);
+        $this->assertSame(['s_ef56', 's_hero', 's_cd34', 's_ab12'], $this->ids($r['doc']));
+        $this->assertSame("\u{201E}Свободен текст\u{201C} е преместена на място 1 от 3.", $r['message'], 'counted among the shown sections');
+    }
+
+    public function test_reorder_of_shown_sections_refuses_a_hidden_or_missing_one(): void
+    {
+        $this->assertFalse(home_apply_reorder($this->doc(), ['s_hero', 's_ab12', 's_cd34'], 's_hero', true)['ok'], 'a hidden one');
+        $this->assertFalse(home_apply_reorder($this->doc(), ['s_hero'], 's_hero', true)['ok'], 'a shown one missing');
+    }
+
     /** @return iterable<string, array{0: array}> */
     public static function badOrders(): iterable
     {

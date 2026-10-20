@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'reorder') {   // sent by the drag handles, answers in JSON
         header('Content-Type: application/json; charset=UTF-8');
         $order = is_array($_POST['order'] ?? null) ? $_POST['order'] : [];
-        $r = home_apply_reorder($doc, $order, $post_id);
+        $r = home_apply_reorder($doc, $order, $post_id, $post_str('scope') === 'visible');
         $new_rev = $post_rev;
         if ($r['ok']) {
             $saved = home_save($r['doc'], $post_rev);
@@ -306,12 +306,23 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       (повреденият файл се пази като резервно копие на сървъра).
     </div>
   <?php endif; ?>
+  <?php
+    // Shown sections can be dragged into order; hidden ones fold away below so they don't
+    // have to be scrolled past (the built-in ones can't be deleted, only hidden).
+    $rows = static fn(bool $shown): array => array_values(array_filter($doc['sections'],
+        fn($s) => isset($types[$s['type']]) && !empty($s['visible']) === $shown));
+    $shown  = $rows(true);
+    $hidden = $rows(false);
+  ?>
+  <?php if (!$shown && $hidden): ?>
+  <p style="margin:0 0 1rem;padding:1rem;border:2px dashed var(--border);border-radius:8px;">В момента нито една секция не се показва на сайта. Отворете „Скрити секции“ отдолу и натиснете „Покажи“ на тази, която искате.</p>
+  <?php endif; ?>
   <ol id="list" data-rev="<?= (int) $rev ?>" data-action="<?= h(hs_url()) ?>" data-csrf="<?= h(csrf_token()) ?>" style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.75rem;">
-    <?php $n = count($doc['sections']); foreach ($doc['sections'] as $i => $s):
-      $t = $types[$s['type']] ?? null; if ($t === null) continue;
-      $name = home_section_name($s); $vis = !empty($s['visible']); ?>
+    <?php $n = count($shown); foreach ($shown as $i => $s):
+      $t = $types[$s['type']];
+      $name = home_section_name($s); $vis = true; ?>
     <li id="row-<?= h($s['id']) ?>" data-id="<?= h($s['id']) ?>" data-name="<?= h($name) ?>" style="border:1px solid var(--border);border-radius:8px;padding:1rem;display:flex;flex-wrap:wrap;gap:1rem;align-items:center;justify-content:space-between;background:<?= $vis ? '#fff' : '#f3f4f6' ?>;">
-      <?= hs_sort_handle("Премести „{$name}“ (място " . ($i + 1) . " от {$n})", 'hsSortHelp') ?>
+      <?php if ($vis): ?><?= hs_sort_handle("Премести „{$name}“ (място " . ($i + 1) . " от {$n})", 'hsSortHelp') ?><?php endif; ?>
       <div style="flex:1;min-width:220px;">
         <h2 id="h-<?= h($s['id']) ?>" tabindex="-1" style="font-size:1.05rem;margin:0;"><span aria-hidden="true"><?= $t['icon'] ?> </span><?= h($t['label']) ?></h2>
         <p style="margin:.25rem 0 0;color:var(--text-muted);"><?= h(home_section_preview($s)) ?></p>
@@ -334,6 +345,42 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </li>
     <?php endforeach; ?>
   </ol>
+  <?php if ($hidden): ?>
+  <details id="hsHidden" style="margin-top:1.25rem;border:1px solid var(--border);border-radius:8px;background:#f9fafb;">
+    <summary style="cursor:pointer;padding:.85rem 1rem;min-height:44px;box-sizing:border-box;font-weight:700;font-size:1.05rem;">
+      Скрити секции (<?= count($hidden) ?>)
+      <span style="font-weight:400;color:var(--text-muted);"> — не се показват на сайта</span>
+    </summary>
+    <ul style="list-style:none;padding:0 1rem 1rem;margin:0;display:flex;flex-direction:column;gap:.75rem;">
+    <?php foreach ($hidden as $s):
+      $t = $types[$s['type']];
+      $name = home_section_name($s); $vis = false; ?>
+    <li id="row-<?= h($s['id']) ?>" data-hidden-id="<?= h($s['id']) ?>" data-name="<?= h($name) ?>" style="border:1px solid var(--border);border-radius:8px;padding:1rem;display:flex;flex-wrap:wrap;gap:1rem;align-items:center;justify-content:space-between;background:<?= $vis ? '#fff' : '#f3f4f6' ?>;">
+      <?php if ($vis): ?><?= hs_sort_handle("Премести „{$name}“ (място " . ($i + 1) . " от {$n})", 'hsSortHelp') ?><?php endif; ?>
+      <div style="flex:1;min-width:220px;">
+        <h2 id="h-<?= h($s['id']) ?>" tabindex="-1" style="font-size:1.05rem;margin:0;"><span aria-hidden="true"><?= $t['icon'] ?> </span><?= h($t['label']) ?></h2>
+        <p style="margin:.25rem 0 0;color:var(--text-muted);"><?= h(home_section_preview($s)) ?></p>
+        <p style="margin:.35rem 0 0;font-weight:600;color:<?= $vis ? '#166534' : '#4b5563' ?>;"><?= $vis ? '● Видима на сайта' : '○ Скрита' ?></p>
+        <?php if ($s['type'] === 'campaign' && !feature_enabled('campaign')): ?>
+          <p style="margin:.35rem 0 0;color:#4b5563;">Модулът „Кампания“ е изключен — секцията не се показва.</p>
+        <?php endif; ?>
+        <?php if ($s['type'] === 'products' && !module_enabled_with_needs('shop')): ?>
+          <p style="margin:.35rem 0 0;color:#4b5563;">Модулът „Магазин“ е изключен — секцията не се показва.</p>
+        <?php endif; ?>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:.5rem;">
+        <a id="btn-edit-<?= h($s['id']) ?>" href="<?= h(hs_url(['edit' => $s['id']])) ?>" class="btn btn--outline" style="min-height:44px;" aria-label="<?= h("Редактирай „{$name}“") ?>">Редактирай</a>
+        <?= hs_action_form('toggle', $s, $rev, $vis ? 'Скрий' : 'Покажи', ($vis ? 'Скрий' : 'Покажи') . " „{$name}“") ?>
+        <?php if (!$t['builtin']): ?>
+          <?= hs_action_form('duplicate', $s, $rev, 'Дублирай', "Дублирай „{$name}“") ?>
+          <?= hs_action_form('delete', $s, $rev, 'Изтрий', "Изтрий „{$name}“", true) ?>
+        <?php endif; ?>
+      </div>
+    </li>
+    <?php endforeach; ?>
+    </ul>
+  </details>
+  <?php endif; ?>
 <?php endif; ?>
 
 <script>
@@ -349,6 +396,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     var p = q.split(':'), el = document.getElementById('btn-' + p[0] + '-' + p[1]);
     if (p[0] === 'settings') el = document.getElementById('cpSettingsTitle');   // a created page's title/address saved
     if (!el || el.disabled) el = document.getElementById('h-' + p[1]) || document.getElementById('hsListTitle');
+    var fold = el && el.closest('details');   // a section just hidden: open the group so focus can land on it
+    if (fold) fold.open = true;
     if (el) el.focus();
   }
   var summary = document.getElementById('hsErrSummary') || document.getElementById('cpErrSummary');
@@ -595,6 +644,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         body.append('action', 'reorder');
         body.append('rev', sections.dataset.rev);
         body.append('id', row.dataset.id);
+        body.append('scope', 'visible');   // hidden sections aren't in this list; they keep their places
         Array.prototype.forEach.call(sections.querySelectorAll('li[data-id]'), function (li) { body.append('order[]', li.dataset.id); });
         var fail = 'Новият ред не можа да се запази. Презаредете страницата и опитайте отново.';
         function failed(text) { list_.restore(before); showMsg(text || fail, false); }
@@ -604,7 +654,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
             if (!d || !d.ok) { failed(d && d.message); return; }
             // Every other button on the page must now send the new revision.
             sections.dataset.rev = String(d.rev);
-            Array.prototype.forEach.call(sections.querySelectorAll('input[name="rev"]'), function (i) { i.value = String(d.rev); });
+            Array.prototype.forEach.call(document.querySelectorAll('#list input[name="rev"], #hsHidden input[name="rev"]'), function (i) { i.value = String(d.rev); });
             showMsg(d.message, true);
           }, function () { failed('Няма връзка със сървъра. Проверете интернета и опитайте отново.'); })
           .then(function () { saving = false; });
