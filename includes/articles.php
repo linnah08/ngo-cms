@@ -153,6 +153,15 @@ function article_excerpt_from_content(string $html, int $max_len = 160): string 
 }
 
 /**
+ * The article text as shown, without the empty lines editors often leave at its end
+ * (<p>&nbsp;</p> from pressing Enter), which only pushed what follows further down.
+ * What is saved is not changed.
+ */
+function article_trim_trailing_blank(string $html): string {
+    return (string) preg_replace('#(?:\s*<p[^>]*>(?:\s|&nbsp;|&\#160;|\x{00A0}|<br\s*/?>)*</p>)+\s*$#u', '', $html);
+}
+
+/**
  * Assemble the EN article record. Date, author, image, status and tags are shared
  * with the BG record by the caller; only the EN title/excerpt/content differ.
  */

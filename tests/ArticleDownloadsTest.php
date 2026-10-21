@@ -65,11 +65,20 @@ final class ArticleDownloadsTest extends TestCase
         $this->assertSame('intro-en', file_links_in_html($html, $this->root)[0]['name']);
     }
 
-    public function test_both_article_pages_show_the_box(): void
+    /** Both article pages show the buttons twice: a row under the title and the box after the text. */
+    public function test_both_article_pages_show_the_buttons_on_top_and_after_the_text(): void
     {
         foreach (['novini/index.php', 'en/news/index.php'] as $page) {
             $src = (string) file_get_contents(dirname(__DIR__) . '/' . $page);
-            $this->assertStringContainsString("templates/article-downloads.php", $src, "$page shows the downloads box");
+            $this->assertSame(2, substr_count($src, 'templates/article-downloads.php'), "$page shows the downloads twice");
+            $this->assertMatchesRegularExpression('#</h1>\s*<\?php [^?]*\$downloads_compact = true#', $src, "$page: the row sits under the title");
         }
+    }
+
+    public function test_empty_lines_at_the_end_of_an_article_are_not_shown(): void
+    {
+        require_once dirname(__DIR__) . '/includes/articles.php';
+        $this->assertSame('<p>Благодарим 🙏</p>', article_trim_trailing_blank("<p>Благодарим 🙏</p>\n<p>&nbsp;</p>\n<p> <br></p>\n<p>\u{00A0}</p>\n"));
+        $this->assertSame('<p>&nbsp;</p><p>Текст</p>', article_trim_trailing_blank('<p>&nbsp;</p><p>Текст</p>'), 'only the end is trimmed');
     }
 }

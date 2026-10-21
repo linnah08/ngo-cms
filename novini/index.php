@@ -73,6 +73,8 @@ if ($slug) {
           data-cms-bg="<?= h($article['title'] ?? '') ?>"
           data-cms-en=""><?= h($article['title']) ?></h1>
 
+      <?php $lang = 'bg'; $downloads_compact = true; require $_SERVER['DOCUMENT_ROOT'] . '/templates/article-downloads.php'; ?>
+
       <?php $lang = 'bg'; ?>
       <?php if (count(article_photos($article)) <= 1 && !empty($article['image'])): ?>
         <span class="om-img-wrap" data-cms-field="image" data-cms-section="article">
@@ -90,10 +92,10 @@ if ($slug) {
            data-cms-type="richtext"
            data-cms-bg="<?= h($article['content'] ?? '') ?>"
            data-cms-en="">
-        <?= $article['content'] ?? '' ?>
+        <?= article_trim_trailing_blank($article['content'] ?? '') ?>
       </div>
 
-      <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/article-downloads.php'; ?>
+      <?php $downloads_compact = false; require $_SERVER['DOCUMENT_ROOT'] . '/templates/article-downloads.php'; ?>
 
       <?php if (!empty($article['sources'])): ?>
         <div style="margin-top:3rem;padding-top:2rem;border-top:1px solid var(--border);">
