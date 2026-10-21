@@ -101,3 +101,43 @@ function file_upload_store(string $tmp, string $original, int $error, string $ro
 
     return ['ok' => true, 'path' => '/' . FILES_DIR . '/' . $name, 'text' => file_link_text($original, $bytes), 'size' => file_size_label($bytes)];
 }
+
+/**
+ * The site's own PDFs an article's text links to, once each and in order, for the
+ * „Файлове за изтегляне“ box under the article (templates/article-downloads.php).
+ * A link counts when it points into /assets/files/<folder>/ — as a path or as a full
+ * address on this site — and the file is there; links elsewhere are left alone.
+ * The name is the link's title (the upload button sets it to the file's name), else
+ * its text, else the stored file name.
+ *
+ * @return list<array{href: string, name: string, size: string}>
+ */
+function file_links_in_html(string $html, string $root = ROOT_PATH): array
+{
+    if (stripos($html, '.pdf') === false) return [];
+    $doc = new DOMDocument();
+    libxml_use_internal_errors(true);
+    $doc->loadHTML('<?xml encoding="UTF-8"><div>' . $html . '</div>', LIBXML_NONET);
+    libxml_clear_errors();
+
+    $site  = strtolower((string) parse_url(SITE_URL, PHP_URL_HOST));
+    $site  = preg_replace('/^www\./', '', $site);
+    $found = [];
+    foreach ($doc->getElementsByTagName('a') as $a) {
+        $href = trim($a->getAttribute('href'));
+        $host = strtolower((string) parse_url($href, PHP_URL_HOST));
+        if ($host !== '' && preg_replace('/^www\./', '', $host) !== $site) continue;
+        $path = rawurldecode((string) parse_url($href, PHP_URL_PATH));
+        if (!preg_match('#^/assets/files/[a-z0-9_-]+/[^/]+\.pdf$#i', $path) || str_contains($path, '..')) continue;
+        if (isset($found[$path])) continue;
+        $file = rtrim($root, '/') . $path;
+        if (!is_file($file)) continue;
+
+        $name = trim((string) preg_replace('/\s*\(PDF,[^)]*\)\s*$/u', '', $a->getAttribute('title')));
+        if ($name === '') $name = trim((string) preg_replace('/\s+/u', ' ', $a->textContent));
+        if ($name === '') $name = (string) preg_replace('/-[0-9a-f]{6}$/', '', pathinfo($path, PATHINFO_FILENAME));
+
+        $found[$path] = ['href' => $path, 'name' => $name, 'size' => file_size_label((int) filesize($file))];
+    }
+    return array_values($found);
+}

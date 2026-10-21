@@ -93,6 +93,8 @@ if ($slug) {
         <?= $article['content'] ?? '' ?>
       </div>
 
+      <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/article-downloads.php'; ?>
+
       <?php if (!empty($article['sources'])): ?>
         <div style="margin-top:3rem;padding-top:2rem;border-top:1px solid var(--border);">
           <h4 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:1rem;"><?= te('news.sources', 'Източници', 'Sources') ?></h4>

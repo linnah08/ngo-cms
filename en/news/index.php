@@ -99,6 +99,8 @@ if ($slug) {
         <?= $article['content'] ?? '' ?>
       </div>
 
+      <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/article-downloads.php'; ?>
+
     </div>
   </section>
 </article>
