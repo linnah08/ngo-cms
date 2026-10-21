@@ -5,7 +5,11 @@
  * and ←/→. Never moves on its own; no slide animation under prefers-reduced-motion.
  * Captions show under the photo and are its alt text.
  *
- * Vars: $article, $lang ('bg'|'en'); $photos_exist (callable) only in tests.
+ * Carousel slides share a 3:2 frame and fill it. A photo taller than it is wide (a poster,
+ * a one-page leaflet) would lose its top and bottom that way, so it is shown whole in the
+ * frame on a light background instead.
+ *
+ * Vars: $article, $lang ('bg'|'en'); $photos_exist and $photo_size (callables) only in tests.
  * Inline styles only — main.css may be stale-cached.
  */
 $_ac_photos = article_photos($article, $photos_exist ?? null);
@@ -18,6 +22,16 @@ $_ac_alt = static function (array $p, int $n) use ($lang, $_ac_total, $_ac_title
     return $lang === 'en' ? "Photo $n of $_ac_total — $_ac_title" : "Снимка $n от $_ac_total — $_ac_title";
 };
 $_ac_img = 'width:100%;height:auto;border-radius:var(--radius-lg);display:block;';
+/** [width, height] of a photo on disk, or null. */
+$_ac_size = $photo_size ?? static function (string $src): ?array {
+    if (!str_starts_with($src, '/') || str_contains($src, '..')) return null;
+    $s = @getimagesize(rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/') . $src);
+    return $s ? [(int) $s[0], (int) $s[1]] : null;
+};
+$_ac_fit = static function (array $p) use ($_ac_size): string {
+    $s = $_ac_size($p['src']);
+    return $s && $s[1] > $s[0] ? 'object-fit:contain;background:#f8fafb;' : 'object-fit:cover;';
+};
 ?>
 <?php if ($_ac_total === 1): $p = $_ac_photos[0]; ?>
   <figure style="margin:0 0 2rem;">
@@ -35,7 +49,7 @@ $_ac_img = 'width:100%;height:auto;border-radius:var(--radius-lg);display:block;
       <figure data-slide <?= $i === $_ac_start ? '' : 'hidden' ?> style="margin:0;">
         <img src="<?= asset_url($p['src']) ?>" alt="<?= h($_ac_alt($p, $i + 1)) ?>"
              <?= $i === $_ac_start ? '' : 'loading="lazy"' ?>
-             style="<?= $_ac_img ?>aspect-ratio:3/2;object-fit:cover;">
+             style="<?= $_ac_img ?>aspect-ratio:3/2;<?= $_ac_fit($p) ?>">
         <?php if ($p['caption'] !== ''): ?>
           <figcaption style="margin-top:.5rem;font-size:.9rem;color:var(--text-muted);"><?= h($p['caption']) ?></figcaption>
         <?php endif; ?>

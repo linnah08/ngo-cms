@@ -11,9 +11,10 @@ final class ArticleCarouselTemplateTest extends TestCase
         require_once dirname(__DIR__, 2) . '/includes/articles.php';
     }
 
-    private function render(array $article, string $lang = 'bg', ?callable $exists = null): string
+    private function render(array $article, string $lang = 'bg', ?callable $exists = null, ?callable $size = null): string
     {
         $photos_exist = $exists ?? static fn(): bool => true;
+        $photo_size   = $size ?? static fn(): ?array => null;
         ob_start();
         require dirname(__DIR__, 2) . '/templates/article-carousel.php';
         return (string) ob_get_clean();
@@ -48,6 +49,15 @@ final class ArticleCarouselTemplateTest extends TestCase
         $this->assertStringContainsString('aria-label="Следваща снимка"', $html);
         $this->assertStringContainsString('aria-live="polite"', $html);
         $this->assertStringNotContainsString('autoplay', $html);
+    }
+
+    /** A tall picture (a one-page leaflet) is shown whole; ordinary photos still fill the frame. */
+    public function testATallPhotoIsShownWholeInTheCarousel(): void
+    {
+        $size = static fn(string $src): array => str_ends_with($src, 'p1.jpg') ? [1080, 1527] : [1600, 1067];
+        $html = $this->render($this->post(2), 'bg', null, $size);
+        $this->assertMatchesRegularExpression('#p0\.jpg"[^>]*object-fit:cover#s', $html);
+        $this->assertMatchesRegularExpression('#p1\.jpg"[^>]*object-fit:contain#s', $html);
     }
 
     public function testCaptionIsShownAndUsedAsAlt(): void
