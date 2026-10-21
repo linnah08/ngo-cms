@@ -99,10 +99,16 @@ body.om-edit-mode [data-cms-field] {
 }
 body.om-edit-mode [data-cms-field]:hover {
   outline: 2px dashed #a78bfa;
-  background: rgba(167,139,250,.07);
 }
 body.om-edit-mode [data-cms-field]:focus {
   outline: 2px solid #7c3aed;
+}
+/* The tint stays off buttons: it would replace their own hover background
+   and leave light label text on a near-white field. */
+body.om-edit-mode [data-cms-field]:not(.btn):hover {
+  background: rgba(167,139,250,.07);
+}
+body.om-edit-mode [data-cms-field]:not(.btn):focus {
   background: rgba(167,139,250,.1);
 }
 
