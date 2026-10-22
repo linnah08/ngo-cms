@@ -90,7 +90,7 @@ window.OmCMS = (function () {
         const ed = tinymce.get(el.id);
         if (ed) el.dataset['cms' + _cap(activeLang)] = ed.getContent();
       } else {
-        el.dataset['cms' + _cap(activeLang)] = el.dataset.cmsType === 'richtext' ? el.innerHTML : el.textContent;
+        el.dataset['cms' + _cap(activeLang)] = el.dataset.cmsType === 'richtext' ? el.innerHTML : _plainText(el);
       }
     });
 
@@ -122,6 +122,12 @@ window.OmCMS = (function () {
     return text.replace(/\{(\w+)\}/g, function (m, k) { return Object.prototype.hasOwnProperty.call(vars, k) ? vars[k] : m; });
   }
 
+  // A text with line breaks (data-cms-type="lines", shown with white-space:pre-line) is read
+  // through innerText, which turns a typed <br> into a line break; other texts stay on one line.
+  function _plainText(el) {
+    return el.dataset.cmsType === 'lines' ? el.innerText.replace(/\n+$/, '') : el.textContent;
+  }
+
   function _cap(s) {
     return s.charAt(0).toUpperCase() + s.slice(1);
   }
@@ -132,6 +138,8 @@ window.OmCMS = (function () {
     const el = e.currentTarget;
     const field = el.dataset.cmsField;
     const section = el.dataset.cmsSection;
+    // Typed line breaks become plain ones, so what is sent is the text as it will show.
+    if (el.dataset.cmsType === 'lines') el.textContent = _plainText(el);
     _dirtyEntry(section, field, el)[activeLang] = el.innerHTML;
     el.dataset['cms' + _cap(activeLang)] = el.innerHTML;
     // The same wording can show more than once (a button on every product card): keep them alike.
@@ -1068,7 +1076,7 @@ window.OmCMS = (function () {
     if (!item) return;
     if (e.target.closest('a, button, label, summary')) e.preventDefault();
     var isAdmin = item.matches('[data-cms-admin]') && !item.closest('[data-cms-field]');
-    if (isAdmin || item.dataset.cmsType === 'text') e.stopPropagation();
+    if (isAdmin || item.dataset.cmsType === 'text' || item.dataset.cmsType === 'lines') e.stopPropagation();
     if (isAdmin) {
       e.preventDefault();
       _showAdminHint(item);
@@ -1080,10 +1088,14 @@ window.OmCMS = (function () {
   document.addEventListener('keydown', function (e) {
     if (!editMode || !e.target.closest) return;
     var item = e.target.closest('[data-cms-field]');
-    // One-line texts: Enter finishes the edit instead of breaking the line;
-    // Space inside a button types a space instead of pressing the button.
+    // One-line texts: Enter finishes the edit instead of breaking the line; a text with
+    // lines gets a plain line break (never a new <div>). Space inside a button types a space.
     if (item && item.isContentEditable && item.dataset.cmsType !== 'richtext') {
-      if (e.key === 'Enter') { e.preventDefault(); item.blur(); }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (item.dataset.cmsType !== 'lines') item.blur();
+        else if (!document.execCommand('insertLineBreak')) document.execCommand('insertText', false, '\n');
+      }
       return;
     }
     var hint = e.target.closest('[data-cms-admin]');

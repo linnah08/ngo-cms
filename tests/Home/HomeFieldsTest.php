@@ -5,6 +5,7 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 require_once dirname(__DIR__, 2) . '/includes/home.php';
+require_once dirname(__DIR__, 2) . '/includes/home_admin.php';
 
 final class HomeFieldsTest extends TestCase
 {
@@ -150,5 +151,40 @@ final class HomeFieldsTest extends TestCase
         $this->assertSame('https://bg.wikipedia.org/wiki/България', home_clean_link('https://bg.wikipedia.org/wiki/България') ?? 'null');
         $this->assertNull(home_clean_link('https://-.бг'));
         $this->assertNull(home_clean_link('javascript://пример.бг'));
+    }
+
+    public function test_a_field_with_lines_keeps_single_line_breaks_and_tidies_the_rest(): void
+    {
+        $def = ['kind' => 'text', 'label' => 'Заглавие', 'max' => 150, 'lines' => 3];
+        [$v, $err] = home_clean_field($def, ['bg' => "  - Какво   правиш?\r\n\n\n- Нищо  ", 'en' => 'One line'], 'title');
+        $this->assertSame([], $err);
+        $this->assertSame(['bg' => "- Какво правиш?\n- Нищо", 'en' => 'One line'], $v);
+    }
+
+    public function test_a_field_with_lines_refuses_more_lines_than_it_allows(): void
+    {
+        $def = ['kind' => 'text', 'label' => 'Заглавие', 'max' => 150, 'lines' => 3];
+        [, $err] = home_clean_field($def, ['bg' => "1\n2\n3\n4", 'en' => ''], 'title');
+        $this->assertSame('Най-много 3 реда.', $err['title.bg']);
+    }
+
+    public function test_a_one_line_text_still_joins_line_breaks(): void
+    {
+        [$v] = home_clean_field(['kind' => 'text', 'label' => 'Заглавие'], ['bg' => "a\nb", 'en' => ''], 'heading');
+        $this->assertSame('a b', $v['bg']);
+    }
+
+    public function test_the_hero_title_allows_three_lines(): void
+    {
+        $this->assertSame(3, home_types()['hero']['fields']['title']['lines']);
+    }
+
+    public function test_the_admin_form_gives_a_field_with_lines_a_box_of_that_many_rows(): void
+    {
+        $html = hs_field('title', home_types()['hero']['fields']['title'], ['bg' => "- А?\n- Б", 'en' => ''], []);
+        $this->assertStringContainsString("<textarea id=\"f_title_bg\" name=\"f[title][bg]\" aria-describedby=\"f_title_hint\" rows=\"3\">- А?\n- Б</textarea>", $html);
+        $this->assertStringContainsString('data-translate-from="f[title][bg]" rows="3"', $html);
+        $this->assertStringNotContainsString('<input', hs_field('heading', ['kind' => 'text', 'label' => 'Заглавие', 'lines' => 2], '', []));
+        $this->assertStringContainsString('<input type="text"', hs_field('heading', ['kind' => 'text', 'label' => 'Заглавие'], '', []));
     }
 }

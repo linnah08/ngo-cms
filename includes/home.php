@@ -254,7 +254,8 @@ function home_types(): array {
     $types = [
         'hero' => ['builtin' => true, 'icon' => '🏠', 'label' => 'Начален банер',
             'desc' => 'Голямото заглавие и снимка най-горе на страницата.', 'note' => null,
-            'fields' => ['title' => $head, 'text' => ['kind' => 'textarea', 'label' => 'Текст', 'max' => 600]]
+            'fields' => ['title' => $head + ['lines' => 3, 'hint' => 'За нов ред натиснете Enter — например за реплики от разговор. Най-много 3 реда.'],
+                         'text' => ['kind' => 'textarea', 'label' => 'Текст', 'max' => 600]]
                 + $img('Снимка') + $btn(1) + $btn(2)],
         'products' => ['builtin' => true, 'icon' => '🛍', 'label' => 'Продукти от магазина',
             'desc' => 'Продуктите, отбелязани за началната страница.',
@@ -346,7 +347,14 @@ function home_clean_field(array $def, mixed $raw, string $key): array {
                     // \s with /u also trims a non-breaking space, which trim() leaves (null: not UTF-8).
                     $v = strip_tags($v);
                     $v = preg_replace('/^\s+|\s+$/u', '', $v) ?? trim($v);
-                    if ($def['kind'] !== 'textarea') $v = (string) preg_replace('/\s+/u', ' ', $v);
+                    if (($def['lines'] ?? 1) > 1) {
+                        // Up to 'lines' lines: spaces inside a line are tidied, empty lines dropped.
+                        $rows = array_filter(array_map(fn($r) => trim((string) preg_replace('/[^\S\n]+/u', ' ', $r)), explode("\n", str_replace("\r", '', $v))), 'strlen');
+                        if (count($rows) > $def['lines']) $err["$key.$l"] = "Най-много {$def['lines']} реда.";
+                        $v = implode("\n", $rows);
+                    } elseif ($def['kind'] !== 'textarea') {
+                        $v = (string) preg_replace('/\s+/u', ' ', $v);
+                    }
                 }
                 $max = (int) ($def['max'] ?? 0);
                 if ($max > 0 && mb_strlen($v) > $max) $err["$key.$l"] = "Текстът е твърде дълъг — най-много $max знака.";
@@ -1055,6 +1063,8 @@ function home_inline_save(string $id, array $fields): array {
                 if (!array_key_exists($l, $values)) continue;
                 $v = is_string($values[$l]) ? $values[$l] : '';
                 // The page sends innerHTML: "&amp;" must be stored as "&" (output is escaped again).
+                // A field with several lines keeps a typed line break (<br>) as one.
+                if (($def['lines'] ?? 1) > 1) $v = (string) preg_replace('~<br\s*/?>|</(?:div|p)>~i', "\n", $v);
                 if ($def['kind'] !== 'html') $v = home_plain_text($v);
                 $raw[$l] = $v;
             }

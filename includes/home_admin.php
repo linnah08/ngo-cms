@@ -68,6 +68,7 @@ function hs_field(string $key, array $def, mixed $val, array $errors, string $nb
                 $v = h($pair[$l]);
                 $control = match ($def['kind']) {
                     'textarea' => "<textarea{$attrs} rows=\"3\">{$v}</textarea>",
+                    'text'     => ($def['lines'] ?? 1) > 1 ? "<textarea{$attrs} rows=\"{$def['lines']}\">{$v}</textarea>" : "<input type=\"text\"{$attrs} value=\"{$v}\">",
                     'html'     => "<textarea{$attrs} rows=\"8\" class=\"hs-rich\">{$v}</textarea>",
                     'link'     => "<input type=\"text\" inputmode=\"url\" autocomplete=\"off\"{$attrs} value=\"{$v}\">" . hs_pdf_button($fid, $def['label'] . ' (' . strtoupper($l) . ')'),
                     default    => "<input type=\"text\"{$attrs} value=\"{$v}\">",

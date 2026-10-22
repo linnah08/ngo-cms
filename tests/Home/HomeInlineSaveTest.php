@@ -257,4 +257,11 @@ final class HomeInlineSaveTest extends TestCase
         $this->assertLessThan(strpos($src, '// Allowed field map'), $route);
         $this->assertLessThan($route, strpos($src, "hash_equals(csrf_token()"), 'auth + CSRF checks must run first');
     }
+
+    public function test_a_line_break_typed_on_the_page_is_kept_in_the_hero_title(): void
+    {
+        $r = home_inline_save('s_hero', ['title' => ['bg' => '- Какво правиш?<br>- Нищо &amp; още<br>', 'en' => "- What are you doing?\n- Nothing"]]);
+        $this->assertTrue($r['ok']);
+        $this->assertSame(['bg' => "- Какво правиш?\n- Нищо & още", 'en' => "- What are you doing?\n- Nothing"], $this->section('s_hero')['fields']['title']);
+    }
 }

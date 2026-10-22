@@ -194,4 +194,10 @@ final class HomeRenderTest extends TestCase
         $this->assertSame(1, substr_count($head, '<style'));
         $this->assertSame(1, substr_count($head, '<script'));
     }
+
+    public function test_hero_title_shows_its_line_breaks_and_stays_escaped(): void
+    {
+        $html = $this->render([$this->s('hero', ['title' => ['bg' => "- Какво правиш?\n- <b>Нищо</b>", 'en' => '']])]);
+        $this->assertMatchesRegularExpression('~<h1[^>]*data-cms-type="lines"[^>]*style="white-space:pre-line;">- Какво правиш\?\n- &lt;b&gt;Нищо&lt;/b&gt;</h1>~u', $html);
+    }
 }
