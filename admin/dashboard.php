@@ -44,7 +44,7 @@ if ($can_editorial && module_enabled_with_needs('comments_reviews')) {
         }
     } catch (Throwable $e) { /* table may not exist */ }
 }
-if ($can_editorial) {
+if ($can_editorial && module_enabled_with_needs('contact_form')) {
     try {
         foreach ($pdo->query("SELECT name, message, created_at FROM contact_submissions WHERE status='new' ORDER BY created_at DESC")->fetchAll() as $m) {
             $inbox[] = [

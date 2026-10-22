@@ -162,7 +162,7 @@ function modules_registry(?array $replace = null): array
             // Comments work without the shop; the product-review parts also check
             // module_enabled_with_needs('shop'). admin/comments.php is not listed:
             // it also holds the contact-form messages, so with this module off it
-            // stays as „Контакти“ only.
+            // stays as „Контакти“ only (and is guarded once contact_form is off too).
             'admin_pages'  => ['product-reviews.php'],
             'public_paths' => ['/api/comment-submit.php', '/api/review-submit.php'],
             'pending'      => static function (PDO $pdo): ?string {
@@ -176,6 +176,24 @@ function modules_registry(?array $replace = null): array
                 return $n === 1
                     ? '1 коментар или отзив още чака преглед.'
                     : $n . ' коментара и отзива още чакат преглед.';
+            },
+        ],
+        'contact_form' => [
+            'label'       => 'Контактна форма',
+            'description' => 'Форма на страница „Контакти“, през която посетителите ви пишат, с теми, които избирате, защита от спам и пощенска кутия със съобщенията в админ панела.',
+            'off_warning' => 'Изключвате контактната форма. Формата ще изчезне от страница „Контакти“, но имейлът, IBAN-ът и социалните мрежи остават там. Съобщенията и темите остават запазени и се връщат, щом я включите отново.',
+            'needs'        => [],
+            // Nothing listed, on purpose: /kontakti/ and /en/contacts/ stay up
+            // (and in the menus) without the form, and admin/comments.php also
+            // holds the comments — it is guarded only when both modules are off.
+            'admin_pages'  => [],
+            'public_paths' => [],
+            'pending'      => static function (PDO $pdo): ?string {
+                $n = (int) $pdo->query("SELECT COUNT(*) FROM contact_submissions WHERE status = 'new'")->fetchColumn();
+                if ($n < 1) return null;
+                return $n === 1
+                    ? '1 съобщение от контактната форма още не е прочетено.'
+                    : $n . ' съобщения от контактната форма още не са прочетени.';
             },
         ],
         'social' => [

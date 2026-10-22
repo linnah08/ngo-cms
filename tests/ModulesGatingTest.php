@@ -303,9 +303,37 @@ final class ModulesGatingTest extends TestCase
     {
         $src = self::src('admin/comments.php');
         $this->assertStringContainsString("if (!\$comments_on) \$source = 'contacts';", $src);
-        $this->assertStringContainsString("!module_enabled_with_needs('comments_reviews') && in_array(\$post_action, \$comment_actions, true)", $src, 'comment moderation refused');
+        $this->assertStringContainsString("\$comments_on = module_enabled_with_needs('comments_reviews');", $src);
+        $this->assertStringContainsString("!\$comments_on && in_array(\$post_action, \$comment_actions, true)", $src, 'comment moderation refused');
         $this->assertNotContains('comments.php', modules_registry()['comments_reviews']['admin_pages'], 'the page also holds contact messages');
         $this->assertStringContainsString("if (\$can_editorial && module_enabled_with_needs('comments_reviews'))", self::src('admin/dashboard.php'));
+    }
+
+    // ── contact_form ─────────────────────────────────────────────────────────
+
+    public function test_comments_stay_when_the_contact_form_is_off(): void
+    {
+        $src = self::src('admin/comments.php');
+        $this->assertStringContainsString("module_admin_guard(['comments_reviews', 'contact_form']);", $src, 'closed only when both are off');
+        $this->assertStringContainsString("if (!\$contacts_on) \$source = 'comments';", $src);
+        $this->assertStringContainsString("!\$contacts_on && in_array(\$post_action, \$contact_actions, true)", $src, 'contact actions refused');
+        foreach (['save_topics', 'csub_delete', 'bulk_delete_contacts'] as $action) {
+            $this->assertStringContainsString("'$action'", substr($src, strpos($src, '$contact_actions = ['), 400), "$action is a contact action");
+        }
+        $this->assertStringContainsString("module_any_enabled('comments_reviews', 'contact_form')", self::src('admin/includes/admin-header.php'), 'menu item while either is on');
+        $this->assertStringContainsString("if (\$can_editorial && module_enabled_with_needs('contact_form'))", self::src('admin/dashboard.php'));
+        $this->assertSame([], modules_registry()['contact_form']['public_paths'], 'the contact page stays, and so do links to it');
+    }
+
+    public function test_both_contact_pages_drop_the_form_when_off(): void
+    {
+        foreach (['kontakti/index.php', 'en/contacts/index.php'] as $f) {
+            $src = self::src($f);
+            $this->assertStringContainsString("\$form_on = module_enabled_with_needs('contact_form');", $src, $f);
+            $this->assertStringContainsString("if (\$_SERVER['REQUEST_METHOD'] === 'POST' && !\$form_on) {", $src, "$f refuses a form sent anyway");
+            $this->assertStringContainsString('<?php if ($form_on): ?>', $src, "$f hides the form");
+            $this->assertStringNotContainsString('module_public_guard', $src, "$f stays up");
+        }
     }
 
     // ── social ───────────────────────────────────────────────────────────────

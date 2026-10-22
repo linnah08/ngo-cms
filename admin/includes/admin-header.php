@@ -69,8 +69,9 @@ $current_user = admin_user();
       </a>
       <?php endif; ?>
       <?php
-      // The page also holds contact messages, so it stays; with „Коментари и
-      // отзиви“ off it is just „Контакти“ and the waiting-comments badge goes.
+      // The page holds comments and contact messages: it stays while either
+      // module is on. With „Коментари и отзиви“ off it is just „Контакти“ and the
+      // waiting-comments badge goes; with „Контактна форма“ off, just „Коментари“.
       $comments_on      = module_enabled_with_needs('comments_reviews');
       $pending_comments = 0;
       if ($comments_on) {
@@ -79,7 +80,7 @@ $current_user = admin_user();
           } catch (Throwable $e) {}
       }
       ?>
-      <?php if (module_admin_page_visible('comments.php')): ?>
+      <?php if (module_any_enabled('comments_reviews', 'contact_form')): ?>
       <a href="/admin/comments.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'comments' ? 'active' : '' ?>">
         <?= $comments_on ? 'Коментари' : 'Контакти' ?><?php if ($pending_comments > 0): ?> <span style="background:var(--teal);color:#fff;border-radius:10px;padding:.05rem .4rem;font-size:.72rem;margin-left:.3rem;vertical-align:middle;"><?= $pending_comments ?></span><?php endif; ?>

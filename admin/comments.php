@@ -6,7 +6,12 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/auth.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/spam_filter.php';
 admin_require_editorial();
-$page_title_admin = module_enabled_with_needs('comments_reviews') ? 'Коментари & Контакти' : 'Контакти';
+// Holds two modules: „Коментари и отзиви“ and „Контактна форма“. With one of
+// them off it is just the other; with both off it does not open.
+module_admin_guard(['comments_reviews', 'contact_form']);
+$comments_on = module_enabled_with_needs('comments_reviews');
+$contacts_on = module_enabled_with_needs('contact_form');
+$page_title_admin = $comments_on && $contacts_on ? 'Коментари & Контакти' : ($comments_on ? 'Коментари' : 'Контакти');
 
 $pdo = get_pdo();
 
@@ -50,8 +55,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // „Коментари и отзиви“ switched off (Admin → Модули): contact messages still
     // work here, comment moderation does not.
     $comment_actions = ['approve', 'reject', 'delete', 'spam', 'bulk_spam_comments', 'bulk_approve_comments', 'bulk_reject_comments', 'bulk_delete_comments'];
-    if (!module_enabled_with_needs('comments_reviews') && in_array($post_action, $comment_actions, true)) {
+    if (!$comments_on && in_array($post_action, $comment_actions, true)) {
         header('Location: /admin/comments.php?source=contacts');
+        exit;
+    }
+    // Same for „Контактна форма“ off: its messages and topics stay as they are.
+    $contact_actions = ['save_topics', 'csub_read', 'csub_archive', 'csub_delete', 'csub_spam', 'bulk_spam_contacts', 'bulk_read_contacts', 'bulk_archive_contacts', 'bulk_delete_contacts'];
+    if (!$contacts_on && in_array($post_action, $contact_actions, true)) {
+        header('Location: /admin/comments.php?source=comments');
         exit;
     }
 
@@ -248,9 +259,9 @@ if (!empty($_GET['spam_review'])) {
 
 // ── Source toggle: comments | contacts | both ──────────────────────────────────
 $source = in_array($_GET['source'] ?? '', ['comments', 'contacts', 'both']) ? $_GET['source'] : 'both';
-// Comments switched off in Admin → Модули: this page is just the contact messages.
-$comments_on = module_enabled_with_needs('comments_reviews');
+// One of the two switched off in Admin → Модули: this page is just the other.
 if (!$comments_on) $source = 'contacts';
+if (!$contacts_on) $source = 'comments';
 
 // ── Comment filter ─────────────────────────────────────────────────────────────
 $comment_filter = in_array($_GET['filter'] ?? '', ['pending', 'approved', 'rejected', 'spam']) ? $_GET['filter'] : 'pending';
@@ -308,7 +319,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 ?>
 
 <div class="admin-page-header">
-  <h1>Коментари &amp; Контакти</h1>
+  <h1><?= h($page_title_admin) ?></h1>
 </div>
 
 <?php if (!empty($_GET['saved'])): ?>
@@ -345,7 +356,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   </div>
 <?php endif; ?>
 
-<?php if ($comments_on): ?>
+<?php if ($comments_on && $contacts_on): ?>
 <!-- ── Source toggle ──────────────────────────────────────────────────────────── -->
 <div style="display:flex;gap:.5rem;margin-bottom:1.75rem;flex-wrap:wrap;">
   <?php
@@ -545,6 +556,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 </div>
 <?php endif; ?>
 
+<?php if ($contacts_on): ?>
 <!-- ── Topic management ───────────────────────────────────────────────────────── -->
 <div class="admin-card" style="padding:1.5rem;margin-top:1rem;">
   <h2 style="font-size:1rem;font-weight:600;margin:0 0 1rem;">Теми в контактната форма</h2>
@@ -568,6 +580,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </div>
   </form>
 </div>
+<?php endif; ?>
 
 <script>
 function spamToggleAll(scope, cb) {

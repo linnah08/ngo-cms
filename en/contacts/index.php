@@ -7,9 +7,14 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/spam_filter.php';
 
 $page_title       = 'Contacts';
 $page_description = 'Get in touch with ' . SITE_NAME_EN . '.';
+$page_head_extra  = '<style>@media(max-width:640px){.contact-us-form-wrapper{grid-template-columns:1fr!important;gap:2rem!important;}}</style>';
 
 $sent  = false;
 $error = '';
+
+// Admin → Модули → „Контактна форма“ off: the page keeps the contact details,
+// without the form. A form sent anyway (an old tab, a bot) is neither saved nor mailed.
+$form_on = module_enabled_with_needs('contact_form');
 
 // Load contact topics (EN version stored separately; fallback to defaults)
 $_raw_topics = setting_get('contact_topics_en');
@@ -29,7 +34,7 @@ if (!in_array($_preselect_topic, $_topics, true)) {
 
 // Ensure DB table exists
 $pdo = get_pdo();
-$pdo->exec("
+if ($form_on) $pdo->exec("
     CREATE TABLE IF NOT EXISTS contact_submissions (
         id         INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
         name       VARCHAR(200) NOT NULL,
@@ -44,7 +49,9 @@ $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$form_on) {
+    $error = 'The message form is not available at the moment. Please email us at ' . SITE_EMAIL . '.';
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) {
         $error = 'Invalid request.';
     } elseif (!empty($_POST['website'])) {
@@ -115,7 +122,12 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 
 <section class="section">
   <div class="container">
-    <div class="contact-us-form-wrapper" style="display:grid;grid-template-columns:1fr 1.6fr;gap:4rem;align-items:start;">
+    <?php if (!$form_on && $error): ?>
+      <div role="alert" style="background:#fdf0ef;border:1px solid #f0c4c0;border-radius:8px;padding:1rem;color:#c0392b;margin-bottom:2rem;max-width:40rem;">
+        <?= h($error) ?>
+      </div>
+    <?php endif; ?>
+    <div class="contact-us-form-wrapper" style="display:grid;grid-template-columns:<?= $form_on ? '1fr 1.6fr' : '1fr' ?>;gap:4rem;align-items:start;">
 
       <div>
         <h3 style="margin-bottom:1.5rem;"><?= te('contact.info.title', 'Информация за контакт', 'Contact information') ?></h3>
@@ -143,6 +155,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
         </div>
       </div>
 
+      <?php if ($form_on): ?>
       <div>
         <h3 style="margin-bottom:1.5rem;"><?= te('contact.form.title', 'Изпратете съобщение', 'Send a message') ?></h3>
 
@@ -152,7 +165,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
           </div>
         <?php else: ?>
           <?php if ($error): ?>
-            <div style="background:#fdf0ef;border:1px solid #f0c4c0;border-radius:8px;padding:1rem;color:#c0392b;margin-bottom:1.5rem;">
+            <div role="alert" style="background:#fdf0ef;border:1px solid #f0c4c0;border-radius:8px;padding:1rem;color:#c0392b;margin-bottom:1.5rem;">
               <?= h($error) ?>
             </div>
           <?php endif; ?>
@@ -194,6 +207,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
           </form>
         <?php endif; ?>
       </div>
+      <?php endif; ?>
     </div>
   </div>
 </section>

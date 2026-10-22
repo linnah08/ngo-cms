@@ -320,6 +320,89 @@ final class ModulesOffHttpTest extends TestCase
         $this->assertSame(404, $code);
     }
 
+    // ── contact_form ─────────────────────────────────────────────────────────
+
+    public static function contactPages(): array
+    {
+        return [
+            'bg' => ['/kontakti/', 'Формата за съобщения в момента не работи'],
+            'en' => ['/en/contacts/', 'The message form is not available at the moment'],
+        ];
+    }
+
+    #[DataProvider('contactPages')]
+    public function test_contact_page_keeps_the_details_but_not_the_form_when_off(string $path, string $offMessage): void
+    {
+        $this->switchOff('contact_form');
+        [$code, $page] = $this->http($path);
+        $this->assertSame(200, $code, 'the page itself stays');
+        $this->assertStringContainsString('href="mailto:' . SITE_EMAIL . '"', $page, 'email still shown');
+        $this->assertStringNotContainsString('action="' . $path . '"', $page, 'no form');
+        $this->assertStringNotContainsString('name="message"', $page);
+
+        $email = 'contact-off-' . bin2hex(random_bytes(4)) . '@example.test';
+        [$code, $body] = $this->http($path, false, [
+            'csrf_token' => 'x', 'name' => 'Модули Тест', 'email' => $email, 'topic' => 'Друго', 'message' => 'Здравейте',
+        ]);
+        $this->assertSame(200, $code, 'a form sent anyway gets a message, not a 500');
+        $this->assertStringContainsString($offMessage, $body);
+        $this->assertStringContainsString('role="alert"', $body);
+        $stmt = get_pdo()->prepare('SELECT COUNT(*) FROM contact_submissions WHERE email = ?');
+        $stmt->execute([$email]);
+        $this->assertSame(0, (int) $stmt->fetchColumn(), 'nothing saved');
+
+        $this->switchOff();
+        [, $on] = $this->http($path);
+        $this->assertStringContainsString('action="' . $path . '"', $on, 'back when on');
+    }
+
+    public function test_contact_form_off_leaves_the_comments_page_as_comments_only(): void
+    {
+        get_pdo()->prepare("INSERT INTO contact_submissions (name, email, topic, message, status) VALUES (?, ?, 'Друго', 'Здравейте', 'new')")
+            ->execute(['Контакт Изключен', 'contact-off-inbox@example.test']);
+        $id = (int) get_pdo()->lastInsertId();
+        try {
+            $this->switchOff('contact_form');
+            [$code, $body] = $this->http('/admin/comments.php?source=contacts', true);
+            $this->assertSame(200, $code);
+            $this->assertStringContainsString('Коментари към статии', $body);
+            $this->assertStringNotContainsString('Съобщения от контактната форма', $body);
+            $this->assertStringNotContainsString('Теми в контактната форма', $body);
+            $this->assertMatchesRegularExpression('#<a href="/admin/comments.php"\s+class="admin-nav__link[^"]*">\s*Коментари#u', $body);
+
+            [$code, , $loc] = $this->http('/admin/comments.php', true, ['csrf_token' => $this->csrf($body), 'action' => 'csub_delete', 'csub_id' => (string) $id]);
+            $this->assertSame(302, $code);
+            $this->assertStringContainsString('source=comments', $loc);
+            $stmt = get_pdo()->prepare('SELECT COUNT(*) FROM contact_submissions WHERE id = ?');
+            $stmt->execute([$id]);
+            $this->assertSame(1, (int) $stmt->fetchColumn(), 'messages are kept while the module is off');
+
+            [, $dash] = $this->http('/admin/dashboard.php', true);
+            $this->assertStringNotContainsString('Контакт Изключен', $dash, 'not in the dashboard inbox');
+
+            $this->switchOff();
+            [, $dash] = $this->http('/admin/dashboard.php', true);
+            $this->assertStringContainsString('Контакт Изключен', $dash, 'back in the inbox when on');
+        } finally {
+            get_pdo()->prepare('DELETE FROM contact_submissions WHERE id = ?')->execute([$id]);
+        }
+    }
+
+    public function test_comments_page_is_closed_when_comments_and_contact_form_are_both_off(): void
+    {
+        $this->switchOff('comments_reviews', 'contact_form');
+        [$code, $body] = $this->http('/admin/comments.php', true);
+        $this->assertSame(404, $code);
+        $this->assertStringContainsString('Този модул е изключен', $body);
+        $this->assertSame('', $this->navLinkTo($body, 'comments.php'), 'not in the menu');
+    }
+
+    /** The CSRF token in an admin page the test already fetched. */
+    private function csrf(string $html): string
+    {
+        return preg_match('/name="csrf_token" value="([^"]+)"/', $html, $m) ? $m[1] : '';
+    }
+
     // ── social ───────────────────────────────────────────────────────────────
 
     public function test_article_editor_has_no_social_tab_when_social_is_off(): void
