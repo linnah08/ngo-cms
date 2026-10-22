@@ -389,7 +389,7 @@
   "share.copy": "Копирай линк",
   "share.copied": "Копирано!",
   "shop.variant": "Вариант",
-  "shop.stock_left": "{n} бр.",
+  "shop.stock_left": "Налични: {n} бр.",
   "shop.variant_selected": "Избран",
   "reviews.title": "Отзиви",
   "reviews.name": "Твоето име",

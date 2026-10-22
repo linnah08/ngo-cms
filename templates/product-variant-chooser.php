@@ -59,7 +59,7 @@ $_pv_admin    = cms_admin(['Продукти', '/admin/product-edit.php?id=' . (
       </div>
       <?php if ($d['in_stock']): ?>
         <div style="font-size:.8rem;flex-shrink:0;color:var(--teal);">
-          <?= te('shop.stock_left', '{n} бр.', '{n} left', $lang, ['n' => (int) $_single_pv['stock']]) ?>
+          <?= te('shop.stock_left', 'Налични: {n} бр.', '{n} left', $lang, ['n' => (int) $_single_pv['stock']]) ?>
         </div>
       <?php elseif ($_preorder_on): ?>
         <div style="font-size:.8rem;flex-shrink:0;color:#92400e;font-weight:600;">⏳ <?= te('shop.preorder.label', 'Предварителна поръчка', 'Pre-order', $lang) ?></div>
@@ -100,7 +100,7 @@ $_pv_admin    = cms_admin(['Продукти', '/admin/product-edit.php?id=' . (
           </span>
           <span style="font-size:.8rem;flex-shrink:0;<?= $d['in_stock'] ? 'color:var(--teal);' : ($_preorder_on ? 'color:#92400e;font-weight:600;' : 'color:#b03a2e;font-weight:600;') ?>">
             <?= $d['in_stock']
-                ? te('shop.stock_left', '{n} бр.', '{n} left', $lang, ['n' => (int) $pv['stock']])
+                ? te('shop.stock_left', 'Налични: {n} бр.', '{n} left', $lang, ['n' => (int) $pv['stock']])
                 : ($_preorder_on ? '⏳ ' . te('shop.preorder.label', 'Предварителна поръчка', 'Pre-order', $lang) : te('shop.out_of_stock', 'Изчерпан', 'Out of stock', $lang)) ?>
           </span>
         </label>

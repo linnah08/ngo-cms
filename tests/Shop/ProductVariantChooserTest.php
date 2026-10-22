@@ -84,7 +84,8 @@ final class ProductVariantChooserTest extends TestCase
         $this->assertStringContainsString('Вариант', $html);
         $this->assertStringContainsString('Синя', $html);
         $this->assertStringContainsString('Размер: 30x50', $html);
-        $this->assertStringContainsString('4 бр.', $html);
+        // "4 бр." alone read as the pack size, not how many are left.
+        $this->assertStringContainsString('Налични: 4 бр.', $html);
         $this->assertStringNotContainsString('aria-hidden', $html);
         $this->assertStringNotContainsString('display:none', $html);
     }
