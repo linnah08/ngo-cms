@@ -25,6 +25,11 @@ $cp_errors = [];  // created page: errors and typed values of its title/address 
 $cp_values = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if ($_POST === [] && (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
+        // PHP dropped the whole request: it was over post_max_size. Say so plainly instead of "invalid request".
+        flash_set('error', HOME_TOO_BIG_MESSAGE);
+        header('Location: ' . hs_url()); exit;
+    }
     if (!csrf_verify()) { http_response_code(400); exit('Невалидна заявка — презаредете страницата и опитайте отново.'); }
     // Wrong types (e.g. action[]=x) count as missing — never "Array to string conversion".
     $post_str = fn(string $k): string => is_string($_POST[$k] ?? null) ? $_POST[$k] : '';
@@ -408,6 +413,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     var box = e.target.closest('[data-hs-image]');
     if (!box) return;
     var path = box.querySelector('[data-hs-path]'), img = box.querySelector('[data-hs-preview]'), file = box.querySelector('input[type=file]');
+    if (file) file._hsUp = (file._hsUp || 0) + 1;   // an upload still on its way no longer counts
     if (e.target.closest('[data-hs-pick]')) {
       openMediaPicker(function (p) { path.value = p; img.src = p; img.style.display = 'block'; file.value = ''; imageChanged(box); announce('Снимката е избрана.'); });
     }
@@ -427,6 +433,102 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     img.dataset.hsObjectUrl = URL.createObjectURL(input.files[0]);
     img.src = img.dataset.hsObjectUrl;
     img.style.display = 'block';
+  });
+
+  // Photos go up the moment they are picked (admin/home-upload.php), shrunk first, and the
+  // save then carries only their paths — so no number of new photos can push one save over
+  // the server's size limit. The path goes into the [data-hs-path] of the photo's box:
+  // [data-hs-image] here, or [data-hs-upload-box] in a site's own editors. A file input with
+  // no such box keeps the old way and is sent with the save.
+  var form = document.getElementById('hsForm'), pending = 0, held = false;
+  var MAX_SIDE = 2400;
+  function note(el, kind, text) {
+    var p = el._hsNote;
+    if (!p) {
+      p = document.createElement('p');
+      p.style.cssText = 'margin:.4rem 0 0;font-size:.9rem;font-weight:600;';
+      el.parentNode.insertBefore(p, el.nextSibling);
+      el._hsNote = p;
+    }
+    p.style.color = kind === 'err' ? '#b91c1c' : kind === 'ok' ? '#15803d' : 'inherit';
+    p.textContent = text;
+    p.hidden = text === '';
+    if (text !== '') announce(text);
+  }
+  // Big phone photos are scaled down in the browser; small ones go as they are.
+  function shrink(file) {
+    return new Promise(function (done) {
+      if (!/^image\/(jpeg|png|webp)$/.test(file.type) || !window.URL || !URL.createObjectURL) return done(file);
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onerror = function () { URL.revokeObjectURL(url); done(file); };
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var w = img.naturalWidth, h = img.naturalHeight, k = Math.min(1, MAX_SIDE / Math.max(w, h));
+        if (k === 1 && file.size <= 1500000) return done(file);
+        var c = document.createElement('canvas'), alpha = file.type === 'image/png';
+        c.width = Math.round(w * k); c.height = Math.round(h * k);
+        if (!c.toBlob) return done(file);
+        var ctx = c.getContext('2d');
+        if (!alpha) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); }
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        c.toBlob(function (b) { done(b && b.size < file.size ? b : file); }, alpha ? 'image/png' : 'image/jpeg', 0.85);
+      };
+      img.src = url;
+    });
+  }
+  function restorePreview(box, path) {
+    var img = box.querySelector('[data-hs-preview]');
+    if (!img) return;
+    if (path.value) { img.src = path.value; img.style.display = 'block'; } else { img.removeAttribute('src'); img.style.display = 'none'; }
+  }
+  // Bubble phase: the image cropper (capture phase) has already swapped in the cropped file.
+  document.addEventListener('change', function (e) {
+    var input = e.target;
+    if (!form || !window.fetch || !window.FormData || !input.matches || !input.matches('#hsForm input[type=file]')) return;
+    if (!input.files || !input.files[0]) return;
+    var box = input.closest('[data-hs-image], [data-hs-upload-box]'), path = box && box.querySelector('[data-hs-path]');
+    if (!path) return;
+    var file = input.files[0], token = input._hsUp = (input._hsUp || 0) + 1;
+    pending++;
+    note(input, '', 'Снимката се качва…');
+    shrink(file).then(function (blob) {
+      var body = new FormData(), id = form.querySelector('input[name="id"]');
+      body.append('csrf_token', form.querySelector('input[name="csrf_token"]').value);
+      body.append('sid', id ? id.value : '');
+      body.append('field', input.name);
+      body.append('image', blob, blob === file ? file.name : file.name.replace(/\.[^.]*$/, '') + (blob.type === 'image/png' ? '.png' : '.jpg'));
+      return fetch('/admin/home-upload.php', { method: 'POST', body: body, credentials: 'same-origin' })
+        .then(function (r) { return r.json().catch(function () { return { ok: false }; }); });
+    }).then(function (res) {
+      if (input._hsUp !== token) return;   // picked again, removed or replaced meanwhile
+      input.value = '';
+      if (res.ok) {
+        path.value = res.path;
+        note(input, 'ok', '✓ Снимката е качена. Натиснете „Запази“, за да се покаже на сайта.');
+      } else {
+        restorePreview(box, path);
+        note(input, 'err', '⚠ ' + (res.error || 'Снимката не можа да се качи.') + ' Изберете я отново.');
+      }
+    }, function () {
+      if (input._hsUp !== token) return;
+      input.value = '';
+      restorePreview(box, path);
+      note(input, 'err', '⚠ Снимката не можа да се качи — проверете връзката с интернет и я изберете отново.');
+    }).then(function () {
+      pending--;
+      if (pending === 0 && held) {
+        held = false;
+        note(form.querySelector('button[type="submit"]'), '', '');
+        if (form.requestSubmit) form.requestSubmit(); else form.submit();
+      }
+    });
+  });
+  // "Запази" while photos are still going up: wait for them, then save on its own.
+  if (form) form.addEventListener('submit', function (e) {
+    if (!pending) return;
+    e.preventDefault();
+    held = true;
+    note(form.querySelector('button[type="submit"]'), '', 'Изчакайте — снимките още се качват. Секцията ще се запази сама след това.');
   });
 
   // The part of a photo that shows in a fixed-shape frame (field kind "focus"). The value is a JSON rectangle in

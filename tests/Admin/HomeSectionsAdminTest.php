@@ -415,6 +415,62 @@ final class HomeSectionsAdminTest extends TestCase
             home_store_upload(['tmp_name' => '', 'error' => UPLOAD_ERR_NO_FILE], 's_ab12', 'image'));
     }
 
+    // ── Photos upload when picked ──────────────────────────────────────────────
+
+    public function test_one_photo_upload_needs_a_real_image(): void
+    {
+        $this->assertSame(['ok' => false, 'error' => 'Не е избрана снимка.'], home_upload_one(['sid' => 's_ab12'], []));
+        $this->assertSame(['ok' => false, 'error' => 'Не е избрана снимка.'],
+            home_upload_one([], ['image' => ['tmp_name' => '', 'error' => UPLOAD_ERR_NO_FILE, 'name' => '']]));
+        $this->assertFalse(home_upload_one([], ['image' => ['tmp_name' => ['x'], 'error' => [0], 'name' => ['a.jpg']]])['ok'],
+            'a list of files is not one photo');
+
+        $tmp = tempnam(sys_get_temp_dir(), 'up');
+        file_put_contents($tmp, '<?php echo 1;');
+        $r = home_upload_one(['sid' => '../../etc', 'field' => 'up[image]'], ['image' => ['tmp_name' => $tmp, 'error' => UPLOAD_ERR_OK, 'name' => 'x.jpg']]);
+        unlink($tmp);
+        $this->assertSame(['ok' => false, 'error' => 'Снимката трябва да е JPEG, PNG или WebP.'], $r);
+
+        $this->assertSame(['ok' => false, 'error' => 'Снимката не можа да се качи. Опитайте с по-малък файл.'],
+            home_upload_one(['sid' => 's_ab12'], ['image' => ['tmp_name' => '/tmp/x', 'error' => UPLOAD_ERR_INI_SIZE, 'name' => 'big.jpg']]));
+    }
+
+    public function test_the_upload_endpoint_checks_the_admin_size_and_csrf_before_storing(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 2) . '/admin/home-upload.php');
+        $admin = strpos($src, 'admin_require_admin();');
+        $size  = strpos($src, "\$_POST === [] && (int) (\$_SERVER['CONTENT_LENGTH']");
+        $csrf  = strpos($src, 'csrf_verify()');
+        $store = strpos($src, 'home_upload_one(');
+        $this->assertNotFalse($admin);
+        $this->assertLessThan(strpos($src, "\$_SERVER['REQUEST_METHOD']"), $admin);
+        $this->assertLessThan($csrf, $size, 'an oversized photo is reported as such, not as an expired session');
+        $this->assertLessThan($store, $csrf);
+        $this->assertStringContainsString("header('Content-Type: application/json; charset=UTF-8');", $src);
+    }
+
+    public function test_an_oversized_save_says_so_instead_of_invalid_request(): void
+    {
+        $src  = $this->src();
+        $post = strpos($src, "if (\$_SERVER['REQUEST_METHOD'] === 'POST')");
+        $big  = strpos($src, "flash_set('error', HOME_TOO_BIG_MESSAGE);", (int) $post);
+        $this->assertNotFalse($big);
+        $this->assertLessThan(strpos($src, 'csrf_verify()', (int) $post), $big);
+        $this->assertStringContainsString('една по една', HOME_TOO_BIG_MESSAGE);
+    }
+
+    public function test_photos_upload_when_picked_and_a_save_waits_for_them(): void
+    {
+        $src = $this->src();
+        $this->assertStringContainsString("fetch('/admin/home-upload.php'", $src);
+        $this->assertStringContainsString("body.append('csrf_token'", $src);
+        $this->assertStringContainsString("input.closest('[data-hs-image], [data-hs-upload-box]')", $src);
+        $this->assertStringContainsString("input.value = '';", $src, 'an uploaded file is not sent again with the save');
+        $this->assertStringContainsString('MAX_SIDE = 2400', $src);
+        $this->assertStringContainsString('Секцията ще се запази сама след това.', $src);
+        $this->assertStringContainsString('form.requestSubmit()', $src);
+    }
+
     public function test_files_entry_reads_nested_upload_arrays(): void
     {
         $files = ['up_card' => ['tmp_name' => [3 => '/tmp/x'], 'error' => [3 => 0], 'name' => [3 => 'a.jpg']]];

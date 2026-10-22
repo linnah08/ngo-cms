@@ -1130,6 +1130,28 @@ function home_store_upload(array $file, string $sid, string $key): array {
     return ['path' => $rel, 'error' => null];
 }
 
+/** What the admin sees when a save carried more than the server accepts (PHP then drops the whole request). */
+const HOME_TOO_BIG_MESSAGE = 'Снимките бяха твърде големи за едно запазване и нищо не беше запазено. '
+                           . 'Отворете секцията отново и добавете снимките една по една — всяка се качва веднага, щом я изберете.';
+
+/**
+ * One photo, uploaded the moment the admin picks it (admin/home-upload.php), so a save
+ * only carries its path — however many photos the section has. $post: sid (the section,
+ * '' while it is new) and field (the file input's name, used only in the file name).
+ * @return array{ok: bool, path?: string, error?: string}
+ */
+function home_upload_one(array $post, array $files): array {
+    $sid   = is_string($post['sid'] ?? null) && preg_match('/^s_[a-z0-9_]{1,24}$/', $post['sid']) ? $post['sid'] : 's_new';
+    $field = is_string($post['field'] ?? null) ? $post['field'] : '';
+    $key   = substr((string) preg_replace('/[^a-z0-9]/', '', strtolower($field)), 0, 32) . '_' . bin2hex(random_bytes(3));
+    $file  = is_array($files['image'] ?? null) && !is_array($files['image']['tmp_name'] ?? null) ? $files['image'] : null;
+    if ($file === null || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+        return ['ok' => false, 'error' => 'Не е избрана снимка.'];
+    }
+    $r = home_store_upload($file, $sid, $key);
+    return $r['path'] ? ['ok' => true, 'path' => $r['path']] : ['ok' => false, 'error' => $r['error'] ?? 'Снимката не можа да се качи.'];
+}
+
 /** Store chosen files and put their paths into $in. Upload fields: up[<key>], up_list[<list key>][<row>][<item field>]. */
 function home_apply_uploads(array &$in, string $type, array $files, string $sid): array {
     $errors = [];
