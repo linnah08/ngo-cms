@@ -212,7 +212,7 @@ if ($slug) {
         <div><?= price_html((float)$p['price_eur']) ?></div>
 
         <?php if ($desc): ?>
-          <div style="line-height:1.8;color:var(--text-muted);white-space:pre-wrap;"
+          <div style="line-height:1.8;color:var(--text-muted);"
                data-cms-field="description"
                data-cms-section="product"
                data-cms-type="richtext"
