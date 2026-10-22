@@ -91,7 +91,10 @@ $_show_nl_banner = module_enabled_with_needs('newsletter') && empty($_COOKIE['om
         <?php endif; ?>
       </div>
 
+      <?php // A link column with no links in this language is left out, heading and
+            // all: emptying it in Admin → Менюта is how an admin removes it. ?>
       <!-- Navigation -->
+      <?php if ($_fnav): ?>
       <div class="footer-col">
         <h4><?= te('footer.nav') ?></h4>
         <ul>
@@ -107,8 +110,10 @@ $_show_nl_banner = module_enabled_with_needs('newsletter') && empty($_COOKIE['om
           <?php endforeach; ?>
         </ul>
       </div>
+      <?php endif; ?>
 
       <!-- Help -->
+      <?php if ($_fhelp): ?>
       <div class="footer-col">
         <h4><?= te('footer.help') ?></h4>
         <ul>
@@ -124,6 +129,7 @@ $_show_nl_banner = module_enabled_with_needs('newsletter') && empty($_COOKIE['om
           <?php endforeach; ?>
         </ul>
       </div>
+      <?php endif; ?>
 
       <!-- Contact -->
       <div class="footer-col">

@@ -229,6 +229,11 @@ foreach ($sections as $key => $title):
 ?>
 
 <h2 id="h-<?= h($key) ?>" style="margin-bottom:1rem;"><?= h($title) ?></h2>
+<?php if (str_starts_with($key, 'footer_')): ?>
+<p style="color:var(--text-muted);margin:-.5rem 0 1rem;font-size:.9rem;">
+  Колона без връзки не се показва във футъра — заедно със заглавието ѝ. Махнете всички връзки, за да я скриете.
+</p>
+<?php endif; ?>
 <form method="POST" action="/admin/menus.php" class="admin-form menu-form" style="margin-bottom:3rem;">
   <?= csrf_field() ?>
   <input type="hidden" name="section" value="<?= h($key) ?>">
