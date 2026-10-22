@@ -104,20 +104,34 @@ final class HomeProductsLayoutTest extends TestCase
         $this->assertStringContainsString('data-cms-en=', $this->render([$this->product()], 'bg', true));
     }
 
+    private const CENTRED = 'grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),22rem));justify-content:center;';
+
     public function test_two_products_are_centred_cards(): void
     {
         $html = $this->render([$this->product(), $this->product()]);
         $this->assertStringNotContainsString('home-spot', $html);
-        $this->assertStringContainsString('max-width:52rem;margin-inline:auto;', $html);
+        $this->assertStringContainsString(self::CENTRED, $html);
         $this->assertStringContainsString('Виж всички продукти', $html);
     }
 
-    public function test_three_products_keep_the_full_grid(): void
+    /** A wide container fits four columns; three cards must not sit to the left of an empty fourth. */
+    public function test_three_products_are_centred_cards(): void
     {
         $html = $this->render([$this->product(), $this->product(), $this->product()]);
         $this->assertStringNotContainsString('home-spot', $html);
-        $this->assertStringNotContainsString('max-width:52rem', $html);
         $this->assertStringContainsString('class="grid grid--3"', $html);
+        $this->assertStringContainsString(self::CENTRED, $html);
+    }
+
+    /** "Поръчай предварително" is wider than a card in some theme fonts: it wraps rather than spilling out. */
+    public function test_card_buttons_wrap_long_labels(): void
+    {
+        $html = $this->render([$this->product(), $this->product()]);
+        preg_match_all('/<(?:a|button)[^>]*class="btn btn--(?:primary|outline)"[^>]*style="([^"]*)"/', $html, $m);
+        $this->assertNotEmpty($m[1]);
+        foreach ($m[1] as $style) {
+            $this->assertStringContainsString('white-space:normal;', $style);
+        }
     }
 
     public function test_spotlight_exposes_theme_variables_and_no_inline_styles(): void

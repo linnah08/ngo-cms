@@ -200,7 +200,7 @@ function home_shared_head(): string {
 .home-spot__low{font-size:.85rem;color:#b45309;font-weight:600;margin:0 0 .5rem}
 .home-spot__actions{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:1rem}
 .home-spot__actions form{margin:0}
-.home-spot__actions .btn{justify-content:center;font-size:1rem;padding:.8rem 1.6rem;min-height:44px;box-sizing:border-box}
+.home-spot__actions .btn{justify-content:center;text-align:center;white-space:normal;font-size:1rem;padding:.8rem 1.6rem;min-height:44px;box-sizing:border-box}
 .home-spot__soldout{margin:0;padding:.8rem 1.6rem;border-radius:var(--radius);background:#fdf0ef;border:1px solid #f0c4c0;color:#c0392b;font-weight:600}
 @media(max-width:640px){
   .home-ti,.campaign-block-grid,.home-spot{grid-template-columns:1fr!important}

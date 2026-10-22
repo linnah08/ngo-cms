@@ -123,7 +123,7 @@ $single_vid     = $p['type'] === 'variant' ? (int)($variant_single[$p['id']] ?? 
     <div style="display:flex;flex-direction:column;gap:.5rem;">
       <?php if ($p['type'] === 'variant' && !$single_vid): ?>
         <a href="<?= $prod_url ?>" class="btn btn--primary"
-           style="width:100%;justify-content:center;font-size:.9rem;padding:.65rem 1rem;text-align:center;box-sizing:border-box;">
+           style="width:100%;justify-content:center;font-size:.9rem;padding:.65rem 1rem;text-align:center;box-sizing:border-box;white-space:normal;">
           <?= te('shop.choose_variant', 'Избери вариант', 'Choose variant', $lang) ?>
         </a>
       <?php elseif ($in_stock_count > 0 || $card_preorder): ?>
@@ -136,7 +136,7 @@ $single_vid     = $p['type'] === 'variant' ? (int)($variant_single[$p['id']] ?? 
           <input type="hidden" name="redirect" value="<?= h($card_redirect) ?>">
           <input type="hidden" name="_lang" value="<?= h($lang) ?>">
           <button type="submit" class="btn btn--primary"
-                  style="width:100%;justify-content:center;font-size:.9rem;padding:.65rem 1rem;">
+                  style="width:100%;justify-content:center;font-size:.9rem;padding:.65rem 1rem;text-align:center;white-space:normal;">
             <?= $card_preorder
                 ? te('shop.preorder.button', 'Поръчай предварително', 'Pre-order now', $lang)
                 : te('shop.add_to_cart', 'Добави в количката', 'Add to cart', $lang) ?>
@@ -149,7 +149,7 @@ $single_vid     = $p['type'] === 'variant' ? (int)($variant_single[$p['id']] ?? 
         </div>
       <?php endif; ?>
       <a href="<?= $prod_url ?>" class="btn btn--outline"
-         style="width:100%;justify-content:center;font-size:.9rem;padding:.65rem 1rem;text-align:center;box-sizing:border-box;">
+         style="width:100%;justify-content:center;font-size:.9rem;padding:.65rem 1rem;text-align:center;box-sizing:border-box;white-space:normal;">
         <?= te('shop.view_details', 'Виж детайли', 'View details', $lang) ?>
       </a>
     </div>

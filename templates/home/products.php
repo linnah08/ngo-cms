@@ -21,8 +21,9 @@ $featured_count  = count($ctx['featured_products']);
       <div><h2<?= home_cms_attrs($sid, 'heading', $f) ?>><?= h(hf($f, 'heading', $lang)) ?></h2></div>
       <?= home_buttons($sid, $f, $lang, [['btn btn--outline', '']]) ?>
     </div>
-    <?php /* Two products sit centred at card width rather than leaving an empty third column. */ ?>
-    <div class="grid grid--3" style="gap:2rem;align-items:stretch;<?= $featured_count === 2 ? 'grid-template-columns:repeat(auto-fit,minmax(240px,1fr));max-width:52rem;margin-inline:auto;' : '' ?>">
+    <?php /* Cards keep card width and sit centred: a wide container fits more columns than
+             there are featured products, and they must not huddle left of the empty ones. */ ?>
+    <div class="grid grid--3" style="gap:2rem;align-items:stretch;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),22rem));justify-content:center;">
       <?php foreach ($ctx['featured_products'] as $p): ?>
         <?php require ROOT_PATH . '/templates/product-card.php'; ?>
       <?php endforeach; ?>
