@@ -307,6 +307,9 @@ $page_head_extra = '<style>
 .dist-page .admin-form-grid input[type=text]{border-color:#6b7280;min-height:44px;box-sizing:border-box;}
 .dist-page input:focus-visible,.dist-page select:focus-visible,.dist-page button:focus-visible,.dist-page a:focus-visible{outline:3px solid #1b998b;outline-offset:2px;}
 .dist-page .dist-hint{font-size:.8rem;font-weight:400;color:#4b5563;}
+/* Single-row forms: the site-wide label margin pushed the fields above the button, and the variant picker came unstyled. */
+.dist-page .dist-inline label{display:flex;flex-direction:column;gap:.35rem;font-weight:600;font-size:.875rem;color:var(--text);margin:0;}
+.dist-page .dist-inline .btn{min-height:44px;}
 </style>';
 
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
@@ -359,7 +362,7 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
   (дистрибутори, магазина, лично продадени, подаръци) и какво са продали и платили дистрибуторите.
 </p>
 
-<form method="get" action="/admin/distribution.php" style="<?= $box ?>display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;">
+<form method="get" action="/admin/distribution.php" class="dist-inline" style="<?= $box ?>display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;">
   <label for="distProduct" style="display:flex;flex-direction:column;gap:.35rem;font-weight:600;font-size:.875rem;flex:1 1 240px;">Продукт
     <select name="product" id="distProduct" onchange="this.form.submit()">
       <?php foreach ($products as $p): ?>
@@ -424,7 +427,7 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
     „Изпратени към онлайн магазина“ е запис на това, което сте пратили към магазина. „В онлайн магазина сега“ е истинската
     наличност, от която купуват клиентите — тя намалява сама с всяка поръчка. Ако след преброяване числото не е вярно, поправете го тук:
   </p>
-  <form method="post" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-top:.75rem;">
+  <form method="post" class="dist-inline" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-top:.75rem;">
     <?= $common() ?>
     <input type="hidden" name="action" value="set_online_stock">
     <?= $variant_select('distStockVariant') ?>
@@ -539,7 +542,7 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
     <button type="submit" class="btn btn--primary" style="margin-top:1rem;">Запиши</button>
   </form>
 
-  <form method="get" action="/admin/distribution.php#allocations" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-top:1.75rem;padding-top:1rem;border-top:1px solid var(--border);">
+  <form method="get" action="/admin/distribution.php#allocations" class="dist-inline" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-top:1.75rem;padding-top:1rem;border-top:1px solid var(--border);">
     <input type="hidden" name="product" value="<?= (int) $product_id ?>">
     <label for="fAlloc" style="display:flex;flex-direction:column;gap:.35rem;font-weight:600;font-size:.875rem;">Покажи
       <select name="af" id="fAlloc">
@@ -667,7 +670,7 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
     <p style="margin:0;color:#4b5563;">Първо добавете дистрибутор в раздел „Дистрибутори“ и му дайте стока.</p>
   <?php endif; ?>
 
-  <form method="get" action="/admin/distribution.php#sales" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-top:1.75rem;padding-top:1rem;border-top:1px solid var(--border);">
+  <form method="get" action="/admin/distribution.php#sales" class="dist-inline" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-top:1.75rem;padding-top:1rem;border-top:1px solid var(--border);">
     <input type="hidden" name="product" value="<?= (int) $product_id ?>">
     <label for="fSaleD" style="display:flex;flex-direction:column;gap:.35rem;font-weight:600;font-size:.875rem;">Дистрибутор
       <select name="sd" id="fSaleD">
