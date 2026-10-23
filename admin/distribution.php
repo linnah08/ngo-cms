@@ -390,8 +390,9 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
   ?>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:.6rem;">
     <?php foreach ($tiles as [$label, $value, $style]): ?>
-      <div style="border:1px solid var(--border);border-radius:8px;padding:.75rem;">
-        <div style="font-size:.8rem;color:#4b5563;line-height:1.3;"><?= h($label) ?></div>
+      <?php /* Labels wrap to 1–3 lines; the number sits at the bottom so a row's numbers line up. */ ?>
+      <div style="border:1px solid var(--border);border-radius:8px;padding:.75rem;display:flex;flex-direction:column;gap:.35rem;">
+        <div style="font-size:.8rem;color:#4b5563;line-height:1.3;flex:1;"><?= h($label) ?></div>
         <div style="font-size:1.4rem;font-weight:700;<?= $style ?>"><?= (int) $value ?></div>
       </div>
     <?php endforeach; ?>
