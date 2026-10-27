@@ -23,6 +23,28 @@ function donation_path(string $page, ?string $lang = null): string {
 }
 
 /**
+ * Does the shop page's top banner show a „Дари сега“ button? Admin → Организация →
+ * Страница на магазина (SHOP_DONATE_BUTTON); off by default, and never while the
+ * donations module is off — the button would lead to a page that is not there.
+ */
+function shop_donate_button_on(): bool {
+    if (!defined('SHOP_DONATE_BUTTON') || !filter_var((string) constant('SHOP_DONATE_BUTTON'), FILTER_VALIDATE_BOOLEAN)) return false;
+    return function_exists('module_enabled_with_needs') ? module_enabled_with_needs('donations') : feature_enabled('donations');
+}
+
+/**
+ * The shop banner's „Дари сега“ / "Donate now" button to the donation page, or ''
+ * when shop_donate_button_on() says no. Its text is the wording key
+ * shop.hero.donate_button, editable on the page in Edit mode. A site with its own
+ * shop header (theme 'shop_header') calls this too, with its own class and style.
+ */
+function shop_donate_button(string $lang, string $class = 'btn btn--primary', string $style = ''): string {
+    if (!shop_donate_button_on()) return '';
+    return '<a href="' . h(donation_path('form', $lang)) . '" class="' . h($class) . '"' . ($style !== '' ? ' style="' . h($style) . '"' : '') . '>'
+         . te('shop.hero.donate_button', 'Дари сега', 'Donate now', $lang) . '</a>';
+}
+
+/**
  * Title and intro of the donation page, in $lang, with generic defaults for a
  * site that has not written its own yet. Stored in pages.json where the shop's
  * donation block always kept them: donation.title(_en) and

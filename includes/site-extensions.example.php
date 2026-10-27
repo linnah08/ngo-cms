@@ -88,7 +88,10 @@ return [
     // A designed header for the shop page (/magazin/, /en/shop/) in place of the
     // plain title and sentence. A PHP file from the site root; it gets $lang,
     // $pages, $donations_on and $shop_hero (['title' => …, 'text' => …], the
-    // texts edited on the page). If it fails, the plain header shows. A theme
+    // texts edited on the page) and $shop_donate_on (the optional „Дари сега“
+    // button, Организация → Страница на магазина; print it where it fits with
+    // shop_donate_button($lang, 'your classes', 'your inline style') — it returns
+    // '' while the button is off). If it fails, the plain header shows. A theme
     // preset in includes/themes-site.php may name it instead ('shop_header').
     'shop_header' => 'templates/site/shop-header.php',
 

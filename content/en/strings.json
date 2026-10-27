@@ -413,6 +413,7 @@
   "shop.oos.all_variants": "All variants are sold out.",
   "shop.oos.product": "This product is currently sold out.",
   "shop.hero.text": "Every purchase supports our cause.",
+  "shop.hero.donate_button": "Donate now",
   "help.page_description": "Find out how you can support {name}.",
   "email.donation.message": "Your message",
   "email.campaign.reward_to": "Your reward will be shipped to:",

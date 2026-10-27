@@ -655,6 +655,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/site_extensions.php';   // a
 $_shop_header_file = site_shop_header_file();
 $_shop_header_done = $_shop_header_file !== null && site_extension_render($_shop_header_file, [
     'lang' => $lang, 'pages' => $pages, 'shop_hero' => $_shop_hero, 'donations_on' => $_donations_on,
+    // The optional „Дари сега“ button (Организация → Страница на магазина): true when it is switched on.
+    // The header prints it with shop_donate_button($lang, <its class>, <its style>).
+    'shop_donate_on' => shop_donate_button_on(),
 ]);
 ?>
 <?php if (!$_shop_header_done): ?>
@@ -668,6 +671,9 @@ $_shop_header_done = $_shop_header_file !== null && site_extension_render($_shop
        data-cms-field="hero_text" data-cms-section="shop" data-cms-type="text"
        data-cms-bg="<?= h($pages['shop']['hero_text_bg'] ?? '') ?>"
        data-cms-en="<?= h($pages['shop']['hero_text_en'] ?? '') ?>"><?= h($_shop_hero['text']) ?></p>
+    <?php if (($_shop_donate = shop_donate_button($lang)) !== ''): ?>
+    <div style="margin-top:1.5rem;"><?= $_shop_donate ?></div>
+    <?php endif; ?>
   </div>
 </section>
 <?php endif; ?>

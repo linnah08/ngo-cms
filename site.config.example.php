@@ -99,6 +99,10 @@ define('NEWSLETTER_DONATE_CTA', false);
 // A second button in that box, to the shop (needs FEATURE_SHOP on). Also in
 // Admin → Организация („Добави бутон към магазина“).
 define('NEWSLETTER_DONATE_SHOP', false);
+// A „Дари сега“ button in the shop page's top banner, to the donation page
+// (needs FEATURE_SHOP and FEATURE_DONATIONS on). Also in Admin → Организация →
+// Страница на магазина; its text is changed on the page in Edit mode.
+define('SHOP_DONATE_BUTTON', false);
 
 // ── While the site is still being filled in ───────────────────────────────────
 // A dark strip at the top of every public page saying the site is new. It is a

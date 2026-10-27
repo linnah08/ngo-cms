@@ -64,6 +64,7 @@ function org_fields(): array
         'newsletter_donate_shop'       => 'NEWSLETTER_DONATE_SHOP',
         'newsletter_donate_shop_label_bg' => 'NEWSLETTER_DONATE_SHOP_LABEL_BG',
         'newsletter_donate_shop_label_en' => 'NEWSLETTER_DONATE_SHOP_LABEL_EN',
+        'shop_donate_button' => 'SHOP_DONATE_BUTTON',   // '1': a „Дари сега“ button in the shop page's top banner
         'site_launched'    => 'SITE_LAUNCHED',     // set by „Пусни сайта“ (admin/launch.php), not by the form
     ] + org_module_fields();
 }
@@ -121,7 +122,8 @@ function org_module_fields(): array
  * Организация fields whose section is hidden because a module it serves is off
  * (Админ → Модули): the newsletter band colour without Бюлетин, the newsletter
  * donation box without Бюлетин or Дарения, the order number prefix without
- * Магазин or Дарения. Their saved values are kept.
+ * Магазин or Дарения, the shop banner's donate button without Магазин and Дарения.
+ * Their saved values are kept.
  */
 function org_hidden_fields(): array
 {
@@ -137,6 +139,8 @@ function org_hidden_fields(): array
     if (in_array('newsletter_donate_cta', $hidden, true) || !module_enabled_with_needs('shop')) {
         array_push($hidden, 'newsletter_donate_shop', 'newsletter_donate_shop_label_bg', 'newsletter_donate_shop_label_en');
     }
+    // The shop banner's donate button needs both the shop and donations.
+    if (!module_enabled_with_needs('shop') || !module_enabled_with_needs('donations')) $hidden[] = 'shop_donate_button';
     return $hidden;
 }
 
@@ -436,6 +440,7 @@ function org_validate(array $in, array $themeKeys): array
     // And for Latin article addresses — off (Cyrillic, as before) unless ticked.
     $v['article_slugs_latin'] = ($in['article_slugs_latin'] ?? '') === '1' ? '1' : '0';
     $v['newsletter_donate_shop'] = ($in['newsletter_donate_shop'] ?? '') === '1' ? '1' : '0';
+    $v['shop_donate_button'] = ($in['shop_donate_button'] ?? '') === '1' ? '1' : '0';
 
     foreach (['launch_banner_bg' => 'на български', 'launch_banner_en' => 'на английски'] as $k => $lang) {
         if (mb_strlen($v[$k]) > 200) {

@@ -247,6 +247,21 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   </section>
   <?php endif; ?>
 
+  <?php if (module_enabled_with_needs('shop') && module_enabled_with_needs('donations')): ?>
+  <!-- ── Shop page ─────────────────────────────────────────────────────────── -->
+  <section class="admin-card" style="<?= $card ?>" aria-labelledby="shop-page-title">
+    <h2 class="admin-card__title" id="shop-page-title">Страница на магазина</h2>
+    <label class="admin-checkbox" style="margin-bottom:.5rem;">
+      <input type="checkbox" name="shop_donate_button" value="1" aria-describedby="hint-shop_donate_button" <?= in_array($val('shop_donate_button'), ['1', 'true'], true) ? 'checked' : '' ?>>
+      Покажи бутон „Дари сега“ в горната част на магазина
+    </label>
+    <p class="admin-meta" id="hint-shop_donate_button" style="margin:0;line-height:1.6;">
+      Бутонът води към страницата за дарения. Изключен е, докато не го включите.
+      Надписът му се променя на самата страница на магазина, в режим „Редактирай“.
+    </p>
+  </section>
+  <?php endif; ?>
+
   <!-- ── Brand ─────────────────────────────────────────────────────────────── -->
   <section class="admin-card" style="<?= $card ?>">
     <h2 class="admin-card__title">Визия</h2>

@@ -413,6 +413,7 @@
   "shop.oos.all_variants": "Всички варианти са изчерпани.",
   "shop.oos.product": "Продуктът в момента е изчерпан.",
   "shop.hero.text": "Всяка покупка подкрепя каузата ни.",
+  "shop.hero.donate_button": "Дари сега",
   "help.page_description": "Научете как можете да подкрепите {name}.",
   "email.donation.message": "Вашето послание",
   "email.campaign.reward_to": "Твоята награда ще бъде изпратена на:",
