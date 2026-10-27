@@ -19,7 +19,7 @@ $cart = $_SESSION['cart'] ?? [];
 
 // Fetch stock limits for all products and variants in the cart
 $pdo = get_pdo();
-$product_ids = array_unique(array_column($cart, 'product_id'));
+$product_ids = array_values(array_unique(array_column($cart, 'product_id')));
 $stock_by_product = [];
 $product_rows     = [];
 if ($product_ids) {

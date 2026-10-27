@@ -241,4 +241,26 @@ final class CartMutationTest extends TestCase
         $this->assertCount(1, $new_cart);
         $this->assertSame(2, $new_cart[0]['product_id']);
     }
+
+    // ── 13. testUpdateStockQueryWorksWithSameProductTwice ─────────────────────
+
+    public function testUpdateStockQueryWorksWithSameProductTwice(): void
+    {
+        // Two variants of one product sit in the cart before another product.
+        // array_unique() alone keeps the gap in the keys ([0, 2]), and PDO
+        // reads key 2 as a third "?" → SQLSTATE[HY093].
+        $src = file_get_contents(dirname(__DIR__, 2) . '/cart/update.php');
+        $this->assertMatchesRegularExpression('/\$product_ids\s*=\s*array_values\(array_unique\(/', $src);
+
+        $cart = [
+            ['product_id' => 7, 'variant_id' => 1, 'quantity' => 1],
+            ['product_id' => 7, 'variant_id' => 2, 'quantity' => 1],
+            ['product_id' => 9, 'quantity' => 1],
+        ];
+        $product_ids = array_values(array_unique(array_column($cart, 'product_id')));
+        $in   = implode(',', array_fill(0, count($product_ids), '?'));
+        $stmt = get_pdo()->prepare("SELECT id FROM products WHERE id IN ($in)");
+
+        $this->assertTrue($stmt->execute($product_ids));
+    }
 }

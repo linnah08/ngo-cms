@@ -15,7 +15,7 @@ $pdo = get_pdo();
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) { http_response_code(400); exit('Invalid token'); }
 
-    $ids    = array_filter(array_map('intval', $_POST['ids'] ?? []));
+    $ids    = array_values(array_filter(array_map('intval', $_POST['ids'] ?? [])));
     $action = $_POST['bulk_action'] ?? '';
 
     if ($ids) {
