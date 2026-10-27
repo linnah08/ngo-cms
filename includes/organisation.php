@@ -64,7 +64,8 @@ function org_fields(): array
         'newsletter_donate_shop'       => 'NEWSLETTER_DONATE_SHOP',
         'newsletter_donate_shop_label_bg' => 'NEWSLETTER_DONATE_SHOP_LABEL_BG',
         'newsletter_donate_shop_label_en' => 'NEWSLETTER_DONATE_SHOP_LABEL_EN',
-        'shop_donate_button' => 'SHOP_DONATE_BUTTON',   // '1': a „Дари сега“ button in the shop page's top banner
+        'shop_donate_button' => 'SHOP_DONATE_BUTTON', // '1': a „Дари сега“ button in the shop page's top banner
+        'admin_logo_white' => 'ADMIN_LOGO_WHITE',   // '1': the logo is shown white in the admin's dark side menu
         'site_launched'    => 'SITE_LAUNCHED',     // set by „Пусни сайта“ (admin/launch.php), not by the form
     ] + org_module_fields();
 }
@@ -441,6 +442,7 @@ function org_validate(array $in, array $themeKeys): array
     $v['article_slugs_latin'] = ($in['article_slugs_latin'] ?? '') === '1' ? '1' : '0';
     $v['newsletter_donate_shop'] = ($in['newsletter_donate_shop'] ?? '') === '1' ? '1' : '0';
     $v['shop_donate_button'] = ($in['shop_donate_button'] ?? '') === '1' ? '1' : '0';
+    $v['admin_logo_white'] = ($in['admin_logo_white'] ?? '') === '1' ? '1' : '0';
 
     foreach (['launch_banner_bg' => 'на български', 'launch_banner_en' => 'на английски'] as $k => $lang) {
         if (mb_strlen($v[$k]) > 200) {
@@ -700,6 +702,23 @@ function org_site_description(string $lang = 'bg'): string
     if ($desc !== '') return $desc;
     $site  = $en && defined('SITE_NAME_EN') ? 'SITE_NAME_EN' : 'SITE_NAME_BG';
     return defined($site) ? trim((string) constant($site)) : '';
+}
+
+/**
+ * Is the logo drawn white in the admin's dark side menu? Admin → Организация →
+ * Визия → „Покажи логото в бяло в тъмното меню“ (ADMIN_LOGO_WHITE); off by
+ * default, so the logo keeps its own colours. Meant for a dark, one-colour logo
+ * that would vanish on the dark menu.
+ */
+function org_admin_logo_white(): bool
+{
+    return defined('ADMIN_LOGO_WHITE') && filter_var((string) constant('ADMIN_LOGO_WHITE'), FILTER_VALIDATE_BOOLEAN);
+}
+
+/** Inline style for the side menu's logo: white when org_admin_logo_white(), else ''. Inline, so a stale admin.css cannot lose it. */
+function org_admin_logo_style(): string
+{
+    return org_admin_logo_white() ? 'filter:brightness(0) invert(1);' : '';
 }
 
 /**

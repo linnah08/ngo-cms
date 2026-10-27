@@ -49,7 +49,8 @@ $current_user = admin_user();
   <aside class="admin-sidebar" id="adminSidebar">
     <div class="admin-sidebar__top">
       <a href="/admin/dashboard.php" class="admin-logo">
-        <img src="<?= logo_url() ?>" alt="<?= h(SITE_NAME_BG) ?>">
+        <?php $_logo_style = function_exists('org_admin_logo_style') ? org_admin_logo_style() : ''; ?>
+        <img src="<?= logo_url() ?>" alt="<?= h(SITE_NAME_BG) ?>"<?= $_logo_style !== '' ? ' style="' . h($_logo_style) . '"' : '' ?>>
       </a>
     </div>
 

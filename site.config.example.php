@@ -103,6 +103,9 @@ define('NEWSLETTER_DONATE_SHOP', false);
 // (needs FEATURE_SHOP and FEATURE_DONATIONS on). Also in Admin → Организация →
 // Страница на магазина; its text is changed on the page in Edit mode.
 define('SHOP_DONATE_BUTTON', false);
+// The logo drawn white in the admin's dark side menu, for a dark logo that would
+// not show there. Also in Admin → Организация → Визия.
+define('ADMIN_LOGO_WHITE', false);
 
 // ── While the site is still being filled in ───────────────────────────────────
 // A dark strip at the top of every public page saying the site is new. It is a

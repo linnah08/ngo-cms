@@ -365,6 +365,11 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <?= $ferr('logo') ?>
         <small style="<?= $hint ?>">Най-добре изглежда лого с прозрачен фон. Иконката в браузъра се създава автоматично от него. Ако не изберете файл, сегашното лого остава.</small>
       </label>
+      <label class="admin-checkbox" style="margin-top:1rem;">
+        <input type="checkbox" name="admin_logo_white" value="1" aria-describedby="hint-admin_logo_white" <?= in_array($val('admin_logo_white'), ['1', 'true'], true) ? 'checked' : '' ?>>
+        Покажи логото в бяло в тъмното меню
+      </label>
+      <small id="hint-admin_logo_white" style="<?= $hint ?>">Само в менюто вляво в администрацията. Включете го, ако логото ви е тъмно и не се вижда на тъмния фон. На сайта логото остава в своите цветове.</small>
     </div>
   </section>
 
