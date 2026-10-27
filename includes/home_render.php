@@ -110,10 +110,12 @@ function home_current_link(string $url): string {
 /**
  * Up to two buttons. $styles: [[class, inline style], [class, inline style]].
  * A button renders only with both a label and a link.
+ * $middle: ready markup of one more button, placed after button 1 (the CTA block's shop button).
  */
-function home_buttons(string $sid, array $f, string $lang, array $styles, string $group_style = ''): string {
+function home_buttons(string $sid, array $f, string $lang, array $styles, string $group_style = '', string $middle = ''): string {
     $out = '';
     foreach ([1, 2] as $n) {
+        if ($n === 2) $out .= $middle;
         if (!isset($f["btn{$n}_label"], $styles[$n - 1])) continue;
         $label = hf($f, "btn{$n}_label", $lang);
         $url   = home_current_link(hf($f, "btn{$n}_url", $lang));
@@ -126,6 +128,24 @@ function home_buttons(string $sid, array $f, string $lang, array $styles, string
               . home_cms_attrs($sid, "btn{$n}_label", $f) . '>' . h($label) . '</a>';
     }
     return $out === '' ? '' : '<div class="btn-group"' . ($group_style !== '' ? ' style="' . h($group_style) . '"' : '') . '>' . $out . '</div>';
+}
+
+/**
+ * The CTA block's optional button to the shop (fields HOME_CTA_SHOP_FIELDS), or ''.
+ * Shown only when the block switches it on and the shop module is on. An empty label
+ * uses the wording key home.cta.shop_button, which Edit mode then saves into the block.
+ * @param array{0:string,1:string} $style [class, inline style]
+ */
+function home_cta_shop_button(string $sid, array $f, string $lang, array $style): string {
+    if (($f['shop_button'] ?? 'off') !== 'on' || !module_enabled_with_needs('shop')) return '';
+    $default = ['bg' => t_or('home.cta.shop_button', 'Разгледай магазина', 'Visit the shop', 'bg'),
+                'en' => t_or('home.cta.shop_button', 'Разгледай магазина', 'Visit the shop', 'en')];
+    $stored  = home_pair($f['shop_label'] ?? null);
+    $f['shop_label'] = ['bg' => $stored['bg'] !== '' ? $stored['bg'] : $default['bg'],
+                        'en' => $stored['en'] !== '' ? $stored['en'] : $default['en']];
+    [$class, $css] = $style;
+    return '<a href="' . h(shop_path('shop', $lang)) . '" class="' . h($class) . '"' . ($css !== '' ? ' style="' . h($css) . '"' : '')
+         . home_cms_attrs($sid, 'shop_label', $f) . '>' . h($f['shop_label'][$lang === 'en' ? 'en' : 'bg']) . '</a>';
 }
 
 /**

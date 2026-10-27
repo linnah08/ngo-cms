@@ -185,6 +185,18 @@ const HOME_PERSON_FIELDS = [
 ];
 
 /**
+ * The call-to-action block's optional third button, to the shop (between button 1 and 2).
+ * Off by default; it shows only while the shop module is on. An empty label falls back
+ * to the wording key home.cta.shop_button.
+ */
+const HOME_CTA_SHOP_FIELDS = [
+    'shop_button' => ['kind' => 'choice', 'label' => 'Бутон към магазина',
+                      'options' => ['off' => 'Не показвай', 'on' => 'Покажи бутон към магазина (когато магазинът е включен)'], 'default' => 'off'],
+    'shop_label'  => ['kind' => 'text', 'label' => 'Бутон към магазина — надпис', 'max' => 60,
+                      'hint' => 'Оставете празно за „Разгледай магазина“.'],
+];
+
+/**
  * Extra section types a site adds on top of the built-in ones, from the PHP file named by
  * the active theme's 'home_types' key (a path from the site root) — so a fork keeps its own
  * blocks in its own files. The file returns [type => definition], shaped like home_types().
@@ -294,9 +306,9 @@ function home_types(): array {
                 + ['image_side' => ['kind' => 'choice', 'label' => 'Къде да е снимката', 'options' => ['left' => 'Отляво на текста', 'right' => 'Отдясно на текста'], 'default' => 'left']]
                 + $btn(1) + ['background' => $bg('white')]],
         'cta' => ['builtin' => false, 'icon' => '📢', 'label' => 'Призив за действие',
-            'desc' => 'Цветна лента със заглавие, кратък текст и до два бутона.', 'note' => null,
+            'desc' => 'Цветна лента със заглавие, кратък текст и до два бутона, по желание и бутон към магазина.', 'note' => null,
             'fields' => ['heading' => $head, 'text' => ['kind' => 'textarea', 'label' => 'Кратък текст', 'max' => 400]]
-                + $btn(1) + $btn(2) + ['background' => $bg('teal', HOME_BACKGROUNDS_CTA)]],
+                + $btn(1) + $btn(2) + HOME_CTA_SHOP_FIELDS + ['background' => $bg('teal', HOME_BACKGROUNDS_CTA)]],
         'richtext' => ['builtin' => false, 'icon' => '📝', 'label' => 'Свободен текст',
             'desc' => 'Заглавие и текст със списъци, връзки и таблици.', 'note' => null,
             'fields' => ['heading' => $head, 'body' => $rich, 'background' => $bg('white')]],

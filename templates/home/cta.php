@@ -2,6 +2,9 @@
 $bg   = home_bg_key($f, 'teal', HOME_BACKGROUNDS_CTA);
 $dark = $bg === 'teal';
 $text = hf($f, 'text', $lang);
+$styles = $dark
+    ? [['btn btn--white', ''], ['btn btn--outline btn--white-outline', 'border-color:white;color:white;']]
+    : [['btn btn--primary', ''], ['btn btn--outline', '']];
 ?>
 <section class="section<?= home_bg_class($f, 'teal', HOME_BACKGROUNDS_CTA) ?>">
   <div class="container" style="text-align:center;">
@@ -11,8 +14,6 @@ $text = hf($f, 'text', $lang);
     <?php if ($text !== '' || $show_admin): ?>
     <p class="lead" style="<?= $dark ? 'color:#fff;' : '' ?>margin:1.5rem auto;max-width:600px;"<?= home_cms_attrs($sid, 'text', $f) ?>><?= h($text) ?></p>
     <?php endif; ?>
-    <?= home_buttons($sid, $f, $lang, $dark
-        ? [['btn btn--white', ''], ['btn btn--outline btn--white-outline', 'border-color:white;color:white;']]
-        : [['btn btn--primary', ''], ['btn btn--outline', '']], 'justify-content:center;') ?>
+    <?= home_buttons($sid, $f, $lang, $styles, 'justify-content:center;', home_cta_shop_button($sid, $f, $lang, $styles[1])) ?>
   </div>
 </section>
