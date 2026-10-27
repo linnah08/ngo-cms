@@ -154,10 +154,13 @@ if ($action === 'generate') {
     $article = load_json($file);
     $title   = $article['title']   ?? '';
     $content = mb_substr(strip_tags($article['content'] ?? ''), 0, 3000);
+    // Who the organisation is (Организация → name and Кратко описание); nothing when not set.
+    $org_about = org_ai_context('bg');
+    $org_about = $org_about !== '' ? "\n\n" . $org_about : '';
 
     if ($generate_type === 'post') {
         $article_url = rtrim(SITE_URL, '/') . '/novini/' . rawurlencode($slug) . '/';
-        $prompt = "You write Facebook posts for a Bulgarian non-profit organisation.
+        $prompt = "You write Facebook posts for a Bulgarian non-profit organisation.{$org_about}
 
 VOICE: Warm, honest, occasionally dry/funny. Team voice (\"ние\"), never corporate. Story-first. Emotion through specific detail, not adjectives.
 
@@ -177,7 +180,7 @@ DO NOT:
 - Start with \"С радост съобщаваме\", \"Какво става когато\" or \"С удоволствие споделяме\"
 - Use NGO jargon: устойчивост, въздействие, екосистема, уязвими групи
 - Use dashes to connect clauses (reads as AI-generated)
-- Over-explain the foundation's mission
+- Over-explain the organisation's mission
 - Invent overly specific illustrative examples
 
 Write a Facebook post for this article.
@@ -186,7 +189,7 @@ Content: {$content}
 
 Return only the post text. No explanations, no alternatives.";
     } else {
-        $prompt = "Напиши публикация за Facebook и Instagram за българска НПО.
+        $prompt = "Напиши публикация за Facebook и Instagram за българска НПО.{$org_about}
 
 Тон: топъл, честен, близък. Не корпоративен. Истински истории, реален ефект. Подходящ за широката аудитория.
 

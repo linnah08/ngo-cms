@@ -72,10 +72,13 @@ if ($action === 'generate') {
     $source  = file_exists($en_file) ? load_json($en_file) : $article;
     $title   = $source['title'] ?? ($article['title'] ?? '');
     $content = mb_substr(strip_tags($source['content'] ?? ($article['content'] ?? '')), 0, 3000);
+    // Who the organisation is (Организация → name and Кратко описание); nothing when not set.
+    $org_about = org_ai_context('en');
+    $org_about = $org_about !== '' ? "\n\n" . $org_about : '';
 
     if ($generate_type === 'post') {
         $article_url = rtrim(SITE_URL, '/') . '/en/news/' . rawurlencode($slug_en) . '/';
-        $prompt = "You write LinkedIn posts for a Bulgarian non-profit organisation.
+        $prompt = "You write LinkedIn posts for a Bulgarian non-profit organisation.{$org_about}
 
 VOICE:
 - Warm, human, first-person plural — use \"we\", \"us\", \"our team\"
@@ -100,7 +103,7 @@ FORMATTING:
 - Link to the article at the end of the body, before hashtags: {$article_url}
 
 DO NOT:
-- Write in third person (\"The Foundation does...\")
+- Write in third person (\"The organisation does...\")
 - Use charity clichés: \"changing lives\", \"making a difference\", \"at-risk youth\", \"vulnerable populations\"
 - Use hyperbolic language: \"incredible\", \"amazing\", \"life-changing\"
 - Use heavy passive voice
@@ -113,7 +116,7 @@ Content: {$content}
 
 Return only the post text. No explanations, no alternatives.";
     } else {
-        $prompt = "Write a LinkedIn post for a Bulgarian non-profit organisation.
+        $prompt = "Write a LinkedIn post for a Bulgarian non-profit organisation.{$org_about}
 
 Voice: warm, honest, professional but not corporate. Real stories, real impact.
 

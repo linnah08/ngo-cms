@@ -702,6 +702,27 @@ function org_site_description(string $lang = 'bg'): string
     return defined($site) ? trim((string) constant($site)) : '';
 }
 
+/**
+ * Who the organisation is, for the AI that drafts social media posts
+ * (admin/social-ajax.php, admin/linkedin-ajax.php): its name and the short
+ * description from Admin → Организация (Кратко описание), so a post knows what
+ * the organisation does. $lang is the language of the post: its name and
+ * description in that language, the other language's description when that one
+ * is empty. '' when neither a name nor a description is set — the prompt then
+ * stays generic. One line, without anything that could pass for markup.
+ */
+function org_ai_context(string $lang = 'bg'): string
+{
+    $en    = $lang === 'en';
+    $const = static fn(string $c): string => defined($c) ? trim((string) preg_replace('/\s+/u', ' ', strip_tags((string) constant($c)))) : '';
+    $name  = $const($en ? 'SITE_NAME_EN' : 'SITE_NAME_BG') ?: $const('SITE_NAME_BG');
+    $desc  = $const($en ? 'SITE_DESCRIPTION_EN' : 'SITE_DESCRIPTION_BG') ?: $const($en ? 'SITE_DESCRIPTION_BG' : 'SITE_DESCRIPTION_EN');
+    if ($desc === $name) $desc = '';
+    if ($name === '' && $desc === '') return '';
+    $text = $name !== '' && $desc !== '' ? rtrim($name, '.') . '. ' . $desc : ($name !== '' ? $name : $desc);
+    return ($en ? 'ABOUT THE ORGANISATION: ' : 'ЗА ОРГАНИЗАЦИЯТА: ') . $text;
+}
+
 /** "#RRGGBB" → [r, g, b], or null. */
 function org_hex_rgb(string $hex): ?array
 {
