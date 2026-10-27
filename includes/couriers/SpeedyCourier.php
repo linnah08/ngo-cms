@@ -210,27 +210,90 @@ class SpeedyCourier
     private function resolveSiteIds(string $cityName): array
     {
         try {
-            $data = $this->post('location/site', ['countryId' => 100, 'name' => $cityName]);
-            $ids  = [];
-            foreach ($data['sites'] ?? [] as $s) {
-                if (isset($s['id'])) {
-                    $ids[] = (int)$s['id'];
-                }
-            }
-            return $ids;
+            return $this->findSiteIds($cityName);
         } catch (RuntimeException) {
             return [];
         }
     }
 
     /**
-     * Resolve a city name to a single Speedy siteId (first match).
-     * Used for calculate/shipment endpoints that need one specific site.
+     * Like resolveSiteIds(), but a failed API call throws instead of looking
+     * like "no such town", so callers can tell an unknown town from Speedy
+     * being unreachable.
+     *
+     * @return int[]
      */
-    private function resolveSiteId(string $cityName): ?int
+    private function findSiteIds(string $cityName): array
     {
-        $ids = $this->resolveSiteIds($cityName);
-        return $ids[0] ?? null;
+        ['name' => $name, 'postCode' => $postCode] = self::parseCityInput($cityName);
+        if ($name === '') {
+            return [];
+        }
+        // The postcode picks the right one of several same-named villages;
+        // if it doesn't match anything, fall back to the name alone.
+        if ($postCode !== null) {
+            $ids = $this->siteIdsFor(['name' => $name, 'postCode' => $postCode]);
+            if ($ids) {
+                return $ids;
+            }
+        }
+        return $this->siteIdsFor(['name' => $name]);
+    }
+
+    /** @return int[] */
+    private function siteIdsFor(array $query): array
+    {
+        $data = $this->post('location/site', ['countryId' => 100] + $query);
+        if (!empty($data['error'])) {
+            throw new RuntimeException('Speedy API error: ' . ($data['error']['message'] ?? json_encode($data['error'])));
+        }
+        $ids = [];
+        foreach ($data['sites'] ?? [] as $s) {
+            if (isset($s['id'])) {
+                $ids[] = (int)$s['id'];
+            }
+        }
+        return $ids;
+    }
+
+    /**
+     * Split what was typed in a town field into the name Speedy searches by and
+     * the postcode, if there is one. Browser autofill often fills in the full
+     * form "гр. СОФИЯ (1000), общ. СТОЛИЧНА, обл. СОФИЯ (СТОЛИЦА)", and
+     * Speedy's site search matches neither that nor a "гр." / "с." prefix.
+     *
+     * @return array{name: string, postCode: ?string}
+     */
+    public static function parseCityInput(string $input): array
+    {
+        $first    = explode(',', $input, 2)[0];
+        $postCode = preg_match('/(?<!\d)(\d{4})(?!\d)/u', $first, $m) ? $m[1] : null;
+
+        $name = preg_replace('/\([^)]*\)/u', ' ', $first);
+        $name = preg_replace('/(?<!\d)\d{4}(?!\d)/u', ' ', $name);
+        $name = preg_replace('/^\s*(?:(?:гр|с)\.|(?:гр|град|с|село)\s)\s*/iu', '', $name);
+        $name = trim(preg_replace('/\s+/u', ' ', $name));
+
+        return ['name' => $name, 'postCode' => $postCode];
+    }
+
+    /**
+     * Whether Speedy knows the town typed at checkout.
+     * Returns null when Speedy can't be reached, so an outage doesn't block checkout.
+     */
+    public function isKnownTown(string $cityName): ?bool
+    {
+        try {
+            return $this->findSiteIds($cityName) !== [];
+        } catch (RuntimeException) {
+            return null;
+        }
+    }
+
+    /** Error for a door-delivery town Speedy doesn't recognise. */
+    private static function unknownTownError(string $cityName): RuntimeException
+    {
+        return new RuntimeException('Населеното място „' . trim($cityName) . '“ не е намерено в Speedy. Провери града в адреса на поръчката.');
     }
 
     /**
@@ -258,16 +321,13 @@ class SpeedyCourier
                 'pickupOfficeId' => $officeId,
             ];
         } else {
-            $siteId  = $this->resolveSiteId($toCity);
-            $address = ['countryId' => 100];
-            if ($siteId !== null) {
-                $address['siteId'] = $siteId;
-            } else {
-                $address['siteName'] = $toCity;
+            $siteId = $this->findSiteIds($toCity)[0] ?? null;
+            if ($siteId === null) {
+                throw self::unknownTownError($toCity);
             }
             $recipient = [
                 'privatePerson'   => true,
-                'addressLocation' => $address,
+                'addressLocation' => ['countryId' => 100, 'siteId' => $siteId],
             ];
         }
 
@@ -398,13 +458,13 @@ class SpeedyCourier
         ];
 
         if ($deliveryType === 'door') {
-            $siteId = $this->resolveSiteId($order['receiver_city'] ?? '');
-            $addr   = ['countryId' => 100];
-            if ($siteId !== null) {
-                $addr['siteId'] = $siteId;
-            } else {
-                $addr['siteName'] = $order['receiver_city'] ?? '';
+            // Never fall back to sending the raw text as siteName: Speedy rejects
+            // anything over 50 characters with a message nobody can act on.
+            $siteId = $this->findSiteIds($order['receiver_city'] ?? '')[0] ?? null;
+            if ($siteId === null) {
+                throw self::unknownTownError($order['receiver_city'] ?? '');
             }
+            $addr = ['countryId' => 100, 'siteId' => $siteId];
             $rawAddress = trim($order['receiver_address'] ?? '');
             if ($rawAddress !== '') {
                 $addr['addressNote'] = $rawAddress;

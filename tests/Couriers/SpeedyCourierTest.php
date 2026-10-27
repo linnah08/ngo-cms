@@ -109,7 +109,38 @@ class SpeedyCourierTest extends TestCase
         );
     }
 
+    // ── isKnownTown ────────────────────────────────────────────────────────────
+
+    public function testIsKnownTownAcceptsAutofilledFullForm(): void
+    {
+        // Regression: this autofilled form found no
+        // Speedy site, so the label failed on Speedy's 50-character siteName limit.
+        $this->assertTrue($this->speedy->isKnownTown('гр. СОФИЯ (1000), общ. СТОЛИЧНА, обл. СОФИЯ (СТОЛИЦА)'));
+    }
+
+    public function testIsKnownTownRejectsUnknownTown(): void
+    {
+        $this->assertFalse($this->speedy->isKnownTown('НесъществуващГрадXYZ123'));
+    }
+
     // ── calculateShipping ──────────────────────────────────────────────────────
+
+    public function testCalculateShippingDoorAcceptsAutofilledFullForm(): void
+    {
+        $price = $this->speedy->calculateShipping(
+            ['weight' => 1.0, 'pack_count' => 1],
+            'гр. СОФИЯ (1000), общ. СТОЛИЧНА, обл. СОФИЯ (СТОЛИЦА)',
+            'door'
+        );
+        $this->assertGreaterThan(0, $price);
+    }
+
+    public function testCalculateShippingDoorUnknownTownThrowsPlainMessage(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('не е намерено в Speedy');
+        $this->speedy->calculateShipping(['weight' => 1.0, 'pack_count' => 1], 'НесъществуващГрадXYZ123', 'door');
+    }
 
     public function testCalculateShippingDoorReturnsPositiveFloat(): void
     {

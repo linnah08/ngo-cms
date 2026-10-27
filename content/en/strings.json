@@ -98,6 +98,7 @@
   "checkout.err.delivery_type": "Please choose a delivery method.",
   "checkout.err.address": "Please enter your address.",
   "checkout.err.city": "Please enter your town or city.",
+  "checkout.err.city_unknown": "We can’t find the town “{city}”. Please type just the town’s name, e.g. “Sofia”.",
   "checkout.err.office": "Please choose an office or locker.",
   "checkout.err.consent": "Please accept the Terms of Use and the Privacy Policy to place your order.",
   "checkout.err.no_payment": "Online payment is not available right now. Please contact us.",

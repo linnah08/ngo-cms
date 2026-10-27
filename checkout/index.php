@@ -205,6 +205,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($delivery_type === 'address') {
                 if (!$address) $errors[] = t_or('checkout.err.address', 'Въведете адрес.', 'Please enter your address.');
                 if (!$city)    $errors[] = t_or('checkout.err.city', 'Въведете град.', 'Please enter your town or city.');
+                // A town Speedy can't find would only fail later, when the
+                // shipping label is made. If Speedy can't be reached (null), let it through.
+                if ($city && $courier === 'speedy') {
+                    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/couriers/SpeedyCourier.php';
+                    if ((new SpeedyCourier())->isKnownTown($city) === false) {
+                        $errors[] = t_or('checkout.err.city_unknown', 'Не намираме населеното място „{city}“. Напишете само името му, например „София“ или „Лозен“.', 'We can’t find the town “{city}”. Please type just the town’s name, e.g. “Sofia”.', null, ['city' => $city]);
+                    }
+                }
             } else {
                 if (!$office_code) $errors[] = t_or('checkout.err.office', 'Изберете офис/автомат.', 'Please choose an office or locker.');
             }
