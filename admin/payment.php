@@ -378,6 +378,21 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   </table>
 </section>
 
+<?php if (module_admin_page_visible('sumup.php')): ?>
+<!-- ── SumUp ───────────────────────────────────────────────────────────────────── -->
+<section class="admin-card" style="margin-bottom:2rem;">
+  <h2 class="admin-card__title">SumUp (продажби на място с карта)</h2>
+  <p style="margin:0;line-height:1.6;">
+    <?php if (setting_get('sumup_merchant_code') !== ''): ?>
+      <span style="color:#2e7d32;font-weight:600;">✓ Свързан</span> — продажбите с терминала намаляват наличността в магазина всяка нощ.
+    <?php else: ?>
+      Ако продавате на щанд с терминал на SumUp, свържете го и продадените продукти ще се изваждат от наличността в магазина сами.
+    <?php endif; ?>
+    <a href="/admin/sumup.php">Към настройките на SumUp →</a>
+  </p>
+</section>
+<?php endif; ?>
+
 <!-- ── TinyMCE ─────────────────────────────────────────────────────────────────── -->
 <section class="admin-card" style="margin-bottom:2rem;">
   <h2 class="admin-card__title">Редактор на текстове (TinyMCE) <span style="font-weight:400;font-size:.85rem;color:var(--text-muted);">— по желание</span></h2>

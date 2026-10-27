@@ -85,7 +85,7 @@ function modules_registry(?array $replace = null): array
             // tickets are orders too), monthly-report.php (it covers donations),
             // the label, print-file and document endpoints (past orders still
             // ship and still need their papers), payment.php (donations pay too).
-            'admin_pages'  => ['products.php', 'product-edit.php', 'couriers.php'],
+            'admin_pages'  => ['products.php', 'product-edit.php', 'couriers.php', 'sumup.php'],
             // /checkout/ also covers /checkout/confirmation/ and
             // /checkout/payment-failed/ for link hiding; payment-failed guards only
             // shop orders, so a failed donation still lands there. Payment returns

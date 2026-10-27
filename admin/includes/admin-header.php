@@ -136,6 +136,13 @@ $current_user = admin_user();
         Поръчки
       </a>
       <?php endif; ?>
+      <?php if (module_admin_page_visible('sumup.php')): ?>
+      <?php require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/sumup.php'; $_sumup_waiting = sumup_attention_count(get_pdo()); ?>
+      <a href="/admin/sumup.php"
+         class="admin-nav__link <?= ($active_nav ?? '') === 'sumup' ? 'active' : '' ?>">
+        SumUp<?php if ($_sumup_waiting > 0): ?> <span title="Продажби, които чакат да изберете продукт" style="background:var(--teal);color:#fff;border-radius:10px;padding:.05rem .4rem;font-size:.72rem;margin-left:.3rem;vertical-align:middle;"><?= $_sumup_waiting ?><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);"> чакат избор</span></span><?php endif; ?>
+      </a>
+      <?php endif; ?>
       <?php if (module_admin_page_visible('distribution.php')): ?>
       <a href="/admin/distribution.php"
          class="admin-nav__link <?= ($active_nav ?? '') === 'distribution' ? 'active' : '' ?>">

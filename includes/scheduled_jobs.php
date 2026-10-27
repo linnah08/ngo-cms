@@ -58,6 +58,15 @@ function scheduled_jobs(): array
             'grace'       => 33 * 86400,
             'needed_when' => 'Нужна е, когато сайтът приема поръчки или дарения.',
         ],
+        'sumup_stock' => [
+            'label'       => 'Продажби от SumUp',
+            'what'        => 'Всяка нощ взима от SumUp продажбите на място с картовия терминал и намалява наличността на продадените продукти в онлайн магазина. Върнатите продажби връщат продуктите в наличност.',
+            'script'      => 'cron/sumup-stock-cron.php',
+            'cron'        => ['30', '2', '*', '*', '*'],
+            'every'       => 'всяка нощ',
+            'grace'       => 36 * 3600,
+            'needed_when' => 'Нужна е само ако SumUp е свързан (Админ → SumUp).',
+        ],
         'error_digest' => [
             'label'       => 'Обобщение на грешките',
             'what'        => 'Изпраща дневно или седмично обобщение на грешките в сайта (Админ → Известия за грешки).',
@@ -207,6 +216,9 @@ function scheduled_job_needed(string $key): bool
 
             case 'monthly_report':
                 return (bool) get_pdo()->query('SELECT 1 FROM orders LIMIT 1')->fetchColumn();
+
+            case 'sumup_stock':
+                return setting_get('sumup_api_key') !== '';
 
             case 'error_digest':
                 return setting_get('error_alert_enabled') === '1'

@@ -16,7 +16,7 @@ final class ScheduledJobsTest extends TestCase
 
     public function test_every_job_script_exists_and_is_tracked(): void
     {
-        $this->assertCount(5, scheduled_jobs());
+        $this->assertCount(6, scheduled_jobs());
         foreach (scheduled_jobs() as $key => $job) {
             $path = $_SERVER['DOCUMENT_ROOT'] . '/' . $job['script'];
             $this->assertFileExists($path, $key);
