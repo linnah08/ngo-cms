@@ -114,4 +114,10 @@
             <exclude>tests/LaunchBannerTest.php</exclude>
         </testsuite>
     </testsuites>
+    <php>
+        <!-- The image tests build full-size photos in memory; the whole suite
+             peaks just under PHP's default 128M, so one more test file tipped
+             it into "Premature end of PHPUnit's PHP process". -->
+        <ini name="memory_limit" value="512M"/>
+    </php>
 </phpunit>
