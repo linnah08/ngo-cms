@@ -11,7 +11,7 @@ echo $_tpl['intro'];
 ?>
 
 <?php if (!empty($donation_message)): ?>
-<p><strong><?= $_lang === 'en' ? 'Your message' : 'Вашето послание' ?>:</strong> <?= htmlspecialchars($donation_message, ENT_QUOTES, 'UTF-8') ?></p>
+<p><strong><?= htmlspecialchars(t_or('email.donation.message', 'Вашето послание', 'Your message', $_lang), ENT_QUOTES, 'UTF-8') ?>:</strong> <?= htmlspecialchars($donation_message, ENT_QUOTES, 'UTF-8') ?></p>
 <?php endif; ?>
 
 <?php echo $_tpl['outro']; ?>

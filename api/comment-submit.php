@@ -42,16 +42,16 @@ $content = trim($_POST['content']      ?? '');
 
 // ── Validate ──────────────────────────────────────────────────────────────────
 $errors = [];
-if (!$slug)   $errors[] = $lang === 'bg' ? 'Невалидна статия.' : 'Invalid article.';
-if (!$name)   $errors[] = $lang === 'bg' ? 'Името е задължително.' : 'Name is required.';
+if (!$slug)   $errors[] = t_or('comments.err.article', 'Невалидна статия.', 'Invalid article.', $lang);
+if (!$name)   $errors[] = t_or('comments.err.name', 'Името е задължително.', 'Name is required.', $lang);
 if (mb_strlen($name) > 100)
-              $errors[] = $lang === 'bg' ? 'Името е твърде дълго (макс. 100 знака).' : 'Name is too long (max 100 characters).';
+              $errors[] = t_or('comments.err.name_long', 'Името е твърде дълго (макс. 100 знака).', 'Name is too long (max 100 characters).', $lang);
 if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL))
-              $errors[] = $lang === 'bg' ? 'Въведете валиден имейл.' : 'A valid email is required.';
+              $errors[] = t_or('comments.err.email', 'Въведете валиден имейл.', 'A valid email is required.', $lang);
 if (!$content || mb_strlen($content) < 5)
-              $errors[] = $lang === 'bg' ? 'Коментарът е твърде кратък.' : 'Comment is too short.';
+              $errors[] = t_or('comments.err.short', 'Коментарът е твърде кратък.', 'Comment is too short.', $lang);
 if (mb_strlen($content) > 2000)
-              $errors[] = $lang === 'bg' ? 'Коментарът е твърде дълъг (макс. 2000 знака).' : 'Comment is too long (max 2000 characters).';
+              $errors[] = t_or('comments.err.long', 'Коментарът е твърде дълъг (макс. 2000 знака).', 'Comment is too long (max 2000 characters).', $lang);
 
 if ($errors) {
     flash_set('comment_error', implode(' ', $errors));
@@ -93,9 +93,7 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([$slug, $ip]);
 if ((int)$stmt->fetchColumn() > 0) {
-    flash_set('comment_error', $lang === 'bg'
-        ? 'Изчакайте малко, преди да публикувате нов коментар.'
-        : 'Please wait before posting another comment.');
+    flash_set('comment_error', t_or('comments.err.wait', 'Изчакайте малко, преди да публикувате нов коментар.', 'Please wait before posting another comment.', $lang));
     header('Location: ' . $back . '#comments');
     exit;
 }

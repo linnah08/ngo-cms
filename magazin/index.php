@@ -647,9 +647,7 @@ $_shop_hero = [
     'title' => ($pages['shop']['hero_title_' . $lang] ?? '') ?: ($_donations_on
         ? ($lang === 'bg' ? 'Пазарувай и подкрепи' : 'Shop & Support')
         : ($lang === 'bg' ? 'Магазин' : 'Shop')),
-    'text'  => ($pages['shop']['hero_text_' . $lang] ?? '') ?: ($lang === 'bg'
-        ? 'Всяка покупка подкрепя каузата ни.'
-        : 'Every purchase supports our cause.'),
+    'text'  => ($pages['shop']['hero_text_' . $lang] ?? '') ?: t_or('shop.hero.text', 'Всяка покупка подкрепя каузата ни.', 'Every purchase supports our cause.', $lang),
 ];
 // A site may bring its own designed header (includes/site-extensions.php or its
 // theme: 'shop_header'). If that file is missing or fails, the plain one shows.

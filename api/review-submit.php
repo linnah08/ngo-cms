@@ -35,13 +35,13 @@ $rating  = (int)($_POST['rating'] ?? 0);
 $content = trim($_POST['content'] ?? '');
 
 $errors = [];
-if (!$name)                       $errors[] = $lang === 'bg' ? 'Името е задължително.' : 'Name is required.';
-if (mb_strlen($name) > 100)       $errors[] = $lang === 'bg' ? 'Името е твърде дълго (макс. 100 знака).' : 'Name is too long (max 100 characters).';
+if (!$name)                       $errors[] = t_or('reviews.err.name', 'Името е задължително.', 'Name is required.', $lang);
+if (mb_strlen($name) > 100)       $errors[] = t_or('reviews.err.name_long', 'Името е твърде дълго (макс. 100 знака).', 'Name is too long (max 100 characters).', $lang);
 if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL))
-                                   $errors[] = $lang === 'bg' ? 'Въведи валиден имейл.' : 'A valid email is required.';
-if ($rating < 1 || $rating > 5)   $errors[] = $lang === 'bg' ? 'Изберете оценка от 1 до 5.' : 'Choose a rating from 1 to 5.';
-if (!$content || mb_strlen($content) < 5) $errors[] = $lang === 'bg' ? 'Отзивът е твърде кратък.' : 'Review is too short.';
-if (mb_strlen($content) > 2000)   $errors[] = $lang === 'bg' ? 'Отзивът е твърде дълъг (макс. 2000 знака).' : 'Review is too long (max 2000 characters).';
+                                   $errors[] = t_or('reviews.err.email', 'Въведи валиден имейл.', 'A valid email is required.', $lang);
+if ($rating < 1 || $rating > 5)   $errors[] = t_or('reviews.err.rating', 'Изберете оценка от 1 до 5.', 'Choose a rating from 1 to 5.', $lang);
+if (!$content || mb_strlen($content) < 5) $errors[] = t_or('reviews.err.short', 'Отзивът е твърде кратък.', 'Review is too short.', $lang);
+if (mb_strlen($content) > 2000)   $errors[] = t_or('reviews.err.long', 'Отзивът е твърде дълъг (макс. 2000 знака).', 'Review is too long (max 2000 characters).', $lang);
 
 $pdo = get_pdo();
 
@@ -52,7 +52,7 @@ if ($slug) {
     $st->execute([$slug]);
     $pid = (int)$st->fetchColumn();
 }
-if (!$pid) $errors[] = $lang === 'bg' ? 'Невалиден продукт.' : 'Invalid product.';
+if (!$pid) $errors[] = t_or('reviews.err.product', 'Невалиден продукт.', 'Invalid product.', $lang);
 
 if ($errors) {
     product_review_flash_set('error', implode(' ', $errors));
@@ -73,9 +73,7 @@ $st = $pdo->prepare(
 );
 $st->execute([$pid, $ip]);
 if ((int)$st->fetchColumn() > 0) {
-    product_review_flash_set('error', $lang === 'bg'
-        ? 'Изчакайте малко, преди да публикувате нов отзив.'
-        : 'Please wait before posting another review.');
+    product_review_flash_set('error', t_or('reviews.err.wait', 'Изчакайте малко, преди да публикувате нов отзив.', 'Please wait before posting another review.', $lang));
     header('Location: ' . $back . '#reviews'); exit;
 }
 

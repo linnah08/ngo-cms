@@ -23,7 +23,7 @@ echo $_tpl['intro'];
 <?php if ($addr): ?>
 <h3 style="color:#0387A5;"><?= $_lang === 'en' ? 'Reward delivery' : 'Доставка на наградата' ?></h3>
 <p>
-  <?= $_lang === 'en' ? 'Your reward will be shipped to:' : 'Твоята награда ще бъде изпратена на:' ?><br>
+  <?= htmlspecialchars(t_or('email.campaign.reward_to', 'Твоята награда ще бъде изпратена на:', 'Your reward will be shipped to:', $_lang), ENT_QUOTES, 'UTF-8') ?><br>
   <strong><?= htmlspecialchars(implode(', ', array_filter([$addr['address']??'', $addr['city']??'', $addr['postcode']??''])), ENT_QUOTES, 'UTF-8') ?></strong>
   <?php if (!empty($addr['phone'])): ?>
   <br><?= $_lang === 'en' ? 'Phone' : 'Телефон' ?>: <?= htmlspecialchars($addr['phone'], ENT_QUOTES, 'UTF-8') ?>

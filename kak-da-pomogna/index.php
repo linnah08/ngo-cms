@@ -4,7 +4,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/donation.php';
 $pages = load_json(CONTENT_PATH . '/pages.json');
 $help = $pages['how_to_help'] ?? [];
 $page_title = 'Как да помогна';
-$page_description = 'Научете как можете да подкрепите ' . SITE_NAME_BG . '.';
+$page_description = t_or('help.page_description', 'Научете как можете да подкрепите {name}.', 'Find out how you can support {name}.', null, ['name' => SITE_NAME_BG]);
 $page_head_extra = '<style>@media(max-width:640px){.how-to-help--list-wrapper>div{grid-template-columns:1fr!important;gap:.75rem!important;}}</style>';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>

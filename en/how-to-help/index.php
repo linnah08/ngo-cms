@@ -5,7 +5,7 @@ $pages            = load_json(CONTENT_PATH . '/pages.json');
 $how              = $pages['how_to_help'] ?? [];
 $ways             = $how['ways'] ?? [];
 $page_title       = 'How to Help';
-$page_description = 'Find out how you can support ' . SITE_NAME_EN . '.';
+$page_description = t_or('help.page_description', 'Научете как можете да подкрепите {name}.', 'Find out how you can support {name}.', null, ['name' => SITE_NAME_EN]);
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
 

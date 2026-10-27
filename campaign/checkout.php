@@ -51,10 +51,10 @@ $reward_id  = (int)($_POST['reward_id'] ?? 0);
 $ticket_qty = 1;
 $amount_eur = round((float)($_POST['amount_eur'] ?? 0), 2);
 
-if ($name === '')                      $errors[] = 'Моля, въведете вашето име.';
-if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Моля, въведете валиден имейл адрес.';
-if ($amount_eur < 1)                   $errors[] = 'Минималната сума е 1 EUR.';
-if ($amount_eur > 100000)              $errors[] = 'Сумата е твърде голяма.';
+if ($name === '')                      $errors[] = t_or('campaign.err.name', 'Моля, въведете вашето име.', 'Please enter your name.', $pledge_lang);
+if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = t_or('campaign.err.email', 'Моля, въведете валиден имейл адрес.', 'Please enter a valid email address.', $pledge_lang);
+if ($amount_eur < 1)                   $errors[] = t_or('campaign.err.min', 'Минималната сума е 1 EUR.', 'The minimum amount is 1 EUR.', $pledge_lang);
+if ($amount_eur > 100000)              $errors[] = t_or('campaign.err.max', 'Сумата е твърде голяма.', 'The amount is too large.', $pledge_lang);
 
 // Validate reward exists if one was selected (donations only)
 $reward = null;
@@ -123,7 +123,7 @@ try {
     order_session_remember($pledge_number);
 } catch (Throwable $e) {
     payment_error_report('Подкрепата за кампания не можа да бъде записана', '', $e);
-    $_SESSION['campaign_error'] = 'Техническа грешка. Моля, опитайте отново.';
+    $_SESSION['campaign_error'] = t_or('campaign.err.technical', 'Техническа грешка. Моля, опитайте отново.', 'Something went wrong on our side. Please try again.', $pledge_lang);
     header('Location: /campaign/');
     exit;
 }
@@ -148,7 +148,7 @@ if (!$is_ticket && $reward_id > 0) {
 // ── Register with DSK Bank ────────────────────────────────────────────────────
 if (!DSKBankPayment::isEnabled()) {
     payment_error_report('Плащането с карта не е настроено — подкрепа за кампания не може да бъде платена', $pledge_number, 'DSK Bank not configured');
-    $_SESSION['campaign_error'] = 'Плащанията не са конфигурирани. Моля, свържете се с нас.';
+    $_SESSION['campaign_error'] = t_or('campaign.err.payments', 'Плащанията не са конфигурирани. Моля, свържете се с нас.', 'Online payments are not set up yet. Please get in touch with us.', $pledge_lang);
     header('Location: /campaign/');
     exit;
 }

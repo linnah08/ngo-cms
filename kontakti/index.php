@@ -6,7 +6,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/spam_filter.php';
 
 $page_title       = 'Контакти';
-$page_description = 'Свържете се с ' . SITE_NAME_BG . '.';
+$page_description = t_or('contact.page_description', 'Свържете се с {name}.', 'Get in touch with {name}.', null, ['name' => SITE_NAME_BG]);
 $page_head_extra  = '<style>@media(max-width:640px){.contact-us-form-wrapper{grid-template-columns:1fr!important;gap:2rem!important;}}</style>';
 
 $sent  = false;
@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$form_on) {
     $error = 'Формата за съобщения в момента не работи. Пишете ни на ' . SITE_EMAIL . '.';
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) {
-        $error = 'Невалидна заявка.';
+        $error = t_or('contact.err.invalid', 'Невалидна заявка.', 'Invalid request.');
     } elseif (!empty($_POST['website'])) {
         // Honeypot tripped — pretend success without saving anything.
         $sent = true;
@@ -73,13 +73,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$form_on) {
         $rate_limited = (int)$rate_limit_stmt->fetchColumn() > 0;
 
         if (!$name || !$email || !$topic || !$message) {
-            $error = 'Моля попълнете всички полета.';
+            $error = t_or('contact.err.fields', 'Моля попълнете всички полета.', 'Please fill in all fields.');
         } elseif (mb_strlen($name) > 200) {
-            $error = 'Името е твърде дълго (макс. 200 знака).';
+            $error = t_or('contact.err.name_long', 'Името е твърде дълго (макс. 200 знака).', 'Your name is too long (max 200 characters).');
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $error = 'Невалиден имейл адрес.';
+            $error = t_or('contact.err.email', 'Невалиден имейл адрес.', 'Invalid email address.');
         } elseif (!in_array($topic, $_topics, true)) {
-            $error = 'Моля изберете валидна тема.';
+            $error = t_or('contact.err.topic', 'Моля изберете валидна тема.', 'Please select a valid topic.');
         } elseif (
             $rate_limited
             || spam_content_is_blocked($message)
@@ -106,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$form_on) {
             if (send_mail(SITE_EMAIL, $subject, $body, $email)) {
                 $sent = true;
             } else {
-                $error = 'Грешка при изпращане. Моля опитайте отново или пишете директно на ' . SITE_EMAIL;
+                $error = t_or('contact.err.send', 'Грешка при изпращане. Моля опитайте отново или пишете директно на {email}', 'There was an error sending your message. Please try again or email us directly at {email}', null, ['email' => SITE_EMAIL]);
             }
         }
     }
@@ -195,7 +195,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
               <label for="topic"><?= te('contact.form.topic', 'Как можете да помогнете?', 'How can you help?') ?></label>
               <select id="topic" name="topic" required
                       style="width:100%;padding:.55rem .75rem;border:1px solid var(--border);border-radius:var(--radius);font-size:1rem;background:#fff;">
-                <option value="" disabled <?= (empty($_POST['topic']) && $_preselect_topic === '') ? 'selected' : '' ?>>— Изберете тема —</option>
+                <option value="" disabled <?= (empty($_POST['topic']) && $_preselect_topic === '') ? 'selected' : '' ?>><?= h(t_or('contact.topic_placeholder', '— Изберете тема —', '— Select a topic —')) ?></option>
                 <?php foreach ($_topics as $t): ?>
                   <option value="<?= h($t) ?>" <?= (($_POST['topic'] ?? $_preselect_topic) === $t) ? 'selected' : '' ?>><?= h($t) ?></option>
                 <?php endforeach; ?>

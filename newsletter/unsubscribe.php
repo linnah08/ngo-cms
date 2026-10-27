@@ -10,7 +10,7 @@ $lang  = get_lang();
 
 // Always show the same success page regardless of whether the token was found —
 // avoids leaking whether an email address is in the list.
-$page_title       = $lang === 'bg' ? 'Отписани сте' : 'Unsubscribed';
+$page_title       = t_or('newsletter.unsub.page_title', 'Отписани сте', 'Unsubscribed', $lang);
 $page_description = '';
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>

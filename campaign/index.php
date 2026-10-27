@@ -373,7 +373,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
           <div class="form-field">
             <label>Email</label>
             <input type="email" name="email" required autocomplete="email"
-                   placeholder="<?= $is_en ? 'your@email.com' : 'вашият@email.com' ?>">
+                   placeholder="<?= h(t_or('campaign.email_placeholder', 'вашият@email.com', 'your@email.com', $is_en ? 'en' : 'bg')) ?>">
           </div>
 
           <!-- Reward delivery note — delivery is selected at checkout step 2 -->
