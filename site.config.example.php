@@ -36,6 +36,10 @@ define('SITE_IBAN',      '');
 define('SITE_BIC',       '');
 define('SITE_BANK_NAME', '');
 
+// First letters of order numbers (2–5 latin letters, not CP). Also editable in
+// Admin → Организация. Left out, orders start with OM-.
+// define('ORDER_PREFIX', 'OM');
+
 // Email of the single admin account authorised to sign donation certificates.
 define('SIGNING_ADMIN_EMAIL', 'info@example.org');
 

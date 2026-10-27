@@ -14,6 +14,11 @@ final class MailerTest extends TestCase
 {
     // ── email_wrap ────────────────────────────────────────────────────────────
 
+    public function test_team_notification_subject_starts_with_the_site_name(): void
+    {
+        $this->assertSame('[' . SITE_NAME_BG . '] Нова поръчка #LF-20261027-1A2B', admin_mail_subject('Нова поръчка #LF-20261027-1A2B'));
+    }
+
     public function test_email_wrap_is_valid_utf8(): void
     {
         $html = email_wrap('<p>Здравей свят</p>');

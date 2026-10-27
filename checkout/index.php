@@ -578,7 +578,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
         send_mail(
             SITE_EMAIL,
-            'Нова поръчка #' . $order_number,
+            admin_mail_subject('Нова поръчка #' . $order_number),
             render_email('order-notification-admin', [
                 'order'     => $order,
                 'admin_url' => SITE_URL . '/admin/order-view.php?id=' . $order_id,

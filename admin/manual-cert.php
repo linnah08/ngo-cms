@@ -163,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Notify signing admin
             send_mail(
                 SIGNING_ADMIN_EMAIL,
-                'Сертификат за дарение #' . $doc_formatted . ' — нужен подпис',
+                admin_mail_subject('Сертификат за дарение #' . $doc_formatted . ' — нужен подпис'),
                 render_email('cert-needs-signature', [
                     'order'    => $order_row,
                     'document' => ['formatted_number' => $doc_formatted],

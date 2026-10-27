@@ -10,7 +10,7 @@ $order_number = trim($_GET['order'] ?? '');
 // in the server log, never shown to the customer.
 $bank_error   = !empty($_GET['err']);
 
-if (!preg_match('/^OM-\d{8}-[A-F0-9]{4}$/i', $order_number)) {
+if (!is_order_number($order_number)) {
     header('Location: /');
     exit;
 }

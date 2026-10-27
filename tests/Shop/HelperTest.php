@@ -40,6 +40,37 @@ final class HelperTest extends TestCase
         // We just verify both are valid; a collision here is negligible
     }
 
+    public function testOrderNumberStartsWithTheSitePrefix(): void
+    {
+        // ORDER_PREFIX is a constant, so set it in a separate PHP process.
+        $code = '$_SERVER["DOCUMENT_ROOT"] = ' . var_export(dirname(__DIR__, 2), true) . ';'
+            . 'define("ORDER_PREFIX", "lf"); require $_SERVER["DOCUMENT_ROOT"] . "/config.php";'
+            . 'echo generate_order_number();';
+        $out = (string) shell_exec(escapeshellarg(PHP_BINARY) . ' -r ' . escapeshellarg($code) . ' 2>&1');
+        $this->assertMatchesRegularExpression('/^LF-\d{8}-[A-F0-9]{4}$/', $out);
+    }
+
+    public function testOrderPrefixValidation(): void
+    {
+        foreach (['LF', 'OM', 'ABCDE'] as $ok) $this->assertTrue(order_prefix_valid($ok), $ok);
+        // CP- belongs to campaign pledges; the rest are not 2–5 latin capitals.
+        foreach (['CP', 'A', 'ABCDEF', 'L1', 'ЛФ', 'lf', ''] as $bad) $this->assertFalse(order_prefix_valid($bad), $bad);
+    }
+
+    public function testIsOrderNumberAcceptsAnySitePrefix(): void
+    {
+        // Orders placed under an earlier prefix keep working after it changes.
+        $this->assertTrue(is_order_number('OM-20261027-1A2B'));
+        $this->assertTrue(is_order_number('LF-20261027-1A2B'));
+        $this->assertTrue(is_order_number('lf-20261027-1a2b'));
+        $this->assertTrue(is_order_number(generate_order_number()));
+        $this->assertFalse(is_order_number('CP-20261027-1A2B'), 'pledge numbers are not orders');
+        $this->assertFalse(is_order_number('LF-2026102-1A2B'));
+        $this->assertFalse(is_order_number('LF-20261027-1A2B\n'));
+        $this->assertFalse(is_order_number("LF-20261027-1A2B' OR 1=1"));
+        $this->assertFalse(is_order_number(''));
+    }
+
     // ── slug ─────────────────────────────────────────────────────────────────
 
     #[DataProvider('slugProvider')]

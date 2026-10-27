@@ -37,7 +37,7 @@ function notify_order_paid(array $order): void
         );
         send_mail(
             SITE_EMAIL,
-            'Ново дарение — ' . $order['customer_name'] . ' — ' . number_format((float)$order['total_eur'], 2) . '€',
+            admin_mail_subject('Ново дарение — ' . $order['customer_name'] . ' — ' . number_format((float)$order['total_eur'], 2) . '€'),
             render_email('donation-notification-admin', [
                 'donor_name'       => $order['customer_name'],
                 'donor_email'      => $order['customer_email'],
@@ -56,7 +56,7 @@ function notify_order_paid(array $order): void
         );
         send_mail(
             SITE_EMAIL,
-            'Нова поръчка #' . $order['order_number'],
+            admin_mail_subject('Нова поръчка #' . $order['order_number']),
             render_email('order-notification-admin', [
                 'order'     => $order,
                 'admin_url' => SITE_URL . '/admin/order-view.php?id=' . $order['id'],

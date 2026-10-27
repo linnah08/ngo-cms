@@ -83,6 +83,14 @@ function render_email_subject(string $key, string $lang = 'bg', array $vars = []
     return email_tpl_get($key, $lang, $vars)['subject'];
 }
 
+/**
+ * Subject of a notification to the site's own team (new order, donation, ticket…),
+ * starting with the site name, so mail from several sites in one inbox is told apart.
+ */
+function admin_mail_subject(string $subject): string {
+    return '[' . (defined('SITE_NAME_BG') ? SITE_NAME_BG : 'Site') . '] ' . $subject;
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Mail transport selection
 //

@@ -600,7 +600,7 @@ function event_tickets_fulfil(PDO $pdo, array $pledge, array $hooks = []): void
         $notify = $hooks['notify'] ?? static fn(string $to, string $subject, string $html): bool => send_mail($to, $subject, $html);
         $notify(
             defined('SITE_EMAIL') ? SITE_EMAIL : '',
-            'Продаден билет — ' . ($event['title'] ?: 'събитие') . ' — ' . $pledge['pledge_number'],
+            admin_mail_subject('Продаден билет — ' . ($event['title'] ?: 'събитие') . ' — ' . $pledge['pledge_number']),
             render_email('event-ticket-admin', ['pledge' => $pledge, 'event' => $event])
         );
     } catch (Throwable $e) {

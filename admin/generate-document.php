@@ -216,7 +216,7 @@ if ($doc_type === 'credit_note') {
 if ($doc_type === 'donation_cert') {
     send_mail(
         SIGNING_ADMIN_EMAIL,
-        'Сертификат за дарение #' . $doc_formatted . ' — нужен подпис',
+        admin_mail_subject('Сертификат за дарение #' . $doc_formatted . ' — нужен подпис'),
         render_email('cert-needs-signature', [
             'order'    => $order,
             'document' => ['formatted_number' => $doc_formatted],

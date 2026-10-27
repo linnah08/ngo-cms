@@ -23,7 +23,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/process_iris_result.
 $pdo          = get_pdo();
 $order_number = trim($_GET['order'] ?? '');
 
-if (!preg_match('/^OM-\d{8}-[A-F0-9]{4}$/i', $order_number)) {
+if (!is_order_number($order_number)) {
     header('Location: /');
     exit;
 }

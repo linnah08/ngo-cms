@@ -156,7 +156,7 @@ function process_campaign_dsk_result(PDO $pdo, array $pledge, string $dskOrderId
             // Admin notification
             send_mail(
                 SITE_EMAIL,
-                'Нов поддръжник на кампанията — ' . $pledge['pledge_number'],
+                admin_mail_subject('Нов поддръжник на кампанията — ' . $pledge['pledge_number']),
                 render_email('campaign-admin-notification', ['pledge' => $pledge])
             );
         }
@@ -227,7 +227,7 @@ function generate_campaign_cert(PDO $pdo, array $pledge): void
             require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/email-templates.php';
             send_mail(
                 SIGNING_ADMIN_EMAIL,
-                'Сертификат за дарение #' . $formatted . ' — нужен подпис',
+                admin_mail_subject('Сертификат за дарение #' . $formatted . ' — нужен подпис'),
                 render_email('cert-needs-signature', [
                     'order'    => [
                         'customer_name'  => $pledge['name'],

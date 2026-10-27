@@ -36,6 +36,7 @@ function org_fields(): array
         'site_iban'        => 'SITE_IBAN',
         'site_bic'         => 'SITE_BIC',
         'site_bank_name'   => 'SITE_BANK_NAME',
+        'order_prefix'     => 'ORDER_PREFIX',     // first letters of order numbers; see order_number_prefix()
         'brand_theme'      => 'BRAND_THEME',
         'brand_primary'    => 'BRAND_PRIMARY',
         'brand_accent'     => 'BRAND_ACCENT',
@@ -115,13 +116,15 @@ function org_module_fields(): array
 /**
  * Организация fields whose section is hidden because a module it serves is off
  * (Админ → Модули): the newsletter band colour without Бюлетин, the newsletter
- * donation box without Бюлетин or Дарения. Their saved values are kept.
+ * donation box without Бюлетин or Дарения, the order number prefix without
+ * Магазин or Дарения. Their saved values are kept.
  */
 function org_hidden_fields(): array
 {
     $hidden = [];
     $newsletter = module_enabled_with_needs('newsletter');
     if (!$newsletter) array_push($hidden, 'newsletter_band', 'newsletter_band_color');
+    if (!module_enabled_with_needs('shop') && !module_enabled_with_needs('donations')) $hidden[] = 'order_prefix';
     if (!$newsletter || !module_enabled_with_needs('donations')) {
         array_push($hidden, 'newsletter_donate_cta', 'newsletter_donate_heading_bg', 'newsletter_donate_heading_en',
             'newsletter_donate_text_bg', 'newsletter_donate_text_en');
@@ -372,6 +375,14 @@ function org_validate(array $in, array $themeKeys): array
 
     if (mb_strlen($v['site_bank_name']) > 150) {
         $e['site_bank_name'] = 'Името на банката е твърде дълго (най-много 150 знака).';
+    }
+
+    // Empty means the default prefix (order_number_prefix() in config.php).
+    $v['order_prefix'] = strtoupper($v['order_prefix']);
+    if ($v['order_prefix'] !== '' && !order_prefix_valid($v['order_prefix'])) {
+        $e['order_prefix'] = $v['order_prefix'] === 'CP'
+            ? 'CP е запазено за номерата от кампаниите. Моля, изберете други букви.'
+            : 'Моля, въведете от 2 до 5 латински букви, например AB.';
     }
 
     if (!in_array($v['brand_theme'], $themeKeys, true)) {

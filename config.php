@@ -759,8 +759,33 @@ function flash_get(): array {
 // SHOP HELPERS
 // ============================================
 
+/** Order numbers start with this until the site picks its own prefix. */
+const ORDER_PREFIX_DEFAULT = 'OM';
+
+/**
+ * The first letters of this site's order numbers (Admin → Организация →
+ * „Номера на поръчките“), so two sites' orders never look alike in one inbox.
+ */
+function order_number_prefix(): string {
+    $p = defined('ORDER_PREFIX') ? strtoupper(trim((string) ORDER_PREFIX)) : '';
+    return order_prefix_valid($p) ? $p : ORDER_PREFIX_DEFAULT;
+}
+
+/** 2–5 latin capitals; CP- is taken by campaign pledge numbers. */
+function order_prefix_valid(string $p): bool {
+    return (bool) preg_match('/^[A-Z]{2,5}$/', $p) && $p !== 'CP';
+}
+
 function generate_order_number(): string {
-    return 'OM-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(2)));
+    return order_number_prefix() . '-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(2)));
+}
+
+/**
+ * Whether $n is shaped like an order number. Any prefix is accepted, not only
+ * the current one: orders placed before the prefix was changed keep working.
+ */
+function is_order_number(string $n): bool {
+    return (bool) preg_match('/^([A-Z]{2,5})-\d{8}-[A-F0-9]{4}$/i', $n, $m) && strtoupper($m[1]) !== 'CP';
 }
 
 function cart_count(): int {

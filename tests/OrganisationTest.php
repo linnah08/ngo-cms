@@ -129,6 +129,20 @@ final class OrganisationTest extends TestCase
         $this->assertArrayNotHasKey('site_name_en', $r['errors']);
     }
 
+    public function test_order_prefix_is_optional_uppercased_and_checked(): void
+    {
+        $themes = array_keys(brand_themes());
+        $this->assertSame('', org_validate($this->validInput(['order_prefix' => '']), $themes)['values']['order_prefix']);
+
+        $r = org_validate($this->validInput(['order_prefix' => ' lf ']), $themes);
+        $this->assertSame([], $r['errors']);
+        $this->assertSame('LF', $r['values']['order_prefix']);
+
+        foreach (['CP', 'L', 'ЛФ', 'AB-1', 'ABCDEF'] as $bad) {
+            $this->assertArrayHasKey('order_prefix', org_validate($this->validInput(['order_prefix' => $bad]), $themes)['errors'], $bad);
+        }
+    }
+
     public function test_legal_name_is_optional_but_needs_both_languages(): void
     {
         $themes = array_keys(brand_themes());

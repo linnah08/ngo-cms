@@ -227,6 +227,26 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </div>
   </section>
 
+  <?php if (module_enabled_with_needs('shop') || module_enabled_with_needs('donations')): ?>
+  <!-- ── Order numbers ─────────────────────────────────────────────────────── -->
+  <section class="admin-card" style="<?= $card ?>">
+    <h2 class="admin-card__title">Номера на поръчките</h2>
+    <p class="admin-meta" style="margin:0 0 1rem;line-height:1.6;">
+      С тези букви започва номерът на всяка нова поръчка и дарение, например <strong><?= h(order_number_prefix()) ?>-<?= date('Ymd') ?>-1A2B</strong>.
+      Изберете букви, по които да познаете вашия сайт, ако получавате поръчки и от друг сайт. Вече направените поръчки запазват номерата си.
+    </p>
+    <div class="admin-form-grid">
+      <label id="f-order_prefix">Начални букви
+        <input type="text" name="order_prefix" value="<?= h($val('order_prefix')) ?>" maxlength="5" placeholder="<?= h(ORDER_PREFIX_DEFAULT) ?>"
+               autocomplete="off" spellcheck="false" aria-describedby="hint-order_prefix<?= isset($errors['order_prefix']) ? ' err-order_prefix' : '' ?>"
+               style="font-family:monospace;text-transform:uppercase;<?= isset($errors['order_prefix']) ? $bad_css : '' ?>"<?= isset($errors['order_prefix']) ? ' aria-invalid="true"' : '' ?>>
+        <span id="hint-order_prefix" style="<?= $hint ?>">От 2 до 5 латински букви. Ако оставите полето празно: <?= h(ORDER_PREFIX_DEFAULT) ?>.</span>
+        <?= $ferr('order_prefix') ?>
+      </label>
+    </div>
+  </section>
+  <?php endif; ?>
+
   <!-- ── Brand ─────────────────────────────────────────────────────────────── -->
   <section class="admin-card" style="<?= $card ?>">
     <h2 class="admin-card__title">Визия</h2>

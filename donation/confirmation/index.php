@@ -11,7 +11,7 @@ module_public_guard('donations');
 $lang         = get_lang();
 $order_number = trim($_GET['order'] ?? '');
 
-if (!preg_match('/^OM-\d{8}-[A-F0-9]{4}$/i', $order_number)) {
+if (!is_order_number($order_number)) {
     header('Location: /');
     exit;
 }
