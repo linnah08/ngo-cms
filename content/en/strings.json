@@ -447,5 +447,7 @@
   "reviews.err.long": "Review is too long (max 2000 characters).",
   "reviews.err.product": "Invalid product.",
   "reviews.err.wait": "Please wait before posting another review.",
-  "newsletter.unsub.page_title": "Unsubscribed"
+  "newsletter.unsub.page_title": "Unsubscribed",
+  "distribution.protocol.price_label": "Price per item",
+  "distribution.protocol.item_name": "{product}"
 }

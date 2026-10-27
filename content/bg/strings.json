@@ -447,5 +447,7 @@
   "reviews.err.long": "Отзивът е твърде дълъг (макс. 2000 знака).",
   "reviews.err.product": "Невалиден продукт.",
   "reviews.err.wait": "Изчакайте малко, преди да публикувате нов отзив.",
-  "newsletter.unsub.page_title": "Отписани сте"
+  "newsletter.unsub.page_title": "Отписани сте",
+  "distribution.protocol.price_label": "Цена за брой",
+  "distribution.protocol.item_name": "{product}"
 }

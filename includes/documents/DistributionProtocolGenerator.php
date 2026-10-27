@@ -38,7 +38,10 @@ class DistributionProtocolGenerator extends DocumentGenerator {
         }
 
         $recipient  = self::h((string) $order['distributor_name']);
-        $item_name  = self::h((string) $order['item_name']);
+        // Wording a site can change in strings.site.json: the item line ({product} is the
+        // product and variant) and the price column. The protocol itself is in Bulgarian.
+        $item_name  = self::h(t_or('distribution.protocol.item_name', '{product}', '{product}', 'bg', ['product' => (string) $order['item_name']]));
+        $price_head = self::h(t_or('distribution.protocol.price_label', 'Цена за брой', 'Price per item', 'bg'));
         $quantity   = (int) $order['quantity'];
         $unit_price = (float) $order['unit_price_eur'];
         $unit_fmt   = self::fmtEur($unit_price);
@@ -105,7 +108,7 @@ class DistributionProtocolGenerator extends DocumentGenerator {
               <th style="width:40%;">Наименование</th>
               <th style="width:10%;text-align:center;">Мярка</th>
               <th style="width:12%;text-align:center;">К-во</th>
-              <th class="right" style="width:18%;">Цена за брой</th>
+              <th class="right" style="width:18%;">{$price_head}</th>
               <th class="right" style="width:20%;">Стойност</th>
             </tr>
           </thead>
