@@ -14,8 +14,8 @@
  * has no products at all — waits on the admin page until the admin picks the
  * product; the choice is remembered for that name (sumup_name_map).
  *
- * Only sales made after the key was first connected count, so older sales
- * already reflected in the stock are never taken out again.
+ * Every sale in the SumUp account counts, also those from before the key was
+ * connected: the first check goes through the whole history.
  */
 
 require_once __DIR__ . '/settings.php';
@@ -24,6 +24,8 @@ const SUMUP_API_BASE = 'https://api.sumup.com';
 /** The nightly check looks back this much before the last check, in case SumUp records a sale late. */
 const SUMUP_OVERLAP_SECONDS = 3600;
 const SUMUP_MAX_PAGES = 50;
+/** Where the first check starts: before any SumUp sale (SumUp opened in 2012). */
+const SUMUP_HISTORY_START = 1325376000; // 2012-01-01 UTC
 
 /** A problem talking to SumUp, worded for the admin. */
 final class SumUpError extends RuntimeException {}
@@ -91,11 +93,8 @@ function sumup_is_connected(): bool
     return setting_get('sumup_api_key') !== '' && setting_get('sumup_merchant_code') !== '';
 }
 
-/**
- * Checks the key with SumUp and saves it. The first connection starts the
- * clock: sales before it are never taken out of stock.
- */
-function sumup_connect(string $key, ?callable $get = null, ?int $now = null): array
+/** Checks the key with SumUp and saves it. */
+function sumup_connect(string $key, ?callable $get = null): array
 {
     $key = trim($key);
     if ($key === '') throw new SumUpError('Поставете ключа от SumUp в полето.');
@@ -103,9 +102,6 @@ function sumup_connect(string $key, ?callable $get = null, ?int $now = null): ar
     setting_set('sumup_api_key', $key);
     setting_set('sumup_merchant_code', $merchant['code']);
     setting_set('sumup_merchant_name', $merchant['name']);
-    if (!ctype_digit(setting_get('sumup_connected_at'))) {
-        setting_set('sumup_connected_at', (string) ($now ?? time()));
-    }
     return $merchant;
 }
 
@@ -268,14 +264,15 @@ function sumup_sync(PDO $pdo, ?callable $get = null, ?int $now = null): array
 {
     $now      = $now ?? time();
     $merchant = setting_get('sumup_merchant_code');
-    $since    = setting_get('sumup_synced_until');
-    $start    = setting_get('sumup_connected_at');
-    if ($merchant === '' || !ctype_digit($start)) {
+    // Not sumup_synced_until: sites that ran the version which skipped older
+    // sales go through the whole history once (sales already seen stay as they are).
+    $since    = setting_get('sumup_history_until');
+    if ($merchant === '') {
         throw new SumUpError('SumUp още не е свързан. Поставете ключа в Админ → SumUp.');
     }
     $get   = $get ?? sumup_getter(setting_get('sumup_api_key'));
-    $start = (int) $start;
-    $from  = max($start, (ctype_digit($since) ? (int) $since : $start) - SUMUP_OVERLAP_SECONDS);
+    $from  = ctype_digit($since) ? max(SUMUP_HISTORY_START, (int) $since - SUMUP_OVERLAP_SECONDS) : SUMUP_HISTORY_START;
+    $until = $now;
 
     $base  = '/v2.1/merchants/' . rawurlencode($merchant) . '/transactions';
     $query = http_build_query(['changes_since' => gmdate('Y-m-d\TH:i:s\Z', $from), 'order' => 'ascending', 'limit' => 100])
@@ -286,11 +283,13 @@ function sumup_sync(PDO $pdo, ?callable $get = null, ?int $now = null): array
     $map     = sumup_name_map($pdo);
     $sum     = ['new_sales' => 0, 'items_out' => 0, 'refunds' => 0, 'items_back' => 0, 'attention' => 0];
 
+    $last = null;
     for ($page = 0; $page < SUMUP_MAX_PAGES && $query !== null; $page++) {
         $data  = $get($base . '/history?' . $query);
         $query = null;
         foreach ((array) ($data['items'] ?? []) as $tx) {
-            sumup_sync_one($pdo, $get, $base, (array) $tx, $start, $index, $map, $sum);
+            sumup_sync_one($pdo, $get, $base, (array) $tx, $index, $map, $sum);
+            $last = sumup_parse_time((string) ($tx['timestamp'] ?? ''))['ts'] ?? $last;
         }
         foreach ((array) ($data['links'] ?? []) as $link) {
             if (($link['rel'] ?? '') === 'next' && !empty($link['href']) && !empty($data['items'])) {
@@ -299,13 +298,15 @@ function sumup_sync(PDO $pdo, ?callable $get = null, ?int $now = null): array
         }
     }
 
-    setting_set('sumup_synced_until', (string) $now);
+    // More pages than one check reads (a long history): the next check carries on from here.
+    if ($query !== null && $last !== null) $until = $last;
+    setting_set('sumup_history_until', (string) $until);
     setting_set('sumup_last_sync', json_encode($sum + ['at' => $now]));
     return $sum;
 }
 
 /** One sale from SumUp's history: take its items out of stock, or put them back if it was refunded. */
-function sumup_sync_one(PDO $pdo, callable $get, string $base, array $tx, int $start, array $index, array $map, array &$sum): void
+function sumup_sync_one(PDO $pdo, callable $get, string $base, array $tx, array $index, array $map, array &$sum): void
 {
     $id     = (string) ($tx['id'] ?? $tx['transaction_id'] ?? '');
     $status = (string) ($tx['status'] ?? '');
@@ -323,7 +324,6 @@ function sumup_sync_one(PDO $pdo, callable $get, string $base, array $tx, int $s
         }
         return;
     }
-    if ($time['ts'] < $start) return; // before SumUp was connected: already reflected in the stock
 
     $detail = $get($base . '?id=' . rawurlencode($id));
     $lines  = [];

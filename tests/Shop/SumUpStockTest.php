@@ -16,7 +16,7 @@ final class SumUpStockTest extends TestCase
     private static array $tx_ids      = [];
     private array $saved_settings     = [];
 
-    private const SETTINGS = ['sumup_api_key', 'sumup_merchant_code', 'sumup_merchant_name', 'sumup_connected_at', 'sumup_synced_until', 'sumup_last_sync'];
+    private const SETTINGS = ['sumup_api_key', 'sumup_merchant_code', 'sumup_merchant_name', 'sumup_history_until', 'sumup_last_sync'];
 
     public static function setUpBeforeClass(): void
     {
@@ -50,8 +50,7 @@ final class SumUpStockTest extends TestCase
         if (!self::$pdo) return;
         foreach (self::SETTINGS as $k) $this->saved_settings[$k] = setting_get($k);
         setting_set('sumup_merchant_code', 'MTEST');
-        setting_set('sumup_connected_at', (string) strtotime('2026-10-01 00:00:00 UTC'));
-        setting_delete('sumup_synced_until');
+        setting_delete('sumup_history_until');
     }
 
     protected function tearDown(): void
@@ -185,23 +184,47 @@ final class SumUpStockTest extends TestCase
         $this->assertSame(5, $this->stock($mug['id']), 'a refund puts items back only once');
     }
 
-    public function testSalesBeforeConnectingAndAlreadyRefundedSalesLeaveStockAlone(): void
+    public function testOldSalesCountButAnAlreadyRefundedSaleLeavesStockAlone(): void
     {
         $this->requireDb();
         $mug  = $this->product('PHPUnit Чаша ' . uniqid(), 5);
         $name = self::$pdo->query('SELECT name_bg FROM products WHERE id = ' . $mug['id'])->fetchColumn();
 
         sumup_sync(self::$pdo, $this->fake([
-            $this->tx('SUCCESSFUL', [['name' => $name, 'quantity' => 1]], '2026-09-30T23:00:00.000+00:00'),
+            $this->tx('SUCCESSFUL', [['name' => $name, 'quantity' => 1]], '2019-03-30T23:00:00.000+00:00'),
             $this->tx('REFUNDED', [['name' => $name, 'quantity' => 1]]),
         ]));
-        $this->assertSame(5, $this->stock($mug['id']));
+        $this->assertSame(4, $this->stock($mug['id']), 'a sale from years ago takes stock too; a refunded one does not');
+    }
+
+    public function testTheFirstCheckAsksForTheWholeHistory(): void
+    {
+        $this->requireDb();
+        setting_set('sumup_synced_until', (string) strtotime('2026-10-26 02:30:00 UTC')); // left by the version that skipped older sales
+        $asked = [];
+        sumup_sync(self::$pdo, $this->fake([], $asked), strtotime('2026-10-28 20:00:00 UTC'));
+        $this->assertStringContainsString('changes_since=2012-01-01T00%3A00%3A00Z', $asked[0]);
+        $this->assertSame((string) strtotime('2026-10-28 20:00:00 UTC'), setting_get('sumup_history_until'));
+        setting_delete('sumup_synced_until');
+    }
+
+    public function testAHistoryLongerThanOneCheckCarriesOnNextTime(): void
+    {
+        $this->requireDb();
+        $txs = [];
+        for ($i = 0; $i < 2 * SUMUP_MAX_PAGES + 1; $i++) {
+            $txs[] = $this->tx('SUCCESSFUL', [], gmdate('Y-m-d\TH:i:s.000+00:00', strtotime('2025-01-01 UTC') + $i * 60));
+        }
+        $sum = sumup_sync(self::$pdo, $this->fake($txs), strtotime('2026-10-28 20:00:00 UTC'));
+        $this->assertSame(2 * SUMUP_MAX_PAGES, $sum['new_sales']);
+        $this->assertSame((string) (strtotime('2025-01-01 UTC') + (2 * SUMUP_MAX_PAGES - 1) * 60), setting_get('sumup_history_until'),
+            'the next check starts where this one stopped, not at "now"');
     }
 
     public function testOnlyCardReaderPaymentsChangedSinceTheLastCheckAreAskedFor(): void
     {
         $this->requireDb();
-        setting_set('sumup_synced_until', (string) strtotime('2026-10-26 02:30:00 UTC'));
+        setting_set('sumup_history_until', (string) strtotime('2026-10-26 02:30:00 UTC'));
         $asked = [];
         sumup_sync(self::$pdo, $this->fake([], $asked));
         $this->assertStringContainsString('/v2.1/merchants/MTEST/transactions/history?', $asked[0]);
@@ -332,15 +355,13 @@ final class SumUpStockTest extends TestCase
         sumup_sync(self::$pdo, $this->fake([]));
     }
 
-    public function testConnectFindsTheMerchantAndKeepsTheFirstStartTime(): void
+    public function testConnectFindsTheMerchant(): void
     {
         $this->requireDb();
-        $first = setting_get('sumup_connected_at');
         $get = fn (string $path) => ['items' => [['resource_id' => 'MXYZ', 'resource' => ['id' => 'MXYZ', 'name' => 'Сдружение']]], 'total_count' => 1];
-        $m = sumup_connect(' sup_sk_test ', $get, time());
+        $m = sumup_connect(' sup_sk_test ', $get);
         $this->assertSame(['code' => 'MXYZ', 'name' => 'Сдружение'], $m);
         $this->assertSame('sup_sk_test', setting_get('sumup_api_key'));
-        $this->assertSame($first, setting_get('sumup_connected_at'), 'reconnecting never restarts the clock');
 
         $this->expectException(SumUpError::class);
         sumup_connect('sup_sk_x', fn () => ['items' => [], 'total_count' => 0]);

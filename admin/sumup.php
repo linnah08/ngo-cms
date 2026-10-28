@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'connect':
                 $m = sumup_connect(is_string($_POST['api_key'] ?? null) ? $_POST['api_key'] : '');
                 setting_delete('sumup_last_error');
-                flash_set('success', 'SumUp е свързан с профила „' . $m['name'] . '“. От днес продажбите с терминала ще намаляват наличността в магазина.');
+                flash_set('success', 'SumUp е свързан с профила „' . $m['name'] . '“. Натиснете „Провери сега“ — сайтът ще вземе всички продажби от SumUp, също и по-старите, и ще намали наличността на продадените продукти.');
                 break;
 
             case 'disconnect':
@@ -89,7 +89,6 @@ $waiting    = $pdo->query('SELECT * FROM sumup_sales WHERE needs_attention = 1 A
 $recent     = $pdo->query('SELECT * FROM sumup_sales ORDER BY sold_at DESC LIMIT 30')->fetchAll(PDO::FETCH_ASSOC);
 $last       = json_decode(setting_get('sumup_last_sync'), true) ?: null;
 $last_error = json_decode(setting_get('sumup_last_error'), true) ?: null;
-$started    = setting_get('sumup_connected_at');
 $flashes    = flash_get();
 
 $fmt_time = static fn (string $dt): string => date('d.m.Y H:i', strtotime($dt));
@@ -137,7 +136,6 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <?php if ($connected): ?>
     <p style="margin:0 0 .5rem;"><span style="color:#2e7d32;font-weight:600;">✓ Свързан</span> с профила „<?= h(setting_get('sumup_merchant_name')) ?>“.</p>
     <p class="admin-meta" style="margin:0 0 1rem;">
-      Отчитат се продажбите от <?= ctype_digit($started) ? h(date('d.m.Y H:i', (int) $started)) : '—' ?> нататък.
       <?php if ($last): ?>
         Последна проверка: <?= h(date('d.m.Y H:i', (int) $last['at'])) ?>.
       <?php else: ?>
@@ -178,7 +176,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
                style="flex:1 1 280px;min-width:0;min-height:44px;box-sizing:border-box;">
         <button type="submit" class="btn btn--primary" style="<?= $btn ?>">Свържи със SumUp</button>
       </div>
-      <p class="admin-meta" style="margin:.5rem 0 0;">Отчитат се само продажбите след свързването — по-старите не променят наличността.</p>
+      <p class="admin-meta" style="margin:.5rem 0 0;">Първата проверка взима всички продажби в SumUp, също и отпреди свързването, и намалява наличността и за тях. Ако вече сте намалили бройките на ръка за тези продажби, проверете наличността след това.</p>
     </form>
   <?php endif; ?>
 </section>
