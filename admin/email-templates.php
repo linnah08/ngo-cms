@@ -32,7 +32,7 @@ $templates = [
         'vars'  => ['{{customer_name}}', '{{order_number}}', '{{courier}}'],
     ],
     'donation-confirmation-customer' => [
-        'label' => 'Потвърждение на дарение (банков превод)',
+        'label' => 'Потвърждение на дарение',
         'vars'  => ['{{donor_name}}', '{{amount_eur}}'],
     ],
     'order-cancelled-customer' => [
