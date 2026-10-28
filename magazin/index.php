@@ -614,9 +614,9 @@ renderGallery(<?= (int)($default_pv ?? $prod_variants[0])['id'] ?>);
 // ── LISTING ───────────────────────────────────────────────────────────────────
 $page_title      = $lang === 'bg' ? 'Магазин' : 'Shop';
 $page_head_extra = '<style>@media(max-width:640px){.product-detail-grid{grid-template-columns:1fr!important;gap:1.5rem!important;}}</style>';
-$page_description = $lang === 'bg'
-    ? 'Подкрепете ' . SITE_NAME_BG . ' с покупка от нашия магазин.'
-    : 'Support ' . SITE_NAME_EN . ' with a purchase from our shop.';
+// Search-engine description; a site can reword it in strings.site.json ({name} = the organisation).
+$page_description = t_or('shop.page_description', 'Подкрепете {name} с покупка от нашия магазин.', 'Support {name} with a purchase from our shop.',
+    $lang, ['name' => $lang === 'bg' ? SITE_NAME_BG : SITE_NAME_EN]);
 
 $pages = load_json(CONTENT_PATH . '/pages.json');
 

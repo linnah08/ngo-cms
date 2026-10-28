@@ -415,6 +415,9 @@
   "shop.hero.text": "Всяка покупка подкрепя каузата ни.",
   "shop.hero.donate_button": "Дари сега",
   "help.page_description": "Научете как можете да подкрепите {name}.",
+  "about.page_description": "Научете повече за {name} и нашата история.",
+  "about.page_description_team": "Научете повече за {name}, нашия екип и нашата история.",
+  "shop.page_description": "Подкрепете {name} с покупка от нашия магазин.",
   "email.donation.message": "Вашето послание",
   "email.campaign.reward_to": "Твоята награда ще бъде изпратена на:",
   "contact.page_description": "Свържете се с {name}.",
@@ -448,6 +451,11 @@
   "reviews.err.product": "Невалиден продукт.",
   "reviews.err.wait": "Изчакайте малко, преди да публикувате нов отзив.",
   "newsletter.unsub.page_title": "Отписани сте",
+  "newsletter.email.unsubscribe": "Отпишете се от бюлетина",
   "distribution.protocol.price_label": "Цена за брой",
-  "distribution.protocol.item_name": "{product}"
+  "distribution.protocol.item_name": "{product}",
+  "email.cert_sign.greeting": "Здравейте,",
+  "email.cert_sign.intro": "Генериран е нов сертификат за дарение и очаква вашия подпис.",
+  "email.cert_sign.button": "Подпишете сертификата",
+  "email.cert_sign.hint": "Намерете бутона „Подпиши“ до сертификата в страницата на поръчката."
 }

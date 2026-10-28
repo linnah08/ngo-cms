@@ -636,9 +636,8 @@ function render_newsletter_email(
         require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
     }
 
-    $unsub_text = $lang === 'bg'
-        ? 'Отпишете се от бюлетина'
-        : 'Unsubscribe from this newsletter';
+    // A site can reword it (e.g. informal „Отпиши се“) in strings.site.json.
+    $unsub_text = t_or('newsletter.email.unsubscribe', 'Отпишете се от бюлетина', 'Unsubscribe from this newsletter', $lang === 'en' ? 'en' : 'bg');
 
     $unsub_block = $unsub_url
         ? '<p style="margin-top:32px;font-size:12px;color:#9b9590;text-align:center;">'

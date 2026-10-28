@@ -37,12 +37,19 @@ final class VoiceOverridableTextTest extends TestCase
             'templates/product-reviews.php' => ['Твоето име', 'Твоята оценка', 'Отзивът ти е получен', 'Бъди първият!'],
             'api/comment-submit.php' => ['Въведете валиден имейл.', 'Изчакайте малко, преди да публикувате нов коментар.'],
             'api/review-submit.php' => ['Въведи валиден имейл.', 'Изберете оценка от 1 до 5.', 'Изчакайте малко, преди да публикувате нов отзив.'],
-            'magazin/index.php' => ['Изберете размер, за да продължите.', 'Качи твоя дизайн', 'Всяка покупка подкрепя каузата ни.'],
+            'magazin/index.php' => ['Изберете размер, за да продължите.', 'Качи твоя дизайн', 'Всяка покупка подкрепя каузата ни.',
+                'с покупка от нашия магазин.', 'with a purchase from our shop.'],
             'kak-da-pomogna/index.php' => ['Свържете се с нас', 'Свържи се с нас', 'Научете как можете да подкрепите'],
             'en/how-to-help/index.php' => ['Get in touch', 'Find out how you can support'],
             'newsletter/unsubscribe.php' => ['Отписани сте', 'Няма да получавате повече имейли от нас.'],
             'includes/emails/campaign-confirmation.php' => ['Твоята награда ще бъде изпратена на:'],
             'includes/emails/donation-confirmation-customer.php' => ['Вашето послание'],
+            'includes/emails/cert-needs-signature.php' => ['Здравейте,', 'Генериран е нов сертификат за дарение и очаква вашия подпис.',
+                'Подпишете сертификата', 'до сертификата в страницата на поръчката.'],
+            'includes/newsletter.php' => ['Отпишете се от бюлетина', 'Unsubscribe from this newsletter'],
+            'za-nas/index.php' => ['Научете повече за {name}, нашия екип и нашата история.', 'Научете повече за {name} и нашата история.'],
+            'en/about/index.php' => ['Learn more about {name}, our team and our story.', 'Learn more about {name} and our story.'],
+            'includes/documents/DistributionProtocolGenerator.php' => ['Цена за брой'],
         ];
     }
 

@@ -415,6 +415,9 @@
   "shop.hero.text": "Every purchase supports our cause.",
   "shop.hero.donate_button": "Donate now",
   "help.page_description": "Find out how you can support {name}.",
+  "about.page_description": "Learn more about {name} and our story.",
+  "about.page_description_team": "Learn more about {name}, our team and our story.",
+  "shop.page_description": "Support {name} with a purchase from our shop.",
   "email.donation.message": "Your message",
   "email.campaign.reward_to": "Your reward will be shipped to:",
   "contact.page_description": "Get in touch with {name}.",
@@ -448,6 +451,11 @@
   "reviews.err.product": "Invalid product.",
   "reviews.err.wait": "Please wait before posting another review.",
   "newsletter.unsub.page_title": "Unsubscribed",
+  "newsletter.email.unsubscribe": "Unsubscribe from this newsletter",
   "distribution.protocol.price_label": "Price per item",
-  "distribution.protocol.item_name": "{product}"
+  "distribution.protocol.item_name": "{product}",
+  "email.cert_sign.greeting": "Hello,",
+  "email.cert_sign.intro": "A new donation certificate has been created and is waiting for your signature.",
+  "email.cert_sign.button": "Sign the certificate",
+  "email.cert_sign.hint": "Find the \"Sign\" button next to the certificate on the order page."
 }
