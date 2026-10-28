@@ -226,4 +226,80 @@ final class WebrootGuardsTest extends TestCase
             );
         }
     }
+
+    // ── .htaccess: internal files are never served ───────────────────────────
+
+    /**
+     * The blocking rules of the root .htaccess (a "-" target that answers 403 or
+     * 404), as [PCRE pattern, case-insensitive], in the order Apache runs them.
+     * @return list<array{0:string,1:bool}>
+     */
+    private static function htaccessBlocks(): array
+    {
+        $ht   = self::source(self::root() . '/.htaccess');
+        $head = substr($ht, 0, (int) strpos($ht, '# Force HTTPS'));
+        preg_match_all('/^\s*RewriteRule\s+(\S+)\s+-\s+\[([^\]]*)\]/m', $head, $m, PREG_SET_ORDER);
+        $out = [];
+        foreach ($m as [, $pattern, $flags]) {
+            if (!preg_match('/(^|,)(F|R=40[34])(,|$)/', $flags)) continue;
+            $out[] = [$pattern, (bool) preg_match('/(^|,)NC(,|$)/', $flags)];
+        }
+        return $out;
+    }
+
+    /** Does a request for $path (as .htaccess sees it: no leading slash) hit a blocking rule? */
+    private static function blocked(string $path): bool
+    {
+        foreach (self::htaccessBlocks() as [$pattern, $nc]) {
+            if (preg_match('~' . str_replace('~', '\~', $pattern) . '~' . ($nc ? 'i' : ''), $path)) return true;
+        }
+        return false;
+    }
+
+    /** Never for visitors: the repository, tooling, notes, exports, backups, settings. */
+    private const NEVER_SERVED = [
+        '.git/config', '.github/workflows/release.yml', '.githooks/pre-commit', '.gitignore', '.user.ini', 'admin/.user.ini',
+        '.htaccess', '.phpunit.result.cache', '.env',
+        'README.md', 'CLAUDE.md', 'docs/runbooks/x.md', 'docs/notes.html',
+        'tests/bootstrap.php', 'scripts/sync-from-prod.sh', 'migrations/001_init.sql', 'cron/unpaid-orders-cron.php',
+        'relay/README.md', 'relay/public/ticket.php', 'data/bg-cities.json', 'logs/php_errors.log',
+        'node_modules/x/package.json', 'vendor/autoload.php', 'vendor/composer/installed.json',
+        'composer.json', 'composer.lock', 'package.json', 'package-lock.json', 'phpunit.xml', 'playwright.config.js',
+        'VERSION', 'LICENSE', 'db.config.php', 'site.config.php', 'db.config.php.example',
+        'orders-export.csv', 'backup.sql', 'dump.SQL', 'pages.json.bak', 'content/pages.json.bak-20261027120000',
+        'content/home.json.corrupt-20261027181407', 'backups/site.tar', 'nginx.pid', 'settings.ini', 'config.yml',
+        'migrate.php', 'install.php',
+    ];
+
+    /** Must stay reachable: pages, assets, search-engine files and certificate checks. */
+    private const ALWAYS_SERVED = [
+        '', 'index.php', 'page.php', 'robots.txt', 'sitemap.xml', 'robots.php', 'sitemap.php', 'ads.txt',
+        '.well-known/acme-challenge/abc123', '.well-known/security.txt',
+        'assets/css/main.css', 'assets/js/main.js', 'assets/images/logo.png', 'assets/files/leaflet-3fa9c1.pdf',
+        'magazin/', 'en/shop/', 'novini/some-article/', 'install/', 'install/index.php', 'api/cities.php',
+        'newsletter/unsubscribe.php', 'donation/', 'cart/design-thumb.php', 'admin/login.php', 'errors/404.php',
+    ];
+
+    public function testInternalFilesAreNeverServed(): void
+    {
+        $this->assertNotEmpty(self::htaccessBlocks(), 'the blocking rules should be found before "# Force HTTPS"');
+        $served = array_values(array_filter(self::NEVER_SERVED, static fn(string $p) => !self::blocked($p)));
+        $this->assertSame([], $served, 'the web server would hand these out to anyone');
+    }
+
+    public function testPagesAssetsAndCertificateChecksStayReachable(): void
+    {
+        $blocked = array_values(array_filter(self::ALWAYS_SERVED, static fn(string $p) => self::blocked($p)));
+        $this->assertSame([], $blocked, 'these must stay reachable');
+    }
+
+    /** cron/ and relay/ are blocked from the web: nothing there may need a browser. */
+    public function testNothingInBlockedFoldersIsMeantForTheWeb(): void
+    {
+        foreach (glob(self::root() . '/cron/*.php') ?: [] as $path) {
+            $this->assertTrue(self::doesNotRunOverHttp(self::source($path)), basename($path) . ' must be run from the command line');
+        }
+        // The relay is its own service on its own (sub)domain, with relay/public/ as web root.
+        $this->assertStringContainsString('Only `public/` should be web-reachable', self::source(self::root() . '/relay/README.md'));
+    }
 }

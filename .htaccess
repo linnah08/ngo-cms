@@ -44,6 +44,19 @@ ErrorDocument 503 /errors/503.php
   # every library and version) are never for the web.
   RewriteRule ^vendor(/|$) - [F,L]
 
+  # Nothing else that is not for visitors is served either: it answers "not found".
+  # Dot files and folders (.git, .github, .user.ini, .phpunit.result.cache …) except
+  # .well-known, which certificate checks need.
+  RewriteRule (^|/)\.(?!well-known(/|$)) - [R=404,L]
+  # Internal folders. Nothing in them is meant to be opened in a browser: cron/ and
+  # relay/bin/ run from the command line, relay/ is a separate service with its own
+  # web root, data/ and logs/ are read by PHP only.
+  RewriteRule ^(docs|scripts|migrations|tests|node_modules|cron|relay|data|logs|backups?)(/|$) - [R=404,L]
+  # Notes, scripts, exports, dumps, backups and settings files, wherever they are.
+  RewriteRule \.(md|sh|sql|sqlite|db|lock|log|pid|csv|tsv|bak|old|orig|swp|tmp|dist|ini|yml|yaml|example|neon)$ - [R=404,NC,L]
+  RewriteRule \.(bak|corrupt)-[0-9]+$ - [R=404,NC,L]
+  RewriteRule (^|/)(composer\.json|package(-lock)?\.json|phpunit\.xml(\.dist)?|playwright\.config\.js|VERSION|LICENSE)$ - [R=404,NC,L]
+
   # Force HTTPS
   RewriteCond %{HTTPS} off
   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
