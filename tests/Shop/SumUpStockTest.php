@@ -165,6 +165,45 @@ final class SumUpStockTest extends TestCase
         $this->assertSame(2, $this->stock($mug['id']), 'a second check never takes the same sale again');
     }
 
+    public function testAVariantMatchesByItsOwnLabelUnlessAnotherProductHasIt(): void
+    {
+        $this->requireDb();
+        $label = 'PHPUnit Ледоразбивачи ' . uniqid();
+        $cards = $this->product('PHPUnit Лафетки ' . uniqid(), 0, [$label => 4, 'PHPUnit Очи ' . uniqid() => 2]);
+        $sum = sumup_sync(self::$pdo, $this->fake([$this->tx('SUCCESSFUL', [['name' => $label, 'quantity' => 1]])]));
+        $this->assertSame(0, $sum['attention']);
+        $this->assertSame(3, $this->stock($cards['id'], $cards['variants'][$label]));
+
+        $this->product($label, 9); // now a product of its own has that name too: ask rather than guess
+        $sum = sumup_sync(self::$pdo, $this->fake([$this->tx('SUCCESSFUL', [['name' => $label, 'quantity' => 1]])]));
+        $this->assertSame(1, $sum['attention']);
+        $this->assertSame(3, $this->stock($cards['id'], $cards['variants'][$label]));
+    }
+
+    public function testSumUpsCustomAmountLineIsATypedInAmountAndIsNeverRemembered(): void
+    {
+        $this->requireDb();
+        $mug  = $this->product('PHPUnit Чаша ' . uniqid(), 5);
+        $old  = self::$pdo->query("SELECT product_id, variant_id FROM sumup_name_map WHERE name_key = 'custom amount'")->fetch(PDO::FETCH_ASSOC);
+        // What the earlier version remembered after an admin answered a typed-in amount.
+        self::$pdo->prepare("REPLACE INTO sumup_name_map (name_key, product_id, variant_id) VALUES ('custom amount', ?, NULL)")->execute([$mug['id']]);
+        try {
+            $tx  = $this->tx('SUCCESSFUL', [['name' => 'Custom amount', 'quantity' => 1]]);
+            $sum = sumup_sync(self::$pdo, $this->fake([$tx]));
+            $this->assertSame(1, $sum['attention']);
+            $this->assertSame(5, $this->stock($mug['id']), 'a typed-in amount never takes stock by itself');
+
+            $id = (int) self::$pdo->query('SELECT id FROM sumup_sales WHERE transaction_id = ' . self::$pdo->quote($tx['id']))->fetchColumn();
+            $this->assertSame('[]', self::$pdo->query("SELECT `lines` FROM sumup_sales WHERE id = $id")->fetchColumn(),
+                'the admin picks the products as for any typed-in amount');
+            $this->assertSame('', sumup_resolve_sale_products(self::$pdo, $id, [[$mug['id'] . ':0', 1]]));
+            $this->assertSame(4, $this->stock($mug['id']));
+        } finally {
+            self::$pdo->exec("DELETE FROM sumup_name_map WHERE name_key = 'custom amount'");
+            if ($old) self::$pdo->prepare("INSERT INTO sumup_name_map (name_key, product_id, variant_id) VALUES ('custom amount', ?, ?)")->execute([$old['product_id'], $old['variant_id']]);
+        }
+    }
+
     public function testRefundPutsItemsBackOnce(): void
     {
         $this->requireDb();

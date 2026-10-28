@@ -10,7 +10,9 @@
  * SumUp names the products in a sale but gives no product code, so a line is
  * matched by name: the shop's own product name, plus the variant's label for a
  * product with variants ("Тениска - M", "Тениска (M)" and "тениска m" are all
- * the same). A line that doesn't match — or a sale typed in as an amount, which
+ * the same). A variant is also known by its own label alone ("Ледоразбивачи"
+ * for "Лафетки — Ледоразбивачи"), as long as no other product has that name.
+ * A line that doesn't match — or a sale typed in as an amount, which
  * has no products at all — waits on the admin page until the admin picks the
  * product; the choice is remembered for that name (sumup_name_map).
  *
@@ -26,6 +28,8 @@ const SUMUP_OVERLAP_SECONDS = 3600;
 const SUMUP_MAX_PAGES = 50;
 /** Where the first check starts: before any SumUp sale (SumUp opened in 2012). */
 const SUMUP_HISTORY_START = 1325376000; // 2012-01-01 UTC
+/** What SumUp calls the line of a sale typed in as an amount: not a product, so never matched or remembered. */
+const SUMUP_NO_PRODUCT_NAMES = ['custom amount'];
 
 /** A problem talking to SumUp, worded for the admin. */
 final class SumUpError extends RuntimeException {}
@@ -151,6 +155,8 @@ function sumup_catalog(PDO $pdo): array
             foreach ($names as $n) foreach ($labels as $l) $vnames[] = $n . ' ' . $l;
             // A product with a single variant is also known by its name alone.
             if (count($vs) === 1) $vnames = array_merge($vnames, $names);
+            // A SumUp item is often named after the variant only ("Ледоразбивачи").
+            $vnames = array_merge($vnames, $labels);
             $out[] = ['product_id' => $pid, 'variant_id' => (int) $v['id'], 'label' => $p['name_bg'] . ' — ' . $v['label_bg'],
                       'names' => $vnames, 'stock' => (int) $v['stock']];
         }
@@ -329,6 +335,8 @@ function sumup_sync_one(PDO $pdo, callable $get, string $base, array $tx, array 
     $lines  = [];
     foreach ((array) ($detail['products'] ?? []) as $p) {
         $name = trim((string) ($p['name'] ?? ''));
+        // A typed-in amount: the admin says what was sold, as for a sale with no products.
+        if (in_array(sumup_norm($name), SUMUP_NO_PRODUCT_NAMES, true)) continue;
         $qty  = max(1, (int) ($p['quantity'] ?? 1));
         $hit  = sumup_match($name, $index, $map);
         $lines[] = ['name' => $name, 'quantity' => $qty, 'product_id' => $hit[0] ?? null, 'variant_id' => $hit[1] ?? null,
@@ -471,7 +479,7 @@ function sumup_resolve_line(PDO $pdo, int $sale_id, int $line, string $target): 
         sumup_stock_move($pdo, $hit[0], $hit[1], -(int) $lines[$line]['quantity']);
         $lines[$line] = array_merge($lines[$line], ['product_id' => $hit[0], 'variant_id' => $hit[1], 'done' => true]);
         $key = sumup_norm((string) $lines[$line]['name']);
-        if ($key !== '' && !sumup_name_lacks_variant($pdo, $key)) {
+        if ($key !== '' && !in_array($key, SUMUP_NO_PRODUCT_NAMES, true) && !sumup_name_lacks_variant($pdo, $key)) {
             $pdo->prepare('REPLACE INTO sumup_name_map (name_key, product_id, variant_id) VALUES (?, ?, ?)')
                 ->execute([$key, $hit[0], $hit[1]]);
         }
