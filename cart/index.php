@@ -278,7 +278,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 <!-- Print preview modal -->
 <div id="previewOverlay" onclick="closePreview()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;align-items:center;justify-content:center;">
   <div onclick="event.stopPropagation()" style="background:#fff;border-radius:12px;padding:1.25rem;max-width:480px;width:calc(100vw - 2rem);position:relative;">
-    <button onclick="closePreview()" style="position:absolute;top:.75rem;right:.75rem;background:none;border:none;font-size:1.4rem;cursor:pointer;line-height:1;color:var(--text-muted);">✕</button>
+    <button type="button" onclick="closePreview()" aria-label="<?= h(t_or('common.close', 'Затвори', 'Close', $lang)) ?>" style="position:absolute;top:.75rem;right:.75rem;background:none;border:none;font-size:1.4rem;cursor:pointer;line-height:1;color:var(--text-muted);min-width:44px;min-height:44px;"><span aria-hidden="true">✕</span></button>
     <h3 style="margin:0 0 1rem;font-size:1rem;"><?= $lang === 'bg' ? 'Преглед на продукта' : 'Product preview' ?></h3>
     <canvas id="previewCanvas" style="width:100%;border-radius:8px;background:var(--off-white);display:block;"></canvas>
     <p id="previewHint" style="margin:.75rem 0 0;font-size:.78rem;color:var(--text-muted);text-align:center;display:none;"><?= $lang === 'bg' ? 'Наслагването показва позицията на печата — точните цветове може да варират.' : 'Overlay shows print position — exact colours may vary.' ?></p>

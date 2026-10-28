@@ -457,5 +457,6 @@
   "email.cert_sign.greeting": "Hello,",
   "email.cert_sign.intro": "A new donation certificate has been created and is waiting for your signature.",
   "email.cert_sign.button": "Sign the certificate",
-  "email.cert_sign.hint": "Find the \"Sign\" button next to the certificate on the order page."
+  "email.cert_sign.hint": "Find the \"Sign\" button next to the certificate on the order page.",
+  "common.close": "Close"
 }

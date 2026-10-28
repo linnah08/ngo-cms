@@ -500,7 +500,7 @@ if ($slug) {
 <!-- Size guide modal -->
 <div id="sizeGuideOverlay" onclick="closeSizeGuide()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;align-items:center;justify-content:center;">
   <div onclick="event.stopPropagation()" style="background:#fff;border-radius:12px;padding:1.25rem;max-width:720px;width:calc(100vw - 2rem);max-height:90vh;overflow-y:auto;position:relative;">
-    <button onclick="closeSizeGuide()" style="position:absolute;top:.75rem;right:.75rem;background:none;border:none;font-size:1.4rem;cursor:pointer;line-height:1;color:var(--text-muted);">✕</button>
+    <button type="button" onclick="closeSizeGuide()" aria-label="<?= h(t_or('common.close', 'Затвори', 'Close', $lang)) ?>" style="position:absolute;top:.75rem;right:.75rem;background:none;border:none;font-size:1.4rem;cursor:pointer;line-height:1;color:var(--text-muted);min-width:44px;min-height:44px;"><span aria-hidden="true">✕</span></button>
     <h3 style="margin:0 0 1rem;font-size:1rem;"><?= te('shop.product.size_guide', 'Таблица с размери', 'Size guide', $lang) ?></h3>
     <img src="/assets/images/products/<?= h($size_guide) ?>" alt="Size guide" style="width:100%;height:auto;border-radius:6px;display:block;">
   </div>
