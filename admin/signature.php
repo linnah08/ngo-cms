@@ -6,8 +6,15 @@ admin_require_admin();
 module_admin_guard(MODULES_ISSUING_CERTIFICATES);   // the signature only signs donation certificates
 
 if (!admin_can_sign()) {
-    http_response_code(403);
-    exit('Нямате достъп до тази страница.');
+    // Only the chosen signer draws a signature here; say who that is and where to change it.
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/signer.php';
+    $signer = signing_admin();
+    flash_set('error', $signer === null
+        ? 'Никой не е избран да подписва сертификатите за дарение. Изберете човека тук, в „Подписва сертификатите за дарение“.'
+        : 'Сертификатите за дарение подписва ' . (trim($signer['name']) !== '' ? $signer['name'] : $signer['email'])
+          . '. Само той или тя рисува подпис в „Подпис“. Ако трябва да подписвате вие, изберете себе си тук.');
+    header('Location: ' . SIGNER_SETTING_URL);
+    exit;
 }
 
 $pdo        = get_pdo();

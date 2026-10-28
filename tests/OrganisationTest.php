@@ -181,7 +181,8 @@ final class OrganisationTest extends TestCase
     public function test_save_then_load_round_trip_keeps_empty_values(): void
     {
         $file = $this->tmp . '/organisation.json';
-        $vals = org_validate($this->validInput(['site_phone' => '']), array_keys(brand_themes()))['values'];
+        // [] = the list of admins who may sign (admin/organisation.php passes theirs).
+        $vals = org_validate($this->validInput(['site_phone' => '']), array_keys(brand_themes()), [])['values'];
         $this->assertTrue(org_save_overrides($vals + ['evil' => 'x'], $file));
 
         $loaded = org_load_overrides($file);

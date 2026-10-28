@@ -5,10 +5,14 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/auth.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/signer.php';   // who signs certificates (also for a site that kept an older config.php)
 admin_require_admin();
 
 $themes    = brand_themes();
 $theme_bg  = ['classic' => 'Класически', 'friendly' => 'Приветлив', 'modern' => 'Модерен', 'editorial' => 'Списание'];
+// Who may sign donation certificates: the admins (only where certificates are issued).
+$certs_on  = module_certificates_enabled();
+$signer_candidates = $certs_on ? signing_admin_candidates(get_pdo()) : [];
 $errors    = [];   // field => message (plus '_form' for errors not tied to a field)
 $form      = null; // re-filled values after a failed save
 
@@ -19,7 +23,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (!csrf_verify()) {
         $errors['_form'] = 'Страницата беше отворена твърде дълго и сесията изтече. Презаредете страницата и опитайте отново.';
     } else {
-        $result = org_validate($_POST, array_keys($themes));
+        $result = org_validate($_POST, array_keys($themes),
+            $certs_on ? array_column($signer_candidates, 'id') : null);
         $form   = $result['values'];
         $errors = $result['errors'];
 
@@ -67,6 +72,9 @@ $const = static fn(string $c): string => defined($c) ? (string) constant($c) : '
 $current = [];
 foreach (org_fields() as $field => $c) $current[$field] = $const($c);
 if (!isset($themes[$current['brand_theme']])) $current['brand_theme'] = 'classic';
+// The signer as it works now — also when it still comes from site.config.php.
+$signer_now = $certs_on ? signing_admin() : null;
+$current['signing_admin_id'] = $signer_now ? (string) $signer_now['id'] : '';
 $active_theme = $themes[$current['brand_theme']];
 if (!org_color_valid($current['brand_primary'])) $current['brand_primary'] = $active_theme['primary'];
 if (!org_color_valid($current['brand_accent']))  $current['brand_accent']  = $active_theme['accent'];
@@ -259,6 +267,37 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       Бутонът води към страницата за дарения. Изключен е, докато не го включите.
       Надписът му се променя на самата страница на магазина, в режим „Редактирай“.
     </p>
+  </section>
+  <?php endif; ?>
+
+  <?php if ($certs_on): ?>
+  <!-- ── Donation certificate signer ───────────────────────────────────────── -->
+  <section class="admin-card" style="<?= $card ?>" aria-labelledby="signer-title">
+    <h2 class="admin-card__title" id="signer-title">Подпис на сертификатите за дарение</h2>
+    <div id="f-signing_admin_id">
+      <label for="signing_admin_id" style="display:block;font-weight:600;">Подписва сертификатите за дарение</label>
+      <select id="signing_admin_id" name="signing_admin_id"
+              aria-describedby="hint-signing_admin_id<?= isset($errors['signing_admin_id']) ? ' err-signing_admin_id' : '' ?>"
+              style="margin-top:.35rem;max-width:32rem;width:100%;<?= isset($errors['signing_admin_id']) ? $bad_css : '' ?>"<?= isset($errors['signing_admin_id']) ? ' aria-invalid="true"' : '' ?>>
+        <?php if ($val('signing_admin_id') === '' || !in_array($val('signing_admin_id'), array_map('strval', array_column($signer_candidates, 'id')), true)): ?>
+          <option value="">— Изберете човек —</option>
+        <?php endif; ?>
+        <?php foreach ($signer_candidates as $sc): ?>
+          <option value="<?= (int) $sc['id'] ?>" <?= $val('signing_admin_id') === (string) $sc['id'] ? 'selected' : '' ?>>
+            <?= h(trim((string) $sc['name']) !== '' ? $sc['name'] . ' — ' . $sc['email'] : $sc['email']) ?>
+          </option>
+        <?php endforeach; ?>
+      </select>
+      <span id="hint-signing_admin_id" style="<?= $hint ?>max-width:60rem;">
+        Този човек рисува подписа си в „Подпис“, подписва сертификатите и получава имейл, когато сертификат чака подпис.
+        В списъка са само хората с роля „Администратор“ (от „Потребители“).
+        Ако изберете друг човек, той трябва да нарисува свой подпис — запазеният подпис е на предишния и не се прехвърля.
+      </span>
+      <?= $ferr('signing_admin_id') ?>
+      <?php if (!$signer_candidates): ?>
+        <span style="<?= $hint ?>color:#c0392b;">Няма потребители с роля „Администратор“. Добавете такъв в „Потребители“.</span>
+      <?php endif; ?>
+    </div>
   </section>
   <?php endif; ?>
 

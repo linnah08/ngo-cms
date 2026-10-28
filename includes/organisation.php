@@ -67,6 +67,7 @@ function org_fields(): array
         'shop_donate_button' => 'SHOP_DONATE_BUTTON', // '1': a „Дари сега“ button in the shop page's top banner
         'admin_logo_white' => 'ADMIN_LOGO_WHITE',   // '1': the logo is shown white in the admin's dark side menu
         'site_launched'    => 'SITE_LAUNCHED',     // set by „Пусни сайта“ (admin/launch.php), not by the form
+        'signing_admin_id' => 'SIGNING_ADMIN_ID',  // user id of who signs donation certificates; see includes/signer.php
     ] + org_module_fields();
 }
 
@@ -132,6 +133,7 @@ function org_hidden_fields(): array
     $newsletter = module_enabled_with_needs('newsletter');
     if (!$newsletter) array_push($hidden, 'newsletter_band', 'newsletter_band_color');
     if (!module_enabled_with_needs('shop') && !module_enabled_with_needs('donations')) $hidden[] = 'order_prefix';
+    if (!module_certificates_enabled()) $hidden[] = 'signing_admin_id';
     if (!$newsletter || !module_enabled_with_needs('donations')) {
         array_push($hidden, 'newsletter_donate_cta', 'newsletter_donate_heading_bg', 'newsletter_donate_heading_en',
             'newsletter_donate_text_bg', 'newsletter_donate_text_en');
@@ -314,7 +316,7 @@ function org_url_valid(string $url): bool
  * 'errors' => [field => plain-Bulgarian message]]. Values are returned even on
  * error so the form can be re-filled.
  */
-function org_validate(array $in, array $themeKeys): array
+function org_validate(array $in, array $themeKeys, ?array $signerIds = null): array
 {
     $v = [];
     // Module switches are not part of this form (Admin → Модули saves them).
@@ -466,6 +468,17 @@ function org_validate(array $in, array $themeKeys): array
 
     foreach (org_google_validate($v) as $k => $msg) $e[$k] = $msg;
     $v['site_noindex'] = ($in['site_noindex'] ?? '') === '1' ? '1' : '0';
+
+    // Who signs donation certificates: an id from $signerIds (the admins). The
+    // caller looks those up in the database; without them the saved choice is kept.
+    if ($signerIds === null) {
+        unset($v['signing_admin_id']);
+    } else {
+        require_once __DIR__ . '/signer.php';
+        $signer = signing_admin_validate($v['signing_admin_id'], $signerIds);
+        $v['signing_admin_id'] = $signer['value'];
+        if ($signer['error'] !== null) $e['signing_admin_id'] = $signer['error'];
+    }
 
     // Sections the page hides because their module is off are not posted:
     // leave them out, so org_save_overrides() keeps what is saved for them.

@@ -8,6 +8,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/signer.php';   // who signs certificates (also for a site that kept an older config.php)
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DocumentGenerator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DonationCertGenerator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/site_extensions.php';   // donation recipients
@@ -160,16 +161,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 VALUES (?, ?, ?, ?, ?)
             ')->execute([$order_id, 'donation_cert', $doc_number, $doc_formatted, $rel_path]);
 
-            // Notify signing admin
-            send_mail(
-                SIGNING_ADMIN_EMAIL,
-                admin_mail_subject('Сертификат за дарение #' . $doc_formatted . ' — нужен подпис'),
-                render_email('cert-needs-signature', [
-                    'order'    => $order_row,
-                    'document' => ['formatted_number' => $doc_formatted],
-                    'order_id' => $order_id,
-                ])
-            );
+            // Notify the signer (nobody chosen: the dashboard asks the admins to choose)
+            if (($signer_email = signing_admin_email()) !== null) {
+                send_mail(
+                    $signer_email,
+                    admin_mail_subject('Сертификат за дарение #' . $doc_formatted . ' — нужен подпис'),
+                    render_email('cert-needs-signature', [
+                        'order'    => $order_row,
+                        'document' => ['formatted_number' => $doc_formatted],
+                        'order_id' => $order_id,
+                    ])
+                );
+            }
 
             header('Location: /admin/order-view.php?id=' . $order_id . '&doc_success=' . urlencode('Сертификатът е генериран успешно.'));
             exit;

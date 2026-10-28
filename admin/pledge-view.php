@@ -10,6 +10,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/email-templates.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_documents.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_shipping.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_email_composer.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/signer.php';   // who signs certificates (also for a site that kept an older config.php)
 admin_require_shop();
 
 // Campaign module switched off in Admin → Модули — says so, with a way back.
@@ -342,8 +343,15 @@ $pledge_phone = $pledge['phone'] ?? null;
       <?php if (empty($cert_doc['signed_at']) && function_exists('admin_can_sign') && admin_can_sign()): ?>
       <button type="button" class="btn btn--primary" style="font-size:.85rem;"
               onclick="openPledgeSignModal(<?= (int)$cert_doc['id'] ?>)">Подпиши</button>
+      <?php elseif (empty($cert_doc['signed_at']) && ($cert_signer = signing_admin()) !== null): ?>
+      <span style="font-size:.85rem;color:var(--text-muted);">
+        Чака подпис от <?= h(trim($cert_signer['name']) !== '' ? $cert_signer['name'] : $cert_signer['email']) ?>
+      </span>
       <?php endif; ?>
     </div>
+    <?php if (empty($cert_doc['signed_at'])): ?>
+      <?= signer_missing_notice_html(signing_admin(), module_certificates_enabled(), admin_is_admin()) /* fixed text */ ?>
+    <?php endif; ?>
 
   <?php elseif (!empty($pledge['cert_path'])): ?>
     <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">

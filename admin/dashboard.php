@@ -5,6 +5,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/articles.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_view.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/signer.php';   // also for a site that kept an older config.php
 admin_require_login();
 
 $page_title_admin = 'Начало';
@@ -14,6 +15,10 @@ $can_sign      = admin_can_sign() && module_certificates_enabled();
 $can_shop      = admin_can_manage_shop();
 $can_editorial = admin_can_editorial();
 $pdo           = get_pdo();
+// Certificates are issued but nobody can sign them: tell admins and shop staff.
+$signer_notice = (admin_is_admin() || $can_shop)
+    ? signer_missing_notice_html(signing_admin(), module_certificates_enabled(), admin_is_admin())
+    : '';
 
 // ── Mail transport check: warn admins when no way to send email is configured ──
 $mail_not_configured = false;
@@ -317,6 +322,8 @@ if (admin_is_admin()):
   <a href="/admin/scheduled-jobs.php" style="flex:0 0 auto;display:inline-block;background:#c0392b;color:#fff;text-decoration:none;font-weight:600;font-size:.85rem;padding:.55rem 1rem;border-radius:6px;">Как да <?= count($job_problems) === 1 ? 'я' : 'ги' ?> настроя</a>
 </div>
 <?php endif; ?>
+
+<?= $signer_notice /* built from fixed text, see signer_missing_notice_html() */ ?>
 
 <?php if ($can_editorial || $can_shop): ?>
 <?php

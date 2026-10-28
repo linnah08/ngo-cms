@@ -2,6 +2,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/signer.php';   // who signs certificates (also for a site that kept an older config.php)
 
 admin_require_shop();
 
@@ -212,10 +213,11 @@ if ($doc_type === 'credit_note') {
     );
 }
 
-// Notify the signing admin when a donation cert is ready
-if ($doc_type === 'donation_cert') {
+// Notify the signer when a donation cert is ready. Nobody chosen: the dashboard
+// tells the admins to choose someone (signer_missing_notice_html()).
+if ($doc_type === 'donation_cert' && ($signer_email = signing_admin_email()) !== null) {
     send_mail(
-        SIGNING_ADMIN_EMAIL,
+        $signer_email,
         admin_mail_subject('Сертификат за дарение #' . $doc_formatted . ' — нужен подпис'),
         render_email('cert-needs-signature', [
             'order'    => $order,

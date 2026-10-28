@@ -40,7 +40,8 @@ define('SITE_BANK_NAME', '');
 // Admin → Организация. Left out, orders start with OM-.
 // define('ORDER_PREFIX', 'OM');
 
-// Email of the single admin account authorised to sign donation certificates.
+// Who signs donation certificates is chosen in Admin → Организация. This email is
+// only the fallback until someone is chosen there: the admin who logs in with it.
 define('SIGNING_ADMIN_EMAIL', 'info@example.org');
 
 // Purpose line printed on donation certificates (all donations go to your org).

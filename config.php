@@ -866,10 +866,14 @@ function variant_gallery(array $pv): array {
     return array_values(array_unique($imgs));
 }
 
-// SITE_BIC, SITE_BANK_NAME and SIGNING_ADMIN_EMAIL are defined in site.config.php.
+// SITE_BIC and SITE_BANK_NAME are defined in site.config.php. Who signs donation
+// certificates is chosen in Admin → Организация (includes/signer.php); the old
+// SIGNING_ADMIN_EMAIL in site.config.php is only its fallback.
+require_once __DIR__ . '/includes/signer.php';
 
+/** May the logged-in user sign donation certificates? Only the one chosen signer. */
 function admin_can_sign(): bool {
-    return admin_logged_in() && (admin_user()['email'] ?? '') === SIGNING_ADMIN_EMAIL;
+    return admin_logged_in() && admin_is_signer(admin_user(), signing_admin());
 }
 
 // The site's own redirects (includes/site-extensions.php 'redirects'), which

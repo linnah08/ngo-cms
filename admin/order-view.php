@@ -473,7 +473,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Pre-load saved signature for the signing UI (only for the authorised user)
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/signer.php';   // also for a site that kept an older config.php
 $can_sign       = admin_can_sign();
+// Nobody can sign: say so where the certificate is (empty when there is a signer).
+$signer_notice  = signer_missing_notice_html(signing_admin(), module_certificates_enabled(), admin_is_admin());
 $signer_has_sig = false;
 if ($can_sign) {
     $sig_check = $pdo->prepare('SELECT 1 FROM admin_signatures WHERE admin_user_id = ?');
@@ -1139,6 +1142,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <div style="font-size:.8rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem;">
           Сертификат за дарение
         </div>
+        <?= $signer_notice /* fixed text, see signer_missing_notice_html() */ ?>
         <?php if ($existing_cert): ?>
           <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.4rem;">
             № <?= h($existing_cert['formatted_number']) ?> &nbsp;·&nbsp;
@@ -1173,6 +1177,13 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
                       class="btn btn--primary" style="font-size:.8rem;padding:.3rem .75rem;">
                 ✍ Подпиши
               </button>
+            <?php elseif (empty($existing_cert['signed_at'])): ?>
+              <?php $cert_signer = signing_admin(); ?>
+              <?php if ($cert_signer !== null): ?>
+              <span style="align-self:center;font-size:.8rem;color:var(--text-muted);">
+                Чака подпис от <?= h(trim($cert_signer['name']) !== '' ? $cert_signer['name'] : $cert_signer['email']) ?>
+              </span>
+              <?php endif; ?>
             <?php endif; ?>
             <form method="POST" action="/admin/generate-document.php" style="display:inline;">
               <?= csrf_field() ?>

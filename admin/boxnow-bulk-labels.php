@@ -63,7 +63,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'parcel_id'     => $r['parcel'],
                 'lines'         => boxnow_pack_lines($r['order']),
             ], $ready);
-            $to = admin_user()['email'] ?? SIGNING_ADMIN_EMAIL;
+            // To whoever made the labels; failing that, the certificate signer, then the organisation.
+            require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/signer.php';
+            $to = (string) (admin_user()['email'] ?? '') ?: (signing_admin_email() ?? SITE_EMAIL);
             try {
                 $mail_ok = send_mail($to, 'Списък за опаковане — ' . count($rows) . ' BoxNow пратки (' . date('d.m.Y') . ')',
                                      render_email('boxnow-packing-list', ['rows' => $rows]));

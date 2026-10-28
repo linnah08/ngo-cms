@@ -8,6 +8,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/payment_errors.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/signer.php';   // who signs certificates (also for a site that kept an older config.php)
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/process_payment.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DocumentGenerator.php';
@@ -223,10 +224,10 @@ function generate_campaign_cert(PDO $pdo, array $pledge): void
         pledge_insert_cert_document($pdo, $order_id, $num, $formatted, ltrim($rel_path, '/'));
 
         // Notify signing admin
-        if (function_exists('send_mail') && defined('SIGNING_ADMIN_EMAIL')) {
+        if (function_exists('send_mail') && ($signer_email = signing_admin_email()) !== null) {
             require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/email-templates.php';
             send_mail(
-                SIGNING_ADMIN_EMAIL,
+                $signer_email,
                 admin_mail_subject('Сертификат за дарение #' . $formatted . ' — нужен подпис'),
                 render_email('cert-needs-signature', [
                     'order'    => [

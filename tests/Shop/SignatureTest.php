@@ -19,6 +19,11 @@ final class SignatureTest extends TestCase
     protected function tearDown(): void
     {
         $_SESSION = $this->savedSession;
+        if ($this->inTx) {
+            get_pdo()->rollBack();
+            $this->inTx = false;
+        }
+        if (function_exists('signing_admin')) signing_admin(true);   // forget the temporary signer
     }
 
     // ── admin_can_sign ──────────────────────────────────────────────────────
@@ -29,46 +34,50 @@ final class SignatureTest extends TestCase
         $this->assertFalse(admin_can_sign());
     }
 
-    public function testAdminCanSignReturnsFalseForWrongEmail(): void
+    private bool $inTx = false;
+
+    /**
+     * The signer this install resolves to (includes/signer.php). When none does,
+     * a temporary admin with SIGNING_ADMIN_EMAIL (the fallback) is added inside
+     * a transaction that tearDown() rolls back. Skips without a database.
+     */
+    private function signerOrSkip(): array
     {
+        $signer = signing_admin(true);
+        if ($signer === null && test_db_available() && defined('SIGNING_ADMIN_EMAIL')) {
+            $pdo = get_pdo();
+            $pdo->beginTransaction();
+            $this->inTx = true;
+            $pdo->prepare("DELETE FROM admin_users WHERE email = ? AND role <> 'admin'")->execute([SIGNING_ADMIN_EMAIL]);
+            $pdo->prepare("INSERT INTO admin_users (name, email, password_hash, role) VALUES ('Signer', ?, 'x', 'admin')")
+                ->execute([SIGNING_ADMIN_EMAIL]);
+            $signer = signing_admin(true);
+        }
+        if ($signer === null) $this->markTestSkipped('No signer resolves on this install (no DB, or a signer chosen who no longer exists).');
+        return $signer;
+    }
+
+    public function testAdminCanSignReturnsFalseForAnotherAdmin(): void
+    {
+        $signer = $this->signerOrSkip();
+        // Another admin — even one sharing the signer's email in a stale session — cannot sign.
         $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(),
-            'id'    => 99,
+            'id'    => $signer['id'] + 1000,
             'name'  => 'Other Admin',
-            'email' => 'other@example.com',
+            'email' => $signer['email'],
             'role'  => 'admin',
             'time'  => time(),
         ];
         $this->assertFalse(admin_can_sign());
     }
 
-    public function testAdminCanSignReturnsFalseForNonFoundationEmail(): void
+    public function testAdminCanSignReturnsTrueForTheSigner(): void
     {
-        // Explicitly verify that a different email cannot sign,
-        // even if the account has admin role.
+        $signer = $this->signerOrSkip();
         $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(),
-            'id'    => 2,
-            'name'  => 'Other Admin',
-            'email' => 'other-admin@example.com',
-            'role'  => 'admin',
-            'time'  => time(),
-        ];
-        $this->assertFalse(admin_can_sign());
-        $this->assertNotEquals('other-admin@example.com', SIGNING_ADMIN_EMAIL,
-            'Signing must use the configured signing account, not an arbitrary one.');
-    }
-
-    public function testSigningEmailIsConfigured(): void
-    {
-        $this->assertNotFalse(filter_var(SIGNING_ADMIN_EMAIL, FILTER_VALIDATE_EMAIL),
-            'SIGNING_ADMIN_EMAIL must be a valid email address.');
-    }
-
-    public function testAdminCanSignReturnsTrueForSigningEmail(): void
-    {
-        $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(),
-            'id'    => 1,
-            'name'  => 'Signing Admin',
-            'email' => SIGNING_ADMIN_EMAIL,
+            'id'    => $signer['id'],
+            'name'  => $signer['name'],
+            'email' => $signer['email'],
             'role'  => 'admin',
             'time'  => time(),
         ];
@@ -77,10 +86,11 @@ final class SignatureTest extends TestCase
 
     public function testAdminCanSignReturnsFalseWhenSessionExpired(): void
     {
+        $signer = $this->signerOrSkip();
         $_SESSION[ADMIN_SESSION_NAME] = ['site' => admin_session_site(),
-            'id'    => 1,
-            'name'  => 'Signing Admin',
-            'email' => SIGNING_ADMIN_EMAIL,
+            'id'    => $signer['id'],
+            'name'  => $signer['name'],
+            'email' => $signer['email'],
             'role'  => 'admin',
             'time'  => time() - (ADMIN_SESSION_HOURS * 3600 + 1),
         ];
