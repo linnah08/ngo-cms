@@ -11,6 +11,9 @@ php_errors.log
 /assets/images/uploads/
 # PDFs admins upload to link to (includes/files.php)
 /assets/files/uploads/*.pdf
+# Designs customers upload for printed products (cart/add.php) — their files, never code.
+/uploads/print-designs/*
+!/uploads/print-designs/.htaccess
 admin/setup.php
 git-reset.php
 run-migrate.php
