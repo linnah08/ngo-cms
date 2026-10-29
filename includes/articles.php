@@ -376,6 +376,17 @@ function article_legacy_slug_target(string $slug, string $lang = '', ?string $di
     return null;
 }
 
+/**
+ * The current English address of a Bulgarian article (its slug_en), or null when
+ * it has no English version. Lets an English link that only knows the Bulgarian
+ * address (current or old) land on the English article, not the Bulgarian one.
+ */
+function article_en_slug_of_bg(string $bgSlug): ?string {
+    $bg = $bgSlug !== '' ? get_article($bgSlug, 'bg') : null;
+    $en = is_array($bg) && is_string($bg['slug_en'] ?? null) ? trim($bg['slug_en']) : '';
+    return $en !== '' && get_article($en, 'en') ? $en : null;
+}
+
 /** Most photos a post can have — Instagram's carousel limit, so nothing is dropped on the way there. */
 const ARTICLE_PHOTOS_MAX = 10;
 

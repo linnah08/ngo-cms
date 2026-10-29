@@ -29,6 +29,11 @@ final class ArticleLegacyRedirectHttpTest extends TestCase
         $article = ['title' => 'T', 'date' => '2026-01-01', 'status' => 'published', 'content' => '<p>x</p>', 'excerpt' => '', 'image' => '', 'tags' => []];
         self::put('bg', self::$tag . '-novo', $article + ['slug_en' => self::$tag . '-new', 'slug_legacy' => 'стара-' . self::$tag]);
         self::put('en', self::$tag . '-new', $article + ['slug_legacy' => [self::$tag . '-old', 'стара-' . self::$tag]]);
+        // A BG article with an English version whose English file knows nothing of the
+        // old Cyrillic address (content migrated from oddminds): English links that use
+        // the BG address, old or current, land on the English article.
+        self::put('bg', self::$tag . '-dvoyno', $article + ['slug_en' => self::$tag . '-double', 'slug_legacy' => 'двойно-' . self::$tag]);
+        self::put('en', self::$tag . '-double', $article);
         // A BG-only article renamed once: its old address on /en/news/ goes to the BG page.
         self::put('bg', self::$tag . '-samo-bg', $article + ['slug_legacy' => self::$tag . '-bg-old']);
     }
@@ -87,6 +92,31 @@ final class ArticleLegacyRedirectHttpTest extends TestCase
     {
         [$code, $loc] = $this->head('/en/news/' . self::$tag . '-bg-old/');
         $this->assertSame(301, $code);
+        $this->assertSame('/novini/' . self::$tag . '-samo-bg/', $loc);
+    }
+
+    public function testOldCyrillicAddressOnTheEnglishPageGoesToTheEnglishVersion(): void
+    {
+        [$code, $loc] = $this->head('/en/news/' . rawurlencode('двойно-' . self::$tag) . '/');
+        $this->assertSame(301, $code);
+        $this->assertSame('/en/news/' . self::$tag . '-double/', $loc);
+        // …and on the Bulgarian page to the Bulgarian article.
+        [$code, $loc] = $this->head('/novini/' . rawurlencode('двойно-' . self::$tag) . '/');
+        $this->assertSame(301, $code);
+        $this->assertSame('/novini/' . self::$tag . '-dvoyno/', $loc);
+    }
+
+    public function testCurrentBgAddressOnTheEnglishPageGoesToTheEnglishVersion(): void
+    {
+        [$code, $loc] = $this->head('/en/news/' . self::$tag . '-dvoyno/');
+        $this->assertSame(301, $code);
+        $this->assertSame('/en/news/' . self::$tag . '-double/', $loc);
+    }
+
+    public function testCurrentAddressOfABgOnlyArticleOnTheEnglishPageStillGoesToTheBgPage(): void
+    {
+        [$code, $loc] = $this->head('/en/news/' . self::$tag . '-samo-bg/');
+        $this->assertSame(302, $code);
         $this->assertSame('/novini/' . self::$tag . '-samo-bg/', $loc);
     }
 
