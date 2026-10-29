@@ -29,6 +29,11 @@ function error_alert_ensure_table(): void
  */
 function error_alert_capture(string $error_class, string $message, string $file, int $line, bool $force_immediate = false): void
 {
+    // Code run by hand on the server — `php -r`, a piped script, a scratch file in
+    // someone's home folder — is someone trying things, not the site failing. It
+    // stays in errors.log, no email. Cron jobs live inside the site, so they still alert.
+    if (PHP_SAPI === 'cli' && !str_starts_with($file, dirname(__DIR__) . '/')) return;
+
     try {
         if (!function_exists('get_pdo')) {
             require_once __DIR__ . '/../admin/includes/db.php';

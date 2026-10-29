@@ -26,6 +26,12 @@ final class ErrorAlertsTest extends TestCase
         self::$pdo->exec("DELETE FROM error_alerts WHERE error_class = 'TestCapture'");
     }
 
+    /** Tests run from the CLI, where only errors in the site's own files raise an alert. */
+    private static function siteFile(string $path): string
+    {
+        return dirname(__DIR__) . '/' . $path;
+    }
+
     public function testEnsureTableCreatesTable(): void
     {
         error_alert_ensure_table();
@@ -39,7 +45,7 @@ final class ErrorAlertsTest extends TestCase
         setting_set('error_alert_email',     'test@example.com');
         setting_set('error_alert_frequency', 'daily');
 
-        error_alert_capture('TestCapture', 'Test message', '/some/file.php', 42);
+        error_alert_capture('TestCapture', 'Test message', self::siteFile('some/file.php'), 42);
 
         $row = self::$pdo->query(
             "SELECT * FROM error_alerts WHERE error_class = 'TestCapture' ORDER BY id DESC LIMIT 1"
@@ -47,7 +53,7 @@ final class ErrorAlertsTest extends TestCase
 
         $this->assertNotFalse($row);
         $this->assertSame('Test message', $row['message']);
-        $this->assertSame('/some/file.php', $row['file']);
+        $this->assertSame(self::siteFile('some/file.php'), $row['file']);
         $this->assertSame(42, (int)$row['line']);
         $this->assertNull($row['sent_at']);
     }
@@ -60,7 +66,28 @@ final class ErrorAlertsTest extends TestCase
             "SELECT COUNT(*) FROM error_alerts WHERE error_class = 'TestCapture'"
         )->fetchColumn();
 
-        error_alert_capture('TestCapture', 'Should not insert', '/file.php', 1);
+        error_alert_capture('TestCapture', 'Should not insert', self::siteFile('file.php'), 1);
+
+        $after = (int) self::$pdo->query(
+            "SELECT COUNT(*) FROM error_alerts WHERE error_class = 'TestCapture'"
+        )->fetchColumn();
+
+        $this->assertSame($before, $after);
+    }
+
+    public function testCaptureSkipsCodeRunByHandOnTheServer(): void
+    {
+        setting_set('error_alert_enabled',   '1');
+        setting_set('error_alert_email',     'test@example.com');
+        setting_set('error_alert_frequency', 'daily');
+
+        $before = (int) self::$pdo->query(
+            "SELECT COUNT(*) FROM error_alerts WHERE error_class = 'TestCapture'"
+        )->fetchColumn();
+
+        error_alert_capture('TestCapture', 'php -r typo', 'Command line code', 3);
+        error_alert_capture('TestCapture', 'piped script typo', 'Standard input code', 1);
+        error_alert_capture('TestCapture', 'scratch script typo', '/home/someone/docseq-check.php', 8);
 
         $after = (int) self::$pdo->query(
             "SELECT COUNT(*) FROM error_alerts WHERE error_class = 'TestCapture'"
@@ -75,7 +102,7 @@ final class ErrorAlertsTest extends TestCase
         setting_set('error_alert_email',     'test@example.com');
         setting_set('error_alert_frequency', 'daily');
 
-        error_alert_capture('TestCapture', str_repeat('x', 3000), '/file.php', 1);
+        error_alert_capture('TestCapture', str_repeat('x', 3000), self::siteFile('file.php'), 1);
 
         $row = self::$pdo->query(
             "SELECT message FROM error_alerts WHERE error_class = 'TestCapture' ORDER BY id DESC LIMIT 1"
