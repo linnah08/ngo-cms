@@ -8,6 +8,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/auth.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/email-templates.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_documents.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/donation_cert_delete.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/pledge_shipping.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_email_composer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/signer.php';   // who signs certificates (also for a site that kept an older config.php)
@@ -51,7 +52,8 @@ if ($pledge['reward_id']) {
 $errors  = [];
 $success = '';
 if (!empty($_GET['refund_ok']))     $success = 'Плащането е върнато успешно.';
-if (!empty($_GET['cert_ok']))       $success = 'Сертификатът е регенериран.';
+if (!empty($_GET['cert_ok']))       $success = 'Сертификатът е готов.';
+if (!empty($_GET['cert_deleted']))  $success = 'Сертификатът е изтрит. Можете да генерирате нов.';
 if (!empty($_GET['doc_success']))   $success = trim($_GET['doc_success']);
 if (!empty($_GET['email_sent']))    $success = 'Имейлът е изпратен до ' . $pledge['email'] . '. Виждате го в „Комуникация с клиента“.';
 
@@ -142,8 +144,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email_draft = ['preset' => $_post_str('email_preset'), 'subject' => $_post_str('email_subject'), 'body' => $_post_str('email_body')];
     }
 
+    // ── Delete an unsigned cert (to generate it again with a new number) ──────
+    if ($action === 'delete_cert') {
+        $why = donation_cert_delete_for_pledge($pdo, $pledge);
+        if ($why === '') {
+            header('Location: /admin/pledge-view.php?id=' . $id . '&cert_deleted=1');
+            exit;
+        }
+        $errors[] = $why;
+    }
+
     // ── Regenerate cert ───────────────────────────────────────────────────────
-    if ($action === 'regenerate_cert') {
+    if ($action === 'regenerate_cert' && (int)($pledge['cert_number'] ?? 0) <= 0
+        && ($pledge['payment_status'] !== 'paid' || ($pledge['pledge_type'] ?? '') === 'ticket')) {
+        $errors[] = 'Сертификат се издава само за платено дарение.';
+    } elseif ($action === 'regenerate_cert') {
         try {
             $order_id = pledge_ensure_order_row($pdo, $pledge);
 
@@ -156,21 +171,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $formatted = str_pad((string)$cert_number, 5, '0', STR_PAD_LEFT);
                 pledge_insert_cert_document($pdo, $order_id, $cert_number, $formatted, ltrim($cert_path_rel, '/'));
             } else {
-                // Generate a fresh cert with a new sequence number
+                // Generate the PDF afresh. A certificate that already has a number keeps
+                // it (its file went missing); only a first certificate takes a new one.
                 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DocumentGenerator.php';
                 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DonationCertGenerator.php';
 
-                $pdo->beginTransaction();
-                $lock = $pdo->prepare("SELECT last_number FROM document_sequences WHERE type = 'donation_cert' FOR UPDATE");
-                $lock->execute();
-                $last = $lock->fetchColumn();
-                if ($last === false) {
-                    throw new \RuntimeException("No sequence row found for type 'donation_cert'");
+                $num = $cert_number;
+                if ($num <= 0) {
+                    $pdo->beginTransaction();
+                    $lock = $pdo->prepare("SELECT last_number FROM document_sequences WHERE type = 'donation_cert' FOR UPDATE");
+                    $lock->execute();
+                    $last = $lock->fetchColumn();
+                    if ($last === false) {
+                        throw new \RuntimeException("No sequence row found for type 'donation_cert'");
+                    }
+                    $num = (int)$last + 1;
+                    $pdo->prepare("UPDATE document_sequences SET last_number = ? WHERE type = 'donation_cert'")
+                        ->execute([$num]);
+                    $pdo->commit();
                 }
-                $num = (int)$last + 1;
-                $pdo->prepare("UPDATE document_sequences SET last_number = ? WHERE type = 'donation_cert'")
-                    ->execute([$num]);
-                $pdo->commit();
 
                 $formatted = str_pad((string)$num, 5, '0', STR_PAD_LEFT);
                 $year      = date('Y', strtotime($pledge['created_at']));
@@ -348,6 +367,16 @@ $pledge_phone = $pledge['phone'] ?? null;
         Чака подпис от <?= h(trim($cert_signer['name']) !== '' ? $cert_signer['name'] : $cert_signer['email']) ?>
       </span>
       <?php endif; ?>
+      <?php if (empty($cert_doc['signed_at'])): ?>
+      <form method="POST" style="display:inline;"
+            data-confirm="<?= h('Сертификат № ' . $cert_doc['formatted_number'] . ' ще бъде изтрит. След това можете да генерирате нов — той ще получи следващия номер от брояча (' . donation_cert_next_formatted($pdo) . ').'
+                . (!empty($cert_doc['emailed_at']) ? ' Дарителят вече има копие със стария номер.' : '')) ?>"
+            data-confirm-ok="Изтрий">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="delete_cert">
+        <button type="submit" class="btn btn--outline" style="font-size:.85rem;color:#c0392b;border-color:#c0392b;">Изтрий</button>
+      </form>
+      <?php endif; ?>
     </div>
     <?php if (empty($cert_doc['signed_at'])): ?>
       <?= signer_missing_notice_html(signing_admin(), module_certificates_enabled(), admin_is_admin()) /* fixed text */ ?>
@@ -366,7 +395,22 @@ $pledge_phone = $pledge['phone'] ?? null;
         <input type="hidden" name="action" value="regenerate_cert">
         <button type="submit" class="btn btn--outline" style="font-size:.85rem;">Регенерирай</button>
       </form>
+      <form method="POST" style="display:inline;"
+            data-confirm="<?= h('Сертификат № ' . str_pad((string)(int)$pledge['cert_number'], 5, '0', STR_PAD_LEFT) . ' ще бъде изтрит. След това можете да генерирате нов — той ще получи следващия номер от брояча (' . donation_cert_next_formatted($pdo) . ').') ?>"
+            data-confirm-ok="Изтрий">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="delete_cert">
+        <button type="submit" class="btn btn--outline" style="font-size:.85rem;color:#c0392b;border-color:#c0392b;">Изтрий</button>
+      </form>
     </div>
+
+  <?php elseif ($pledge['payment_status'] === 'paid' && ($pledge['pledge_type'] ?? '') !== 'ticket'): ?>
+    <form method="POST">
+      <?= csrf_field() ?>
+      <input type="hidden" name="action" value="regenerate_cert">
+      <button type="submit" class="btn btn--primary" style="font-size:.85rem;">+ Генерирай сертификат</button>
+      <span style="font-size:.8rem;color:#6b6560;margin-left:.5rem;">Получава следващия номер от брояча (<?= h(donation_cert_next_formatted($pdo)) ?>).</span>
+    </form>
 
   <?php else: ?>
     <p style="color:#9b9590;margin:0;">Сертификатът ще бъде генериран автоматично при плащане.</p>

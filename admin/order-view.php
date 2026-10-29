@@ -14,6 +14,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/unpaid_orders.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/order_refund.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_email_composer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/couriers/order_shipment.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/donation_cert_delete.php';
 
 admin_require_shop();
 
@@ -109,6 +110,14 @@ $email_draft = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) { http_response_code(400); exit('Invalid token'); }
     $action = $_POST['action'] ?? '';
+
+    // ── Delete an unsigned donation certificate (to generate it again with a new number)
+    if ($action === 'delete_cert') {
+        $why = donation_cert_delete($pdo, (int) $id);
+        $q   = $why === '' ? 'doc_success=' . urlencode('Сертификатът е изтрит. Можете да генерирате нов.') : 'doc_error=' . urlencode($why);
+        header('Location: /admin/order-view.php?id=' . (int) $id . '&' . $q);
+        exit;
+    }
 
     // Reward shipping label actions (pledge orders) — shared with pledge-view
     if ($pledge_row) {
@@ -1200,6 +1209,18 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
                 ✉ Изпрати отново
               </button>
             </form>
+            <?php if (empty($existing_cert['signed_at'])): ?>
+            <form method="POST" style="display:inline;"
+                  data-confirm="<?= h('Сертификат № ' . $existing_cert['formatted_number'] . ' ще бъде изтрит. След това можете да генерирате нов — той ще получи следващия номер от брояча (' . donation_cert_next_formatted($pdo) . ').'
+                      . (!empty($existing_cert['emailed_at']) ? ' Дарителят вече има копие със стария номер.' : '')) ?>"
+                  data-confirm-ok="Изтрий">
+              <?= csrf_field() ?>
+              <input type="hidden" name="action" value="delete_cert">
+              <button type="submit" class="btn btn--outline" style="font-size:.8rem;padding:.3rem .75rem;color:#c0392b;border-color:#c0392b;">
+                🗑 Изтрий
+              </button>
+            </form>
+            <?php endif; ?>
           </div>
         <?php else: ?>
           <form method="POST" action="/admin/generate-document.php">
