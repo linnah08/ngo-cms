@@ -28,7 +28,9 @@ module.exports = defineConfig({
     // The built-in server is single-threaded by default; with the desktop and
     // mobile projects in parallel one slow request (a courier lookup) stalls
     // the other project's checkout. A few workers keep them independent.
-    command: 'PHP_CLI_SERVER_WORKERS=4 php -S localhost:8080 -t .',
+    // NGO_SITE_STRINGS_DIR: a site's own strings.site.json must not reword the
+    // text the tests look for (see tests/bootstrap.php).
+    command: 'PHP_CLI_SERVER_WORKERS=4 NGO_SITE_STRINGS_DIR=tests/Support/no-site-strings php -S localhost:8080 -t .',
     url: 'http://localhost:8080',
     reuseExistingServer: true,
     timeout: 5000,

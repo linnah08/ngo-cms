@@ -8,6 +8,15 @@ $_SERVER['HTTP_HOST']     = 'localhost';
 
 require_once $root . '/vendor/autoload.php';
 
+// ── A site's own wording stays out of the tests ──────────────────────────────
+// A site checkout can have content/{bg,en}/strings.site.json, which rewords the
+// built-in text the tests check. Point lang_strings() at an empty folder instead
+// — through the environment, so every page a test runs in a child PHP process or
+// on a test web server inherits it. A test that needs a strings.site.json sets
+// $GLOBALS['_om_site_strings_dir'] to its own folder, which wins over this.
+putenv('NGO_SITE_STRINGS_DIR=' . __DIR__ . '/Support/no-site-strings');
+$_ENV['NGO_SITE_STRINGS_DIR'] = __DIR__ . '/Support/no-site-strings';
+
 // ── courier.config.php — real credentials or stubs ───────────────────────────
 if (file_exists($root . '/courier.config.php')) {
     require_once $root . '/courier.config.php';

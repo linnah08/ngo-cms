@@ -426,7 +426,12 @@ function lang_strings(string $lang): array {
         // A site's own wording lives in strings.site.json beside it — a file no
         // release ships — so strings.json itself can take every update unchanged
         // (a kept strings.json would miss each new key). Its keys win.
-        $site = $GLOBALS['_om_site_strings_dir'] ?? __DIR__ . '/content';
+        // Tests point NGO_SITE_STRINGS_DIR at an empty folder, so a site's own
+        // wording can't fail tests that check the built-in text.
+        // (A relative folder is taken from the site root.)
+        $env  = (string) getenv('NGO_SITE_STRINGS_DIR');
+        if ($env !== '' && $env[0] !== '/') $env = __DIR__ . '/' . $env;
+        $site = $GLOBALS['_om_site_strings_dir'] ?? ($env !== '' ? $env : __DIR__ . '/content');
         $file = "{$site}/{$lang}/strings.site.json";
         $over = file_exists($file) ? json_decode((string) file_get_contents($file), true) : null;
         if (is_array($over)) {
