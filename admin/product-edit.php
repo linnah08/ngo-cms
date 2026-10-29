@@ -414,8 +414,8 @@ if (($product['type'] ?? '') === 'variant' && !$is_new) {
         <input type="text" name="colour_label_bg[]" placeholder="напр. Праскова" value="<?= h($vc['label_bg']) ?>" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:4px;font-size:.85rem;">
         <input type="text" name="colour_label_en[]" placeholder="e.g. Peach"     value="<?= h($vc['label_en']) ?>" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:4px;font-size:.85rem;">
         <input type="hidden" name="colour_mockup[]" value="<?= h($vc['mockup']) ?>">
-        <button type="button" onclick="this.closest('.colour-row').remove()"
-                style="padding:.3rem .6rem;border:1px solid #f0c4c0;background:#fdf0ef;color:#c0392b;border-radius:4px;cursor:pointer;font-size:.85rem;">✕</button>
+        <button type="button" onclick="this.closest('.colour-row').remove()" aria-label="Премахни цвета"
+                style="min-width:44px;min-height:44px;padding:.3rem .6rem;border:1px solid #f0c4c0;background:#fdf0ef;color:#c0392b;border-radius:4px;cursor:pointer;font-size:.85rem;"><span aria-hidden="true">✕</span></button>
       </div>
       <?php endforeach; ?>
     </div>
@@ -526,7 +526,7 @@ if (($product['type'] ?? '') === 'variant' && !$is_new) {
         <span class="attr-tag" style="display:inline-flex;align-items:center;gap:.3rem;background:#e8f0fe;border:1px solid #4a90e2;border-radius:20px;padding:.2rem .75rem;font-size:.85rem;">
           <?= h($attr) ?>
           <input type="hidden" name="variant_attributes[]" value="<?= h($attr) ?>">
-          <button type="button" onclick="removeAttrTag(this)" style="background:none;border:none;cursor:pointer;color:#888;padding:0;font-size:.9rem;line-height:1;">×</button>
+          <button type="button" onclick="removeAttrTag(this)" aria-label="Премахни стойността" style="min-width:44px;min-height:44px;background:none;border:none;cursor:pointer;color:#888;padding:0;font-size:.9rem;line-height:1;"><span aria-hidden="true">×</span></button>
         </span>
       <?php endforeach; ?>
     </div>
@@ -577,8 +577,8 @@ if (($product['type'] ?? '') === 'variant' && !$is_new) {
                      style="width:70px;padding:.35rem .5rem;border:1px solid var(--border);border-radius:4px;font-size:.85rem;">
             </td>
             <td style="padding:.4rem .5rem;vertical-align:middle;text-align:center;">
-              <button type="button" onclick="removePvRow(this)"
-                      style="background:none;border:none;color:#e53935;cursor:pointer;font-size:1.1rem;padding:.2rem;">✕</button>
+              <button type="button" onclick="removePvRow(this)" aria-label="Премахни варианта"
+                      style="min-width:44px;min-height:44px;background:none;border:none;color:#e53935;cursor:pointer;font-size:1.1rem;padding:.2rem;"><span aria-hidden="true">✕</span></button>
             </td>
           </tr>
           <?php endforeach; ?>
@@ -605,7 +605,7 @@ function addColourRow() {
     + '<input type="text" name="colour_label_bg[]" placeholder="напр. Праскова" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:4px;font-size:.85rem;">'
     + '<input type="text" name="colour_label_en[]" placeholder="e.g. Peach" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:4px;font-size:.85rem;">'
     + '<input type="hidden" name="colour_mockup[]" value="">'
-    + '<button type="button" onclick="this.closest(\'.colour-row\').remove()" style="padding:.3rem .6rem;border:1px solid #f0c4c0;background:#fdf0ef;color:#c0392b;border-radius:4px;cursor:pointer;font-size:.85rem;">✕</button>';
+    + '<button type="button" onclick="this.closest(\'.colour-row\').remove()" aria-label="Премахни цвета" style="min-width:44px;min-height:44px;padding:.3rem .6rem;border:1px solid #f0c4c0;background:#fdf0ef;color:#c0392b;border-radius:4px;cursor:pointer;font-size:.85rem;"><span aria-hidden="true">✕</span></button>';
   document.getElementById('colourRows').appendChild(row);
 }
 
@@ -638,8 +638,9 @@ function addAttrTag() {
   var rmBtn = document.createElement('button');
   rmBtn.type = 'button';
   rmBtn.setAttribute('onclick', 'removeAttrTag(this)');
-  rmBtn.style.cssText = 'background:none;border:none;cursor:pointer;color:#888;padding:0;font-size:.9rem;line-height:1;';
-  rmBtn.textContent = '×';
+  rmBtn.setAttribute('aria-label', 'Премахни стойността');
+  rmBtn.style.cssText = 'min-width:44px;min-height:44px;background:none;border:none;cursor:pointer;color:#888;padding:0;font-size:.9rem;line-height:1;';
+  rmBtn.innerHTML = '<span aria-hidden="true">×</span>';
   span.appendChild(labelNode);
   span.appendChild(hiddenInp);
   span.appendChild(rmBtn);
@@ -742,7 +743,7 @@ function addPvRow() {
     + '<input type="number" name="pv_stock[]" value="0" min="0" style="width:70px;padding:.35rem .5rem;border:1px solid var(--border);border-radius:4px;font-size:.85rem;">'
     + '</td>'
     + '<td style="padding:.4rem .5rem;vertical-align:middle;text-align:center;">'
-    + '<button type="button" onclick="removePvRow(this)" style="background:none;border:none;color:#e53935;cursor:pointer;font-size:1.1rem;padding:.2rem;">✕</button>'
+    + '<button type="button" onclick="removePvRow(this)" aria-label="Премахни варианта" style="min-width:44px;min-height:44px;background:none;border:none;color:#e53935;cursor:pointer;font-size:1.1rem;padding:.2rem;"><span aria-hidden="true">✕</span></button>'
     + '</td>';
   tbody.appendChild(tr);
   syncAttrJson(tr);
@@ -781,8 +782,8 @@ function renderPvPhotos(row) {
       + 'style="width:44px;height:44px;object-fit:cover;border-radius:4px;border:2px solid ' + (isPrimary ? 'var(--teal)' : 'var(--border)') + ';">'
       + '<button type="button" class="pv-star" title="Основна снимка" '
       + 'style="position:absolute;top:-7px;left:-7px;width:17px;height:17px;border:1px solid var(--border);border-radius:50%;background:#fff;cursor:pointer;font-size:11px;line-height:1;padding:0;color:' + (isPrimary ? '#f5a623' : '#ccc') + ';">★</button>'
-      + '<button type="button" class="pv-del" title="Премахни" '
-      + 'style="position:absolute;top:-7px;right:-7px;width:17px;height:17px;border:1px solid var(--border);border-radius:50%;background:#fff;cursor:pointer;font-size:10px;line-height:1;padding:0;color:#e53935;">✕</button>'
+      + '<button type="button" class="pv-del" title="Премахни" aria-label="Премахни снимката" '
+      + 'style="position:absolute;top:-10px;right:-10px;width:24px;height:24px;border:1px solid var(--border);border-radius:50%;background:#fff;cursor:pointer;font-size:10px;line-height:1;padding:0;color:#e53935;"><span aria-hidden="true">✕</span></button>'
       + '</div>';
   });
   if (imgs.length < PV_MAX_PHOTOS) {
@@ -846,7 +847,7 @@ document.getElementById('pvBody').addEventListener('drop', function (e) {
     '<div style="background:#fff;border-radius:10px;width:100%;max-width:820px;margin:auto;box-shadow:0 24px 64px rgba(0,0,0,.25);overflow:hidden;">',
       '<div style="display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem;border-bottom:1px solid var(--border);">',
         '<span style="font-weight:600;font-size:.95rem;">Снимка на вариант</span>',
-        '<button type="button" id="pvImgClose" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#666;line-height:1;padding:.25rem .5rem;">✕</button>',
+        '<button type="button" id="pvImgClose" aria-label="Затвори" style="min-width:44px;min-height:44px;background:none;border:none;font-size:1.4rem;cursor:pointer;color:#666;line-height:1;padding:.25rem .5rem;"><span aria-hidden="true">✕</span></button>',
       '</div>',
       '<div style="display:grid;grid-template-columns:1fr 1fr;min-height:320px;">',
         // Upload panel

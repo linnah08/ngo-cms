@@ -512,8 +512,8 @@ if (admin_is_admin()):
 <!-- Popup card -->
 <div id="dashPop"
      style="display:none;position:fixed;z-index:1000;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.15);padding:.9rem 1rem 1rem;min-width:210px;max-width:290px;">
-  <button onclick="dashPopClose()"
-          style="position:absolute;top:.45rem;right:.6rem;background:none;border:none;cursor:pointer;font-size:.9rem;color:var(--text-muted);line-height:1;padding:0;">✕</button>
+  <button type="button" onclick="dashPopClose()" aria-label="Затвори"
+          style="position:absolute;top:0;right:0;min-width:44px;min-height:44px;background:none;border:none;cursor:pointer;font-size:.9rem;color:var(--text-muted);line-height:1;padding:0;"><span aria-hidden="true">✕</span></button>
   <div id="dashPopCh"    style="display:inline-block;padding:2px 8px;border-radius:3px;font-size:.7rem;font-weight:700;margin-bottom:.5rem;"></div>
   <div id="dashPopTitle" style="font-weight:700;color:var(--text);margin-bottom:.3rem;font-size:.85rem;line-height:1.35;"></div>
   <div id="dashPopTime"  style="color:var(--text-muted);font-size:.75rem;margin-bottom:.55rem;"></div>

@@ -592,7 +592,7 @@ $cp_list  = array_filter(cpage_all(), fn(array $p): bool => !cpage_is_builtin($p
             <?= csrf_field() ?>
             <input type="hidden" name="section" value="deepl_glossary_delete">
             <input type="hidden" name="glossary_idx" value="<?= $i ?>">
-            <button type="submit" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:1rem;line-height:1;padding:0;min-width:32px;min-height:32px;" title="Изтрий" aria-label="Изтрий „<?= h($pair[0]) ?>“ от речника">✕</button>
+            <button type="submit" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:1rem;line-height:1;padding:0;min-width:44px;min-height:44px;" title="Изтрий" aria-label="Изтрий „<?= h($pair[0]) ?>“ от речника"><span aria-hidden="true">✕</span></button>
           </form>
         </td>
       </tr>
@@ -1132,9 +1132,9 @@ if ($edit_idx !== null):
           <button type="button"
                   onclick="removeProjectImage(this,<?= h(json_encode($img)) ?>)"
                   style="position:absolute;top:-4px;right:-4px;background:#c0392b;color:#fff;
-                         border:none;border-radius:50%;width:18px;height:18px;font-size:11px;
+                         border:none;border-radius:50%;width:24px;height:24px;font-size:12px;
                          cursor:pointer;line-height:1;"
-                  aria-label="Премахни снимка">✕</button>
+                  aria-label="Премахни снимка"><span aria-hidden="true">✕</span></button>
         </div>
       <?php endforeach; ?>
     </div>
@@ -1176,8 +1176,8 @@ function _pickProjectImage(btn) {
       '<img src="' + p + '" style="height:70px;border-radius:4px;object-fit:cover;">' +
       '<button type="button" onclick="removeProjectImage(this,' + JSON.stringify(p) + ')" ' +
         'style="position:absolute;top:-4px;right:-4px;background:#c0392b;color:#fff;' +
-               'border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:1;" ' +
-        'aria-label="Премахни снимка">✕</button>';
+               'border:none;border-radius:50%;width:24px;height:24px;font-size:12px;cursor:pointer;line-height:1;" ' +
+        'aria-label="Премахни снимка"><span aria-hidden="true">✕</span></button>';
     document.querySelector('.proj-thumbs').appendChild(thumb);
   });
 }

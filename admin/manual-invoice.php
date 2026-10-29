@@ -270,7 +270,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
             </td>
             <td style="padding:.25rem 0;text-align:center;">
               <button type="button" onclick="removeRow(this)" aria-label="Премахни артикул"
-                      style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.1rem;line-height:1;">×</button>
+                      style="min-width:44px;min-height:44px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.1rem;line-height:1;"><span aria-hidden="true">×</span></button>
             </td>
           </tr>
           <?php endforeach; ?>
@@ -320,7 +320,7 @@ function addRow() {
     '<td style="padding:.25rem .5rem .25rem 0;"><input type="text" name="item_name[]" class="form-input" aria-label="Наименование на артикул" placeholder="Описание"></td>' +
     '<td style="padding:.25rem .5rem;"><input type="number" name="item_qty[]" class="form-input" aria-label="Количество" min="1" step="1" value="1"></td>' +
     '<td style="padding:.25rem .5rem;"><input type="number" name="item_price[]" class="form-input" aria-label="Единична цена" min="0" step="0.01" placeholder="0.00"></td>' +
-    '<td style="padding:.25rem 0;text-align:center;"><button type="button" onclick="removeRow(this)" aria-label="Премахни артикул" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.1rem;line-height:1;">×</button></td>';
+    '<td style="padding:.25rem 0;text-align:center;"><button type="button" onclick="removeRow(this)" aria-label="Премахни артикул" style="min-width:44px;min-height:44px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.1rem;line-height:1;"><span aria-hidden="true">×</span></button></td>';
   body.appendChild(tr);
 }
 function removeRow(btn) {

@@ -191,7 +191,7 @@ function menu_editor_row(string $uid, array $row, array $err = [], ?array $opts 
         <div style="display:flex;gap:.35rem;align-self:center;">
           <button type="button" class="btn btn--outline menu-up"     aria-label="Премести нагоре"     style="min-width:2.75rem;min-height:2.75rem;padding:.3rem;">↑</button>
           <button type="button" class="btn btn--outline menu-down"   aria-label="Премести надолу"     style="min-width:2.75rem;min-height:2.75rem;padding:.3rem;">↓</button>
-          <button type="button" class="btn btn--outline menu-remove" aria-label="Премахни реда (БГ и EN)" style="min-width:2.75rem;min-height:2.75rem;padding:.3rem;">✕</button>
+          <button type="button" class="btn btn--outline menu-remove" aria-label="Премахни реда (БГ и EN)" style="min-width:2.75rem;min-height:2.75rem;padding:.3rem;"><span aria-hidden="true">✕</span></button>
         </div>
       </div>
     </li>

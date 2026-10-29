@@ -36,4 +36,26 @@ final class IconCloseButtonsLabelledTest extends TestCase
         $src = (string) file_get_contents(dirname(__DIR__) . '/cart/index.php');
         $this->assertStringContainsString('<button type="button" onclick="closePreview()" aria-label="<?= h(t_or(\'common.close\', \'Затвори\', \'Close\', $lang)) ?>"', $src);
     }
+
+    public function test_icon_only_buttons_in_admin_have_type_label_and_hidden_glyph(): void
+    {
+        $root = dirname(__DIR__) . '/admin';
+        $bad  = [];
+        $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS));
+        foreach ($it as $f) {
+            $path = (string) $f;
+            if (!str_ends_with($path, '.php')) continue;
+            $rel = substr($path, strlen(dirname(__DIR__)) + 1);
+            $src = (string) file_get_contents($path);
+            // <button ...>✕</button>, also with the glyph wrapped in a span; PHP/JS quotes escaped.
+            if (!preg_match_all('#<button\b([^>]*)>\s*(<span[^>]*>)?\s*(?:✕|×|&times;)\s*(?:</span>)?\s*</button>#u', $src, $m, PREG_SET_ORDER)) continue;
+            foreach ($m as $x) {
+                $attrs = $x[1];
+                if (!str_contains($attrs, 'aria-label=')) $bad[] = "$rel: no aria-label";
+                if (!str_contains($attrs, 'type=') ) $bad[] = "$rel: no type";
+                if (($x[2] ?? '') === '' || !str_contains($x[2], 'aria-hidden')) $bad[] = "$rel: glyph not aria-hidden";
+            }
+        }
+        $this->assertSame([], $bad, 'admin icon-only buttons need type, aria-label and an aria-hidden glyph');
+    }
 }

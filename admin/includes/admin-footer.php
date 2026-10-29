@@ -24,8 +24,8 @@
   <div style="background:#fff;border-radius:10px;padding:1.5rem;width:100%;max-width:780px;box-shadow:0 24px 64px rgba(0,0,0,.25);margin:auto;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
       <h2 id="mediaLibTitle" style="margin:0;font-size:1rem;font-weight:600;">Избери снимка от библиотеката</h2>
-      <button id="mediaLibClose" type="button"
-              style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#666;line-height:1;padding:.25rem .5rem;">✕</button>
+      <button id="mediaLibClose" type="button" aria-label="Затвори"
+              style="min-width:44px;min-height:44px;background:none;border:none;font-size:1.4rem;cursor:pointer;color:#666;line-height:1;padding:.25rem .5rem;"><span aria-hidden="true">✕</span></button>
     </div>
     <div id="mediaLibGrid"
          style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));grid-auto-rows:80px;gap:.5rem;max-height:440px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:6px;padding:.5rem;min-height:80px;"></div>
@@ -169,9 +169,9 @@
       div.className = 'proj-thumb';
       div.style.cssText = 'position:relative;display:inline-block;';
       div.innerHTML = '<img src="' + p.replace(/"/g, '&quot;') + '" style="height:70px;border-radius:4px;object-fit:cover;">'
-        + '<button type="button" onclick="removeProjectImage(this,' + JSON.stringify(p) + ')"'
-        + ' style="position:absolute;top:-4px;right:-4px;background:#c0392b;color:#fff;border:none;'
-        + 'border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:1;">✕</button>';
+        + '<button type="button" onclick="removeProjectImage(this,' + JSON.stringify(p) + ')" aria-label="Премахни снимката"'
+        + ' style="position:absolute;top:-8px;right:-8px;background:#c0392b;color:#fff;border:none;'
+        + 'border-radius:50%;width:24px;height:24px;font-size:12px;cursor:pointer;line-height:1;"><span aria-hidden="true">✕</span></button>';
       thumbs.appendChild(div);
     });
   };

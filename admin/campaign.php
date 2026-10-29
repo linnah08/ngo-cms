@@ -463,8 +463,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
                    title="Перото е платено" style="width:18px;height:18px;cursor:pointer;">
           </td>
           <td style="padding:.35rem .5rem;text-align:center;">
-            <button type="button" onclick="this.closest('tr').remove();updateTotal()"
-                    style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:1.1rem;line-height:1;">✕</button>
+            <button type="button" onclick="this.closest('tr').remove();updateTotal()" aria-label="Премахни реда"
+                    style="min-width:44px;min-height:44px;background:none;border:none;color:#c0392b;cursor:pointer;font-size:1.1rem;line-height:1;"><span aria-hidden="true">✕</span></button>
           </td>
         </tr>
         <?php endforeach; ?>
@@ -498,8 +498,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <?= csrf_field() ?>
         <input type="hidden" name="section" value="photos">
         <input type="hidden" name="delete_photo" value="<?= h($photo) ?>">
-        <button type="submit"
-                style="background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:.75rem;cursor:pointer;line-height:22px;text-align:center;padding:0;">✕</button>
+        <button type="submit" aria-label="Премахни снимката"
+                style="background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:.9rem;cursor:pointer;line-height:1;text-align:center;padding:0;"><span aria-hidden="true">✕</span></button>
       </form>
     </div>
     <?php endforeach; ?>
@@ -538,8 +538,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       <?php foreach ($faq as $idx => $row): ?>
       <div class="faq-row" style="border:1px solid #e8ddd5;border-radius:6px;padding:.85rem;">
         <div style="display:flex;justify-content:flex-end;margin-bottom:.5rem;">
-          <button type="button" onclick="removeFaqRow(this)"
-                  style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:1rem;line-height:1;">✕</button>
+          <button type="button" onclick="removeFaqRow(this)" aria-label="Премахни въпроса"
+                  style="min-width:44px;min-height:44px;background:none;border:none;color:#c0392b;cursor:pointer;font-size:1rem;line-height:1;"><span aria-hidden="true">✕</span></button>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.5rem;">
           <div>
@@ -629,7 +629,7 @@ document.getElementById('addBudgetRow').addEventListener('click', function () {
     + '<td style="padding:.35rem .6rem;"><input type="text" name="budget_label_en[]" style="width:100%;padding:.4rem .6rem;border:1px solid #d1d5db;border-radius:5px;font-size:.88rem;box-sizing:border-box;"></td>'
     + '<td style="padding:.35rem .6rem;"><input type="number" name="budget_amount[]" value="0" min="0" step="0.01" style="width:100%;padding:.4rem .6rem;border:1px solid #d1d5db;border-radius:5px;font-size:.88rem;box-sizing:border-box;"></td>'
     + '<td style="padding:.35rem .6rem;text-align:center;"><input type="hidden" name="budget_paid[]" value="0"><input type="checkbox" class="budget-paid-cb" title="Перото е платено" style="width:18px;height:18px;cursor:pointer;"></td>'
-    + '<td style="padding:.35rem .5rem;text-align:center;"><button type="button" onclick="this.closest(\'tr\').remove();updateTotal()" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:1.1rem;">✕</button></td>';
+    + '<td style="padding:.35rem .5rem;text-align:center;"><button type="button" onclick="this.closest(\'tr\').remove();updateTotal()" aria-label="Премахни реда" style="min-width:44px;min-height:44px;background:none;border:none;color:#c0392b;cursor:pointer;font-size:1.1rem;"><span aria-hidden="true">✕</span></button></td>';
   tbody.appendChild(tr);
   tr.querySelector('input[name="budget_amount[]"]').addEventListener('input', updateTotal);
 });
@@ -669,7 +669,7 @@ document.getElementById('addFaqRow').addEventListener('click', function () {
   div.className = 'faq-row';
   div.style.cssText = 'border:1px solid #e8ddd5;border-radius:6px;padding:.85rem;';
   div.innerHTML = '<div style="display:flex;justify-content:flex-end;margin-bottom:.5rem;">'
-    + '<button type="button" onclick="removeFaqRow(this)" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:1rem;line-height:1;">✕</button>'
+    + '<button type="button" onclick="removeFaqRow(this)" aria-label="Премахни въпроса" style="min-width:44px;min-height:44px;background:none;border:none;color:#c0392b;cursor:pointer;font-size:1rem;line-height:1;"><span aria-hidden="true">✕</span></button>'
     + '</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.5rem;">'
     + '<div><label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:.25rem;">Въпрос (БГ)</label>'
