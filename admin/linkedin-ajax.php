@@ -3,16 +3,11 @@
  * LinkedIn panel AJAX handler.
  *
  * POST body (JSON):
- *   action      'generate' | 'save_post'
+ *   action      'generate' | 'schedule'
  *   csrf_token  string
  *
  * For 'generate':
  *   slug  string  — article slug (BG)
- *
- * For 'save_post':
- *   slug          string
- *   linkedin_url  string  — URL of the LinkedIn post (can be '' to clear)
- *   linkedin_text string  — generated text to store
  */
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
@@ -185,34 +180,6 @@ Return only the post text, nothing else.";
     save_json($file, $data);
 
     echo json_encode(['ok' => true, 'text' => $text]);
-    exit;
-}
-
-// ── Save post URL ─────────────────────────────────────────────────────────────
-if ($action === 'save_post') {
-    $url          = trim($body['linkedin_url']  ?? '');
-    $linkedin_text = trim($body['linkedin_text'] ?? '');
-
-    // Basic URL validation if non-empty
-    if ($url !== '' && !filter_var($url, FILTER_VALIDATE_URL)) {
-        echo json_encode(['ok' => false, 'error' => 'Невалиден URL.']);
-        exit;
-    }
-
-    $data = load_json($file);
-    $data['linkedin_url']       = $url;
-    $data['linkedin_posted_at'] = $url !== '' ? date('Y-m-d H:i:s') : '';
-    if ($linkedin_text !== '') {
-        $data['linkedin_text'] = $linkedin_text;
-    }
-
-    if (save_json($file, $data)) {
-        // Already on LinkedIn, so its link has to work from now on.
-        echo json_encode(['ok' => true, 'posted_at' => $data['linkedin_posted_at'],
-            'site_notice' => $url !== '' ? article_publish_with_social($slug, time(), 'LinkedIn') : null]);
-    } else {
-        echo json_encode(['ok' => false, 'error' => 'Грешка при запис.']);
-    }
     exit;
 }
 

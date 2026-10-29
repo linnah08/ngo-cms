@@ -793,20 +793,6 @@ window._showSiteNotice = function (msg, afterEl) {
       Публикацията ще бъде планирана в Buffer за избрания час. Можете да я редактирате в <a href="https://publish.buffer.com" target="_blank" rel="noopener">publish.buffer.com</a>.
     </p>
 
-    <!-- Posted URL (manual fallback) -->
-    <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid #f0f0f0;">
-      <label for="liUrl" style="font-size:.82rem;font-weight:600;display:block;margin-bottom:.3rem;color:var(--text-muted);">
-        URL на публикуваната публикация (незадължително — за справка)
-      </label>
-      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-        <input type="url" id="liUrl" placeholder="https://www.linkedin.com/posts/..."
-               value="<?= h($article['linkedin_url'] ?? '') ?>"
-               style="flex:1;min-width:200px;box-sizing:border-box;font-size:.88rem;">
-        <button type="button" id="liSaveUrlBtn" class="btn btn--outline" style="font-size:.82rem;white-space:nowrap;">
-          Запази URL
-        </button>
-      </div>
-    </div>
   </div>
 </div>
 <?php endif; // $tab === 'social' && !$is_new && $claude_ready ?>
@@ -1227,7 +1213,6 @@ if (translateBtn) {
   var liTextArea   = document.getElementById('liText');
   var copyBtn      = document.getElementById('liCopyBtn');
   var scheduleBtn  = document.getElementById('liScheduleBtn');
-  var saveUrlBtn   = document.getElementById('liSaveUrlBtn');
   var slug         = '<?= h($edit_slug) ?>';
 
   // Unicode bold sans-serif map (LinkedIn-compatible)
@@ -1395,30 +1380,6 @@ if (translateBtn) {
   var liNowBtn = document.getElementById('liNowBtn');
   if (liNowBtn) {
     liNowBtn.addEventListener('click', function() { _liSend('now', liNowBtn); });
-  }
-
-  // Save URL (manual — paste the LinkedIn post URL after publishing)
-  if (saveUrlBtn) {
-    saveUrlBtn.addEventListener('click', async function() {
-      var url  = document.getElementById('liUrl').value.trim();
-      var text = liTextArea.value;
-      saveUrlBtn.disabled = true;
-      try {
-        var data = await liPost({ action: 'save_post', linkedin_url: url, linkedin_text: text });
-        if (!data.ok) {
-          alert(data.error);
-        } else {
-          var badge   = document.getElementById('liStatusBadge');
-          var dateStr = data.posted_at ? data.posted_at.substring(0,10).split('-').reverse().join('.') : '';
-          var html    = '<span style="color:#2e7d32;">✓ Публикувано ' + dateStr;
-          if (url) html += ' — <a href="' + url.replace(/"/g,'&quot;') + '" target="_blank" rel="noopener" style="color:#0a66c2;">Виж →</a>';
-          badge.innerHTML       = html + '</span>';
-          saveUrlBtn.textContent = '✓ Запазено';
-          _showSiteNotice(data.site_notice, saveUrlBtn);
-        }
-      } catch(e) { alert('Грешка при запис.'); }
-      saveUrlBtn.disabled = false;
-    });
   }
 })();
 
