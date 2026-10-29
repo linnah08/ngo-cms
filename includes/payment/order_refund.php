@@ -40,10 +40,7 @@ function order_return_card_payment(PDO $pdo, array $order, ?DSKBankPayment $dsk 
 
     try {
         $lang = $order['lang'] ?? 'bg';
-        $tpl  = email_tpl_get('order-cancelled-customer', $lang, [
-            'customer_name' => $order['customer_name'],
-            'order_number'  => $order['order_number'],
-        ]);
+        $tpl  = email_tpl_get('order-cancelled-customer', $lang, email_tpl_order_vars($order));
         send_order_mail(
             (int)$order['id'],
             $order['customer_email'],

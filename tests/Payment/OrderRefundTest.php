@@ -109,4 +109,34 @@ final class OrderRefundTest extends TestCase
         $this->assertFalse(order_card_payment_owed(['payment_method' => 'iris'] + $owed));
         $this->assertFalse(order_card_payment_owed(['dsk_order_id' => null] + $owed));
     }
+
+    public function testCancelledEmailFillsTheAmountAnEditedTemplateUses(): void
+    {
+        // oddminds' edited „Отменена поръчка“ template says {{amount_eur}}; it was never filled.
+        $key   = 'email_tpl_order-cancelled-customer';
+        $saved = setting_get($key, '');
+        setting_set($key, json_encode([
+            'subject_bg' => 'Поръчка {{order_number}} е отменена',
+            'intro_bg'   => '<p>{{customer_name}}, връщаме {{amount_eur}} €.</p>',
+            'outro_bg'   => '',
+        ], JSON_UNESCAPED_UNICODE));
+        try {
+            $order = $this->cancelledPaidOrder();
+            $dsk   = new ScriptedDSK([DSKBankPayment::STATUS_REVERSED]);
+            $this->assertNull(order_return_card_payment(self::$pdo, $order, $dsk));
+
+            $stmt = self::$pdo->prepare("SELECT body FROM order_emails WHERE order_id = ? AND template_key = 'order-cancelled-customer'");
+            $stmt->execute([(int) $order['id']]);
+            $body = (string) $stmt->fetchColumn();
+            $this->assertStringContainsString('Тест Клиент, връщаме 24.00 €.', $body);
+            $this->assertStringNotContainsString('{{', $body);
+        } finally {
+            if ($saved === '') {
+                self::$pdo->prepare('DELETE FROM settings WHERE `key` = ?')->execute([$key]);
+            } else {
+                setting_set($key, $saved);
+            }
+            self::$pdo->prepare('DELETE FROM order_emails WHERE order_id IN (' . implode(',', array_map('intval', self::$order_ids)) . ')')->execute();
+        }
+    }
 }

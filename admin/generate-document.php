@@ -185,9 +185,7 @@ try {
 if ($doc_type === 'credit_note') {
     require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/email-templates.php';
     $lang = $order['lang'] ?? 'bg';
-    $tpl  = email_tpl_get('credit-note-customer', $lang, [
-        'customer_name' => $order['customer_name'],
-        'order_number'  => $order['order_number'],
+    $tpl  = email_tpl_get('credit-note-customer', $lang, email_tpl_order_vars($order) + [
         'doc_number'    => $doc_formatted,
     ]);
     $body = render_email('credit-note-customer', [

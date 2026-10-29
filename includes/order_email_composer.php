@@ -43,11 +43,7 @@ function order_email_choices(array $order): array
 {
     $lang = order_email_lang($order);
     $type = (string)($order['type'] ?? '');
-    $vars = [
-        'customer_name' => (string)($order['customer_name'] ?? ''),
-        'order_number'  => (string)($order['order_number'] ?? ''),
-        'amount_eur'    => number_format((float)($order['total_eur'] ?? 0), 2, '.', ''),
-    ];
+    $vars = email_tpl_order_vars($order);
 
     // Messages that ask the buyer to pay only make sense for an online payment,
     // and can only be sent while that payment can still be made.

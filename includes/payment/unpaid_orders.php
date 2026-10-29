@@ -18,6 +18,7 @@
  * cron/unpaid-orders-cron.php.
  */
 require_once __DIR__ . '/payment_errors.php';
+require_once dirname(__DIR__) . '/email-templates.php';   // email_tpl_get(), email_tpl_order_vars()
 require_once dirname(__DIR__) . '/order_stock.php';
 require_once dirname(__DIR__) . '/couriers/order_shipment.php';
 
@@ -191,10 +192,7 @@ function send_payment_failed_email(PDO $pdo, array $order, ?callable $mailer = n
 
     $lang = ($order['lang'] ?? 'bg') === 'en' ? 'en' : 'bg';
     $key  = payment_failed_template_key($order);
-    $tpl  = email_tpl_get($key, $lang, [
-        'customer_name' => $order['customer_name'],
-        'order_number'  => $order['order_number'],
-        'amount_eur'    => number_format((float)$order['total_eur'], 2, '.', ''),
+    $tpl  = email_tpl_get($key, $lang, email_tpl_order_vars($order) + [
         'cancel_date'   => unpaid_cancel_deadline($order),
         'cancel_days'   => unpaid_cancel_days(),
     ]);

@@ -299,6 +299,21 @@ function email_tpl_get(string $key, string $lang = 'bg', array $vars = []): arra
 }
 
 /**
+ * The placeholders every email about an order can use: {{customer_name}},
+ * {{order_number}} and {{amount_eur}} (the order total, e.g. 24.00). Senders add
+ * their own on top, so an admin-edited template never shows a raw {{…}}.
+ *
+ * @return array{customer_name:string,order_number:string,amount_eur:string}
+ */
+function email_tpl_order_vars(array $order): array {
+    return [
+        'customer_name' => (string) ($order['customer_name'] ?? ''),
+        'order_number'  => (string) ($order['order_number'] ?? ''),
+        'amount_eur'    => number_format((float) ($order['total_eur'] ?? 0), 2, '.', ''),
+    ];
+}
+
+/**
  * Replace {{placeholder}} tokens in $html with escaped values from $vars.
  *
  * @param array<string,scalar> $vars

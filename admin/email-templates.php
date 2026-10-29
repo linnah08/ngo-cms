@@ -37,7 +37,7 @@ $templates = [
     ],
     'order-cancelled-customer' => [
         'label' => 'Отменена поръчка (с възстановяване)',
-        'vars'  => ['{{customer_name}}', '{{order_number}}'],
+        'vars'  => ['{{customer_name}}', '{{order_number}}', '{{amount_eur}}'],
     ],
     'order-payment-failed-customer' => [
         'label' => 'Неуспешно плащане на поръчка',
