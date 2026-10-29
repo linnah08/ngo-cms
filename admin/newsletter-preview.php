@@ -8,7 +8,8 @@ module_admin_guard('newsletter');
 
 $pdo  = get_pdo();
 $id   = (int)($_GET['id'] ?? 0);
-$lang = in_array($_GET['lang'] ?? 'bg', ['bg','en']) ? $_GET['lang'] : 'bg';
+$lang = $_GET['lang'] ?? 'bg';
+if (!in_array($lang, ['bg', 'en'], true)) $lang = 'bg';
 
 $stmt = $pdo->prepare('SELECT * FROM newsletter_campaigns WHERE id = ?');
 $stmt->execute([$id]);
@@ -24,7 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'send_
     if (!csrf_verify()) { http_response_code(400); exit('Invalid token'); }
 
     $test_email = trim($_POST['test_email'] ?? '');
-    $test_lang  = in_array($_POST['test_lang'] ?? 'bg', ['bg','en']) ? $_POST['test_lang'] : 'bg';
+    $test_lang  = $_POST['test_lang'] ?? 'bg';
+    if (!in_array($test_lang, ['bg', 'en'], true)) $test_lang = 'bg';
 
     if (!filter_var($test_email, FILTER_VALIDATE_EMAIL)) {
         $test_error = 'Невалиден имейл адрес.';

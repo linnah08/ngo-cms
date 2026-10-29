@@ -89,8 +89,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // ── List ──────────────────────────────────────────────────────────────────────
-$filter_status = in_array($_GET['status'] ?? 'all', ['all', 'active', 'unsubscribed'], true) ? $_GET['status'] : 'all';
-$filter_source = in_array($_GET['source'] ?? 'all', NEWSLETTER_SOURCES, true) ? $_GET['source'] : 'all';
+$filter_status = $_GET['status'] ?? 'all';
+if (!in_array($filter_status, ['all', 'active', 'unsubscribed'], true)) $filter_status = 'all';
+$filter_source = $_GET['source'] ?? 'all';
+if (!in_array($filter_source, NEWSLETTER_SOURCES, true)) $filter_source = 'all';
 $filter_topic  = newsletter_clean_topic($_GET['topic'] ?? 'all');
 $page          = max(1, (int)($_GET['p'] ?? 1));
 $per_page      = 50;
