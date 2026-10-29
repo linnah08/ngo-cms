@@ -338,26 +338,30 @@ final class DistributionTest extends TestCase
 
     // ── shop + protocol ────────────────────────────────────────────────────────
 
-    public function testShopOrderedQtyCountsNonCancelledOrders(): void
+    public function testShopOrderedQtyCountsPaidNotCancelledOrdersOnly(): void
     {
         $pid = $this->product(0, 'variant');
         $va  = $this->variant($pid, 'A');
         $vb  = $this->variant($pid, 'B');
-        foreach ([['new', $va, 2], ['delivered', $vb, 3], ['cancelled', $va, 7]] as [$status, $vid, $qty]) {
+        $rows = [
+            // [status, payment_status, variant, qty, failed email sent]
+            ['new',       'paid',     $va, 2,  false],
+            ['delivered', 'paid',     $vb, 3,  false],
+            ['cancelled', 'paid',     $va, 7,  false],  // cancelled
+            ['new',       'pending',  $va, 11, false],  // unpaid (e.g. cash on delivery not yet paid)
+            ['new',       'pending',  $va, 4,  true],   // declined card, open for a retry
+            ['new',       'pending',  $vb, 13, false],  // unpaid
+            ['cancelled', 'refunded', $vb, 17, false],
+        ];
+        foreach ($rows as [$status, $pay, $vid, $qty, $failed]) {
             self::$pdo->prepare(
-                "INSERT INTO orders (order_number,type,status,customer_name,customer_email,items,subtotal_eur,shipping_eur,total_eur,payment_method,payment_status)
-                 VALUES (?, 'physical', ?, 'Тест', 't@example.test', ?, 10, 0, 10, 'cod', 'pending')"
+                "INSERT INTO orders (order_number,type,status,customer_name,customer_email,items,subtotal_eur,shipping_eur,total_eur,payment_method,payment_status,payment_failed_email_at)
+                 VALUES (?, 'physical', ?, 'Тест', 't@example.test', ?, 10, 0, 10, 'card', ?, ?)"
             )->execute(['D' . substr(bin2hex(random_bytes(7)), 0, 13), $status,
-                json_encode([['product_id' => $pid, 'variant_id' => $vid, 'quantity' => $qty]])]);
+                json_encode([['product_id' => $pid, 'variant_id' => $vid, 'quantity' => $qty]]),
+                $pay, $failed ? date('Y-m-d H:i:s') : null]);
             self::$order_ids[] = (int) self::$pdo->lastInsertId();
         }
-        // A declined card stays 'new' (open for a retry) but doesn't count.
-        self::$pdo->prepare(
-            "INSERT INTO orders (order_number,type,status,customer_name,customer_email,items,subtotal_eur,shipping_eur,total_eur,payment_method,payment_status,payment_failed_email_at)
-             VALUES (?, 'physical', 'new', 'Тест', 't@example.test', ?, 10, 0, 10, 'card', 'pending', NOW())"
-        )->execute(['D' . substr(bin2hex(random_bytes(7)), 0, 13),
-            json_encode([['product_id' => $pid, 'variant_id' => $va, 'quantity' => 4]])]);
-        self::$order_ids[] = (int) self::$pdo->lastInsertId();
 
         $this->assertSame(2, distribution_shop_ordered_qty(self::$pdo, $pid, $va));
         $this->assertSame(3, distribution_shop_ordered_qty(self::$pdo, $pid, $vb));

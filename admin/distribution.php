@@ -388,7 +388,7 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
         ['Безплатни мостри', $t['to_samples'] ?? 0, ''],
         ['Неразпределени (може да се дадат)', $t['available'] ?? 0, 'color:#14796d;'],
         ['В онлайн магазина сега', $t['online_stock'] ?? 0, ''],
-        ['Поръчани през сайта (без отказаните)', $t['shop_ordered'] ?? 0, ''],
+        ['Поръчани през сайта (платени)', $t['shop_ordered'] ?? 0, ''],
     ];
   ?>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:.6rem;">
