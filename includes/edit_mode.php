@@ -54,6 +54,18 @@ function t_lookup(string $key, string $bg, string $en, ?string $lang = null, arr
  */
 if (!function_exists('te')) {
 function te(string $key, string $bg = '', string $en = '', ?string $lang = null, array $vars = []): string {
+    return te_key($key, $bg, $en, $lang, $vars);
+}
+}
+
+/**
+ * te() for wording whose key is made at run time and whose default is the site's
+ * own data rather than strings.json — a donation recipient's name and hint from
+ * includes/site-extensions.php, say. Everywhere else call te(): its literal keys
+ * and defaults are what the strings.json tests check.
+ */
+if (!function_exists('te_key')) {
+function te_key(string $key, string $bg = '', string $en = '', ?string $lang = null, array $vars = []): string {
     $lang = ($lang ?? get_lang()) === 'en' ? 'en' : 'bg';
     $out  = '<span data-cms-section="ui" data-cms-field="' . h($key) . '" data-cms-type="text"';
     // Both languages ride along only for an admin, so switching BG/EN in the bar shows the other one.

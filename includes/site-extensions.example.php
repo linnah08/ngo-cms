@@ -11,6 +11,12 @@
 return [
     // Donation recipients. More than one → donors choose who the donation is for.
     // List the organisation itself too; old donations belong to the default.
+    // The key (lower-case letters, digits, '-' or '_') is stored with each
+    // donation, so never rename one that has donations. label and hint are what
+    // donors read on the form; an admin can reword both there in Edit mode, and
+    // the text here is the default. order_label is optional: the recipient's name
+    // on order lines („Дарение за …“), emails, Админ → Поръчки and the reports,
+    // when that should differ from what donors read (default: the label).
     'recipients' => [
         'foundation' => [
             'label_bg' => 'Фондация Пример', 'label_en' => 'Example Foundation',
@@ -28,6 +34,9 @@ return [
             'hint_url_en' => '/en/news/partner-centre/',
             'purpose_bg' => 'За работата на партньорския център',
             'purpose_en' => 'For the partner centre\'s work',
+            // Name on order lines, emails, admin and reports. One text for both
+            // languages also works: 'order_label' => 'Център Пример'.
+            'order_label' => ['bg' => 'Център Пример', 'en' => 'Example Centre'],
         ],
     ],
 

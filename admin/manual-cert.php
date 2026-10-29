@@ -321,7 +321,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <select name="recipient" id="mcRecipient" class="form-input">
           <?php $rec = donation_recipient_clean($_POST['recipient'] ?? null); ?>
           <?php foreach (donation_recipients() as $rk => $rv): ?>
-            <option value="<?= h($rk) ?>" <?= $rec === $rk ? 'selected' : '' ?>><?= h($rv['label_bg']) ?> — <?= h($rv['purpose_bg']) ?></option>
+            <option value="<?= h($rk) ?>" <?= $rec === $rk ? 'selected' : '' ?>><?= h($rv['order_label_bg']) ?> — <?= h($rv['purpose_bg']) ?></option>
           <?php endforeach; ?>
         </select>
       </div>

@@ -154,7 +154,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 <?php // Who the donations were for — only when the site has several recipients (includes/site_extensions.php). ?>
 <?php if ($filter_type === 'donation' && donation_recipients_choosable()): ?>
 <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin:-.75rem 0 1.5rem;" aria-label="Дарения за">
-  <?php foreach (['' => 'Всички дарения'] + array_map(fn($r) => $r['label_bg'], donation_recipients()) as $rk => $rl): ?>
+  <?php foreach (['' => 'Всички дарения'] + array_map(fn($r) => $r['order_label_bg'], donation_recipients()) as $rk => $rl): ?>
     <a href="<?= h(orders_list_url($filter, ['rec' => $rk])) ?>"<?= $filter['rec'] === $rk ? ' aria-current="true"' : '' ?>
        style="padding:.35rem .9rem;border-radius:20px;font-size:.85rem;text-decoration:none;
          <?= $filter['rec'] === $rk ? 'background:var(--teal);color:#fff;' : 'background:var(--warm-grey);color:var(--text);' ?>">
@@ -290,7 +290,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
                       if (is_array($_it) && ($_it['type'] ?? '') === 'donation') $_recips[donation_line_recipient($_it)] = true;
                   }
                   foreach (array_keys($_recips) as $_rk): ?>
-              <small style="display:block;color:var(--text-muted);"><?= h(donation_recipient_label($_rk)) ?></small>
+              <small style="display:block;color:var(--text-muted);"><?= h(donation_recipient_order_label($_rk)) ?></small>
             <?php endforeach; endif; ?>
           </td>
           <td style="cursor:pointer;" onclick="location='/admin/order-view.php?id=<?= (int)$o['id'] ?>'">

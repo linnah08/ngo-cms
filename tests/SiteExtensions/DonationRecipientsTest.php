@@ -134,4 +134,80 @@ final class DonationRecipientsTest extends TestCase
         $this->assertStringContainsString('href="/en/news/25/"', $en);
         $this->assertStringNotContainsString('/novini/25/', $en);
     }
+
+    public function test_the_name_and_hint_are_editable_on_the_page_with_the_files_text_as_default(): void
+    {
+        require_once dirname(__DIR__, 2) . '/includes/ui_wording.php';
+        $this->site('<?php return ["recipients" => [
+            "foundation"     => ["label_bg" => "Фондацията", "label_en" => "The foundation", "purpose_bg" => "П"],
+            "partner-centre" => ["label_bg" => "Партньор", "purpose_bg" => "П", "hint_bg" => "Център"],
+        ]];');
+        $this->assertSame('donation.recipient_label.partner_centre', donation_recipient_wording_key('partner-centre', 'label'));
+        $this->assertSame('donation.recipient_hint.foundation', donation_recipient_wording_key('foundation', 'hint'));
+        $this->assertMatchesRegularExpression(UI_WORDING_KEY_RE, donation_recipient_wording_key('partner-centre', 'hint'), 'Edit mode can save it');
+
+        $render = function (string $lang): string {
+            ob_start();
+            require dirname(__DIR__, 2) . '/templates/donation-recipients.php';
+            return (string) ob_get_clean();
+        };
+        $had = array_key_exists('_om_ui_wording', $GLOBALS);
+        $old = $GLOBALS['_om_ui_wording'] ?? null;
+        try {
+            $GLOBALS['_om_ui_wording'] = ['bg' => [], 'en' => []];
+            $bg = $render('bg');
+            $this->assertStringContainsString('data-cms-field="donation.recipient_label.partner_centre" data-cms-type="text">Партньор</span>', $bg);
+            $this->assertStringContainsString('data-cms-field="donation.recipient_hint.partner_centre" data-cms-type="text">Център</span>', $bg);
+            $this->assertStringContainsString('>The foundation</span>', $render('en'));
+            $this->assertStringContainsString('>Център</span>', $render('en'), 'no English hint → the Bulgarian one');
+
+            $GLOBALS['_om_ui_wording'] = ['bg' => ['donation.recipient_label.partner_centre' => 'Нов текст'], 'en' => []];
+            $this->assertStringContainsString('>Нов текст</span>', $render('bg'), 'wording saved in Edit mode wins');
+        } finally {
+            if ($had) $GLOBALS['_om_ui_wording'] = $old; else unset($GLOBALS['_om_ui_wording']);
+        }
+    }
+
+    public function test_order_label_names_the_recipient_on_orders_and_reports(): void
+    {
+        require_once dirname(__DIR__, 2) . '/includes/reports/monthly-orders.php';
+        $this->site('<?php return ["recipients" => [
+            "foundation" => ["label_bg" => "Фондацията", "label_en" => "The foundation", "purpose_bg" => "П"],
+            "iris"       => ["label_bg" => "Терапии за деца", "label_en" => "Therapies for children", "purpose_bg" => "П",
+                             "order_label" => ["bg" => "ЦСРИ Ирис", "en" => "Centre Iris"]],
+            "one"        => ["label_bg" => "Едно", "purpose_bg" => "П", "order_label" => "Център Едно"],
+            "bg_only"    => ["label_bg" => "Само", "label_en" => "Only", "purpose_bg" => "П", "order_label" => ["bg" => "Само БГ"]],
+            "bad"        => ["label_bg" => "Лошо", "label_en" => "Bad", "purpose_bg" => "П", "order_label" => 42],
+        ]];');
+        $this->assertSame(['ЦСРИ Ирис', 'Centre Iris'], [donation_recipient_order_label('iris', 'bg'), donation_recipient_order_label('iris', 'en')]);
+        $this->assertSame(['Център Едно', 'Център Едно'], [donation_recipient_order_label('one', 'bg'), donation_recipient_order_label('one', 'en')], 'one text serves both');
+        $this->assertSame('Само БГ', donation_recipient_order_label('bg_only', 'en'), 'no English order name → the Bulgarian one');
+        $this->assertSame(['Фондацията', 'The foundation'], [donation_recipient_order_label('foundation', 'bg'), donation_recipient_order_label('foundation', 'en')], 'none → the label');
+        $this->assertSame(['Лошо', 'Bad'], [donation_recipient_order_label('bad', 'bg'), donation_recipient_order_label('bad', 'en')], 'not text → the label');
+        $this->assertSame('Терапии за деца', donation_recipient_label('iris'), 'donors still read the label');
+        $this->assertSame('Дарение (ЦСРИ Ирис)', monthly_report_donation_label('iris'));
+    }
+
+    public function test_the_donor_facing_label_never_names_an_order_line(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $src  = (string) file_get_contents("$root/checkout/index.php");
+        $this->assertStringContainsString("'Дарение за ' . donation_recipient_order_label(\$donation_recipient, 'bg')", $src);
+        $this->assertStringContainsString("'Donation to ' . donation_recipient_order_label(\$donation_recipient, 'en')", $src);
+        // Order lines, emails (they print the line's name), admin and reports use
+        // the order name; the label is only for the donation form.
+        $it  = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS));
+        $bad = [];
+        foreach ($it as $f) {
+            $rel = substr($f->getPathname(), strlen($root) + 1);
+            if (!str_ends_with($rel, '.php') || preg_match('#^(vendor|node_modules|tests|docs|\.git)/#', $rel)) continue;
+            if (in_array($rel, ['includes/site_extensions.php', 'templates/donation-recipients.php'], true)) continue;
+            $code = (string) file_get_contents($f->getPathname());
+            if (str_contains($code, 'donation_recipient_label(') || str_contains($code, "donation_recipients()")
+                && preg_match('/\[\'label_(bg|en)\'\]/', $code)) {
+                $bad[] = $rel;
+            }
+        }
+        $this->assertSame([], $bad, 'use donation_recipient_order_label() / order_label_bg');
+    }
 }

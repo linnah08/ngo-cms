@@ -418,8 +418,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $donation_recipient = donation_recipient_clean($_POST['donation_recipient'] ?? null);
             $items_json[] = [
                 'type'         => 'donation',
-                'name_bg'      => 'Дарение за ' . donation_recipient_label($donation_recipient, 'bg'),
-                'name_en'      => 'Donation to ' . donation_recipient_label($donation_recipient, 'en'),
+                'name_bg'      => 'Дарение за ' . donation_recipient_order_label($donation_recipient, 'bg'),
+                'name_en'      => 'Donation to ' . donation_recipient_order_label($donation_recipient, 'en'),
                 'amount_eur'   => $donation_amount,
                 'subtotal_eur' => $donation_amount,
                 'recipient'    => $donation_recipient,

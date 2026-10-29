@@ -18,6 +18,7 @@ final class ExampleFileTest extends TestCase
         $GLOBALS['_om_site_extensions_file'] = $file;
         $raw = require $file;
         $this->assertSame(array_keys($raw['recipients']), array_keys(donation_recipients()));
+        $this->assertSame('Център Пример', donation_recipient_order_label('partner_centre', 'bg'), 'order_label is read');
         $this->assertSame(array_keys($raw['roles']), array_keys(site_admin_roles()));
         $this->assertSame(array_keys($raw['order_filters']), array_keys(site_order_filters()));
         $this->assertSame(array_keys($raw['reports']), array_keys(site_reports()));

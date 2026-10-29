@@ -23,10 +23,16 @@
  * site down.
  */
 
-/** Where a site keeps its extensions. Site-owned: never in a release (tests point it elsewhere). */
+/**
+ * Where a site keeps its extensions. Site-owned: never in a release. Tests point
+ * it elsewhere: $GLOBALS['_om_site_extensions_file'] in the test's own process,
+ * NGO_SITE_EXTENSIONS_FILE (an absolute path) for a test web server it starts.
+ */
 function site_extensions_file(): string
 {
-    return (string) ($GLOBALS['_om_site_extensions_file'] ?? dirname(__DIR__) . '/includes/site-extensions.php');
+    if (isset($GLOBALS['_om_site_extensions_file'])) return (string) $GLOBALS['_om_site_extensions_file'];
+    $env = (string) getenv('NGO_SITE_EXTENSIONS_FILE');
+    return $env !== '' ? $env : dirname(__DIR__) . '/includes/site-extensions.php';
 }
 
 /** The raw array the site's file returns, or [] (missing, unreadable or not an array). */
@@ -314,7 +320,8 @@ const DONATION_RECIPIENT_DEFAULT = 'foundation';
 
 /**
  * Who a donation can go to: key => [label_bg, label_en, hint_bg, hint_en,
- * hint_url, hint_url_bg, hint_url_en, purpose_bg, purpose_en, default]. Without site recipients there is one — the
+ * hint_url, hint_url_bg, hint_url_en, purpose_bg, purpose_en, order_label_bg,
+ * order_label_en, default]. Without site recipients there is one — the
  * organisation itself, with the purpose from site.config (DONATION_PURPOSE_BG/EN)
  * — and donors are never asked to choose. A site's list replaces it; exactly one
  * entry is the default (the first, unless one says 'default' => true).
@@ -322,6 +329,11 @@ const DONATION_RECIPIENT_DEFAULT = 'foundation';
  * link: hint_url_bg on the Bulgarian site, hint_url_en on the English one, each
  * falling back to hint_url (one link for both). A link is a path on the site
  * ("/novini/…") or a full http(s) address; anything else is dropped.
+ * The label and hint are what donors read, and an admin can reword them on the
+ * page in Edit mode (donation_recipient_wording_key()); the file's text is the
+ * default. order_label — ['bg' => …, 'en' => …], or one text for both — is the
+ * recipient's name on order lines, emails, admin lists and reports („Дарение за
+ * <order_label>“); without it the label is used.
  */
 function donation_recipients(): array
 {
@@ -337,6 +349,8 @@ function donation_recipients(): array
         'hint_bg'    => '', 'hint_en' => '', 'hint_url' => '', 'hint_url_bg' => '', 'hint_url_en' => '',
         'purpose_bg' => defined('DONATION_PURPOSE_BG') ? (string) DONATION_PURPOSE_BG : 'За дейността и програмите на ' . $site_bg,
         'purpose_en' => defined('DONATION_PURPOSE_EN') ? (string) DONATION_PURPOSE_EN : 'For the activities and programmes of ' . $site_en,
+        'order_label_bg' => $site_bg,
+        'order_label_en' => $site_en,
         'default'    => true,
     ]];
 
@@ -347,9 +361,13 @@ function donation_recipients(): array
         $purpose_bg = trim((string) ($r['purpose_bg'] ?? ''));
         if ($label_bg === '' || $purpose_bg === '') { error_log("site_extensions: recipient '$key' needs label_bg and purpose_bg — skipped"); continue; }
         $base = $own[$key] ?? [];
+        $label_en = trim((string) ($r['label_en'] ?? '')) ?: $label_bg;
+        $order    = $r['order_label'] ?? null;
+        $order_bg = trim((string) (is_array($order) ? ($order['bg'] ?? '') : (is_string($order) ? $order : '')));
+        $order_en = trim((string) (is_array($order) ? ($order['en'] ?? '') : (is_string($order) ? $order : '')));
         $list[$key] = [
             'label_bg'   => $label_bg,
-            'label_en'   => trim((string) ($r['label_en'] ?? '')) ?: $label_bg,
+            'label_en'   => $label_en,
             'hint_bg'    => trim((string) ($r['hint_bg'] ?? '')),
             'hint_en'    => trim((string) ($r['hint_en'] ?? '')),
             'hint_url'   => $url = donation_recipient_url_clean($r['hint_url'] ?? ''),
@@ -357,6 +375,9 @@ function donation_recipients(): array
             'hint_url_en'=> donation_recipient_url_clean($r['hint_url_en'] ?? '') ?: $url,
             'purpose_bg' => $purpose_bg,
             'purpose_en' => trim((string) ($r['purpose_en'] ?? '')) ?: ($base['purpose_en'] ?? $purpose_bg),
+            // A Bulgarian order name alone serves both languages, like label_bg.
+            'order_label_bg' => $order_bg ?: $label_bg,
+            'order_label_en' => $order_en ?: ($order_bg ?: $label_en),
             'default'    => !empty($r['default']),
         ];
     }
@@ -409,6 +430,26 @@ function donation_recipient_label(?string $key, string $lang = 'bg'): string
 {
     $r = donation_recipients()[donation_recipient_clean($key)];
     return $lang === 'en' ? $r['label_en'] : $r['label_bg'];
+}
+
+/**
+ * The recipient's name on an order line, in emails, admin lists and reports:
+ * its order_label, else its label (the donor-facing name).
+ */
+function donation_recipient_order_label(?string $key, string $lang = 'bg'): string
+{
+    $r = donation_recipients()[donation_recipient_clean($key)];
+    return $lang === 'en' ? $r['order_label_en'] : $r['order_label_bg'];
+}
+
+/**
+ * The Edit-mode wording key of a recipient's 'label' or 'hint' on the donation
+ * form, e.g. donation.recipient_label.partner_centre (a '-' in the recipient key
+ * becomes '_', as wording keys allow only letters, digits and '_').
+ */
+function donation_recipient_wording_key(string $key, string $field): string
+{
+    return 'donation.recipient_' . ($field === 'hint' ? 'hint' : 'label') . '.' . str_replace('-', '_', $key);
 }
 
 /** What the donation is for — printed on the donation certificate. */

@@ -44,7 +44,8 @@ function monthly_report_payment_label(array $order): string
 /**
  * The report's name for a donation to $recipient: plain "Дарение" when the site
  * has a single recipient (the organisation itself), "Дарение (<recipient>)" when
- * donors choose between several (site-extensions 'recipients').
+ * donors choose between several (site-extensions 'recipients', named by their
+ * order_label).
  */
 function monthly_report_donation_label(string $recipient): string
 {
@@ -52,7 +53,7 @@ function monthly_report_donation_label(string $recipient): string
         require_once dirname(__DIR__) . '/site_extensions.php';
     }
     if (!donation_recipients_choosable()) return 'Дарение';
-    return 'Дарение (' . donation_recipient_label($recipient, 'bg') . ')';
+    return 'Дарение (' . donation_recipient_order_label($recipient, 'bg') . ')';
 }
 
 /**
