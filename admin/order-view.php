@@ -1355,7 +1355,9 @@ function toggleTracking(status) {
 }
 <?php if ($can_sign): ?>
 function openSignModal(docId) {
-    document.getElementById('signDocId').value = docId;
+    // No saved signature yet: the dialog has no form, only the way to draw one.
+    var docField = document.getElementById('signDocId');
+    if (docField) docField.value = docId;
     var overlay = document.getElementById('signModalOverlay');
     overlay.style.display = 'flex';
     overlay.querySelector('button[data-dismiss]').focus();

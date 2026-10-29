@@ -464,6 +464,11 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/order-email-history.php';
      role="dialog" aria-modal="true">
   <div style="background:#fff;border-radius:10px;padding:2rem;max-width:440px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.25);">
     <h3 style="margin-top:0;font-size:1.05rem;">Подпис на сертификата</h3>
+    <?php
+      $sig_check = $pdo->prepare('SELECT 1 FROM admin_signatures WHERE admin_user_id = ?');
+      $sig_check->execute([(int) admin_user()['id']]);
+    ?>
+    <?php if ($sig_check->fetchColumn()): ?>
     <p style="font-size:.875rem;color:#374151;margin-bottom:1.25rem;">
       Ще бъде приложен вашият запазен подпис, PDF-ът ще бъде презаписан и сертификатът ще бъде изпратен автоматично на <?= h($pledge['email']) ?>.
     </p>
@@ -481,11 +486,28 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/order-email-history.php';
         </button>
       </div>
     </form>
+    <?php else: ?>
+    <p style="font-size:.875rem;color:#374151;margin-bottom:1.25rem;">
+      Нямате запазен подпис. Преди да подпишете сертификат, трябва да нарисувате подписа си.
+    </p>
+    <div style="display:flex;gap:.75rem;justify-content:flex-end;">
+      <button type="button" id="pledgeSignModalCancel"
+              style="padding:.55rem 1.1rem;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:.9rem;">
+        Затвори
+      </button>
+      <a href="/admin/signature.php"
+         style="padding:.55rem 1.25rem;border:none;border-radius:6px;background:var(--teal);color:#fff;text-decoration:none;font-size:.9rem;font-weight:600;display:inline-block;">
+        Добави подпис →
+      </a>
+    </div>
+    <?php endif; ?>
   </div>
 </div>
 <script>
 function openPledgeSignModal(docId) {
-    document.getElementById('pledgeSignDocId').value = docId;
+    // No saved signature yet: the dialog has no form, only the way to draw one.
+    var docField = document.getElementById('pledgeSignDocId');
+    if (docField) docField.value = docId;
     var overlay = document.getElementById('pledgeSignModalOverlay');
     overlay.style.display = 'flex';
     document.getElementById('pledgeSignModalCancel').focus();
