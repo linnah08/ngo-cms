@@ -37,7 +37,7 @@ if ($_print_pids) {
     $_vstmt = $pdo->prepare("SELECT id, variants FROM products WHERE id IN ($_in)");
     $_vstmt->execute(array_values($_print_pids));
     foreach ($_vstmt->fetchAll() as $_vrow) {
-        $_print_variants[(int)$_vrow['id']] = json_decode($_vrow['variants'], true) ?? [];
+        $_print_variants[(int)$_vrow['id']] = json_decode($_vrow['variants'] ?? '{}', true) ?? [];
     }
 }
 

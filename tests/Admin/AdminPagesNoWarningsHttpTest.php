@@ -12,6 +12,8 @@ require_once dirname(__DIR__) . '/Support/TestServer.php';
  *
  * - newsletter-subscribers.php without ?status= read $_GET['status'] after
  *   `?? 'all'` had already matched the whitelist — a warning on every visit.
+ * - order-view.php json_decode()d products.variants, which is NULL for every
+ *   ordinary product — a deprecation on every order with such a product.
  */
 #[Group('http')]
 #[Group('admin')]
@@ -23,6 +25,8 @@ final class AdminPagesNoWarningsHttpTest extends TestCase
     private static ?int   $uid      = null;
     private static string $jar      = '';
     private static ?string $unavailable = null;
+    private static ?int   $productId = null;
+    private static ?int   $orderId   = null;
 
     public static function setUpBeforeClass(): void
     {
@@ -39,6 +43,17 @@ final class AdminPagesNoWarningsHttpTest extends TestCase
             ->execute(['No Warnings Test', self::$email, password_hash(self::$password, PASSWORD_BCRYPT), 'admin']);
         self::$uid = (int) $pdo->lastInsertId();
 
+        // An ordinary product: variants left NULL on purpose.
+        $pdo->prepare('INSERT INTO products (slug, name_bg, name_en, price_eur, stock, active) VALUES (?, ?, ?, ?, ?, ?)')
+            ->execute(['test-nowarn-' . bin2hex(random_bytes(4)), 'Тест без варианти', 'No variants', 5.00, 1, 0]);
+        self::$productId = (int) $pdo->lastInsertId();
+        $pdo->prepare(
+            "INSERT INTO orders (order_number,type,status,customer_name,customer_email,items,subtotal_eur,shipping_eur,total_eur,payment_method,payment_status)
+             VALUES (?, 'physical', 'new', 'Тест', 't@example.test', ?, 5, 0, 5, 'cod', 'pending')"
+        )->execute(['NW' . substr(bin2hex(random_bytes(7)), 0, 12),
+            json_encode([['product_id' => self::$productId, 'name' => 'Тест без варианти', 'price' => 5, 'quantity' => 1]])]);
+        self::$orderId = (int) $pdo->lastInsertId();
+
         self::$jar = (string) tempnam(sys_get_temp_dir(), 'ngo_nowarn_jar_');
         $ch = curl_init(self::$base . '/admin/login.php');
         curl_setopt_array($ch, [
@@ -54,6 +69,8 @@ final class AdminPagesNoWarningsHttpTest extends TestCase
     {
         TestServer::stop();
         if (self::$jar !== '') @unlink(self::$jar);
+        if (self::$orderId !== null) get_pdo()->prepare('DELETE FROM orders WHERE id = ?')->execute([self::$orderId]);
+        if (self::$productId !== null) get_pdo()->prepare('DELETE FROM products WHERE id = ?')->execute([self::$productId]);
         if (self::$uid !== null) get_pdo()->prepare('DELETE FROM admin_users WHERE id = ?')->execute([self::$uid]);
     }
 
@@ -97,6 +114,14 @@ final class AdminPagesNoWarningsHttpTest extends TestCase
         if ($code === 404) $this->markTestSkipped('Newsletter module is off here.');
         $this->assertSame(200, $code);
         $this->assertNoWarningsFrom('newsletter-subscribers.php', $log);
+    }
+
+    public function testOrderWithAProductWithoutVariantsLogsNoDeprecation(): void
+    {
+        [$code, , $log] = $this->visit('/admin/order-view.php?id=' . self::$orderId);
+        if ($code === 404) $this->markTestSkipped('Shop module is off here.');
+        $this->assertSame(200, $code);
+        $this->assertNoWarningsFrom('order-view.php', $log);
     }
 
     /**
