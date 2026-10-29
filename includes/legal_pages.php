@@ -32,6 +32,12 @@ function legal_const(string $name): string
     return defined($name) ? trim((string) constant($name)) : '';
 }
 
+/** An Организация text in English: its *_EN version, else the Bulgarian one (org_text()). */
+function legal_const_en(string $name): string
+{
+    return function_exists('org_text') ? org_text($name, 'en') : legal_const($name);
+}
+
 /** Who the legal pages speak for: the registered legal name, else the site name. */
 function legal_en_org_name(): string
 {
@@ -45,9 +51,9 @@ function legal_en_org_name(): string
 function legal_en_identity_lines(bool $with_representative = false): string
 {
     $lines = '';
-    if (legal_const('SITE_ADDRESS') !== '') $lines .= 'Address: ' . h(legal_const('SITE_ADDRESS')) . "<br>\n";
+    if (legal_const_en('SITE_ADDRESS') !== '') $lines .= 'Address: ' . h(legal_const_en('SITE_ADDRESS')) . "<br>\n";
     if (legal_const('SITE_EIK') !== '')     $lines .= 'UIC: ' . h(legal_const('SITE_EIK')) . "<br>\n";
-    if ($with_representative && legal_const('SITE_MOL') !== '') $lines .= 'Representative: ' . h(legal_const('SITE_MOL')) . "<br>\n";
+    if ($with_representative && legal_const_en('SITE_MOL') !== '') $lines .= 'Representative: ' . h(legal_const_en('SITE_MOL')) . "<br>\n";
     return $lines;
 }
 

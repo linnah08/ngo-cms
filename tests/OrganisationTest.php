@@ -601,4 +601,67 @@ final class OrganisationTest extends TestCase
         }
         $this->assertSame([], $bad, 'use logo_url() / favicon_url() / org_brand_image() instead');
     }
+
+    // ── English address, representative and bank name ───────────────────────────
+
+    public function test_english_address_representative_and_bank_fall_back_to_bulgarian(): void
+    {
+        $root = var_export($_SERVER['DOCUMENT_ROOT'], true);
+        $run  = fn(string $defs) => $this->runPhp("<?php
+            {$defs}
+            if (!function_exists('h')) { function h(\$s) { return htmlspecialchars((string) \$s, ENT_QUOTES, 'UTF-8'); } }
+            require {$root} . '/includes/organisation.php';
+            require {$root} . '/includes/legal_pages.php';
+            require {$root} . '/includes/legal_templates.php';
+            echo json_encode([
+                'bg'    => [org_text('SITE_ADDRESS'), org_text('SITE_MOL', 'bg'), org_text('SITE_BANK_NAME', 'bg')],
+                'en'    => [org_text('SITE_ADDRESS', 'en'), org_text('SITE_MOL', 'en'), org_text('SITE_BANK_NAME', 'en')],
+                'lines' => legal_en_identity_lines(true),
+                'factsEn' => [legal_facts('en')['address'], legal_facts('en')['mol']],
+                'factsBg' => [legal_facts('bg')['address'], legal_facts('bg')['mol']],
+            ], JSON_UNESCAPED_UNICODE);
+        ");
+        $bg = "define('SITE_ADDRESS', 'гр. София, ул. Тест 1'); define('SITE_MOL', 'Иван Иванов'); define('SITE_BANK_NAME', 'Банка ДСК');";
+
+        [$rc, $out] = $run($bg . "define('SITE_ADDRESS_EN', '1 Test St, Sofia'); define('SITE_MOL_EN', 'Ivan Ivanov'); define('SITE_BANK_NAME_EN', ' DSK Bank ');");
+        $this->assertSame(0, $rc, $out);
+        $r = json_decode($out, true);
+        $this->assertSame(['гр. София, ул. Тест 1', 'Иван Иванов', 'Банка ДСК'], $r['bg']);
+        $this->assertSame(['1 Test St, Sofia', 'Ivan Ivanov', 'DSK Bank'], $r['en']);
+        $this->assertStringContainsString('Address: 1 Test St, Sofia', $r['lines']);
+        $this->assertStringContainsString('Representative: Ivan Ivanov', $r['lines']);
+        $this->assertSame(['1 Test St, Sofia', 'Ivan Ivanov'], $r['factsEn']);
+        $this->assertSame(['гр. София, ул. Тест 1', 'Иван Иванов'], $r['factsBg']);
+
+        // English left empty (or never set): the Bulgarian is printed, as before.
+        [$rc, $out] = $run($bg . "define('SITE_ADDRESS_EN', '  ');");
+        $this->assertSame(0, $rc, $out);
+        $r = json_decode($out, true);
+        $this->assertSame($r['bg'], $r['en']);
+        $this->assertStringContainsString('Address: гр. София, ул. Тест 1', $r['lines']);
+    }
+
+    public function test_english_versions_are_saved_checked_and_translatable(): void
+    {
+        foreach (['site_address_en' => 'SITE_ADDRESS_EN', 'site_mol_en' => 'SITE_MOL_EN', 'site_bank_name_en' => 'SITE_BANK_NAME_EN'] as $k => $c) {
+            $this->assertSame($c, org_fields()[$k] ?? null);
+        }
+        $r = org_validate($this->validInput(['site_address_en' => ' 1 Test St ', 'site_mol_en' => 'Ivan', 'site_bank_name_en' => 'DSK Bank']), ['teal']);
+        $this->assertSame('1 Test St', $r['values']['site_address_en']);
+        $this->assertSame('DSK Bank', $r['values']['site_bank_name_en']);
+        $this->assertArrayNotHasKey('site_address_en', $r['errors']);
+
+        $r = org_validate($this->validInput(['site_address_en' => str_repeat('a', 251), 'site_mol_en' => str_repeat('a', 151), 'site_bank_name_en' => str_repeat('a', 151)]), ['teal']);
+        foreach (['site_address_en', 'site_mol_en', 'site_bank_name_en'] as $k) {
+            $this->assertArrayHasKey($k, $r['errors']);
+        }
+
+        $form = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/admin/organisation.php');
+        foreach (['site_address_en' => 'site_address', 'site_mol_en' => 'site_mol', 'site_bank_name_en' => 'site_bank_name'] as $en => $bg) {
+            $this->assertMatchesRegularExpression('/name="' . $en . '" data-translate-from="' . $bg . '"/', $form);
+        }
+        // English documents and the English legal page read the English versions.
+        $this->assertStringContainsString("org_text('SITE_ADDRESS', \$lang)", (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DocumentGenerator.php'));
+        $this->assertStringContainsString("legal_const_en('SITE_BANK_NAME')", (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/en/legal/index.php'));
+    }
 }

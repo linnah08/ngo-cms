@@ -30,13 +30,15 @@ function legal_facts(string $lang): array
     $legal = function_exists('org_legal_name') ? org_legal_name($lang) : $c($en ? 'SITE_NAME_EN' : 'SITE_NAME_BG');
     $fill  = static fn(string $v, string $gap_bg, string $gap_en): string => $v !== '' ? h($v) : legal_gap($en ? $gap_en : $gap_bg);
     $email = $c('SITE_EMAIL');
+    // Address and representative have English versions (empty = the Bulgarian one).
+    $t     = static fn(string $k): string => function_exists('org_text') ? org_text($k, $lang) : $c($k);
     return [
         'name'    => $fill($legal, 'юридическо име', 'legal name'),
         'eik'     => $fill($c('SITE_EIK'), 'ЕИК', 'company ID (EIK)'),
-        'address' => $fill($c('SITE_ADDRESS'), 'адрес на управление', 'registered address'),
+        'address' => $fill($t('SITE_ADDRESS'), 'адрес на управление', 'registered address'),
         'email'   => $email !== '' ? '<a href="mailto:' . h($email) . '">' . h($email) . '</a>' : legal_gap($en ? 'email' : 'имейл'),
         'phone'   => $c('SITE_PHONE') !== '' ? h($c('SITE_PHONE')) : '',
-        'mol'     => $c('SITE_MOL') !== '' ? h($c('SITE_MOL')) : '',
+        'mol'     => $t('SITE_MOL') !== '' ? h($t('SITE_MOL')) : '',
         'url'     => h($c('SITE_URL')),
         'privacy' => $en ? '/en/privacy-policy/' : '/politika-za-poveritelnost/',
         'cookies' => $en ? '/en/cookie-policy/' : '/politika-za-biskvitki/',

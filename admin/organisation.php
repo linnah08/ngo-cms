@@ -184,9 +184,19 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <input type="text" name="site_mol" value="<?= h($val('site_mol')) ?>" maxlength="150" placeholder="Иван Иванов"<?= $fattr('site_mol') ?>>
         <?= $ferr('site_mol') ?>
       </label>
+      <label id="f-site_mol_en">Представляващ на английски
+        <input type="text" name="site_mol_en" data-translate-from="site_mol" value="<?= h($val('site_mol_en')) ?>" maxlength="150" placeholder="Ivan Ivanov"<?= $fattr('site_mol_en') ?>>
+        <?= $ferr('site_mol_en') ?>
+        <small style="<?= $hint ?>">За английските страници и документи. Ако е празно, се показва българското.</small>
+      </label>
       <label id="f-site_address" style="grid-column:1/-1;">Адрес на управление
         <input type="text" name="site_address" value="<?= h($val('site_address')) ?>" maxlength="250" placeholder="гр. София 1000, ул. Примерна 1"<?= $fattr('site_address') ?>>
         <?= $ferr('site_address') ?>
+      </label>
+      <label id="f-site_address_en" style="grid-column:1/-1;">Адрес на управление на английски
+        <input type="text" name="site_address_en" data-translate-from="site_address" value="<?= h($val('site_address_en')) ?>" maxlength="250" placeholder="1 Primerna St, Sofia 1000"<?= $fattr('site_address_en') ?>>
+        <?= $ferr('site_address_en') ?>
+        <small style="<?= $hint ?>">За английските страници и документи. Ако е празно, се показва българското.</small>
       </label>
     </div>
   </section>
@@ -231,6 +241,11 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       <label id="f-site_bank_name">Име на банката
         <input type="text" name="site_bank_name" value="<?= h($val('site_bank_name')) ?>" maxlength="150"<?= $fattr('site_bank_name') ?>>
         <?= $ferr('site_bank_name') ?>
+      </label>
+      <label id="f-site_bank_name_en">Име на банката на английски
+        <input type="text" name="site_bank_name_en" data-translate-from="site_bank_name" value="<?= h($val('site_bank_name_en')) ?>" maxlength="150"<?= $fattr('site_bank_name_en') ?>>
+        <?= $ferr('site_bank_name_en') ?>
+        <small style="<?= $hint ?>">За английските страници и документи. Ако е празно, се показва българското.</small>
       </label>
     </div>
   </section>

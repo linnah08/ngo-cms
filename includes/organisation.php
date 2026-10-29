@@ -30,12 +30,15 @@ function org_fields(): array
         'site_legal_same'  => 'SITE_LEGAL_SAME',   // '1': the name above is also the registered name
         'site_eik'         => 'SITE_EIK',
         'site_address'     => 'SITE_ADDRESS',
+        'site_address_en'  => 'SITE_ADDRESS_EN',    // English pages and documents; empty = the Bulgarian one (org_text())
         'site_mol'         => 'SITE_MOL',
+        'site_mol_en'      => 'SITE_MOL_EN',
         'site_email'       => 'SITE_EMAIL',
         'site_phone'       => 'SITE_PHONE',
         'site_iban'        => 'SITE_IBAN',
         'site_bic'         => 'SITE_BIC',
         'site_bank_name'   => 'SITE_BANK_NAME',
+        'site_bank_name_en' => 'SITE_BANK_NAME_EN',
         'order_prefix'     => 'ORDER_PREFIX',     // first letters of order numbers; see order_number_prefix()
         'brand_theme'      => 'BRAND_THEME',
         'brand_primary'    => 'BRAND_PRIMARY',
@@ -162,6 +165,20 @@ function org_legal_name(string $lang = 'bg'): string
     if ($name !== '') return $name;
     $site  = $en && defined('SITE_NAME_EN') ? 'SITE_NAME_EN' : 'SITE_NAME_BG';
     return defined($site) ? trim((string) constant($site)) : '';
+}
+
+/**
+ * An Организация text in $lang: SITE_ADDRESS, SITE_MOL or SITE_BANK_NAME, or for
+ * English its *_EN version — which falls back to the Bulgarian one when it is
+ * empty, so a site that never filled the English one prints what it had before.
+ * Plain text, not escaped.
+ */
+function org_text(string $const, string $lang = 'bg'): string
+{
+    $bg = defined($const) ? trim((string) constant($const)) : '';
+    if ($lang !== 'en') return $bg;
+    $en = defined($const . '_EN') ? trim((string) constant($const . '_EN')) : '';
+    return $en !== '' ? $en : $bg;
 }
 
 /**
@@ -363,8 +380,12 @@ function org_validate(array $in, array $themeKeys, ?array $signerIds = null): ar
             $v['site_eik'] = $eik;
         }
     }
-    if (mb_strlen($v['site_address']) > 250) $e['site_address'] = 'Адресът е твърде дълъг (най-много 250 знака).';
-    if (mb_strlen($v['site_mol']) > 150)     $e['site_mol'] = 'Името е твърде дълго (най-много 150 знака).';
+    foreach (['site_address', 'site_address_en'] as $k) {
+        if (mb_strlen($v[$k]) > 250) $e[$k] = 'Адресът е твърде дълъг (най-много 250 знака).';
+    }
+    foreach (['site_mol', 'site_mol_en'] as $k) {
+        if (mb_strlen($v[$k]) > 150) $e[$k] = 'Името е твърде дълго (най-много 150 знака).';
+    }
 
     if (filter_var($v['site_email'], FILTER_VALIDATE_EMAIL) === false) {
         $e['site_email'] = 'Моля, въведете правилен имейл адрес, например info@vashata-organizacia.bg';
@@ -388,8 +409,8 @@ function org_validate(array $in, array $themeKeys, ?array $signerIds = null): ar
         }
     }
 
-    if (mb_strlen($v['site_bank_name']) > 150) {
-        $e['site_bank_name'] = 'Името на банката е твърде дълго (най-много 150 знака).';
+    foreach (['site_bank_name', 'site_bank_name_en'] as $k) {
+        if (mb_strlen($v[$k]) > 150) $e[$k] = 'Името на банката е твърде дълго (най-много 150 знака).';
     }
 
     // Empty means the default prefix (order_number_prefix() in config.php).

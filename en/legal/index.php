@@ -32,7 +32,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
       Phone: <?= h(legal_const('SITE_PHONE')) ?><br>
 <?php endif; ?>
       Email: <a href="mailto:<?= h(SITE_EMAIL) ?>"><?= h(SITE_EMAIL) ?></a><?php if (legal_const('SITE_IBAN') !== ''): ?><br>
-      IBAN: <?= h(legal_const('SITE_IBAN')) ?><?php if (legal_const('SITE_BIC') !== ''): ?>, BIC: <?= h(legal_const('SITE_BIC')) ?><?php endif; ?><?php if (legal_const('SITE_BANK_NAME') !== ''): ?>, Bank: <?= h(legal_const('SITE_BANK_NAME')) ?><?php endif; ?>
+      IBAN: <?= h(legal_const('SITE_IBAN')) ?><?php if (legal_const('SITE_BIC') !== ''): ?>, BIC: <?= h(legal_const('SITE_BIC')) ?><?php endif; ?><?php if (legal_const_en('SITE_BANK_NAME') !== ''): ?>, Bank: <?= h(legal_const_en('SITE_BANK_NAME')) ?><?php endif; ?>
 <?php endif; ?>
     </p>
 

@@ -8,19 +8,20 @@ abstract class DocumentGenerator {
      * entity's (org_legal_name(): Admin → Организация → "Юридическо име",
      * falling back to the site name) — a site run as a brand or project of a
      * foundation issues its documents in the foundation's name. Bank and
-     * contact fields, ЕИК, address and МОЛ come from site.config / Admin → Организация.
+     * contact fields, ЕИК, address and МОЛ come from site.config / Admin → Организация
+     * (address, МОЛ and bank name in English when $lang is 'en' and they are filled in).
      */
     protected static function foundation(string $lang = 'bg'): array {
         return [
             'name'         => self::h(org_legal_name($lang)),   // HTML-escaped: printed straight into the templates
-            'bank'         => SITE_BANK_NAME,
+            'bank'         => self::h(org_text('SITE_BANK_NAME', $lang)),
             'bic'          => SITE_BIC,
             'iban'         => SITE_IBAN,
             'phone'        => SITE_PHONE,
             'email'        => SITE_EMAIL,
             'website'      => SITE_URL,
-            'address'      => self::h(defined('SITE_ADDRESS') ? (string) SITE_ADDRESS : ''),
-            'mol'          => self::h(defined('SITE_MOL') ? (string) SITE_MOL : ''),
+            'address'      => self::h(org_text('SITE_ADDRESS', $lang)),   // English: the *_EN version, else the Bulgarian
+            'mol'          => self::h(org_text('SITE_MOL', $lang)),
             'eik'          => self::h(defined('SITE_EIK') ? (string) SITE_EIK : ''),
             'registration' => '',
         ];
