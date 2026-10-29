@@ -361,11 +361,11 @@ if (admin_is_admin()):
 <?php endif; ?>
 
 <?php if ($can_sign || $can_shop): ?>
-<div style="display:flex;gap:.75rem;margin-bottom:.75rem;align-items:flex-start;">
+<div style="display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:.75rem;align-items:flex-start;">
 
   <?php if ($can_sign): ?>
   <!-- Unsigned donation certs -->
-  <div style="flex:1;min-width:0;background:#fff;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;">
+  <div style="flex:1 1 260px;min-width:0;background:#fff;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;">
     <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.6rem;">
       <h3 style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin:0;flex:1;">Сертификати за подписване</h3>
       <?php if ($unsigned_certs): ?>
@@ -398,7 +398,7 @@ if (admin_is_admin()):
   <?php if ($can_shop): ?>
   <?php if (module_certificates_enabled()): ?>
   <!-- Paid donations without a cert -->
-  <div style="flex:1;min-width:0;background:#fff;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;">
+  <div style="flex:1 1 260px;min-width:0;background:#fff;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;">
     <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.6rem;">
       <h3 style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin:0;flex:1;">Дарения без сертификат</h3>
       <?php if ($uncerted_donations): ?>
@@ -408,24 +408,68 @@ if (admin_is_admin()):
     <?php if (!$uncerted_donations): ?>
       <p style="font-size:.78rem;color:var(--text-muted);font-style:italic;margin:0;">Всички дарения имат сертификат.</p>
     <?php else: ?>
+      <form method="POST" action="/admin/donation-cert-not-needed.php" id="uncerted-form" style="margin:0;">
+      <?= csrf_field() ?>
       <div style="max-height:168px;overflow-y:auto;">
       <?php foreach ($uncerted_donations as $don): ?>
-      <a href="/admin/order-view.php?id=<?= (int)$don['id'] ?>"
-         style="display:flex;align-items:center;gap:.45rem;padding:.35rem .5rem;border-radius:4px;font-size:.76rem;background:#fff;margin-bottom:.28rem;border:1px solid var(--border);text-decoration:none;color:inherit;"
-         onmouseover="this.style.background='var(--warm-grey)'" onmouseout="this.style.background='#fff'">
-        <span style="width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--teal);"></span>
-        <span style="font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= h($don['order_number']) ?></span>
-        <span style="color:var(--text-muted);font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:8rem;"><?= h($don['customer_name']) ?> · <?= format_eur((float)$don['donation_eur']) ?></span>
-        <span style="font-size:.68rem;color:var(--teal);font-weight:600;flex-shrink:0;">Генерирай →</span>
-      </a>
+      <div style="display:flex;align-items:center;gap:.35rem;margin-bottom:.28rem;">
+        <input type="checkbox" name="ids[]" value="<?= (int)$don['id'] ?>" class="uncerted-cb"
+               aria-label="Избери <?= h($don['order_number']) ?>"
+               style="width:16px;height:16px;margin:0;flex-shrink:0;cursor:pointer;">
+        <a href="/admin/order-view.php?id=<?= (int)$don['id'] ?>"
+           style="flex:1;min-width:0;display:flex;flex-wrap:nowrap;align-items:center;gap:.45rem;padding:.35rem .5rem;border-radius:4px;font-size:.76rem;background:#fff;border:1px solid var(--border);text-decoration:none;color:inherit;"
+           onmouseover="this.style.background='var(--warm-grey)'" onmouseout="this.style.background='#fff'">
+          <span style="width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--teal);"></span>
+          <span style="font-weight:600;flex-shrink:0;white-space:nowrap;"><?= h($don['order_number']) ?></span>
+          <span style="color:var(--text-muted);font-size:.68rem;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?= h($don['customer_name']) ?> · <?= format_eur((float)$don['donation_eur']) ?></span>
+          <span style="font-size:.68rem;color:var(--teal);font-weight:600;flex-shrink:0;">Генерирай →</span>
+        </a>
+        <button type="submit" name="only" value="<?= (int)$don['id'] ?>"
+                title="Това дарение не се нуждае от сертификат — махни го от списъка"
+                aria-label="<?= h($don['order_number']) ?>: сертификатът не е нужен"
+                style="flex-shrink:0;padding:.35rem .45rem;border-radius:4px;font-size:.68rem;font-family:inherit;background:#fff;border:1px solid var(--border);color:var(--text-muted);cursor:pointer;white-space:nowrap;">Не е нужен</button>
+      </div>
       <?php endforeach; ?>
       </div>
+      <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.45rem;padding-top:.45rem;border-top:1px solid var(--border);font-size:.74rem;">
+        <label style="display:inline-flex;align-items:center;gap:.35rem;cursor:pointer;margin:0;font-size:.74rem;font-weight:400;text-transform:none;letter-spacing:normal;color:inherit;">
+          <input type="checkbox" id="uncerted-all" style="width:16px;height:16px;margin:0;cursor:pointer;"> Избери всички
+        </label>
+        <button type="submit" id="uncerted-bulk" disabled
+                style="margin-left:auto;padding:.3rem .6rem;border-radius:4px;font-size:.72rem;font-family:inherit;font-weight:600;background:#fff;border:1px solid var(--border);color:var(--text-muted);cursor:pointer;">Не е нужен сертификат за избраните</button>
+      </div>
+      </form>
+      <script>
+      (function () {
+        var form = document.getElementById('uncerted-form');
+        var all  = document.getElementById('uncerted-all');
+        var bulk = document.getElementById('uncerted-bulk');
+        var cbs  = form.querySelectorAll('.uncerted-cb');
+        function sync() {
+          var n = 0;
+          cbs.forEach(function (cb) { if (cb.checked) n++; });
+          bulk.disabled = n === 0;
+          bulk.style.opacity = n === 0 ? '.55' : '1';
+          bulk.style.cursor = n === 0 ? 'default' : 'pointer';
+          bulk.textContent = n === 0 ? 'Не е нужен сертификат за избраните'
+                                     : 'Не е нужен сертификат за избраните (' + n + ')';
+          all.checked = n === cbs.length;
+          all.indeterminate = n > 0 && n < cbs.length;
+        }
+        all.addEventListener('change', function () {
+          cbs.forEach(function (cb) { cb.checked = all.checked; });
+          sync();
+        });
+        cbs.forEach(function (cb) { cb.addEventListener('change', sync); });
+        sync();
+      })();
+      </script>
     <?php endif; ?>
   </div>
   <?php endif; ?>
 
   <!-- Physical orders + pledges awaiting shipping -->
-  <div style="flex:1;min-width:0;background:#fff;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;">
+  <div style="flex:1 1 260px;min-width:0;background:#fff;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;">
     <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.6rem;">
       <h3 style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin:0;flex:1;">За изпращане</h3>
       <?php if ($shipping_items): ?>

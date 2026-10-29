@@ -119,6 +119,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // ── „Сертификатът не е нужен“ (takes the order off the dashboard list), and its undo
+    if ($action === 'cert_not_needed' || $action === 'cert_needed') {
+        $ok = $action === 'cert_not_needed'
+            ? donation_cert_mark_not_needed($pdo, [(int) $id]) > 0
+            : donation_cert_clear_not_needed($pdo, (int) $id);
+        $q = $ok
+            ? 'doc_success=' . urlencode($action === 'cert_not_needed'
+                ? 'Отбелязано: това дарение не се нуждае от сертификат.'
+                : 'Върнато: това дарение отново чака сертификат.')
+            : 'doc_error=' . urlencode('Нищо не беше променено.');
+        header('Location: /admin/order-view.php?id=' . (int) $id . '&' . $q);
+        exit;
+    }
+
     // Reward shipping label actions (pledge orders) — shared with pledge-view
     if ($pledge_row) {
         $psc = pledge_shipping_handle_post($pdo, $pledge_row);
@@ -1222,6 +1236,24 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
             </form>
             <?php endif; ?>
           </div>
+        <?php elseif (!empty($order['donation_cert_not_needed_at'])): ?>
+          <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.5rem;">
+            <span style="background:#eef0f2;color:#374151;border-radius:4px;padding:.1rem .45rem;font-size:.7rem;font-weight:600;">Не е нужен</span>
+            &nbsp;Отбелязано на <?= h(substr($order['donation_cert_not_needed_at'], 0, 10)) ?> — не се показва в „Дарения без сертификат“.
+          </div>
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
+            <form method="POST" style="display:inline;">
+              <?= csrf_field() ?>
+              <input type="hidden" name="action" value="cert_needed">
+              <button type="submit" class="btn btn--outline" style="font-size:.8rem;padding:.3rem .75rem;">↺ Върни</button>
+            </form>
+            <form method="POST" action="/admin/generate-document.php" style="display:inline;">
+              <?= csrf_field() ?>
+              <input type="hidden" name="order_id" value="<?= $id ?>">
+              <input type="hidden" name="doc_type" value="donation_cert">
+              <button type="submit" class="btn btn--outline" style="font-size:.8rem;padding:.3rem .75rem;">+ Генерирай все пак</button>
+            </form>
+          </div>
         <?php else: ?>
           <form method="POST" action="/admin/generate-document.php">
             <?= csrf_field() ?>
@@ -1231,6 +1263,15 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
               + Генерирай сертификат
             </button>
           </form>
+          <?php if (($order['payment_status'] ?? '') === 'paid'): ?>
+          <form method="POST" style="margin-top:.4rem;text-align:center;">
+            <?= csrf_field() ?>
+            <input type="hidden" name="action" value="cert_not_needed">
+            <button type="submit" style="background:none;border:none;padding:.2rem;font-family:inherit;font-size:.78rem;color:var(--text-muted);text-decoration:underline;cursor:pointer;">
+              Не е нужен сертификат за това дарение
+            </button>
+          </form>
+          <?php endif; ?>
         <?php endif; ?>
       </div>
       <?php endif; ?>

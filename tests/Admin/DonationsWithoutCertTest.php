@@ -110,4 +110,44 @@ final class DonationsWithoutCertTest extends TestCase
             $stmt->fetchAll(PDO::FETCH_COLUMN)
         );
     }
+
+    public function test_marked_not_needed_leaves_the_list_and_undo_brings_it_back(): void
+    {
+        $a = $this->insertOrder('A', 'donation', [], 25.0);
+        $b = $this->insertOrder('B', 'physical', [['type' => 'donation', 'amount_eur' => 10.0]], 10.0);
+        $this->insertOrder('C', 'donation', [], 5.0);
+
+        $this->assertSame(2, donation_cert_mark_not_needed($this->pdo, [$a, (string)$b, $b, 0, -3]));
+        $this->assertSame(['C'], array_keys($this->uncerted()));
+
+        // Marking again changes nothing.
+        $this->assertSame(0, donation_cert_mark_not_needed($this->pdo, [$a]));
+
+        $this->assertTrue(donation_cert_clear_not_needed($this->pdo, $a));
+        $this->assertFalse(donation_cert_clear_not_needed($this->pdo, $a));
+        $this->assertSame(['A', 'C'], array_keys($this->uncerted()));
+    }
+
+    public function test_only_paid_donations_without_a_cert_can_be_marked(): void
+    {
+        $product = $this->insertOrder('PRODUCT', 'physical', [['type' => 'physical', 'subtotal_eur' => 30.0]], 30.0);
+        $unpaid  = $this->insertOrder('UNPAID', 'donation', [], 5.0, 'pending');
+        $certed  = $this->insertOrder('CERTED', 'donation', [], 7.0);
+        $this->addCert($certed);
+
+        $this->assertSame(0, donation_cert_mark_not_needed($this->pdo, [$product, $unpaid, $certed]));
+        $this->assertSame(0, donation_cert_mark_not_needed($this->pdo, []));
+
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM orders WHERE order_number LIKE ? AND donation_cert_not_needed_at IS NOT NULL');
+        $stmt->execute([self::PREFIX . '%']);
+        $this->assertSame(0, (int)$stmt->fetchColumn());
+    }
+
+    public function test_handler_checks_access_and_csrf(): void
+    {
+        $src = (string)file_get_contents(dirname(__DIR__, 2) . '/admin/donation-cert-not-needed.php');
+        $this->assertStringContainsString('admin_require_shop();', $src);
+        $this->assertStringContainsString('csrf_verify()', $src);
+        $this->assertStringContainsString('donation_cert_mark_not_needed(', $src);
+    }
 }

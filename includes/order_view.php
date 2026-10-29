@@ -80,6 +80,7 @@ function orders_paid_donations_without_cert(PDO $pdo): array {
          LEFT JOIN documents d ON d.order_id = o.id AND d.type = 'donation_cert'
          WHERE " . order_has_donation_sql('o') . "
            AND o.payment_status = 'paid' AND d.id IS NULL
+           AND o.donation_cert_not_needed_at IS NULL
          ORDER BY o.created_at ASC, o.id ASC"
     );
     $rows = [];
@@ -89,6 +90,38 @@ function orders_paid_donations_without_cert(PDO $pdo): array {
         $rows[] = $row;
     }
     return $rows;
+}
+
+/**
+ * Mark paid donations as „Сертификатът не е нужен“, so they leave the dashboard
+ * list „Дарения без сертификат“. Orders that aren't paid donations, that already
+ * have a certificate or that are already marked are left alone.
+ * Returns how many orders were marked.
+ *
+ * @param int[] $order_ids
+ */
+function donation_cert_mark_not_needed(PDO $pdo, array $order_ids): int {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $order_ids), fn($i) => $i > 0)));
+    if (!$ids) return 0;
+    $in   = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = $pdo->prepare(
+        "UPDATE orders o
+         LEFT JOIN documents d ON d.order_id = o.id AND d.type = 'donation_cert'
+            SET o.donation_cert_not_needed_at = NOW()
+          WHERE o.id IN ($in)
+            AND " . order_has_donation_sql('o') . "
+            AND o.payment_status = 'paid' AND d.id IS NULL
+            AND o.donation_cert_not_needed_at IS NULL"
+    );
+    $stmt->execute($ids);
+    return $stmt->rowCount();
+}
+
+/** Undo donation_cert_mark_not_needed() for one order: a certificate is expected again. */
+function donation_cert_clear_not_needed(PDO $pdo, int $order_id): bool {
+    $stmt = $pdo->prepare('UPDATE orders SET donation_cert_not_needed_at = NULL WHERE id = ? AND donation_cert_not_needed_at IS NOT NULL');
+    $stmt->execute([$order_id]);
+    return $stmt->rowCount() > 0;
 }
 
 /**
