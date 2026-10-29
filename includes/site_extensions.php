@@ -620,7 +620,7 @@ function site_report_summary(string $key, int $year, int $month): string
 /**
  * A site's own document kinds (e.g. a certificate its own pages issue):
  * key => [label, plural, digits]. The site's pages create and number them
- * (document_sequence_next()); ngo-cms lists their counter on Админ → Плащания
+ * (document_sequence_next(), includes/document_numbers.php); ngo-cms lists their counter on Админ → Плащания
  * and names their files when an admin downloads them. documents.type and
  * document_sequences.type take the key as it is.
  */
@@ -646,18 +646,4 @@ function document_type_label(string $type): string
     $builtin = ['invoice' => 'Фактура', 'receipt' => 'Бележка', 'donation_cert' => 'Сертификат',
                 'credit_note' => 'Кредитно известие', 'storno_receipt' => 'Сторно бележка'];
     return $builtin[$type] ?? (site_document_types()[$type]['label'] ?? 'Документ');
-}
-
-/**
- * Claim the next number of $type atomically (creating its counter on first use)
- * and return it. Call inside the caller's transaction.
- */
-function document_sequence_next(PDO $pdo, string $type): int
-{
-    $pdo->prepare('INSERT IGNORE INTO document_sequences (type, last_number) VALUES (?, 0)')->execute([$type]);
-    $lock = $pdo->prepare('SELECT last_number FROM document_sequences WHERE type = ? FOR UPDATE');
-    $lock->execute([$type]);
-    $next = (int) $lock->fetchColumn() + 1;
-    $pdo->prepare('UPDATE document_sequences SET last_number = ? WHERE type = ?')->execute([$next, $type]);
-    return $next;
 }

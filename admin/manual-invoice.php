@@ -106,17 +106,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // ── Assign the next invoice number (shared counter) ───────────────────────
     if (empty($errors)) {
         try {
-            $pdo->beginTransaction();
-            $lock = $pdo->prepare('SELECT last_number FROM document_sequences WHERE type = ? FOR UPDATE');
-            $lock->execute(['invoice']);
-            $last = $lock->fetchColumn();
-            if ($last === false) throw new RuntimeException("No sequence row for type 'invoice'");
-            $doc_number = (int)$last + 1;
-            $pdo->prepare('UPDATE document_sequences SET last_number = ? WHERE type = ?')
-                ->execute([$doc_number, 'invoice']);
-            $pdo->commit();
+            $doc_number = document_sequence_next($pdo, 'invoice');
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
             $errors[] = 'Грешка при генериране на номер: ' . $e->getMessage();
         }
     }

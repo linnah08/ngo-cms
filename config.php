@@ -108,6 +108,9 @@ unset($_org_predefined);
 // Visual theme presets (brand_themes() / current_theme()).
 require_once __DIR__ . '/includes/themes.php';
 
+// Document numbers (document_sequence_next()), shared with another site via DOC_SEQUENCE_DB.
+require_once __DIR__ . '/includes/document_numbers.php';
+
 // feature_enabled('<module>') lives in includes/organisation.php (loaded above);
 // the list of optional modules and their guards in includes/modules.php.
 

@@ -107,16 +107,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($errors)) {
         // ── Generate cert (same logic as generate-document.php) ───────────────
         try {
-            $pdo->beginTransaction();
-            $lock = $pdo->prepare('SELECT last_number FROM document_sequences WHERE type = ? FOR UPDATE');
-            $lock->execute(['donation_cert']);
-            $last = (int)$lock->fetchColumn();
-            $doc_number = $last + 1;
-            $pdo->prepare('UPDATE document_sequences SET last_number = ? WHERE type = ?')
-                ->execute([$doc_number, 'donation_cert']);
-            $pdo->commit();
+            $doc_number = document_sequence_next($pdo, 'donation_cert');
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
             $errors[] = 'Грешка при генериране на номер: ' . $e->getMessage();
         }
     }

@@ -646,26 +646,10 @@ function distribution_update_allocation(PDO $pdo, int $id, int $quantity, float 
 
 // ── Hand-over protocol ─────────────────────────────────────────────────────────
 
-/**
- * Next protocol number, taken atomically from document_sequences. Creates the
- * sequence row if a site somehow lacks it.
- */
+/** Next protocol number (includes/document_numbers.php). */
 function distribution_next_protocol_number(PDO $pdo): int
 {
-    $own = !$pdo->inTransaction();
-    if ($own) $pdo->beginTransaction();
-    try {
-        $pdo->exec("INSERT IGNORE INTO document_sequences (type, last_number) VALUES ('distribution_protocol', 0)");
-        $lock = $pdo->prepare("SELECT last_number FROM document_sequences WHERE type = 'distribution_protocol' FOR UPDATE");
-        $lock->execute();
-        $next = (int) $lock->fetchColumn() + 1;
-        $pdo->prepare("UPDATE document_sequences SET last_number = ? WHERE type = 'distribution_protocol'")->execute([$next]);
-        if ($own) $pdo->commit();
-        return $next;
-    } catch (Throwable $e) {
-        if ($own) $pdo->rollBack();
-        throw $e;
-    }
+    return document_sequence_next($pdo, 'distribution_protocol');
 }
 
 /** The fields DistributionProtocolGenerator prints, for one allocation row. */

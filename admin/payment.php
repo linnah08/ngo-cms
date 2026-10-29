@@ -40,10 +40,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } elseif ($next_num < 1) {
                 $errors[] = 'Номерът трябва да е поне 1.';
             } else {
-                // A site's own kind may not have a counter yet.
-                $pdo->prepare('INSERT INTO document_sequences (type, last_number) VALUES (?, ?) ON DUPLICATE KEY UPDATE last_number = VALUES(last_number)')
-                    ->execute([$seq_type, $next_num - 1]);
-                $saved = true;
+                try {
+                    document_sequence_set_last($pdo, $seq_type, $next_num - 1);
+                    $saved = true;
+                } catch (Throwable $e) {
+                    $errors[] = $e instanceof RuntimeException ? $e->getMessage() : 'Номерът не беше записан.';
+                }
             }
         }
 
@@ -52,9 +54,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $seq_type = $_POST['seq_type'] ?? '';
             $valid_types = array_merge(module_certificates_enabled() ? ['invoice', 'receipt', 'donation_cert'] : ['invoice', 'receipt'], array_keys(site_document_types()));
             if (in_array($seq_type, $valid_types, true)) {
-                $pdo->prepare('UPDATE document_sequences SET last_number = 0 WHERE type = ?')
-                    ->execute([$seq_type]);
-                $saved = true;
+                try {
+                    document_sequence_set_last($pdo, $seq_type, 0);
+                    $saved = true;
+                } catch (Throwable $e) {
+                    $errors[] = $e instanceof RuntimeException ? $e->getMessage() : 'Броячът не беше нулиран.';
+                }
             }
         }
 
@@ -675,8 +680,15 @@ function togglePwd(btn) {
 </script>
 <?php
 // Load current sequence values (last_number + 1 = next number to be issued)
-$seq_rows = $pdo->query('SELECT type, last_number FROM document_sequences')->fetchAll();
-$sequences = array_column($seq_rows, 'last_number', 'type');
+$seq_error = '';
+try {
+    $seq_shared = document_sequence_is_shared();
+    $sequences  = document_sequence_last_all($pdo);
+} catch (Throwable $e) {
+    $seq_shared = true;
+    $seq_error  = $e instanceof RuntimeException ? $e->getMessage() : 'Броячите не могат да бъдат прочетени.';
+    $sequences  = [];
+}
 
 $seq_labels = [
     'invoice'       => 'Фактури',
@@ -704,8 +716,20 @@ foreach (site_document_types() as $_dt => $_dv) {
   <p class="admin-meta" style="margin-bottom:1.5rem;">
     Всеки нов документ взима следващия номер от брояча; повторното генериране на вече издаден документ запазва номера му. Задайте желания начален номер преди да генерирате.
   </p>
+  <?php if ($seq_shared): ?>
+  <p role="note" style="margin:-.75rem 0 1.5rem;padding:.75rem 1rem;border-left:4px solid var(--teal);background:var(--bg-subtle, #f4f8f9);font-size:.9rem;">
+    <strong>ⓘ Номерацията е обща с другия сайт на организацията.</strong>
+    Двата сайта взимат номерата от един и същи брояч, така че номер не се повтаря. Промяна тук важи и за другия сайт.
+  </p>
+  <?php endif; ?>
+  <?php if ($seq_error !== ''): ?>
+  <p role="alert" style="margin:0 0 1.5rem;padding:.75rem 1rem;border:1px solid #c0392b;border-left-width:4px;border-radius:6px;color:#8e2a1f;font-size:.9rem;">
+    <strong>⚠ <?= h($seq_error) ?></strong>
+  </p>
+  <?php endif; ?>
 
-  <?php foreach ($seq_labels as $type => $label): ?>
+  <?php // Numbers that couldn't be read aren't shown — a wrong "next number" invites a wrong correction.
+  foreach ($seq_error === '' ? $seq_labels : [] as $type => $label): ?>
   <?php
     $last = (int) ($sequences[$type] ?? 0);
     $next = $last + 1;

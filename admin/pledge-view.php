@@ -177,19 +177,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DonationCertGenerator.php';
 
                 $num = $cert_number;
-                if ($num <= 0) {
-                    $pdo->beginTransaction();
-                    $lock = $pdo->prepare("SELECT last_number FROM document_sequences WHERE type = 'donation_cert' FOR UPDATE");
-                    $lock->execute();
-                    $last = $lock->fetchColumn();
-                    if ($last === false) {
-                        throw new \RuntimeException("No sequence row found for type 'donation_cert'");
-                    }
-                    $num = (int)$last + 1;
-                    $pdo->prepare("UPDATE document_sequences SET last_number = ? WHERE type = 'donation_cert'")
-                        ->execute([$num]);
-                    $pdo->commit();
-                }
+                if ($num <= 0) $num = document_sequence_next($pdo, 'donation_cert');
 
                 $formatted = str_pad((string)$num, 5, '0', STR_PAD_LEFT);
                 $year      = date('Y', strtotime($pledge['created_at']));

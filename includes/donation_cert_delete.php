@@ -14,8 +14,7 @@
  */
 function donation_cert_next_formatted(PDO $pdo): string
 {
-    $last = (int) $pdo->query("SELECT last_number FROM document_sequences WHERE type = 'donation_cert'")->fetchColumn();
-    return str_pad((string) ($last + 1), 5, '0', STR_PAD_LEFT);
+    return str_pad((string) (document_sequence_last($pdo, 'donation_cert') + 1), 5, '0', STR_PAD_LEFT);
 }
 
 /**

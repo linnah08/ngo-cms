@@ -171,11 +171,7 @@ function process_campaign_dsk_result(PDO $pdo, array $pledge, string $dskOrderId
 function generate_campaign_cert(PDO $pdo, array $pledge): void
 {
     try {
-        // Atomically claim the next donation_cert sequence number
-        $pdo->beginTransaction();
-        $pdo->exec("UPDATE document_sequences SET last_number = last_number + 1 WHERE type = 'donation_cert'");
-        $num = (int)$pdo->query("SELECT last_number FROM document_sequences WHERE type = 'donation_cert'")->fetchColumn();
-        $pdo->commit();
+        $num = document_sequence_next($pdo, 'donation_cert');
 
         $formatted = str_pad((string)$num, 5, '0', STR_PAD_LEFT);
         $year      = date('Y');

@@ -91,6 +91,17 @@ define('FEATURE_EVENTS', true);
 // setting itself always wins, so a deliberate git clone can still say true.
 define('FEATURE_SELF_UPDATE', true);
 
+// ── Document numbering ────────────────────────────────────────────────────────
+// One organisation issuing invoices, receipts and certificates from two sites
+// keeps one numbering: name the other site's database (same MySQL server) here,
+// and give this site's database user access to it in the hosting panel. The
+// first number continues after the higher of the two sites' counters. Leave it
+// out when this site numbers on its own.
+// define('DOC_SEQUENCE_DB', 'otheraccount_othersite');
+// On the site whose database holds the counters, so its admin says the
+// numbering is shared:
+// define('DOC_SEQUENCE_SHARED', true);
+
 // ── Newsletter ────────────────────────────────────────────────────────────────
 // A "Donate now" box at the bottom of every newsletter sent to subscribers.
 // Off by default — not every organisation asks for donations by email. Easier

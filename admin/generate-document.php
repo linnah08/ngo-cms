@@ -87,22 +87,12 @@ if ($existing && (int) $existing['number'] > 0) {
     $doc_formatted = (string) ($existing['formatted_number'] ?: str_pad((string) $doc_number, $pad, '0', STR_PAD_LEFT));
 } else {
     // Atomically assign the next number from the counter
-    $pdo->beginTransaction();
     try {
-        $lock = $pdo->prepare('SELECT last_number FROM document_sequences WHERE type = ? FOR UPDATE');
-        $lock->execute([$sequence_type]);
-        $last = $lock->fetchColumn();
-        if ($last === false) {
-            throw new \RuntimeException("No sequence row found for type '{$sequence_type}'");
-        }
-        $doc_number = (int) $last + 1;
-        $pdo->prepare('UPDATE document_sequences SET last_number = ? WHERE type = ?')
-            ->execute([$doc_number, $sequence_type]);
-        $pdo->commit();
+        $doc_number = document_sequence_next($pdo, $sequence_type);
     } catch (Throwable $e) {
-        $pdo->rollBack();
         _om_log('ERROR', 'generate-document: sequence error: ' . $e->getMessage());
-        header('Location: /admin/order-view.php?id=' . $order_id . '&doc_error=' . urlencode('Грешка при генериране на номер на документ.'));
+        $msg = $e instanceof RuntimeException ? $e->getMessage() : 'Грешка при генериране на номер на документ.';
+        header('Location: /admin/order-view.php?id=' . $order_id . '&doc_error=' . urlencode($msg));
         exit;
     }
     $doc_formatted = str_pad((string) $doc_number, $pad, '0', STR_PAD_LEFT);
