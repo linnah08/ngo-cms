@@ -36,6 +36,29 @@ final class ReleaseSiteContentTest extends TestCase
         }
     }
 
+    public function test_the_site_copy_is_gitignored_and_a_seed_ships_instead(): void
+    {
+        $root   = $_SERVER['DOCUMENT_ROOT'];
+        $ignore = (string) file_get_contents($root . '/.gitignore');
+        foreach (self::NOT_SHIPPED as $f) {
+            $this->assertMatchesRegularExpression('#^/' . preg_quote($f, '#') . '$#m', $ignore, "$f is the site's, never committed");
+            $seed = preg_replace('/\.json$/', '.seed.json', $f);
+            $this->assertFileExists($root . '/' . $seed);
+            $this->assertIsArray(json_decode((string) file_get_contents($root . '/' . $seed), true));
+        }
+        $tmp = sys_get_temp_dir() . '/om-seed-' . bin2hex(random_bytes(4));
+        mkdir($tmp);
+        try {
+            file_put_contents($tmp . '/centres.seed.json', '[{"name_bg":"А"}]');
+            $this->assertSame([['name_bg' => 'А']], load_json($tmp . '/centres.json'), 'no site copy yet: the seed');
+            save_json($tmp . '/centres.json', [['name_bg' => 'Б']]);
+            $this->assertSame([['name_bg' => 'Б']], load_json($tmp . '/centres.json'), 'once saved, the site copy');
+            $this->assertSame('[{"name_bg":"А"}]', file_get_contents($tmp . '/centres.seed.json'), 'the seed is never written');
+        } finally {
+            exec('rm -rf ' . escapeshellarg($tmp));
+        }
+    }
+
     public function test_a_missing_content_file_reads_as_an_empty_list(): void
     {
         $this->assertSame([], load_json(sys_get_temp_dir() . '/om-missing-' . bin2hex(random_bytes(4)) . '/centres.json'));

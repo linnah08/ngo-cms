@@ -265,8 +265,9 @@ final class BulkActionsTest extends TestCase
 
     private function withTestPartners(array $partners): void
     {
-        $original = file_get_contents(PARTNERS_FILE);
-        $this->cleanup[] = fn() => file_put_contents(PARTNERS_FILE, $original);
+        // A fresh checkout has no partners.json (it is the site's, gitignored).
+        $original = is_file(PARTNERS_FILE) ? file_get_contents(PARTNERS_FILE) : null;
+        $this->cleanup[] = fn() => $original === null ? @unlink(PARTNERS_FILE) : file_put_contents(PARTNERS_FILE, $original);
         save_json(PARTNERS_FILE, array_merge(load_json(PARTNERS_FILE), $partners));
     }
 
@@ -337,6 +338,7 @@ final class BulkActionsTest extends TestCase
     {
         $a = $this->article('draft');
         $keep = $this->article('draft');
+        $this->withTestPartners([]);   // a file just outside the folder, to aim at
 
         run_admin_page('admin/articles.php', ['ids' => [$a, '../../partners', '../pages']], ['get' => ['action' => 'bulk_delete']]);
         $this->assertFileDoesNotExist(ARTICLES_PATH . "/bg/$a.json");

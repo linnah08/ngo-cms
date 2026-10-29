@@ -597,6 +597,51 @@ final class UpdaterTest extends TestCase
     }
 
     /**
+     * Older releases shipped content/centres.json, impact.json and partners.json
+     * (as empty lists). Newer ones ship only a <name>.seed.json beside them. A
+     * file the new release no longer ships is never deleted or replaced: the
+     * site's centres, numbers and partners survive the update untouched — with
+     * the old baseline in checksums.json, and on a first update without one.
+     */
+    public function test_a_release_that_stops_shipping_site_content_keeps_the_sites_copy(): void
+    {
+        $this->requireZip();
+
+        foreach ([true, false] as $withBaseline) {
+            $root = $this->makeTempRoot();
+            file_put_contents($root . '/VERSION', "1.0.0\n");
+            mkdir($root . '/content', 0755, true);
+            $site = [];
+            $old  = ['VERSION' => hash('sha256', "1.0.0\n")];
+            foreach (['centres', 'impact', 'partners'] as $name) {
+                $site[$name] = json_encode([['name_bg' => "Нашите $name"]], JSON_UNESCAPED_UNICODE);
+                file_put_contents("$root/content/$name.json", $site[$name]);
+                $old["content/$name.json"] = hash('sha256', '[]');   // what the old release shipped
+            }
+            if ($withBaseline) file_put_contents($root . '/checksums.json', json_encode($old));
+
+            $zip = $this->makeReleaseZip([
+                'VERSION'                    => "2.0.0\n",
+                'content/centres.seed.json'  => '[]',
+                'content/impact.seed.json'   => '[]',
+                'content/partners.seed.json' => '[]',
+            ]);
+
+            updater_set_root_override($root);
+            $logged = [];
+            $result = updater_apply(null, $this->deps($zip, $logged));
+            $label  = $withBaseline ? 'with a baseline' : 'first update, no baseline';
+
+            $this->assertSame('success', $result['status'], "$label: " . ($result['error'] ?? ''));
+            foreach ($site as $name => $json) {
+                $this->assertSame($json, file_get_contents("$root/content/$name.json"), "$label: the site's $name must survive");
+                $this->assertSame('[]', file_get_contents("$root/content/$name.seed.json"), "$label: the seed is added beside it");
+            }
+            updater_set_root_override(null);
+        }
+    }
+
+    /**
      * Host configuration differs on every host by design. It is kept, like the
      * owner's logo, but naming it to the admin would accuse them of customizing
      * a file they have never opened — and offer them nothing to do about it.

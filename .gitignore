@@ -58,6 +58,11 @@ package-lock.json
 /content/pages/
 /assets/images/pages/created/
 /content/organisation.json
+# Centres, numbers and partners edited on the site. The tracked
+# content/<name>.seed.json is what a fresh site starts from (load_json()).
+/content/centres.json
+/content/impact.json
+/content/partners.json
 
 # MCP server configuration with credentials
 .mcp.json

@@ -527,8 +527,10 @@ function updater_files_to_apply(array $newFiles): array
  * and is never overwritten — even on a first self-update with no
  * checksums.json baseline, when conflict detection is otherwise off. The
  * three content/*.json files are not shipped at all (tests/release-gate/
- * build-zip.sh): a missing one reads as an empty list, exactly like the
- * placeholder would.
+ * build-zip.sh) and are gitignored: a fresh site reads the shipped
+ * content/<name>.seed.json until it saves its own. Older releases shipped
+ * them; an update never deletes a file the new release leaves out, so the
+ * site's copy stays (tests/UpdaterTest.php).
  */
 function updater_owner_files(): array
 {

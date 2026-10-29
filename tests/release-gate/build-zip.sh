@@ -26,9 +26,9 @@ $exactFiles  = ["phpunit.xml", "playwright.config.js", "package.json", "package-
                 // Site-owned: a site keeps its own theme and wording here, and a
                 // release must never carry (and so overwrite) one.
                 "includes/themes-site.php", "content/bg/strings.site.json", "content/en/strings.site.json",
-                // Site content edited on the site (centres, numbers, partners). A
-                // fresh install reads a missing file as an empty list; an update
-                // must never replace the site copy with an empty placeholder.
+                // Site content edited on the site (centres, numbers, partners),
+                // gitignored. A fresh install reads the shipped <name>.seed.json;
+                // an update must never replace the site copy with a placeholder.
                 "content/centres.json", "content/impact.json", "content/partners.json"];
 $exclude = function (string $rel) use ($dirPrefixes, $exactFiles): bool {
     if (in_array($rel, $exactFiles, true)) return true;
