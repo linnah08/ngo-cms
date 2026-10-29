@@ -19,8 +19,10 @@ function email_logo_size(string $file, int $max_h = 48, int $max_w = 240): array
 }
 
 function email_wrap(string $content): string {
-    $logo = (defined('SITE_URL') ? SITE_URL : '') . '/assets/images/logo.png';
-    [$logo_w, $logo_h] = email_logo_size(($_SERVER['DOCUMENT_ROOT'] ?: dirname(__DIR__)) . '/assets/images/logo.png');
+    // The site's own logo (Admin → Организация), else the shipped default.
+    $logo_rel = function_exists('org_brand_image') ? org_brand_image('logo.png') : 'assets/images/logo.png';
+    $logo = (defined('SITE_URL') ? SITE_URL : '') . '/' . $logo_rel;
+    [$logo_w, $logo_h] = email_logo_size(($_SERVER['DOCUMENT_ROOT'] ?: dirname(__DIR__)) . '/' . $logo_rel);
     $name = defined('SITE_NAME_BG') ? SITE_NAME_BG : 'Your Organisation';
     $email = defined('SITE_EMAIL') ? SITE_EMAIL : '';
     return <<<HTML

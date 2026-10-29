@@ -585,8 +585,9 @@ function versioned_asset(string $rel): string {
     $v    = @filemtime($root . $rel);
     return $rel . ($v ? '?v=' . $v : '');
 }
-function logo_url(): string    { return versioned_asset('assets/images/logo.png'); }
-function favicon_url(): string { return versioned_asset('assets/images/favicon.png'); }
+// The site's own logo and favicon, else the shipped default (org_brand_image()).
+function logo_url(): string    { return versioned_asset(org_brand_image('logo.png')); }
+function favicon_url(): string { return versioned_asset(org_brand_image('favicon.png')); }
 
 function get_articles(string $lang = '', int $limit = 0): array {
     if (!$lang) $lang = get_lang();

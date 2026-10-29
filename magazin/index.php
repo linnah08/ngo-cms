@@ -74,7 +74,7 @@ if ($slug) {
     // ── SEO: Open Graph image + Product structured data ──
     require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/seo.php';
     $seo_type = 'product';
-    $_prod_img = $p['image'] ? '/assets/images/products/' . $p['image'] : '/assets/images/logo.png';
+    $_prod_img = $p['image'] ? '/assets/images/products/' . $p['image'] : '/' . org_brand_image('logo.png');
     $og_image  = $_prod_img;
     $_prod_schema = [
         '@context'    => 'https://schema.org',

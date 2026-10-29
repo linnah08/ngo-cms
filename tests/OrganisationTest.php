@@ -481,8 +481,124 @@ final class OrganisationTest extends TestCase
             $this->assertSame('/assets/images/share-upload.jpg', org_share_image_path($root));
             $this->assertMatchesRegularExpression('#^/assets/images/share-upload\.jpg\?v=\d+$#', org_share_image_url($root));
         } finally {
-            foreach (glob($dir . '/*') ?: [] as $f) @unlink($f);
-            @rmdir($dir); @rmdir($root . '/assets'); @rmdir($root);
+            exec('rm -rf ' . escapeshellarg($root));
         }
+    }
+
+    // ── The site's own logo and favicon live at a path no release ships ─────────
+
+    /** A site root with assets/images/, optionally holding the shipped defaults. */
+    private function brandRoot(bool $withDefaults = true): string
+    {
+        $root = $this->tmp . '/brand-' . bin2hex(random_bytes(3));
+        mkdir($root . '/assets/images', 0777, true);
+        if ($withDefaults) {
+            foreach (['logo.png', 'favicon.png'] as $n) {
+                copy($_SERVER['DOCUMENT_ROOT'] . '/assets/images/' . $n, "$root/assets/images/$n");
+            }
+        }
+        return $root;
+    }
+
+    public function test_the_shipped_defaults_are_known_as_defaults(): void
+    {
+        foreach (['logo.png', 'favicon.png'] as $n) {
+            $this->assertContains(hash_file('sha256', $_SERVER['DOCUMENT_ROOT'] . '/assets/images/' . $n), ORG_BRAND_DEFAULT_HASHES[$n],
+                "assets/images/$n changed: add its hash to ORG_BRAND_DEFAULT_HASHES, or every site would take the new default for its own logo");
+        }
+        $this->assertMatchesRegularExpression('#^/' . preg_quote(ORG_BRAND_DIR, '#') . '/$#m',
+            (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/.gitignore'), 'the site\'s own logo is never committed');
+        $this->assertStringNotContainsString(ORG_BRAND_DIR, implode("\n", updater_owner_files()), 'nothing to keep: no release ships it');
+    }
+
+    public function test_a_fresh_site_shows_the_shipped_default(): void
+    {
+        $root = $this->brandRoot();
+        try {
+            $this->assertSame('assets/images/logo.png', org_brand_image('logo.png', $root));
+            $this->assertSame('assets/images/favicon.png', org_brand_image('favicon.png', $root));
+            $this->assertDirectoryDoesNotExist($root . '/' . ORG_BRAND_DIR, 'the default is never copied');
+        } finally {
+            exec('rm -rf ' . escapeshellarg($root));
+        }
+    }
+
+    public function test_an_uploaded_logo_lands_in_the_sites_own_folder_and_wins(): void
+    {
+        if (!function_exists('imagecreatetruecolor')) $this->markTestSkipped('GD not available');
+        $root = $this->brandRoot();
+        try {
+            $this->assertNull(org_save_logo($this->upload($this->makeImage('png')), org_brand_dir($root), false));
+            $this->assertSame(ORG_BRAND_DIR . '/logo.png', org_brand_image('logo.png', $root));
+            $this->assertSame(ORG_BRAND_DIR . '/favicon.png', org_brand_image('favicon.png', $root));
+            $this->assertSame(hash_file('sha256', $_SERVER['DOCUMENT_ROOT'] . '/assets/images/logo.png'),
+                hash_file('sha256', $root . '/assets/images/logo.png'), 'the shipped default is left as it is');
+        } finally {
+            exec('rm -rf ' . escapeshellarg($root));
+        }
+    }
+
+    /**
+     * A site that had its own logo before the new folder existed — uploaded in
+     * Организация, or committed in a fork (lafetki) — keeps it: the updater
+     * keeps the live copy at the old path, and the first read moves a copy to
+     * the site's own folder, so later releases and deploys can't touch it.
+     */
+    public function test_a_sites_own_logo_at_the_old_path_is_carried_over(): void
+    {
+        if (!function_exists('imagecreatetruecolor')) $this->markTestSkipped('GD not available');
+        $root = $this->brandRoot();
+        try {
+            $mine = $this->makeImage('png', 300, 120);
+            copy($mine, $root . '/assets/images/logo.png');
+            $this->assertSame(['assets/images/logo.png'],
+                updater_owner_files_to_keep(['assets/images/logo.png', 'index.php'], fn(string $p): ?string => is_file("$root/$p") ? 'live' : null),
+                'an update keeps it where it is');
+
+            $this->assertSame(ORG_BRAND_DIR . '/logo.png', org_brand_image('logo.png', $root));
+            $this->assertFileEquals($mine, $root . '/' . ORG_BRAND_DIR . '/logo.png');
+            $this->assertFileEquals($mine, $root . '/assets/images/logo.png', 'the old copy stays');
+            $this->assertSame('assets/images/favicon.png', org_brand_image('favicon.png', $root), 'a default favicon is not carried over');
+
+            // A later upload replaces the carried-over copy, not the old path.
+            $this->assertNull(org_save_logo($this->upload($this->makeImage('png', 50, 50)), org_brand_dir($root), false));
+            $this->assertSame([50, 50], array_slice(getimagesize(org_brand_image_file('logo.png', $root)), 0, 2));
+            $this->assertFileEquals($mine, $root . '/assets/images/logo.png');
+        } finally {
+            exec('rm -rf ' . escapeshellarg($root));
+        }
+    }
+
+    public function test_the_old_path_is_used_as_it_is_when_it_cannot_be_copied(): void
+    {
+        if (function_exists('posix_getuid') && posix_getuid() === 0) $this->markTestSkipped('root can write anywhere');
+        $root = $this->brandRoot();
+        try {
+            file_put_contents($root . '/assets/images/favicon.png', 'a site\'s own favicon');
+            chmod($root . '/assets/images', 0555);
+            $this->assertSame('assets/images/favicon.png', org_brand_image('favicon.png', $root));
+            $this->assertDirectoryDoesNotExist($root . '/' . ORG_BRAND_DIR);
+        } finally {
+            chmod($root . '/assets/images', 0777);
+            exec('rm -rf ' . escapeshellarg($root));
+        }
+    }
+
+    public function test_every_reader_asks_for_the_sites_own_logo(): void
+    {
+        // Only these may name the old path: the helper itself, the updater's
+        // keep list, and fallbacks for code that may run without organisation.php.
+        $allowed = ['includes/organisation.php', 'includes/updater.php', 'includes/mailer.php',
+                    'includes/seo.php', 'includes/launch.php', 'errors/_layout.php', 'site.config.example.php'];
+        $root = $_SERVER['DOCUMENT_ROOT'];
+        $it   = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS));
+        $bad  = [];
+        foreach ($it as $f) {
+            $rel = substr($f->getPathname(), strlen($root) + 1);
+            if (!str_ends_with($rel, '.php') || preg_match('#^(vendor|node_modules|tests|docs|\.git)/#', $rel)) continue;
+            if (in_array($rel, $allowed, true) || preg_match('#^[a-z]+\.config\.php$#', $rel)) continue;   // a site's own config
+            if (preg_match('#assets/images/(logo|favicon)\.png#', (string) file_get_contents($f->getPathname()))) $bad[] = $rel;
+        }
+        $this->assertSame([], $bad, 'use logo_url() / favicon_url() / org_brand_image() instead');
     }
 }

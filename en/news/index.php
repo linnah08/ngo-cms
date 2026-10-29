@@ -59,7 +59,7 @@ if ($slug) {
         '@type'         => 'NewsArticle',
         'headline'      => $article['title'] ?? '',
         'description'   => $article['excerpt'] ?? '',
-        'image'         => seo_abs_url($article['image'] ?: '/assets/images/logo.png'),
+        'image'         => seo_abs_url($article['image'] ?: '/' . org_brand_image('logo.png')),
         'datePublished' => !empty($article['date']) ? date('c', strtotime($article['date'])) : null,
         'author'        => ['@type' => 'Organization', 'name' => SITE_NAME_EN],
         'publisher'     => seo_org_jsonld(),

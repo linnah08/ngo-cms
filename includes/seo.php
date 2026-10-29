@@ -123,7 +123,7 @@ function seo_org_jsonld(): array {
         'name'          => SITE_NAME_EN,
         'alternateName' => SITE_NAME_BG,
         'url'           => rtrim(SITE_URL, '/') . '/',
-        'logo'          => seo_abs_url('/assets/images/logo.png'),
+        'logo'          => seo_abs_url('/' . org_brand_image('logo.png')),
         'email'         => SITE_EMAIL,
         // Machine-readable, and the easiest thing on the page for a scraper to
         // harvest — so it follows the same setting as the visible number.

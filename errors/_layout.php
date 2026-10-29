@@ -48,6 +48,17 @@ try {
     $err_font_links = '';
     $err_font       = '';
 }
+// The site's own logo and favicon, else the shipped defaults.
+$err_logo = 'assets/images/logo.png';
+$err_favicon = 'assets/images/favicon.png';
+try {
+    if (function_exists('org_brand_image')) {
+        $err_logo    = org_brand_image('logo.png');
+        $err_favicon = org_brand_image('favicon.png');
+    }
+} catch (Throwable $e) {
+    // keep the defaults
+}
 ?>
 <!DOCTYPE html>
 <html lang="<?= $lang ?>">
@@ -55,7 +66,7 @@ try {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= $code ?> — <?= htmlspecialchars($display_title, ENT_QUOTES, 'UTF-8') ?></title>
-  <link rel="icon" href="/assets/images/favicon.png">
+  <link rel="icon" href="/<?= htmlspecialchars($err_favicon, ENT_QUOTES, 'UTF-8') ?>">
 <?= $err_font_links ?>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -120,7 +131,7 @@ try {
 </head>
 <body>
   <a href="<?= $is_en ? '/en/' : '/' ?>">
-    <img src="/assets/images/logo.png" alt="<?= defined('SITE_NAME_BG') ? htmlspecialchars(SITE_NAME_BG) : 'Logo' ?>" class="err-logo">
+    <img src="/<?= htmlspecialchars($err_logo, ENT_QUOTES, 'UTF-8') ?>" alt="<?= defined('SITE_NAME_BG') ? htmlspecialchars(SITE_NAME_BG) : 'Logo' ?>" class="err-logo">
   </a>
 
   <div class="err-code"><?= $code ?></div>

@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $has_share = $has_file('share_image');
 
         if (!$errors && $has_logo) {
-            $logo_err = org_save_logo($_FILES['logo'], $images);
+            $logo_err = org_save_logo($_FILES['logo'], org_brand_dir());
             if ($logo_err !== null) $errors['logo'] = $logo_err;
         }
         if (!$errors && $has_share) {
@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$errors) {
             if (org_save_overrides($form)) {
                 // The automatic share picture follows the logo and the main colour.
-                org_make_share_image($images . '/logo.png', $images . '/share.png', $form['brand_primary'] ?? '');
+                org_make_share_image(org_brand_image_file('logo.png'), $images . '/share.png', $form['brand_primary'] ?? '');
                 flash_set('success', $has_logo || $has_share
                     ? 'Промените и новата картинка бяха запазени. Ако на сайта още виждате старата, презаредете страницата.'
                     : 'Промените бяха запазени и вече се виждат на сайта.');

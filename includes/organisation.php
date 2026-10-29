@@ -588,6 +588,68 @@ function org_save_overrides(array $values, ?string $file = null): bool
 const ORG_LOGO_MAX_BYTES = 2 * 1024 * 1024;
 const ORG_LOGO_MAX_SIDE  = 4000;
 
+// The logo and favicon a site uploads (Admin → Организация, or the install
+// wizard) live in a folder no release ships and git never tracks, so neither an
+// update nor a git deploy can put the neutral default back over them. The
+// release still ships that default at assets/images/<name>, used only while a
+// site has none of its own.
+const ORG_BRAND_DIR = 'assets/images/uploads';
+
+// sha256 of every neutral default ngo-cms has shipped at assets/images/<name>.
+// A file there with any other hash is a site's own (uploaded before
+// ORG_BRAND_DIR existed, or committed in a fork). Add the new hash here when the
+// default picture changes — tests/OrganisationTest.php checks the shipped one.
+const ORG_BRAND_DEFAULT_HASHES = [
+    'logo.png'    => ['4efc73c61ccb6766a48aeee6123a1425f48b46950e65b632381df52e6e935715'],
+    'favicon.png' => ['95e5a2e9cc5e7e211fb60f931eedc01748e6bc3ccf10b14c3f14ee52a530dfa7'],
+];
+
+/**
+ * Site-relative path (no leading slash) of the site's logo.png or favicon.png:
+ * its own copy in ORG_BRAND_DIR, else the shipped default. A site that still
+ * has its own picture at the old path, assets/images/<name>, has it copied to
+ * ORG_BRAND_DIR the first time it is read; if that copy cannot be made, the old
+ * path is used as it is.
+ */
+function org_brand_image(string $name, ?string $root = null): string
+{
+    static $cache = [];
+    $root ??= (($_SERVER['DOCUMENT_ROOT'] ?? '') ?: dirname(__DIR__));
+    $root  = rtrim($root, '/');
+    $own   = ORG_BRAND_DIR . '/' . $name;
+    $old   = 'assets/images/' . $name;
+    if (is_file("$root/$own")) return $own;
+    $key = "$root|$name";
+    if (isset($cache[$key]) && $cache[$key] === $old) return $old;
+
+    $cache[$key] = $old;
+    $hash = is_file("$root/$old") ? hash_file('sha256', "$root/$old") : false;
+    if ($hash === false || in_array($hash, ORG_BRAND_DEFAULT_HASHES[$name] ?? [], true)) {
+        return $old;   // the shipped default, or nothing at all
+    }
+    $dir = "$root/" . ORG_BRAND_DIR;
+    $tmp = "$dir/.$name.tmp-" . bin2hex(random_bytes(4));
+    if ((is_dir($dir) || @mkdir($dir, 0755, true)) && @copy("$root/$old", $tmp) && @rename($tmp, "$root/$own")) {
+        return $own;
+    }
+    @unlink($tmp);
+    return $old;
+}
+
+/** Absolute path of the site's logo.png or favicon.png (see org_brand_image()). */
+function org_brand_image_file(string $name, ?string $root = null): string
+{
+    $root ??= (($_SERVER['DOCUMENT_ROOT'] ?? '') ?: dirname(__DIR__));
+    return rtrim($root, '/') . '/' . org_brand_image($name, $root);
+}
+
+/** Absolute path of the folder an uploaded logo and favicon are written to. */
+function org_brand_dir(?string $root = null): string
+{
+    $root ??= (($_SERVER['DOCUMENT_ROOT'] ?? '') ?: dirname(__DIR__));
+    return rtrim($root, '/') . '/' . ORG_BRAND_DIR;
+}
+
 /** Build a square favicon from a logo (fit + centre on transparent). */
 function make_favicon(string $src, string $dest, int $size = 64): void
 {
@@ -667,7 +729,8 @@ function org_decode_upload(array $upload, bool $requireUploaded, array $noun): a
 /**
  * Validate an uploaded logo and install it as $imagesDir/logo.png, then
  * regenerate $imagesDir/favicon.png. The image is decoded and re-encoded as a
- * real PNG, so nothing but pixel data ever lands on disk.
+ * real PNG, so nothing but pixel data ever lands on disk. For a site's own
+ * logo, $imagesDir is org_brand_dir() (created if missing).
  *
  * $upload is one $_FILES entry. $requireUploaded=false lets tests pass a plain
  * temp file. Returns null on success, or a plain-Bulgarian error message.
@@ -679,6 +742,7 @@ function org_save_logo(array $upload, string $imagesDir, bool $requireUploaded =
     imagealphablending($im, false);
     imagesavealpha($im, true);
 
+    if (!is_dir($imagesDir)) @mkdir($imagesDir, 0755, true);
     $logo    = rtrim($imagesDir, '/') . '/logo.png';
     $staging = $logo . '.tmp-' . bin2hex(random_bytes(4));
     $ok = @imagepng($im, $staging);
@@ -857,14 +921,15 @@ function org_share_upload_exists(?string $root = null): bool
 function org_share_image_path(?string $root = null): string
 {
     $root ??= dirname(__DIR__);
-    $dir = $root . '/assets/images';
+    $dir  = $root . '/assets/images';
+    $logo = org_brand_image('logo.png', $root);
     if (is_file($dir . '/share-upload.jpg')) return '/assets/images/share-upload.jpg';
     if (is_file($dir . '/share.png'))        return '/assets/images/share.png';
-    if (is_file($dir . '/logo.png') && is_writable($dir)
-        && org_make_share_image($dir . '/logo.png', $dir . '/share.png', defined('BRAND_PRIMARY') ? (string) BRAND_PRIMARY : '')) {
+    if (is_file($root . '/' . $logo) && is_writable($dir)
+        && org_make_share_image($root . '/' . $logo, $dir . '/share.png', defined('BRAND_PRIMARY') ? (string) BRAND_PRIMARY : '')) {
         return '/assets/images/share.png';
     }
-    return '/assets/images/logo.png';
+    return '/' . $logo;
 }
 
 /**

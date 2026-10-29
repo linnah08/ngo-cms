@@ -104,8 +104,8 @@ if (!write_config($ROOT . '/site.config.php', wizard_site_config($done),
 
 // The logo was checked and re-encoded at step 4; a failed copy must not undo the install.
 if ($logo = staged_logo()) {
-    $images = $ROOT . '/assets/images';
-    if (!@copy($logo, $images . '/logo.png')) {
+    $images = org_brand_dir($ROOT);   // the site's own folder, never shipped
+    if ((!is_dir($images) && !@mkdir($images, 0777, true)) || !@copy($logo, $images . '/logo.png')) {
         $logo_note = 'Логото не беше запазено. Сайтът работи с неутрален знак — качете логото си от администраторския панел → „Организация“.';
     } else {
         @copy(dirname($logo) . '/favicon.png', $images . '/favicon.png');
