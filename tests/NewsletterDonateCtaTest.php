@@ -124,6 +124,7 @@ final class NewsletterDonateCtaTest extends TestCase
 
     public function test_shop_button_switch_is_saved_and_its_label_limited(): void
     {
+        $this->skipUnlessTheBoxIsInOrganisation();
         $on  = org_validate($this->orgInput(['newsletter_donate_shop' => '1']), array_keys(brand_themes()));
         $off = org_validate($this->orgInput(), array_keys(brand_themes()));
         $this->assertSame('1', $on['values']['newsletter_donate_shop']);

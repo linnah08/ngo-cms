@@ -126,6 +126,7 @@ final class DonationCertDeleteTest extends TestCase
 
     public function test_a_pledge_certificate_can_be_deleted_and_generated_again_from_the_pledge_page(): void
     {
+        if (!feature_enabled('campaign')) $this->markTestSkipped('The campaign is off on this site, so there is no pledge page.');
         $num = 'PHPUNIT-CDP-' . strtoupper(bin2hex(random_bytes(3)));
         $this->pledges[] = $num;
         $this->pdo->prepare("INSERT INTO campaign_pledges (pledge_number, name, email, amount_eur, payment_status)
@@ -153,6 +154,7 @@ final class DonationCertDeleteTest extends TestCase
 
     public function test_an_old_system_pledge_certificate_can_be_deleted(): void
     {
+        if (!feature_enabled('campaign')) $this->markTestSkipped('The campaign is off on this site, so there is no pledge page.');
         $num = 'PHPUNIT-CDL-' . strtoupper(bin2hex(random_bytes(3)));
         $this->pledges[] = $num;
         $rel = '/documents/donation_certs/' . date('Y') . "/00007_{$num}.pdf";
@@ -170,6 +172,7 @@ final class DonationCertDeleteTest extends TestCase
 
     public function test_an_unpaid_pledge_gets_no_certificate(): void
     {
+        if (!feature_enabled('campaign')) $this->markTestSkipped('The campaign is off on this site, so there is no pledge page.');
         $num = 'PHPUNIT-CDU-' . strtoupper(bin2hex(random_bytes(3)));
         $this->pledges[] = $num;
         $this->pdo->prepare("INSERT INTO campaign_pledges (pledge_number, name, email, amount_eur, payment_status)

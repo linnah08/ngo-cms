@@ -500,8 +500,32 @@ final class OrganisationTest extends TestCase
         return $root;
     }
 
+    /** Are assets/images/logo.png and favicon.png the neutral defaults a release ships? */
+    private function shippedDefaultsHere(): bool
+    {
+        foreach (['logo.png', 'favicon.png'] as $n) {
+            $hash = hash_file('sha256', $_SERVER['DOCUMENT_ROOT'] . '/assets/images/' . $n);
+            if (!in_array($hash, ORG_BRAND_DEFAULT_HASHES[$n], true)) return false;
+        }
+        return true;
+    }
+
+    /** A fork (lafetki) commits its own logo there; the tests that need the defaults skip on it. */
+    private function skipUnlessTheShippedDefaultsAreHere(): void
+    {
+        if (!$this->shippedDefaultsHere()) {
+            $this->markTestSkipped('This site keeps its own logo or favicon in assets/images/, so the shipped defaults are not here to test with.');
+        }
+    }
+
     public function test_the_shipped_defaults_are_known_as_defaults(): void
     {
+        // In ngo-cms a changed default without its hash must fail. Only a fork of
+        // ngo-cms (its `upstream` remote) may have pictures of its own there.
+        exec('git -C ' . escapeshellarg($_SERVER['DOCUMENT_ROOT']) . ' remote get-url upstream 2>/dev/null', $remote);
+        if (!$this->shippedDefaultsHere() && str_contains(implode('', $remote), 'ngo-cms')) {
+            $this->markTestSkipped('This fork keeps its own logo or favicon in assets/images/.');
+        }
         foreach (['logo.png', 'favicon.png'] as $n) {
             $this->assertContains(hash_file('sha256', $_SERVER['DOCUMENT_ROOT'] . '/assets/images/' . $n), ORG_BRAND_DEFAULT_HASHES[$n],
                 "assets/images/$n changed: add its hash to ORG_BRAND_DEFAULT_HASHES, or every site would take the new default for its own logo");
@@ -513,6 +537,7 @@ final class OrganisationTest extends TestCase
 
     public function test_a_fresh_site_shows_the_shipped_default(): void
     {
+        $this->skipUnlessTheShippedDefaultsAreHere();
         $root = $this->brandRoot();
         try {
             $this->assertSame('assets/images/logo.png', org_brand_image('logo.png', $root));
@@ -547,6 +572,7 @@ final class OrganisationTest extends TestCase
     public function test_a_sites_own_logo_at_the_old_path_is_carried_over(): void
     {
         if (!function_exists('imagecreatetruecolor')) $this->markTestSkipped('GD not available');
+        $this->skipUnlessTheShippedDefaultsAreHere();
         $root = $this->brandRoot();
         try {
             $mine = $this->makeImage('png', 300, 120);

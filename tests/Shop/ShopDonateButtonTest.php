@@ -43,7 +43,7 @@ final class ShopDonateButtonTest extends TestCase
 
     public function test_switched_on_it_links_to_the_donation_page_in_the_visitors_language(): void
     {
-        $out = $this->child("echo shop_donate_button('bg'), \"\\n\", shop_donate_button('en', 'btn btn--white', 'min-width:10rem;');", ['SHOP_DONATE_BUTTON' => '1']);
+        $out = $this->child("echo shop_donate_button('bg'), \"\\n\", shop_donate_button('en', 'btn btn--white', 'min-width:10rem;');", ['SHOP_DONATE_BUTTON' => '1', 'FEATURE_DONATIONS' => true]);
         [$bg, $en] = explode("\n", $out);
         $this->assertStringStartsWith('<a href="/donation/" class="btn btn--primary">', $bg);
         $this->assertStringContainsString('Дари сега</span></a>', $bg);
@@ -61,11 +61,13 @@ final class ShopDonateButtonTest extends TestCase
 
     public function test_the_organisation_form_saves_an_explicit_on_or_off(): void
     {
-        require_once self::root() . '/includes/organisation.php';
-        $this->assertSame('SHOP_DONATE_BUTTON', org_fields()['shop_donate_button']);
-        $this->assertSame('1', org_validate(['shop_donate_button' => '1'], ['classic'])['values']['shop_donate_button']);
-        $this->assertSame('0', org_validate([], ['classic'])['values']['shop_donate_button']);
-        $this->assertSame('0', org_validate(['shop_donate_button' => ['x']], ['classic'])['values']['shop_donate_button']);
+        $out = $this->child("require_once ROOT_PATH . '/includes/organisation.php';"
+            . "echo org_fields()['shop_donate_button'], '|',"
+            . " org_validate(['shop_donate_button' => '1'], ['classic'])['values']['shop_donate_button'] ?? 'none', '|',"
+            . " org_validate([], ['classic'])['values']['shop_donate_button'] ?? 'none', '|',"
+            . " org_validate(['shop_donate_button' => ['x']], ['classic'])['values']['shop_donate_button'] ?? 'none';",
+            ['FEATURE_DONATIONS' => true]);
+        $this->assertSame('SHOP_DONATE_BUTTON|1|0|0', $out);
     }
 
     public function test_hidden_in_the_form_without_the_shop_or_donations(): void
@@ -73,7 +75,7 @@ final class ShopDonateButtonTest extends TestCase
         $this->assertSame('hidden', $this->child("require_once ROOT_PATH . '/includes/organisation.php';"
             . "echo in_array('shop_donate_button', org_hidden_fields(), true) ? 'hidden' : 'shown';", ['FEATURE_DONATIONS' => false]));
         $this->assertSame('shown', $this->child("require_once ROOT_PATH . '/includes/organisation.php';"
-            . "echo in_array('shop_donate_button', org_hidden_fields(), true) ? 'hidden' : 'shown';"));
+            . "echo in_array('shop_donate_button', org_hidden_fields(), true) ? 'hidden' : 'shown';", ['FEATURE_DONATIONS' => true]));
     }
 
     public function test_the_shop_page_and_a_sites_own_header_both_get_it(): void
