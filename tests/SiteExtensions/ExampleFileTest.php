@@ -30,6 +30,14 @@ final class ExampleFileTest extends TestCase
 
     public function test_the_real_site_file_is_never_part_of_the_repository(): void
     {
+        // A site's own repository (oddminds, lafetki) keeps its site-extensions.php
+        // in git on purpose; only ngo-cms itself must never ship one. Same test for
+        // "this checkout is a site" as ThemeExtensionsTest.
+        $root = dirname(__DIR__, 2);
+        if (is_file($root . '/includes/themes-site.php') && defined('BRAND_THEME')
+            && array_key_exists(BRAND_THEME, (array) (include $root . '/includes/themes-site.php'))) {
+            $this->markTestSkipped('This checkout is a site with its own theme, not ngo-cms itself.');
+        }
         $tracked = shell_exec('cd ' . escapeshellarg(dirname(__DIR__, 2)) . ' && git ls-files includes/site-extensions.php 2>/dev/null');
         $this->assertSame('', trim((string) $tracked), 'includes/site-extensions.php belongs to each site, never to a release');
     }
