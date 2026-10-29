@@ -317,7 +317,9 @@ function home_types(): array {
             'fields' => ['heading' => $head, 'cards' => home_cards_list_def(), 'background' => $bg('white')]],
         'people' => ['builtin' => false, 'icon' => '👥', 'label' => 'Хора',
             'desc' => 'Списък с хора — снимка, име, роля и кратък текст за всеки. За екип, доброволци или истории.', 'note' => null,
-            'fields' => ['heading' => $head, 'people' => [
+            'fields' => ['section_label' => ['kind' => 'text', 'label' => 'Малък надпис над заглавието', 'max' => 60,
+                                             'hint' => 'Напр. „Екипът“. Оставете празно, ако не искате надпис.'],
+                         'heading' => $head, 'people' => [
                 'kind' => 'list', 'label' => 'Хора', 'item' => 'Човек', 'add' => '+ Добави човек', 'remove' => 'Премахни човека',
                 'plural' => 'души', 'one' => 'човек', 'plural_the' => 'хората', 'min' => 1, 'max' => 30, 'preview' => true,
                 'say' => ['added' => 'Добавен е нов човек.', 'removed' => 'Човекът е премахнат.', 'moved' => 'Човекът е на място %d. Редът се запазва с бутона „Запази“.'],

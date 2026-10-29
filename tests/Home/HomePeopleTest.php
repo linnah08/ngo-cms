@@ -24,14 +24,14 @@ final class HomePeopleTest extends TestCase
         unset($GLOBALS['_show_admin_bar']);
     }
 
-    private function render(array $people): string
+    private function render(array $people, array $extra = [], string $lang = 'bg'): string
     {
         $doc = ['version' => 1, 'rev' => 1, 'sections' => [[
             'id' => 's_pe01', 'type' => 'people', 'visible' => true,
-            'fields' => ['heading' => ['bg' => 'Екипът', 'en' => ''], 'people' => $people],
+            'fields' => ['heading' => ['bg' => 'Екипът', 'en' => ''], 'people' => $people] + $extra,
         ]]];
         ob_start();
-        home_render($doc, 'bg');
+        home_render($doc, $lang);
         return (string) ob_get_clean();
     }
 
@@ -195,5 +195,40 @@ final class HomePeopleTest extends TestCase
         foreach (['name', 'role', 'bio', 'image_alt'] as $f) {
             $this->assertStringContainsString('data-translate-from="f[people][0][' . $f . '][bg]"', $html);
         }
+    }
+
+    // ── Small label above the heading ──────────────────────────────────────────
+
+    public function test_label_above_the_heading_is_plain_text_in_each_language(): void
+    {
+        $label = ['section_label' => ['bg' => 'Екипът', 'en' => 'The team']];
+        $bg = $this->render([$this->person()], $label);
+        $this->assertMatchesRegularExpression('#<span class="section-label"[^>]*>Екипът</span>\s*<h2#u', $bg, 'a span before the h2, not a heading');
+        $this->assertStringContainsString('The team', $this->render([$this->person()], $label, 'en'));
+        $this->assertStringContainsString('data-cms-field="section_label"', $bg, 'edited in place like the heading');
+    }
+
+    public function test_no_label_means_nothing_extra_on_the_page(): void
+    {
+        $this->assertStringNotContainsString('section-label', $this->render([$this->person()]));
+        $this->assertStringNotContainsString('section-label', $this->render([$this->person()], ['section_label' => ['bg' => '', 'en' => '']]));
+    }
+
+    public function test_an_empty_label_has_a_slot_to_type_into_in_edit_mode(): void
+    {
+        $GLOBALS['_show_admin_bar'] = true;
+        $_SESSION[ADMIN_SESSION_NAME] = ['id' => 1, 'role' => 'admin', 'name' => 'T'];
+        $html = $this->render([$this->person()]);
+        $this->assertStringContainsString('data-cms-field="section_label"', $html);
+    }
+
+    public function test_label_is_validated_and_has_a_length_limit(): void
+    {
+        $this->assertArrayHasKey('section_label', home_types()['people']['fields']);
+        [$v, $e] = home_validate_section('people', ['section_label' => ['bg' => ' Екипът ', 'en' => 'The team'], 'people' => [$this->person()]]);
+        $this->assertSame([], $e);
+        $this->assertSame('Екипът', $v['section_label']['bg'] ?? null);
+        [, $e] = home_validate_section('people', ['section_label' => ['bg' => str_repeat('а', 61), 'en' => ''], 'people' => [$this->person()]]);
+        $this->assertNotSame([], $e);
     }
 }

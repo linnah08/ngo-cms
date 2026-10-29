@@ -11,8 +11,13 @@ $style_printed = !empty($GLOBALS['_om_people_style']);
 <?php endif; ?>
 <section class="section<?= home_bg_class($f) ?>">
   <div class="container">
-    <?php if (hf($f, 'heading', $lang) !== '' || $show_admin): ?>
-    <div class="section-header"><h2<?= home_cms_attrs($sid, 'heading', $f) ?>><?= h(hf($f, 'heading', $lang)) ?></h2></div>
+    <?php $label = hf($f, 'section_label', $lang); ?>
+    <?php if (hf($f, 'heading', $lang) !== '' || $label !== '' || $show_admin): ?>
+    <div class="section-header">
+      <?php /* A small label above the heading — plain text, not a heading. Empty = nothing (an empty slot in edit mode). */ ?>
+      <?php if ($label !== '' || $show_admin): ?><span class="section-label"<?= home_cms_attrs($sid, 'section_label', $f) ?>><?= h($label) ?></span><?php endif; ?>
+      <?php if (hf($f, 'heading', $lang) !== '' || $show_admin): ?><h2<?= home_cms_attrs($sid, 'heading', $f) ?>><?= h(hf($f, 'heading', $lang)) ?></h2><?php endif; ?>
+    </div>
     <?php endif; ?>
     <ul class="home-people" role="list" style="list-style:none;margin:3rem 0 0;padding:0;display:flex;flex-direction:column;gap:4rem;">
       <?php foreach ($people as $p):
