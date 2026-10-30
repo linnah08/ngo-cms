@@ -55,6 +55,33 @@ final class SeoTest extends TestCase
         );
     }
 
+    #[DataProvider('staticPairs')]
+    public function testSitemapListsBothSidesOfEveryStaticPair(string $bg, string $en): void
+    {
+        $src = (string) file_get_contents(ROOT_PATH . '/sitemap.php');
+        foreach ([$bg, $en] as $path) {
+            $this->assertStringContainsString("'$path'", $src, "$path has a BG/EN pair but is missing from the sitemap");
+        }
+    }
+
+    public static function indexPaths(): array
+    {
+        return [
+            'home'      => ['/index.php', '/'],
+            'EN home'   => ['/en/index.php', '/en/'],
+            'section'   => ['/za-nas/index.php', '/za-nas/'],
+            'clean'     => ['/za-nas/', '/za-nas/'],
+            'article'   => ['/novini/statia/', '/novini/statia/'],
+            'other php' => ['/sitemap.php', '/sitemap.php'],
+        ];
+    }
+
+    #[DataProvider('indexPaths')]
+    public function testCanonicalPathDropsIndexPhp(string $path, string $want): void
+    {
+        $this->assertSame($want, seo_canonical_path($path));
+    }
+
     public function testUnknownPathsHaveNoAlternates(): void
     {
         $this->assertSame([], seo_resolve_alternates('/cart/'));

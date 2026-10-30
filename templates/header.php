@@ -52,7 +52,7 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
 
   <?php
     require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/seo.php';
-    $_seo_path = url_request_path($_SERVER['REQUEST_URI'] ?? '/');
+    $_seo_path = seo_canonical_path(url_request_path($_SERVER['REQUEST_URI'] ?? '/'));
     seo_render_meta([
         'title'       => $_doc_title,
         'description' => $page_description ?? '',

@@ -20,6 +20,7 @@ $static = [
     '/politika-za-poveritelnost/', '/politika-za-biskvitki/',
     '/en/', '/en/about/', '/en/projects/', '/en/news/', '/en/contacts/',
     '/en/how-to-help/', '/en/shop/', '/en/terms/', '/en/legal/',
+    '/en/privacy-policy/', '/en/cookie-policy/',
 ];
 if (feature_enabled('donations')) {
     array_push($static, '/donation/', '/en/donation/');

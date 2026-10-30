@@ -19,7 +19,18 @@ function seo_static_alt_map(): array {
         '/donation/'           => '/en/donation/',
         '/usloviya/'           => '/en/terms/',
         '/pravna-informaciya/' => '/en/legal/',
+        '/politika-za-poveritelnost/' => '/en/privacy-policy/',
+        '/politika-za-biskvitki/'     => '/en/cookie-policy/',
+        '/finansovi-otcheti/'         => '/en/financial-reports/',
     ];
+}
+
+/**
+ * The address Google should index for $path: a directory's index.php is the
+ * same page as the directory, so /index.php names / and /en/index.php names /en/.
+ */
+function seo_canonical_path(string $path): string {
+    return preg_replace('#/index\.php$#', '/', $path);
 }
 
 /** Absolutise an image path against SITE_URL. */
