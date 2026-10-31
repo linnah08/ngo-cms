@@ -320,7 +320,7 @@ final class ModulesGatingTest extends TestCase
         foreach (['save_topics', 'csub_delete', 'bulk_delete_contacts'] as $action) {
             $this->assertStringContainsString("'$action'", substr($src, strpos($src, '$contact_actions = ['), 400), "$action is a contact action");
         }
-        $this->assertStringContainsString("module_any_enabled('comments_reviews', 'contact_form')", self::src('admin/includes/admin-header.php'), 'menu item while either is on');
+        $this->assertStringContainsString("module_any_enabled('comments_reviews', 'contact_form')", self::src('admin/includes/admin-nav.php'), 'menu item while either is on');
         $this->assertStringContainsString("if (\$can_editorial && module_enabled_with_needs('contact_form'))", self::src('admin/dashboard.php'));
         $this->assertSame([], modules_registry()['contact_form']['public_paths'], 'the contact page stays, and so do links to it');
     }

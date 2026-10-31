@@ -314,7 +314,7 @@ final class ModulesOffHttpTest extends TestCase
         [$code, $body] = $this->http('/admin/comments.php?source=comments', true);
         $this->assertSame(200, $code, 'contact messages still have their page');
         $this->assertStringNotContainsString('Коментари към статии', $body);
-        $this->assertMatchesRegularExpression('#<a href="/admin/comments.php"\s+class="admin-nav__link[^"]*">\s*Контакти#u', $body);
+        $this->assertMatchesRegularExpression('#<a href="/admin/comments.php"\s+class="admin-nav__link[^"]*"[^>]*>(?:\s*<svg.*?</svg>)?\s*<span>Контакти#us', $body);
 
         [$code] = $this->http('/api/comment-submit.php', false, ['csrf_token' => 'x']);
         $this->assertSame(404, $code);
@@ -368,7 +368,7 @@ final class ModulesOffHttpTest extends TestCase
             $this->assertStringContainsString('Коментари към статии', $body);
             $this->assertStringNotContainsString('Съобщения от контактната форма', $body);
             $this->assertStringNotContainsString('Теми в контактната форма', $body);
-            $this->assertMatchesRegularExpression('#<a href="/admin/comments.php"\s+class="admin-nav__link[^"]*">\s*Коментари#u', $body);
+            $this->assertMatchesRegularExpression('#<a href="/admin/comments.php"\s+class="admin-nav__link[^"]*"[^>]*>(?:\s*<svg.*?</svg>)?\s*<span>Коментари#us', $body);
 
             [$code, , $loc] = $this->http('/admin/comments.php', true, ['csrf_token' => $this->csrf($body), 'action' => 'csub_delete', 'csub_id' => (string) $id]);
             $this->assertSame(302, $code);

@@ -346,6 +346,38 @@ function updater_check_latest(bool $force = false, ?callable $httpFetcher = null
     return $result;
 }
 
+/**
+ * The newer version the last check found ("0.18.0"), or null — read from the
+ * saved result only, never from the network, so every admin page can ask.
+ * An old result still counts: a release does not stop being newer.
+ */
+function updater_cached_update(): ?string
+{
+    $saved = updater_cache_read();
+    if ($saved === null || !empty($saved['no_release']) || empty($saved['tag_name'])) {
+        return null;
+    }
+    $latest = ltrim((string) $saved['tag_name'], 'v');
+    return updater_version_needs_update(updater_get_local_version(), $latest) ? $latest : null;
+}
+
+/** Is the saved check missing or older than UPDATER_CACHE_TTL? */
+function updater_cache_is_stale(): bool
+{
+    $saved = updater_cache_read();
+    return $saved === null || !isset($saved['fetched_at'])
+        || (time() - (int) $saved['fetched_at']) >= UPDATER_CACHE_TTL;
+}
+
+/** The saved result of the last check, or null when there is none. */
+function updater_cache_read(): ?array
+{
+    $file    = updater_cache_file();
+    $raw     = is_file($file) ? @file_get_contents($file) : false;
+    $decoded = is_string($raw) && $raw !== '' ? json_decode($raw, true) : null;
+    return is_array($decoded) ? $decoded : null;
+}
+
 // ── Maintenance mode ───────────────────────────────────────────────────────────
 
 function updater_maintenance_file(): string

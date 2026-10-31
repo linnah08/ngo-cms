@@ -64,11 +64,19 @@ final class SiteAdminNavTest extends TestCase
 
     public function test_the_admin_menu_renders_them_escaped_and_loads_the_helpers_itself(): void
     {
-        $src = (string) file_get_contents(dirname(__DIR__, 2) . '/admin/includes/admin-header.php');
-        $this->assertStringContainsString("includes/site_extensions.php", $src, 'a site that kept an older config.php still gets the helpers');
-        $this->assertStringContainsString('site_admin_nav(', $src);
-        $this->assertStringContainsString("h(\$_site_nav['href'])", $src);
-        $this->assertStringContainsString("h(\$_site_nav['label'])", $src);
-        $this->assertLessThan(strpos($src, '/admin/support.php'), strpos($src, 'site_admin_nav('), 'site links come before Поддръжка');
+        $nav = (string) file_get_contents(dirname(__DIR__, 2) . '/admin/includes/admin-nav.php');
+        $this->assertStringContainsString("includes/site_extensions.php", $nav, 'a site that kept an older config.php still gets the helpers');
+
+        $f = tempnam(sys_get_temp_dir(), 'ext') . '.php';
+        self::$tmp[] = $f;
+        file_put_contents($f, '<?php return ["admin_nav" => [
+            "quiz" => ["label" => "Тест <b>", "href" => "/admin/site/quiz.php?a=1&b=2", "roles" => ["admin"], "active_nav" => "quiz-page"],
+        ]];');
+        $page = run_admin_page('admin/dashboard.php', [], ['method' => 'GET', 'globals' => ['_om_site_extensions_file' => $f]]);
+        $this->assertSame(200, $page['status']);
+        $this->assertStringContainsString('href="/admin/site/quiz.php?a=1&amp;b=2"', $page['body']);
+        $this->assertStringContainsString('<span>Тест &lt;b&gt;</span>', $page['body']);
+        $this->assertStringContainsString('<h2 class="admin-nav__group">Още</h2>', $page['body'], 'in the side menu, under its own heading');
+        $this->assertLessThan(strpos($page['body'], 'id="adminPanelSettings"'), strpos($page['body'], 'quiz.php'), 'in the side menu, not the Настройки panel');
     }
 }

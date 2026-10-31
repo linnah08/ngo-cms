@@ -55,10 +55,19 @@ final class HomePartnersMenuTest extends TestCase
 
     public function test_admin_menu_follows_the_section_and_keeps_the_current_page(): void
     {
-        $src = (string) file_get_contents(dirname(__DIR__, 2) . '/admin/includes/admin-header.php');
-        $this->assertStringContainsString("home_section_on('partners')", $src);
-        $this->assertStringContainsString("\$_nav_partners = (\$active_nav ?? '') === 'partners';", $src,
-            'on the partners page itself the item stays, so the admin is never on a page the menu does not show');
-        $this->assertMatchesRegularExpression('/<\?php if \(\$_nav_partners\): \?>\s*<a href="\/admin\/partners\.php"/', $src);
+        require_once dirname(__DIR__, 2) . '/admin/includes/admin-nav.php';
+        if (session_status() === PHP_SESSION_NONE) @session_start();   // or admin_user() starts it later and drops what is set here
+        $_SESSION[ADMIN_SESSION_NAME] = ['id' => 1, 'role' => 'admin', 'name' => 'T', 'site' => admin_session_site(), 'time' => time()];
+        try {
+            $keys = static fn(?string $nav) => array_column(admin_nav_items($nav), 'key');
+            $this->write(false);
+            $this->assertNotContains('partners', $keys('dashboard'));
+            $this->assertContains('partners', $keys('partners'),
+                'on the partners page itself the item stays, so the admin is never on a page the menu does not show');
+            $this->write(true);
+            $this->assertContains('partners', $keys('dashboard'));
+        } finally {
+            unset($_SESSION[ADMIN_SESSION_NAME]);
+        }
     }
 }

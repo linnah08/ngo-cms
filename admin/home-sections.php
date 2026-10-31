@@ -117,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $picker = $form === null && isset($_GET['add']);
 $flash  = flash_get();
 
-$active_nav       = 'pages';
+$active_nav       = $cpage !== null ? 'pages' : 'home';   // a created page lights up Страници, the front page Начална страница
 $page_title_admin = $cpage !== null ? 'Страница — ' . $cpage['title_bg'] : 'Начална страница';
 if ($form !== null) {
     $page_head_extra = tinymce_script_tag();

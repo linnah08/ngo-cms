@@ -105,7 +105,7 @@ final class FeatureFlagsTest extends TestCase
 
     public function test_admin_menu_hides_module_pages_through_the_registry(): void
     {
-        $src = (string) file_get_contents(self::root() . '/admin/includes/admin-header.php');
+        $src = (string) file_get_contents(self::root() . '/admin/includes/admin-nav.php');
         $this->assertStringContainsString("module_admin_page_visible('campaign.php')", $src);
         $this->assertStringContainsString("module_admin_page_visible('events.php')", $src);
         $this->assertStringNotContainsString("feature_enabled('campaign')", $src, 'no hard-coded module ifs in the menu');

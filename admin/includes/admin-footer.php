@@ -178,12 +178,53 @@
 })();
 
 (function () {
-  /* ── Hamburger ── */
+  /* ── Hamburger: the side menu slides in on narrow screens. Focus goes into it
+     and comes back to the button on close (✕, Esc). ── */
   var hamburger = document.getElementById('adminHamburger');
   var sidebar   = document.getElementById('adminSidebar');
+  var sideClose = document.getElementById('adminSidebarClose');
   if (hamburger && sidebar) {
-    hamburger.addEventListener('click', function () { sidebar.classList.toggle('open'); });
+    var setMenu = function (open, refocus) {
+      sidebar.classList.toggle('open', open);
+      hamburger.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open && sideClose) setTimeout(function () { sideClose.focus(); }, 50);
+      if (!open && refocus) hamburger.focus();
+    };
+    hamburger.addEventListener('click', function () { setMenu(!sidebar.classList.contains('open'), false); });
+    if (sideClose) sideClose.addEventListener('click', function () { setMenu(false, true); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && sidebar.classList.contains('open')) setMenu(false, true);
+    });
   }
+
+  /* ── Top-bar panels (Настройки, account): one open at a time; a click
+     outside or Esc closes it, and Esc hands focus back to its button. ── */
+  var panelBtns = Array.prototype.slice.call(document.querySelectorAll('[data-admin-panel]'));
+  var panelOf   = function (b) { return document.getElementById(b.getAttribute('aria-controls')); };
+  var setPanel  = function (b, open) {
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    var p = panelOf(b);
+    if (p) p.hidden = !open;
+  };
+  panelBtns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var open = b.getAttribute('aria-expanded') !== 'true';
+      panelBtns.forEach(function (o) { if (o !== b) setPanel(o, false); });
+      setPanel(b, open);
+    });
+  });
+  document.addEventListener('click', function (e) {
+    panelBtns.forEach(function (b) {
+      var p = panelOf(b);
+      if (b.getAttribute('aria-expanded') === 'true' && !b.contains(e.target) && !(p && p.contains(e.target))) setPanel(b, false);
+    });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    panelBtns.forEach(function (b) {
+      if (b.getAttribute('aria-expanded') === 'true') { setPanel(b, false); b.focus(); }
+    });
+  });
 
   /* ── Confirmation modal ── */
   var overlay   = document.getElementById('adminConfirmOverlay');
