@@ -57,6 +57,14 @@ $_dl_items = array_map(fn($item) => [
 ], $items);
 
 // Counted once, by the buyer's own browser — never by someone reopening the link.
+// gtag.js (Google Ads / GA4) gets it through $gtag_events, which the header sends
+// after the tag has loaded; the dataLayer push below is for sites on Tag Manager.
+$gtag_events = !$owner ? [] : [['purchase', [
+    'transaction_id' => $order['order_number'],
+    'value'          => (float)$order['total_eur'],
+    'currency'       => 'EUR',
+    'items'          => $_dl_items,
+]]];
 $page_head_extra = !$owner ? '' : '<script>
 window.dataLayer = window.dataLayer || [];
 window.dataLayer.push({

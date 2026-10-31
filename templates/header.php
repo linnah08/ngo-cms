@@ -99,6 +99,11 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
     gtag('js', new Date());
     <?php if ($__ads !== ''): ?>gtag('config', '<?= h($__ads) ?>');<?php endif; ?>
     <?php if ($__ga4 !== ''): ?>gtag('config', '<?= h($__ga4) ?>');<?php endif; ?>
+    <?php // A page's own events ($gtag_events = [[name, params], …]) go after the config
+          // lines: gtag sends an event only to the IDs configured before it. ?>
+    <?php foreach ($gtag_events ?? [] as [$__ev_name, $__ev_params]): ?>
+    gtag('event', <?= json_encode((string) $__ev_name, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>, <?= json_encode((object) $__ev_params, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>);
+    <?php endforeach; ?>
   </script>
   <!-- End Google Ads / GA4 -->
 
