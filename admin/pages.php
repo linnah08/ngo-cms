@@ -379,15 +379,52 @@ $cp_flash = flash_get();
   </div>
 <?php endforeach; ?>
 
-<!-- ── Pages the admin created (content/pages/, admin/created-pages.php) ──── -->
+<!-- ── Every page of the site in one list: the built-in ones and the ones the
+     admin created (content/pages/, admin/created-pages.php), A→Я by title ─── -->
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/menus.php';
-$cp_list  = array_filter(cpage_all(), fn(array $p): bool => !cpage_is_builtin($p['id']));   // За нас is listed below, with the site's pages
+// The site's own pages: [key, title, BG address]. They are always on the site and
+// can only be edited.
+$rows = [
+    ['home',          'Начална страница',               '/'],
+    ['impact',        'Показатели (числа)',              '/'],
+    ['centres',       'Центрове',                        '/'],
+    ['about',         'За нас',                          '/za-nas/'],
+    ['projects',      'Проекти',                         '/proekti/'],
+    ['how_to_help',   'Как да помогна',                  '/kak-da-pomogna/'],
+    ['shop',          'Страница за дарение',             '/donation/'],
+    ['legal_privacy', 'Политика за поверителност',       '/politika-za-poveritelnost/'],
+    ['legal_info',    'Правна информация',               '/pravna-informaciya/'],
+    ['legal_terms',   'Условия за ползване',             '/usloviya/'],
+    ['legal_cookies', 'Политика за бисквитки',           '/politika-za-biskvitki/'],
+    ['reports',       'Финансови отчети',                '/finansovi-otcheti/'],
+];
+// Pages of a switched-off module (Admin → Модули) are not listed.
+$rows = array_filter($rows, static fn(array $r): bool => module_link_visible($r[2]));
+$en_of = path_map_builtin();
+$list  = [];
+foreach ($rows as [$key, $label, $url]) {
+    $en = $en_of[rtrim($url, '/') ?: '/'] ?? null;
+    $list[] = ['title' => $label, 'url_bg' => $url, 'url_en' => $en === null ? null : rtrim($en, '/') . '/', 'cp' => null,
+               'edit' => match ($key) { 'home' => '/admin/home-sections.php', 'reports' => '/admin/financial-reports.php',
+                                        'about' => '/admin/page-edit.php?id=' . CPAGE_ABOUT_ID, default => '/admin/pages.php?page=' . $key }];
+}
+// За нас is stored like a created page but is one of the site's pages (above).
+foreach (cpage_all() as $cp) {
+    if (cpage_is_builtin($cp['id'])) continue;
+    $list[] = ['title' => $cp['title_bg'], 'url_bg' => cpage_url($cp, 'bg'), 'url_en' => cpage_url($cp, 'en'), 'cp' => $cp,
+               'edit' => '/admin/page-edit.php?id=' . $cp['id']];
+}
+$coll = class_exists('Collator') ? new Collator('bg_BG') : null;
+usort($list, static fn(array $a, array $b): int => $coll
+    ? $coll->compare($a['title'], $b['title'])
+    : strcoll(mb_strtolower($a['title']), mb_strtolower($b['title'])));
+$sr = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;';
 ?>
 <section aria-labelledby="cpListTitle" style="margin-bottom:2.5rem;">
-  <h2 id="cpListTitle" style="margin:0 0 .5rem;font-size:1.15rem;">Вашите страници</h2>
+  <h2 id="cpListTitle" style="margin:0 0 .5rem;font-size:1.15rem;">Страници</h2>
   <p style="margin:0 0 1rem;color:var(--text-muted);">
-    Страници, които създавате сами — например „Нашата история“. Новата страница започва като чернова:
+    Всички страници на сайта. Можете да добавите и свои — например „Нашата история“. Новата страница започва като чернова:
     посетителите не я виждат, докато не натиснете „Публикувай“.
   </p>
 
@@ -405,37 +442,35 @@ $cp_list  = array_filter(cpage_all(), fn(array $p): bool => !cpage_is_builtin($p
     </p>
   </form>
 
-  <?php if (!$cp_list): ?>
-    <p style="margin:0;padding:1rem;border:2px dashed var(--border);border-radius:8px;">Още нямате свои страници.</p>
-  <?php else: ?>
   <div class="admin-table-wrap">
     <table class="admin-table">
       <thead>
-        <tr><th scope="col">Страница</th><th scope="col">Адрес</th><th scope="col">Състояние</th><th scope="col"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;">Действия</span></th></tr>
+        <tr><th scope="col">Страница</th><th scope="col">Адрес</th><th scope="col">Състояние</th><th scope="col"><span style="<?= $sr ?>">Действия</span></th></tr>
       </thead>
       <tbody>
-      <?php foreach ($cp_list as $cp):
-        $cp_draft = $cp['status'] !== 'published';
-        $cp_menus = cpage_menus_using($cp);
-        $cp_confirm = "Да изтрия ли страницата \u{201E}{$cp['title_bg']}\u{201C}? Това не може да се върне."
-            . ' Снимките ѝ също ще бъдат изтрити.'
-            . ($cp_menus ? ' Страницата е в менюто: ' . implode(', ', $cp_menus) . '. Тази връзка ще изчезне от сайта, докато не я насочите другаде.' : '');
+      <?php foreach ($list as $row):
+        $cp       = $row['cp'];
+        $cp_draft = $cp !== null && $cp['status'] !== 'published';
+        $cp_menus = $cp !== null ? cpage_menus_using($cp) : [];
       ?>
-        <tr id="cp-<?= h($cp['id']) ?>">
+        <tr<?= $cp !== null ? ' id="cp-' . h($cp['id']) . '"' : '' ?>>
           <td>
-            <strong><?= h($cp['title_bg']) ?></strong>
-            <?php if ($cp['title_en'] !== '' && $cp['title_en'] !== $cp['title_bg']): ?>
-              <br><span lang="en" style="color:var(--text-muted);font-size:.85rem;"><?= h($cp['title_en']) ?></span>
-            <?php elseif (preg_match('/\p{Cyrillic}/u', $cp['title_en'] !== '' ? $cp['title_en'] : $cp['title_bg'])): ?>
-              <br><span style="color:#92400e;font-size:.85rem;"><span aria-hidden="true">⚠ </span>Английското заглавие не е преведено</span>
-            <?php endif; ?>
-            <?php if ($cp_menus): ?>
-              <br><span style="color:var(--text-muted);font-size:.8rem;">В менюто: <?= h(implode(', ', $cp_menus)) ?></span>
+            <strong><?= h($row['title']) ?></strong>
+            <?php if ($cp !== null): ?>
+              <?php if ($cp['title_en'] !== '' && $cp['title_en'] !== $cp['title_bg']): ?>
+                <br><span lang="en" style="color:var(--text-muted);font-size:.85rem;"><?= h($cp['title_en']) ?></span>
+              <?php elseif (preg_match('/\p{Cyrillic}/u', $cp['title_en'] !== '' ? $cp['title_en'] : $cp['title_bg'])): ?>
+                <br><span style="color:#92400e;font-size:.85rem;"><span aria-hidden="true">⚠ </span>Английското заглавие не е преведено</span>
+              <?php endif; ?>
+              <?php if ($cp_menus): ?>
+                <br><span style="color:var(--text-muted);font-size:.8rem;">В менюто: <?= h(implode(', ', $cp_menus)) ?></span>
+              <?php endif; ?>
             <?php endif; ?>
           </td>
           <td style="font-size:.85rem;white-space:nowrap;">
-            <a href="<?= h(cpage_url($cp, 'bg')) ?>" target="_blank" rel="noopener"><?= h(cpage_url($cp, 'bg')) ?><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;"> (отваря се в нов раздел)</span></a><br>
-            <a href="<?= h(cpage_url($cp, 'en')) ?>" target="_blank" rel="noopener"><?= h(cpage_url($cp, 'en')) ?><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;"> (отваря се в нов раздел)</span></a>
+            <?php foreach (array_filter([$row['url_bg'], $row['url_en']]) as $i => $u): ?>
+              <?= $i ? '<br>' : '' ?><a href="<?= h($u) ?>" target="_blank" rel="noopener"><?= h($u) ?><span style="<?= $sr ?>"> (отваря се в нов раздел)</span></a>
+            <?php endforeach; ?>
           </td>
           <td>
             <span style="display:inline-block;font-weight:600;padding:.2rem .55rem;border-radius:4px;white-space:nowrap;<?= $cp_draft ? 'background:#fef3c7;color:#78350f;' : 'background:#dcfce7;color:#14532d;' ?>">
@@ -444,7 +479,12 @@ $cp_list  = array_filter(cpage_all(), fn(array $p): bool => !cpage_is_builtin($p
           </td>
           <td style="text-align:right;">
             <div style="display:flex;flex-wrap:wrap;gap:.4rem;justify-content:flex-end;">
-              <a href="/admin/page-edit.php?id=<?= h($cp['id']) ?>" class="btn btn--outline" style="min-height:44px;" aria-label="<?= h("Редактирай \u{201E}{$cp['title_bg']}\u{201C}") ?>">Редактирай</a>
+              <a href="<?= h($row['edit']) ?>" class="btn btn--outline" style="min-height:44px;" aria-label="<?= h("Редактирай \u{201E}{$row['title']}\u{201C}") ?>">Редактирай</a>
+              <?php if ($cp !== null):
+                $cp_confirm = "Да изтрия ли страницата \u{201E}{$cp['title_bg']}\u{201C}? Това не може да се върне."
+                    . ' Снимките ѝ също ще бъдат изтрити.'
+                    . ($cp_menus ? ' Страницата е в менюто: ' . implode(', ', $cp_menus) . '. Тази връзка ще изчезне от сайта, докато не я насочите другаде.' : '');
+              ?>
               <form method="POST" action="/admin/created-pages.php" style="margin:0;">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="<?= $cp_draft ? 'publish' : 'unpublish' ?>">
@@ -457,6 +497,7 @@ $cp_list  = array_filter(cpage_all(), fn(array $p): bool => !cpage_is_builtin($p
                 <input type="hidden" name="id" value="<?= h($cp['id']) ?>">
                 <button type="submit" class="btn btn--outline" style="min-height:44px;color:#b91c1c;border-color:#b91c1c;" aria-label="<?= h("Изтрий \u{201E}{$cp['title_bg']}\u{201C}") ?>">Изтрий</button>
               </form>
+              <?php endif; ?>
             </div>
           </td>
         </tr>
@@ -464,58 +505,7 @@ $cp_list  = array_filter(cpage_all(), fn(array $p): bool => !cpage_is_builtin($p
       </tbody>
     </table>
   </div>
-  <?php endif; ?>
 </section>
-
-<h2 style="margin:0 0 1rem;font-size:1.15rem;">Страници на сайта</h2>
-<div class="admin-table-wrap">
-  <table class="admin-table">
-    <thead>
-      <tr>
-        <th>Страница</th>
-        <th>URL</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php
-      $rows = [
-          ['home',          'Начална страница',               '/'],
-          ['impact',        'Показатели (числа)',              '/'],
-          ['centres',       'Центрове',                        '/'],
-          ['about',         'За нас',                          '/za-nas/'],
-          ['projects',      'Проекти',                         '/proekti/'],
-          ['how_to_help',   'Как да помогна',                  '/kak-da-pomogna/'],
-          ['shop',          'Страница за дарение',             '/donation/'],
-          ['legal_privacy', 'Политика за поверителност',       '/politika-za-poveritelnost/'],
-          ['legal_info',    'Правна информация',               '/pravna-informaciya/'],
-          ['legal_terms',   'Условия за ползване',             '/usloviya/'],
-          ['legal_cookies', 'Политика за бисквитки',           '/politika-za-biskvitki/'],
-          ['reports',       'Финансови отчети',                '/finansovi-otcheti/'],
-      ];
-      // Pages of a switched-off module (Admin → Модули) are not listed.
-      $rows = array_filter($rows, static fn(array $r): bool => module_link_visible($r[2]));
-      foreach ($rows as [$key, $label, $url]):
-      ?>
-      <tr>
-        <td><strong><?= h($label) ?></strong></td>
-        <td style="color:var(--text-muted);font-size:0.85rem;">
-          <?php if ($url): ?>
-            <a href="<?= h($url) ?>" target="_blank" rel="noopener"
-               style="color:inherit;"><?= h($url) ?> ↗</a>
-          <?php endif; ?>
-        </td>
-        <td style="text-align:right;">
-          <a href="<?= match ($key) { 'home' => '/admin/home-sections.php', 'reports' => '/admin/financial-reports.php',
-                                       'about' => '/admin/page-edit.php?id=' . CPAGE_ABOUT_ID, default => '/admin/pages.php?page=' . h($key) } ?>" class="btn btn--outline" style="font-size:0.85rem;padding:0.4rem 0.9rem;">
-            Редактиране
-          </a>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
-</div>
 
 <?php if (module_enabled_with_needs('ai_helpers')): ?>
 <!-- ── DeepL settings card ──────────────────────────────────────────────────── -->

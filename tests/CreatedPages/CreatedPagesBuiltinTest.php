@@ -129,6 +129,19 @@ final class CreatedPagesBuiltinTest extends CreatedPagesTestCase
         $this->assertStringContainsString('id="cp-p_abcd1234"', $html);
         $this->assertStringNotContainsString('href="/admin/pages.php?page=about"', $html);
 
+        // One list: the created page sits among the site's own pages, A→Я by title,
+        // and only the created one can be hidden or deleted.
+        $this->assertSame(1, substr_count($html, '<table class="admin-table">'), 'one table of pages');
+        $pos = fn(string $t): int|false => strpos($html, '<strong>' . $t . '</strong>');
+        foreach (['За нас', 'Нашата история', 'Политика за бисквитки', 'Проекти'] as $t) {
+            $this->assertNotFalse($pos($t), $t);
+        }
+        $this->assertLessThan($pos('Нашата история'), $pos('За нас'));
+        $this->assertLessThan($pos('Политика за бисквитки'), $pos('Нашата история'));
+        $this->assertLessThan($pos('Проекти'), $pos('Политика за бисквитки'));
+        $this->assertSame(1, substr_count($html, 'aria-label="Изтрий „'), 'only the created page has Изтрий');
+        $this->assertStringContainsString('href="/en/about/"', $html, 'built-in pages show their EN address too');
+
         $old = $this->adminGet('admin/pages.php', ['page' => 'about']);
         $this->assertStringContainsString('href="/admin/page-edit.php?id=p_000about"', $old);
         $this->assertStringNotContainsString('id="aboutForm"', $old);
