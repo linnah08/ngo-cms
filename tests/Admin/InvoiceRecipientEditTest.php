@@ -57,7 +57,8 @@ final class InvoiceRecipientEditTest extends TestCase
     {
         $res = order_invoice_recipient_update([], $this->post(['eik' => '831641792']));
         $this->assertCount(1, $res['errors']);
-        $this->assertStringContainsString('не е верен', $res['errors'][0]);
+        $this->assertStringContainsString('831641792', $res['errors'][0]);
+        $this->assertStringContainsString('някоя цифра е сгрешена', $res['errors'][0]);
     }
 
     public function testVatNumberIsOptionalButMustLookLikeOne(): void

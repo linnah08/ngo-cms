@@ -57,7 +57,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ── Validate ──────────────────────────────────────────────────────────────
     if ($company_name === '') $errors[] = 'Моля, въведете наименование на получателя.';
-    if ($eik === '')          $errors[] = 'Моля, въведете ЕИК / Булстат.';
+    if ($eik === '') {
+        $errors[] = 'Моля, въведете ЕИК / Булстат.';
+    } elseif (($eik_error = org_eik_error($eik)) !== null) {
+        $errors[] = $eik_error;
+    } else {
+        $eik = org_eik_normalize($eik);
+    }
     if (empty($items))        $errors[] = 'Моля, добавете поне един артикул.';
     if ($total_eur < 0.01)    $errors[] = 'Сумата на фактурата трябва да е по-голяма от нула.';
     if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -205,7 +211,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <div class="form-group">
           <label class="form-label" for="eik">ЕИК / Булстат</label>
           <input type="text" id="eik" name="eik" class="form-input"
-                 value="<?= h($_POST['eik'] ?? '') ?>" placeholder="123456789" required>
+                 value="<?= h($_POST['eik'] ?? '') ?>" placeholder="9 цифри" required>
         </div>
         <div class="form-group">
           <label class="form-label" for="vat_number">ДДС номер <span style="font-weight:400;color:var(--text-muted);">(незадължително)</span></label>

@@ -74,6 +74,20 @@ final class LaunchTest extends TestCase
         $this->assertNull(org_eik_normalize('abcdefghi'));
     }
 
+    public function test_a_wrong_eik_says_whether_the_length_or_a_digit_is_wrong(): void
+    {
+        // "123456789" has the right length but no company has it — the message
+        // used to say "9 or 13 digits", which left people stuck (Trello #63).
+        $this->assertNull(org_eik_problem('000 696 327'));
+        $this->assertNull(org_eik_error('BG175074752'));
+        $this->assertSame('checksum', org_eik_problem('123456789'));
+        $this->assertSame('checksum', org_eik_problem('1750747521235'));
+        $this->assertSame('length', org_eik_problem('12345'));
+        $this->assertSame('length', org_eik_problem('12345678a'));
+        $this->assertStringContainsString('някоя цифра е сгрешена', org_eik_error('123456789'));
+        $this->assertStringContainsString('9 цифри', org_eik_error('12345'));
+    }
+
     public function test_the_form_never_posts_the_launch_state(): void
     {
         $this->assertArrayHasKey('site_launched', org_system_fields());

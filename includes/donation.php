@@ -102,8 +102,10 @@ function donation_validate(float $amount, string $name, string $email, string $d
         }
         if ($eik === '') {
             $errors[] = t_or('donation.err.eik', 'Въведете ЕИК / Булстат.', 'Please enter the company ID (EIK / BULSTAT).', $lang);
-        } elseif (org_eik_normalize($eik) === null) {
-            $errors[] = t_or('donation.err.eik_invalid', 'ЕИК / Булстат трябва да е 9 или 13 цифри. Моля проверете го.', 'The company ID (EIK / BULSTAT) should be 9 or 13 digits. Please check it.', $lang);
+        } elseif (($eik_problem = org_eik_problem($eik)) === 'length') {
+            $errors[] = t_or('donation.err.eik_length', 'ЕИК / Булстат е 9 цифри (13 за БУЛСТАТ на клон). Моля, проверете го.', 'The company ID (EIK / BULSTAT) is 9 digits (13 for a branch’s BULSTAT). Please check it.', $lang);
+        } elseif ($eik_problem === 'checksum') {
+            $errors[] = t_or('donation.err.eik_invalid', 'Такъв ЕИК / Булстат не съществува — някоя цифра е сгрешена. Препишете го от Търговския регистър или от фактура на фирмата.', 'No company has this ID (EIK / BULSTAT) — one of the digits is wrong. Please copy it from the Commercial Register or from one of the company’s invoices.', $lang);
         }
         if ($vat !== '' && form_vat_normalize($vat) === null) {
             $errors[] = t_or('donation.err.vat_invalid', 'ДДС номерът започва с кода на държавата, например BG123456789.', 'The VAT number starts with the country code, e.g. BG123456789.', $lang);

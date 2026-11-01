@@ -73,8 +73,10 @@ final class EnglishDonationTest extends TestCase
 
     public function testCompanyIdAndVatNumberAreChecked(): void
     {
-        $this->assertSame(['The company ID (EIK / BULSTAT) should be 9 or 13 digits. Please check it.'],
+        $this->assertSame(['The company ID (EIK / BULSTAT) is 9 digits (13 for a branch’s BULSTAT). Please check it.'],
             donation_validate(20, 'Ann', 'ann@example.com', 'company', 'Acme', '123', 'en'));
+        $this->assertSame(['Такъв ЕИК / Булстат не съществува — някоя цифра е сгрешена. Препишете го от Търговския регистър или от фактура на фирмата.'],
+            donation_validate(20, 'Ann', 'ann@example.com', 'company', 'Acme', '123456789', 'bg'));
         $this->assertSame(['ДДС номерът започва с кода на държавата, например BG123456789.'],
             donation_validate(20, 'Ann', 'ann@example.com', 'company', 'Acme', '000696327', 'bg', '000696327'));
     }

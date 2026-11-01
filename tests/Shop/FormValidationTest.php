@@ -56,7 +56,7 @@ final class FormValidationTest extends TestCase
     public function test_the_checkout_and_donation_forms_use_these_checks(): void
     {
         $checkout = file_get_contents(dirname(__DIR__, 2) . '/checkout/index.php');
-        foreach (['form_person_name_valid(', 'form_phone_valid(', 'org_eik_normalize(', 'form_vat_normalize(', 'isValidNumberPrecise('] as $call) {
+        foreach (['form_person_name_valid(', 'form_phone_valid(', 'org_eik_problem(', 'form_vat_normalize(', 'isValidNumberPrecise('] as $call) {
             $this->assertStringContainsString($call, $checkout);
         }
         $this->assertStringNotContainsString('iti.isValidNumber()', $checkout,
@@ -64,7 +64,7 @@ final class FormValidationTest extends TestCase
         $this->assertStringContainsString('$d = array_merge($d, $contact_redisplay)', $checkout,
             'a form with an error comes back with what the customer typed, not emptied');
         $donation = file_get_contents(dirname(__DIR__, 2) . '/includes/donation.php');
-        $this->assertStringContainsString('org_eik_normalize(', $donation);
+        $this->assertStringContainsString('org_eik_problem(', $donation);
         $this->assertStringContainsString('form_vat_normalize(', $donation);
     }
 }

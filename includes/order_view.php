@@ -301,7 +301,7 @@ function order_invoice_recipient_update(?array $current, array $post): array
     if ($eik_raw === '') {
         $errors[] = 'Попълнете ЕИК / БУЛСТАТ.';
     } elseif (($eik = org_eik_normalize($eik_raw)) === null) {
-        $errors[] = 'ЕИК / БУЛСТАТ „' . $eik_raw . '“ не е верен — проверете цифрите (9 или 13 цифри).';
+        $errors[] = '„' . $eik_raw . '“: ' . org_eik_error($eik_raw);
     }
     $vat = strtoupper(str_replace(' ', '', $vat_raw));
     if ($vat !== '' && !preg_match('/^[A-Z]{2}[0-9A-Z]{2,13}$/', $vat)) {

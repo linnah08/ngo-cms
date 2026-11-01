@@ -47,8 +47,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($donor_type === 'company' && $company_name === '') {
         $errors[] = 'Моля, въведете наименование на фирмата.';
     }
-    if ($donor_type === 'company' && $eik === '') {
-        $errors[] = 'Моля, въведете ЕИК / Булстат.';
+    if ($donor_type === 'company') {
+        if ($eik === '') {
+            $errors[] = 'Моля, въведете ЕИК / Булстат.';
+        } elseif (($eik_error = org_eik_error($eik)) !== null) {
+            $errors[] = $eik_error;
+        } else {
+            $eik = org_eik_normalize($eik);
+        }
     }
     if ($amount_eur < 0.01) {
         $errors[] = 'Моля, въведете валидна сума.';
@@ -256,7 +262,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
           <div class="form-group">
             <label class="form-label">ЕИК / Булстат</label>
             <input type="text" name="eik" class="form-input"
-                   value="<?= h($_POST['eik'] ?? '') ?>" placeholder="123456789">
+                   value="<?= h($_POST['eik'] ?? '') ?>" placeholder="9 цифри">
           </div>
           <div class="form-group">
             <label class="form-label">ДДС номер <span style="font-weight:400;color:var(--text-muted);">(незадължително)</span></label>

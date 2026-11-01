@@ -107,6 +107,29 @@ function org_eik_normalize(string $eik): ?string
 }
 
 /**
+ * Why org_eik_normalize() refuses a number, so the message can say what to fix:
+ * 'length' when it isn't 9 or 13 digits, 'checksum' when it is but a digit is
+ * wrong (e.g. "123456789"), null when it is a real ЕИК / БУЛСТАТ.
+ */
+function org_eik_problem(string $eik): ?string
+{
+    if (org_eik_normalize($eik) !== null) return null;
+    $d = preg_replace('/\s+/', '', strtoupper($eik));
+    if (str_starts_with($d, 'BG')) $d = substr($d, 2);
+    return preg_match('/^(\d{9}|\d{13})$/', $d) ? 'checksum' : 'length';
+}
+
+/** The admin's plain-words message for a wrong ЕИК / БУЛСТАТ, or null when it is fine. */
+function org_eik_error(string $eik): ?string
+{
+    return match (org_eik_problem($eik)) {
+        'length'   => 'ЕИК / БУЛСТАТ е 9 цифри (13 за БУЛСТАТ на клон). Моля, проверете го.',
+        'checksum' => 'Такъв ЕИК / БУЛСТАТ не съществува — някоя цифра е сгрешена. Препишете го от Търговския регистър или от фактура на фирмата.',
+        default    => null,
+    };
+}
+
+/**
  * The module switches, feature_<name> => FEATURE_<NAME>, one per module in
  * modules_registry() (includes/modules.php). Saved by Admin → Модули, not by
  * the Организация form — org_validate() leaves them out and
@@ -375,7 +398,7 @@ function org_validate(array $in, array $themeKeys, ?array $signerIds = null): ar
     if ($v['site_eik'] !== '') {
         $eik = org_eik_normalize($v['site_eik']);
         if ($eik === null) {
-            $e['site_eik'] = 'Този ЕИК не е правилен — трябва да е 9 цифри (13 за БУЛСТАТ) и вероятно има сгрешена цифра. Препишете го от регистрацията на организацията.';
+            $e['site_eik'] = org_eik_error($v['site_eik']);
         } else {
             $v['site_eik'] = $eik;
         }
