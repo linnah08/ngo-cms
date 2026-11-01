@@ -32,9 +32,18 @@ test.beforeEach(() => {
   fs.writeFileSync(EN_FILE, JSON.stringify(post('PW photos', ['One', 'Two', 'Three'])));
 });
 
+// Uploads (Save mid-upload, crop) land straight in assets/images/articles/ under a
+// random name. Remember what was there before, so only this run's files are removed.
+const UPLOAD_DIR = path.join(ROOT, 'assets/images/articles');
+const listUploads = () => (fs.existsSync(UPLOAD_DIR)
+  ? fs.readdirSync(UPLOAD_DIR, { withFileTypes: true }).filter((e) => e.isFile()).map((e) => e.name) : []);
+let before = [];
+test.beforeAll(() => { before = listUploads(); });
+
 test.afterAll(() => {
   for (const f of [BG_FILE, EN_FILE]) if (fs.existsSync(f)) fs.unlinkSync(f);
   if (fs.existsSync(IMG_DIR)) fs.rmSync(IMG_DIR, { recursive: true });
+  for (const name of listUploads()) if (!before.includes(name)) fs.unlinkSync(path.join(UPLOAD_DIR, name));
 });
 
 const enCaps = (page) => page.$$eval('#apEnCaps input', (els) => els.map((e) => e.value));
