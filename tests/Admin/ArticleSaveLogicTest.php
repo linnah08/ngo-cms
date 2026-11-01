@@ -235,7 +235,7 @@ final class ArticleSaveLogicTest extends TestCase
     public function testBulgarianExcerptPromptCarriesTheGrammarRules(): void
     {
         $p = claude_excerpt_system_prompt('bg');
-        foreach (['часто', 'се борира', 'втора гостуване', 'се зародила', 'със доброволци', 'в лева'] as $wrong) {
+        foreach (['часто', 'се борира', 'втора гостуване', 'се зародила', 'със доброволци', 'в лева', 'статията описва', 'учеба'] as $wrong) {
             $this->assertStringContainsString($wrong, $p);
         }
         $this->assertStringNotContainsString('лв', claude_excerpt_system_prompt('en'));
