@@ -59,6 +59,7 @@ function org_fields(): array
         // Google: Search Console proof of ownership, statistics and ads (see org_google_validate()).
         'google_site_verification'  => 'GOOGLE_SITE_VERIFICATION',
         'ga4_id'                    => 'GA4_ID',
+        'ga4_api_secret'            => 'GA4_API_SECRET',   // Measurement Protocol: paid orders sent from the server (includes/ga4.php)
         'gtm_id'                    => 'GTM_ID',
         'google_ads_id'             => 'GOOGLE_ADS_ID',
         'google_ads_purchase_label' => 'GOOGLE_ADS_PURCHASE_LABEL',
@@ -555,7 +556,7 @@ function org_google_verification_code(string $in): ?string
 function org_google_validate(array &$v): array
 {
     $e = [];
-    foreach (['google_site_verification', 'ga4_id', 'gtm_id', 'google_ads_id', 'google_ads_purchase_label'] as $k) {
+    foreach (['google_site_verification', 'ga4_id', 'ga4_api_secret', 'gtm_id', 'google_ads_id', 'google_ads_purchase_label'] as $k) {
         $v[$k] = trim((string) ($v[$k] ?? ''));
     }
 
@@ -575,6 +576,9 @@ function org_google_validate(array &$v): array
         } elseif (!preg_match('/^G-[A-Z0-9]{4,20}$/', $v['ga4_id'])) {
             $e['ga4_id'] = 'Номерът за Google Analytics започва с G- и продължава с латински букви и цифри, например G-AB12CD34EF.';
         }
+    }
+    if ($v['ga4_api_secret'] !== '' && !preg_match('/^[A-Za-z0-9_\-]{10,64}$/', $v['ga4_api_secret'])) {
+        $e['ga4_api_secret'] = 'Тайният ключ съдържа само латински букви, цифри, - и _. Копирайте го от Google Analytics — колоната „Тайна стойност“.';
     }
     if ($v['gtm_id'] !== '') {
         $v['gtm_id'] = strtoupper($v['gtm_id']);

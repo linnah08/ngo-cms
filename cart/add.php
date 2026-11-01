@@ -36,7 +36,7 @@ if (!$product_id) {
 }
 
 $pdo  = get_pdo();
-$stmt = $pdo->prepare('SELECT id, slug, name_bg, name_en, stock, active, `type`, variants, preorder_enabled FROM products WHERE id = ? AND active = 1');
+$stmt = $pdo->prepare('SELECT id, slug, name_bg, name_en, price_eur, stock, active, `type`, variants, preorder_enabled FROM products WHERE id = ? AND active = 1');
 $stmt->execute([$product_id]);
 $product = $stmt->fetch();
 
@@ -169,6 +169,7 @@ foreach ($cart as &$item) {
             $msg = t_or('cart.err.capped', 'Налични са само {n} бр. — количеството е коригирано.', 'Only {n} available — quantity adjusted.', $lang, ['n' => $stock_limit]);
             flash_set('error', $msg);
         }
+        $added_qty        = max(0, $new_qty - $item['quantity']);
         $item['quantity'] = $new_qty;
         // For print products: update variant selection if re-added
         if ($product['type'] === 'print') {
@@ -194,6 +195,7 @@ if (!$found) {
         $msg = t_or('cart.err.capped', 'Налични са само {n} бр. — количеството е коригирано.', 'Only {n} available — quantity adjusted.', $lang, ['n' => $stock_limit]);
         flash_set('error', $msg);
     }
+    $added_qty = $capped_qty;
     $entry = ['product_id' => $product_id, 'quantity' => $capped_qty];
     if ($product['type'] === 'print') {
         $entry['colour']          = $colour;
@@ -208,6 +210,22 @@ if (!$found) {
     $cart[] = $entry;
 }
 $_SESSION['cart'] = $cart;
+
+// GA4 add_to_cart for what was really added — the header of the page this
+// redirects to sends it once (templates/header.php).
+if ($actually_added && ($added_qty ?? 0) > 0) {
+    $_price = round((float) $product['price_eur'], 2);
+    $_SESSION['ga_add_to_cart'] = [
+        'currency' => 'EUR',
+        'value'    => round($_price * $added_qty, 2),
+        'items'    => [[
+            'item_id'   => (string) $product_id,
+            'item_name' => $product['name_bg'] . ($variant_label !== '' ? ' — ' . $variant_label : ''),
+            'price'     => $_price,
+            'quantity'  => $added_qty,
+        ]],
+    ];
+}
 
 if ($redirect_param === 'product') {
     $back = $shop_url . rawurlencode($product['slug']) . '/';

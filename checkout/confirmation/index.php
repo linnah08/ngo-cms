@@ -50,33 +50,9 @@ $item_name      = static fn (array $item): string => $lang === 'en'
 
 $page_title = t_or('confirm.title', 'Поръчката е потвърдена', 'Order confirmed');
 
-$_dl_items = array_map(fn($item) => [
-    'item_name' => $item['name_bg'] ?? ($item['name_en'] ?? ''),
-    'price'     => (float)($item['price_eur'] ?? 0),
-    'quantity'  => (int)($item['quantity'] ?? 1),
-], $items);
-
-// Counted once, by the buyer's own browser — never by someone reopening the link.
-// gtag.js (Google Ads / GA4) gets it through $gtag_events, which the header sends
-// after the tag has loaded; the dataLayer push below is for sites on Tag Manager.
-$gtag_events = !$owner ? [] : [['purchase', [
-    'transaction_id' => $order['order_number'],
-    'value'          => (float)$order['total_eur'],
-    'currency'       => 'EUR',
-    'items'          => $_dl_items,
-]]];
-$page_head_extra = !$owner ? '' : '<script>
-window.dataLayer = window.dataLayer || [];
-window.dataLayer.push({
-    event: "purchase",
-    ecommerce: {
-        transaction_id: ' . json_encode($order['order_number']) . ',
-        value: ' . (float)$order['total_eur'] . ',
-        currency: "EUR",
-        items: ' . json_encode($_dl_items, JSON_UNESCAPED_UNICODE) . '
-    }
-});
-</script>';
+// Paid orders and donations reach Google Analytics / Google Ads from the server,
+// once, when the payment is confirmed (includes/ga4.php) — not from this page,
+// which a buyer may never reach (IRIS confirmed later) or may reload.
 
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>

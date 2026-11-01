@@ -66,6 +66,7 @@ define('SOCIAL_LINKEDIN',  '');
 // the Search Console code (GOOGLE_SITE_VERIFICATION) there.
 define('GTM_ID',                    '');  // Google Tag Manager container
 define('GA4_ID',                    '');  // GA4 measurement ID
+define('GA4_API_SECRET',            '');  // GA4 Measurement Protocol secret — paid orders sent from the server; never commit a real one
 define('GOOGLE_ADS_ID',             '');  // Google Ads conversion ID
 define('GOOGLE_ADS_PURCHASE_LABEL', '');  // add-to-cart conversion label
 

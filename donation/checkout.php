@@ -106,6 +106,11 @@ $pdo->prepare("
 ]);
 $order_id = $pdo->lastInsertId();
 
+// Who the donor is to Google Analytics (only with cookie consent), for the
+// conversion sent once the donation is paid (includes/ga4.php).
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/ga4.php';
+ga4_store_order_tracking_ids($pdo, (int) $order_id);
+
 // Only this session may see the donation's details on its confirmation page
 // (and sign the donor up there) — the number alone is guessable.
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_session.php';

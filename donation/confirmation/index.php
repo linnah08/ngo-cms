@@ -54,25 +54,9 @@ if ($owner && $paid && !empty($_don_consents['newsletter']) && module_enabled_wi
 
 $page_title = t_or('donation.confirm.title', 'Благодарим за дарението!', 'Thank you for your donation!');
 
-// Counted once, by the donor's own browser — never by someone reopening the link.
-// gtag.js (Google Ads / GA4) gets it through $gtag_events, which the header sends
-// after the tag has loaded; the dataLayer push below is for sites on Tag Manager.
-$gtag_events = !$owner ? [] : [['purchase', [
-    'transaction_id' => $order_number,
-    'value'          => $amount,
-    'currency'       => 'EUR',
-]]];
-$page_head_extra = !$owner ? '' : '<script>
-window.dataLayer = window.dataLayer || [];
-window.dataLayer.push({
-    event: "purchase",
-    ecommerce: {
-        transaction_id: ' . json_encode($order_number) . ',
-        value: ' . $amount . ',
-        currency: "EUR"
-    }
-});
-</script>';
+// Paid orders and donations reach Google Analytics / Google Ads from the server,
+// once, when the payment is confirmed (includes/ga4.php) — not from this page,
+// which a buyer may never reach (IRIS confirmed later) or may reload.
 
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>

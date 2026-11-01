@@ -219,6 +219,9 @@ if (!$_is_admin_page) {
         <a href="<?= $lang === 'bg' ? '/finansovi-otcheti/' : '/en/financial-reports/' ?>"><?= te('footer.reports') ?></a>
         <?php endif; ?>
         <a href="<?= $lang === 'bg' ? '/politika-za-biskvitki/' : '/en/cookie-policy/' ?>"><?= te('footer.cookies') ?></a>
+        <?php // Reopens the cookie banner, so a choice can be changed as easily as it was made. ?>
+        <button type="button" onclick="cookieSettings()" aria-controls="cookieBanner"
+                style="background:none;border:0;padding:0;margin:0;font:inherit;cursor:pointer;text-decoration:inherit;"><?= te('cookies.settings') ?></button>
       </div>
     </div>
   </div>
@@ -226,59 +229,61 @@ if (!$_is_admin_page) {
 
 <script src="/assets/js/main.js"></script>
 
-<?php if (empty($_COOKIE['om_cookie_consent']) && !str_starts_with($_SERVER['REQUEST_URI'], '/admin')): ?>
-<div id="cookieBanner"
-     style="position:fixed;bottom:0;left:0;right:0;z-index:9990;background:#1a1a1a;color:#f0f0f0;padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;box-shadow:0 -2px 12px rgba(0,0,0,.35);">
+<?php if (!str_starts_with($_SERVER['REQUEST_URI'], '/admin')): ?>
+<?php require_once ROOT_PATH . '/includes/ga4.php'; $__choice = (string) ($_COOKIE['om_cookie_consent'] ?? ''); ?>
+<div id="cookieBanner" role="region" aria-label="<?= h(t('cookies.settings')) ?>" tabindex="-1"<?= $__choice !== '' ? ' hidden' : '' ?>
+     style="position:fixed;bottom:0;left:0;right:0;z-index:9990;background:#1a1a1a;color:#f0f0f0;padding:1rem 1.5rem;display:<?= $__choice !== '' ? 'none' : 'flex' ?>;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;box-shadow:0 -2px 12px rgba(0,0,0,.35);">
   <p style="margin:0;font-size:.875rem;line-height:1.5;flex:1;min-width:200px;">
     <?= te('cookies.banner.text') ?>
     <a href="<?= $lang === 'bg' ? '/politika-za-biskvitki/' : '/en/cookie-policy/' ?>"
        style="color:var(--banner-accent,#4dc8e0);white-space:nowrap;margin-left:.35rem;"><?= te('cookies.banner.learn_more') ?></a>
   </p>
   <div style="display:flex;gap:.5rem;flex-shrink:0;">
-    <button onclick="cookieConsent('essential')"
-            style="padding:.45rem 1rem;border:1px solid #555;border-radius:5px;background:transparent;color:#f0f0f0;cursor:pointer;font-size:.85rem;font-family:inherit;">
+    <button type="button" onclick="cookieConsent('essential')"<?= $__choice === 'essential' ? ' aria-pressed="true"' : '' ?>
+            style="min-height:44px;padding:.45rem 1rem;border:1px solid #888;border-radius:5px;background:transparent;color:#f0f0f0;cursor:pointer;font-size:.85rem;font-family:inherit;">
       <?= te('cookies.banner.decline') ?>
     </button>
     <?php // The banner sits on near-black: a theme with a dark primary sets
           // --banner-accent / --banner-accent-fg so the button does not vanish into it. ?>
-    <button onclick="cookieConsent('all')"
-            style="padding:.45rem 1rem;border:none;border-radius:5px;background:var(--banner-accent,#0387A5);color:var(--banner-accent-fg,#fff);cursor:pointer;font-size:.85rem;font-weight:600;font-family:inherit;">
+    <button type="button" onclick="cookieConsent('all')"<?= $__choice === 'all' ? ' aria-pressed="true"' : '' ?>
+            style="min-height:44px;padding:.45rem 1rem;border:none;border-radius:5px;background:var(--banner-accent,#0387A5);color:var(--banner-accent-fg,#fff);cursor:pointer;font-size:.85rem;font-weight:600;font-family:inherit;">
       <?= te('cookies.banner.accept') ?>
     </button>
   </div>
 </div>
 <script>
+// The Google tags are already on the page under Consent Mode (templates/header.php):
+// a choice only tells them what they may store — nothing is loaded or reloaded here.
+var _cookieOpener = null;
+function cookieSettings() {
+    var b = document.getElementById('cookieBanner');
+    _cookieOpener = document.activeElement;
+    b.hidden = false; b.style.display = 'flex';
+    b.focus();
+}
 function cookieConsent(choice) {
     document.cookie = 'om_cookie_consent=' + choice + '; max-age=31536000; path=/; samesite=Lax';
-    document.getElementById('cookieBanner').style.display = 'none';
+    var b = document.getElementById('cookieBanner');
+    b.hidden = true; b.style.display = 'none';
+    if (_cookieOpener && _cookieOpener.focus) { _cookieOpener.focus(); _cookieOpener = null; }
+    var all = choice === 'all' ? 'granted' : 'denied';
+    if (typeof gtag === 'function') {
+        gtag('consent', 'update', {ad_storage: all, ad_user_data: all, ad_personalization: all, analytics_storage: all});
+    }
     if (choice === 'all') {
-<?php $__gtm = defined('GTM_ID') ? GTM_ID : ''; $__ads = defined('GOOGLE_ADS_ID') ? GOOGLE_ADS_ID : ''; $__ga4 = defined('GA4_ID') ? GA4_ID : ''; ?>
-<?php if ($__gtm !== '' || $__ads !== '' || $__ga4 !== ''): ?>
-        // Tell Google the visitor accepted cookies (EU consent signal), before any tag loads
-        window.dataLayer=window.dataLayer||[];
-        window.gtag=function(){dataLayer.push(arguments);};
-        gtag('consent','default',{ad_storage:'granted',ad_user_data:'granted',ad_personalization:'granted',analytics_storage:'granted'});
-<?php endif; ?>
-<?php if ($__gtm !== ''): ?>
-        // Load GTM immediately without requiring a page reload
-        (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-        new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-        j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-        'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-        })(window,document,'script','dataLayer','<?= h($__gtm) ?>');
-<?php endif; ?>
-<?php if ($__ads !== '' || $__ga4 !== ''): ?>
-        // Load GA4 + Google Ads gtag immediately — mirrors what the PHP header does on
-        // subsequent page loads. Without this, the page where the user accepts is never tracked.
-        (function(d){var s=d.createElement('script');s.async=true;
-        s.src='https://www.googletagmanager.com/gtag/js?id=<?= h($__ads !== '' ? $__ads : $__ga4) ?>';
-        d.head.appendChild(s);})(document);
-        gtag('js',new Date());
-<?php if ($__ads !== ''): ?>        gtag('config','<?= h($__ads) ?>');
-<?php endif; ?>
-<?php if ($__ga4 !== ''): ?>        gtag('config','<?= h($__ga4) ?>');
-<?php endif; ?>
-<?php endif; ?>
+        // A Google Ads click id on this landing page is kept for 90 days (includes/ga4.php).
+        var m = /[?&]gclid=([A-Za-z0-9_\-]{10,255})/.exec(location.search);
+        if (m) document.cookie = '<?= GA4_GCLID_COOKIE ?>=' + m[1] + '; max-age=<?= GA4_GCLID_DAYS * 86400 ?>; path=/; samesite=Lax' + (location.protocol === 'https:' ? '; secure' : '');
+    } else {
+        // Taking consent back removes what the Google tags and the click id stored.
+        var host = location.hostname, parent = host.split('.').slice(-2).join('.');
+        document.cookie.split(';').forEach(function (c) {
+            var name = c.split('=')[0].trim();
+            if (!/^(_ga|_gid|_gcl_|_gac_|<?= GA4_GCLID_COOKIE ?>$)/.test(name)) return;
+            ['', '; domain=' + host, '; domain=.' + host, '; domain=.' + parent].forEach(function (d) {
+                document.cookie = name + '=; max-age=0; path=/' + d;
+            });
+        });
     }
 }
 </script>

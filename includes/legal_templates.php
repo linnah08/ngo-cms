@@ -122,7 +122,7 @@ function legal_privacy_bg(array $f, array $s): string
         $s['money'] ? 'банката или платежната система, която обработва плащането с карта — ние не виждаме и не пазим данните на картата ви;' : '',
         $s['shop'] ? 'куриерската фирма, която доставя поръчката (име, телефон, адрес);' : '',
         'хостинг доставчика, на чиито сървъри работи сайтът, и доставчика на имейл услугата;',
-        $s['analytics'] ? 'Google — за статистиката на посещенията, само ако сте я приели;' : '',
+        $s['analytics'] ? 'Google — за статистиката на посещенията и рекламите: с бисквитки и номера и сумата на платените поръчки и дарения само ако сте ги приели, иначе само анонимни сигнали без бисквитки;' : '',
         $s['turnstile'] ? 'Cloudflare — проверката срещу спам във формите (Turnstile);' : '',
         'счетоводител и държавни органи — когато законът го изисква.',
     ];
@@ -170,7 +170,7 @@ function legal_privacy_en(array $f, array $s): string
         $s['money'] ? 'the bank or payment provider that processes card payments — we never see or store your card details;' : '',
         $s['shop'] ? 'the courier delivering your order (name, phone, address);' : '',
         'the hosting provider whose servers run the site, and our email provider;',
-        $s['analytics'] ? 'Google — for visit statistics, only if you accepted them;' : '',
+        $s['analytics'] ? 'Google — for visit and advertising statistics: with cookies, and the number and amount of paid orders and donations, only if you accepted them; otherwise only anonymous signals without cookies;' : '',
         $s['turnstile'] ? 'Cloudflare — the anti-spam check on forms (Turnstile);' : '',
         'our accountant and public authorities — where the law requires it.',
     ];
@@ -221,16 +221,19 @@ function legal_cookies_bg(array $f, array $s): string
         . '<h2>2. Задължителни бисквитки</h2>'
         . '<p>Без тях сайтът не работи, затова не искаме съгласие за тях.</p>' . legal_cookie_rows($needed);
     if ($s['analytics']) {
-        $html .= '<h2>3. Бисквитки за статистика (само с ваше съгласие)</h2>'
-            . '<p>Ако изберете „Приемам всички“, зареждаме услугите на Google за статистика на посещенията. Без съгласието ви те не се зареждат.</p>'
-            . legal_cookie_rows([['Услуга', 'Бисквитки', 'Колко дълго'], ['Google Analytics / Tag Manager', '_ga, _ga_* и подобни', 'До 2 години']]);
+        $html .= '<h2>3. Бисквитки за статистика и реклама (само с ваше съгласие)</h2>'
+            . '<p>Сайтът използва Google Analytics и Google Ads, за да знаем колко хора ни посещават и кои от рекламите ни водят до поръчки и дарения. Те записват бисквитки само ако изберете „Приемам всички“. Ако изберете „Само необходими“, Google получава само анонимни сигнали без бисквитки — например че страница е отворена — без нищо, по което да ви разпознае.</p>'
+            . '<p>Когато сте приели бисквитките и платите поръчка или дарение, сайтът съобщава на Google номера, сумата и продуктите, заедно с анонимния номер на браузъра ви от бисквитката _ga. Името, имейлът и адресът ви не се изпращат.</p>'
+            . legal_cookie_rows([['Услуга', 'Бисквитки', 'Колко дълго'],
+                ['Google Analytics / Tag Manager', '_ga, _ga_* и подобни', 'До 2 години'],
+                ['Google Ads', '_gcl_* и om_gclid (номерът на кликнатата реклама)', 'До 90 дни']]);
     }
     $n = $s['analytics'] ? 4 : 3;
     return $html
         . '<h2>' . $n . '. Шрифтове</h2>'
         . '<p>Сайтът зарежда шрифтове от Google Fonts. При това Google получава IP адреса ви, но не записва бисквитки.</p>'
         . '<h2>' . ($n + 1) . '. Как да промените избора си</h2>'
-        . '<p>При първото посещение ви питаме дали приемате бисквитките. За да промените избора си, изтрийте бисквитките на сайта от настройките на браузъра и заредете страницата отново.</p>'
+        . '<p>При първото посещение ви питаме дали приемате бисквитките. Можете да промените избора си по всяко време с бутона „Настройки за бисквитки“ най-долу на всяка страница. Ако изберете „Само необходими“, бисквитките за статистика и реклама се изтриват.</p>'
         . '<p>Въпроси: ' . $f['email'] . '. Вижте и <a href="' . $f['privacy'] . '">Политиката за поверителност</a>.</p>';
 }
 
@@ -247,16 +250,19 @@ function legal_cookies_en(array $f, array $s): string
         . '<h2>2. Necessary cookies</h2>'
         . '<p>The site cannot work without them, so we do not ask for consent.</p>' . legal_cookie_rows($needed);
     if ($s['analytics']) {
-        $html .= '<h2>3. Statistics cookies (only with your consent)</h2>'
-            . '<p>If you choose “Accept all”, we load Google\'s visit statistics. Without your consent they are not loaded.</p>'
-            . legal_cookie_rows([['Service', 'Cookies', 'How long'], ['Google Analytics / Tag Manager', '_ga, _ga_* and similar', 'Up to 2 years']]);
+        $html .= '<h2>3. Statistics and advertising cookies (only with your consent)</h2>'
+            . '<p>The site uses Google Analytics and Google Ads to learn how many people visit us and which of our ads lead to orders and donations. They store cookies only if you choose “Accept all”. If you choose “Essential only”, Google receives only anonymous signals without cookies — for example that a page was opened — with nothing that could identify you.</p>'
+            . '<p>If you accepted cookies and pay for an order or a donation, the site tells Google its number, amount and products, together with your browser\'s anonymous number from the _ga cookie. Your name, email and address are not sent.</p>'
+            . legal_cookie_rows([['Service', 'Cookies', 'How long'],
+                ['Google Analytics / Tag Manager', '_ga, _ga_* and similar', 'Up to 2 years'],
+                ['Google Ads', '_gcl_* and om_gclid (the id of the ad you clicked)', 'Up to 90 days']]);
     }
     $n = $s['analytics'] ? 4 : 3;
     return $html
         . '<h2>' . $n . '. Fonts</h2>'
         . '<p>The site loads fonts from Google Fonts. Google receives your IP address but sets no cookies.</p>'
         . '<h2>' . ($n + 1) . '. Changing your choice</h2>'
-        . '<p>On your first visit we ask whether you accept cookies. To change your choice, delete this site\'s cookies in your browser settings and reload the page.</p>'
+        . '<p>On your first visit we ask whether you accept cookies. You can change your choice at any time with the “Cookie settings” button at the bottom of every page. Choosing “Essential only” deletes the statistics and advertising cookies.</p>'
         . '<p>Questions: ' . $f['email'] . '. See also the <a href="' . $f['privacy'] . '">Privacy policy</a>.</p>';
 }
 

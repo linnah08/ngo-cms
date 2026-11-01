@@ -485,6 +485,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $order_id = $pdo->lastInsertId();
             $pdo->commit();
 
+            // Who the buyer is to Google Analytics (only with cookie consent), for the
+            // conversion sent once the order is paid (includes/ga4.php).
+            require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/ga4.php';
+            ga4_store_order_tracking_ids($pdo, (int) $order_id);
+
             // Only this session may see the order's details on its confirmation
             // page (and sign its buyer up there) — the number alone is guessable.
             require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/order_session.php';

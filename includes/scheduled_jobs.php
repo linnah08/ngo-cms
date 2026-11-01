@@ -76,6 +76,15 @@ function scheduled_jobs(): array
             'grace'       => 36 * 3600,
             'needed_when' => 'Нужна е само ако известията за грешки са включени с дневно или седмично обобщение.',
         ],
+        'ga4_conversions' => [
+            'label'       => 'Плащания към Google Analytics',
+            'what'        => 'Изпраща отново към Google Analytics платените поръчки и дарения, които не са стигнали до Google в момента на плащането — до 3 дни след него.',
+            'script'      => 'cron/ga4-conversions-cron.php',
+            'cron'        => ['*/30', '*', '*', '*', '*'],
+            'every'       => 'на всеки 30 минути',
+            'grace'       => 3 * 3600,
+            'needed_when' => 'Нужна е само ако в Админ → Организация → Google са попълнени идентификаторът и тайният ключ за Google Analytics.',
+        ],
     ];
 }
 
@@ -219,6 +228,10 @@ function scheduled_job_needed(string $key): bool
 
             case 'sumup_stock':
                 return setting_get('sumup_api_key') !== '';
+
+            case 'ga4_conversions':
+                require_once __DIR__ . '/ga4.php';
+                return ga4_measurement_id() !== '' && ga4_api_secret() !== '';
 
             case 'error_digest':
                 return setting_get('error_alert_enabled') === '1'

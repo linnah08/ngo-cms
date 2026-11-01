@@ -103,7 +103,8 @@ final class ConfirmationPrivacyTest extends TestCase
         try {
             $html = self::render('checkout/confirmation', 'order', $number, $owned);
             $this->assertStringContainsString($number, $html, 'the number and thank-you always show');
-            foreach (['ул. Тайна 7', 'Пловдив', 'Тайна книга', '"purchase"'] as $detail) {
+            $this->assertStringNotContainsString('"purchase"', $html, 'the server reports the purchase once paid, never the page');
+            foreach (['ул. Тайна 7', 'Пловдив', 'Тайна книга'] as $detail) {
                 $owned ? $this->assertStringContainsString($detail, $html, "the buyer sees: $detail")
                        : $this->assertStringNotContainsString($detail, $html, "a stranger must not see: $detail");
             }
@@ -124,7 +125,7 @@ final class ConfirmationPrivacyTest extends TestCase
         try {
             $html = self::render('donation/confirmation', 'order', $number, $owned);
             $this->assertStringContainsString($number, $html);
-            foreach (['77.50', 'Лично послание', '"purchase"'] as $detail) {
+            foreach (['77.50', 'Лично послание'] as $detail) {
                 $owned ? $this->assertStringContainsString($detail, $html, "the donor sees: $detail")
                        : $this->assertStringNotContainsString($detail, $html, "a stranger must not see: $detail");
             }

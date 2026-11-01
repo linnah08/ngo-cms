@@ -547,6 +547,12 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <?= $ferr('ga4_id') ?>
         <small id="hint-ga4_id" style="<?= $hint ?>">В Google Analytics: Администриране → Потоци от данни → вашият сайт → „Идентификатор на измерването“.</small>
       </label>
+      <label id="f-ga4_api_secret">Google Analytics — таен ключ за плащанията
+        <input type="text" name="ga4_api_secret" value="<?= h($val('ga4_api_secret')) ?>" maxlength="64"
+               spellcheck="false" autocomplete="off"<?= $gattr('ga4_api_secret') ?>>
+        <?= $ferr('ga4_api_secret') ?>
+        <small id="hint-ga4_api_secret" style="<?= $hint ?>">С него сайтът сам съобщава на Google всяка платена поръчка и всяко дарение — и когато плащането се потвърди по-късно (IRIS). В Google Analytics: Администриране → Потоци от данни → вашият сайт → „Тайни ключове за API на Measurement Protocol“ → „Създаване“, после копирайте „Тайна стойност“.</small>
+      </label>
       <label id="f-gtm_id">Google Tag Manager (GTM-…)
         <input type="text" name="gtm_id" value="<?= h($val('gtm_id')) ?>" maxlength="20" placeholder="GTM-AB12CD3"
                spellcheck="false" autocomplete="off"<?= $gattr('gtm_id') ?>>

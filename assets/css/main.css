@@ -76,6 +76,7 @@ a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-r
 
 /* Focus ring on dark/teal backgrounds */
 .site-footer a:focus-visible,
+.site-footer button:focus-visible,
 .header-top a:focus-visible,
 .admin-sidebar a:focus-visible,
 .nav-cta a:focus-visible {
@@ -846,8 +847,8 @@ textarea { min-height: 140px; resize: vertical; }
   color: rgba(255,255,255,0.72);
 }
 
-.footer-bottom a { color: rgba(255,255,255,0.82); }
-.footer-bottom a:hover { color: var(--white); }
+.footer-bottom a, .footer-bottom .footer-legal button { color: rgba(255,255,255,0.82); }
+.footer-bottom a:hover, .footer-bottom .footer-legal button:hover { color: var(--white); }
 
 .footer-legal { display: flex; gap: var(--space-lg); flex-wrap: wrap; }
 

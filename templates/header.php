@@ -4,6 +4,10 @@
 if (!defined('SITE_NAME_BG')) require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 // te() / cms_admin(): config.php loads them too, but a site that kept an older config.php does not.
 require_once ROOT_PATH . '/includes/edit_mode.php';
+// Before any output: keeps a Google Ads click id (?gclid=) and resumes the visitor's
+// session, so an add-to-cart event waiting there can be sent below.
+require_once ROOT_PATH . '/includes/ga4.php';
+ga4_remember_gclid();
 $lang = get_lang();
 $site_name = $lang === 'bg' ? SITE_NAME_BG : SITE_NAME_EN;
 $other = other_lang();
@@ -75,22 +79,30 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
   <!-- Favicon -->
   <link rel="icon" href="<?= favicon_url() ?>">
 
-  <?php if (($_COOKIE['om_cookie_consent'] ?? '') === 'all'): ?>
   <?php $__gtm = defined('GTM_ID') ? GTM_ID : ''; ?>
   <?php $__ads = defined('GOOGLE_ADS_ID') ? GOOGLE_ADS_ID : ''; ?>
   <?php $__ga4 = defined('GA4_ID') ? GA4_ID : ''; ?>
   <?php $__ads_label = defined('GOOGLE_ADS_PURCHASE_LABEL') ? GOOGLE_ADS_PURCHASE_LABEL : ''; ?>
+  <?php $__consent = ($_COOKIE['om_cookie_consent'] ?? '') === 'all'; ?>
   <?php if ($__gtm !== '' || $__ads !== '' || $__ga4 !== ''): ?>
-  <!-- Tell Google the visitor accepted cookies (EU consent signal). It goes before
+  <?php // An add to the cart that just succeeded (cart/add.php) — sent once, on the page it lands on.
+        if (session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['ga_add_to_cart'])) {
+            $gtag_events   = $gtag_events ?? [];
+            $gtag_events[] = ['add_to_cart', $_SESSION['ga_add_to_cart']];
+            unset($_SESSION['ga_add_to_cart']);
+        } ?>
+  <!-- Google Consent Mode v2. The tags always load, but store nothing and send only
+       cookieless signals until the visitor chooses „Приемам всички“ — set before
        Tag Manager and gtag.js so every tag reads it from the start. -->
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
-    gtag('consent', 'default', {ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'granted', analytics_storage: 'granted'});
+    gtag('consent', 'default', {ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied', analytics_storage: 'denied'});
+    gtag('set', 'ads_data_redaction', true);
+    <?php if ($__consent): ?>gtag('consent', 'update', {ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'granted', analytics_storage: 'granted'});<?php endif; ?>
   </script>
-  <?php endif; ?>
   <?php if ($__gtm !== ''): ?>
-  <!-- Google Tag Manager (consent given) -->
+  <!-- Google Tag Manager (under Consent Mode) -->
   <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
   new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
   j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
@@ -100,7 +112,8 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
   <?php endif; ?>
 
   <?php if ($__ads !== '' || $__ga4 !== ''): ?>
-  <!-- Google Ads / GA4 (consent given) -->
+  <!-- Google Ads / GA4 (under Consent Mode). Paid orders and donations are sent
+       from the server when the payment is confirmed (includes/ga4.php), not here. -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=<?= h($__ads !== '' ? $__ads : $__ga4) ?>"></script>
   <script>
     gtag('js', new Date());

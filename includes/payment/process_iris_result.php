@@ -51,6 +51,7 @@ function process_iris_result(PDO $pdo, array $order, array $status): void
         if ($stmt->rowCount() > 0) {
             $order['payment_status'] = 'paid';
             $order['status']         = 'confirmed';
+            ga4_order_paid($pdo, $order);
             notify_order_paid($order);
         }
     } elseif ($state === 'FAILED') {

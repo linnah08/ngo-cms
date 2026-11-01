@@ -8,6 +8,7 @@
  */
 require_once __DIR__ . '/unpaid_orders.php';
 require_once __DIR__ . '/payment_errors.php';
+require_once dirname(__DIR__) . '/ga4.php';
 
 /**
  * Send the "payment received" emails for a now-paid order.
@@ -117,6 +118,8 @@ function process_dsk_result(PDO $pdo, array $order, string $dskOrderId, array $s
             order_reinstate_for_late_payment($pdo, $order);
             $pdo->prepare("UPDATE orders SET payment_status = 'paid', status = 'confirmed', updated_at = NOW() WHERE id = ?")
                 ->execute([$order['id']]);
+            $order['payment_status'] = 'paid';
+            ga4_order_paid($pdo, $order);   // reported once, even if the callback and the return both get here
             notify_order_paid($order);
         }
     } elseif ($orderStatus === 6 || $orderStatus === 3) {
