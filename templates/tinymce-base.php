@@ -10,8 +10,12 @@
  * Also here, because the link dialog uses it: window.omPickPdf(), which asks for a PDF,
  * uploads it (admin/upload-file.php) and resolves with {path, text, size}, and the
  * „Качи PDF“ buttons under section link fields (hs_pdf_button() in includes/home_admin.php).
+ *
+ * Loads assets/js/upload-progress.js (window.OMUpload) too, so the image upload below,
+ * the admin pages and Edit mode (inline-cms.js) all show the same progress bar.
  */
 ?>
+  <script src="<?= h(versioned_asset('/assets/js/upload-progress.js')) ?>"></script>
   <script>
   window.omPickPdf = function() {
     return new Promise(function(resolve, reject) {
@@ -24,8 +28,7 @@
         var fd = new FormData();
         fd.append('file', f);
         fd.append('csrf_token', window._csrfToken);
-        fetch('/admin/upload-file.php', { method: 'POST', body: fd, credentials: 'same-origin' })
-          .then(function(r) { return r.json(); })
+        window.OMUpload.send('/admin/upload-file.php', fd, { pdf: true })
           .then(function(d) { d && d.ok ? resolve(d) : reject((d && d.message) || 'Файлът не можа да се качи. Опитайте отново.'); })
           .catch(function() { reject('Файлът не можа да се качи. Проверете връзката и опитайте отново.'); });
       };
@@ -98,13 +101,13 @@
           var fd = new FormData();
           fd.append('image', cropped);
           fd.append('csrf_token', window._csrfToken);
-          fetch('/admin/upload-product-image.php', { method: 'POST', body: fd })
-            .then(function(r) { return r.json(); })
+          // No `into`: the bar shows in a panel above the image dialog.
+          window.OMUpload.send('/admin/upload-product-image.php', fd)
             .then(function(d) {
               if (d && d.filename) cb('/assets/images/products/' + d.filename, { title: cropped.name });
-              else alert((d && d.error) ? d.error : 'Грешка при качване.');
+              else window.OMUpload.notice((d && d.error) ? d.error : 'Снимката не можа да се качи. Опитайте отново.');
             })
-            .catch(function() { alert('Грешка при качване.'); });
+            .catch(function() { window.OMUpload.notice('Снимката не можа да се качи. Проверете връзката и опитайте отново.'); });
         });
       };
       input.click();

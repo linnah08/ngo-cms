@@ -432,15 +432,15 @@ window.OmCMS = (function () {
     fd.append('section', wrap.dataset.cmsSection || '');
     fd.append('field', wrap.dataset.cmsField || '');
 
-    fetch('/admin/inline-upload.php', { method: 'POST', body: fd })
-      .then(function (r) { return r.json(); })
+    // No `into`: the progress bar shows in a panel at the top of the screen.
+    window.OMUpload.send('/admin/inline-upload.php', fd)
       .then(function (data) {
-        if (!data.ok) { alert(data.message || 'Снимката не можа да се качи. Опитайте отново.'); return; }
+        if (!data.ok) { window.OMUpload.notice(data.message || 'Снимката не можа да се качи. Опитайте отново.'); return; }
         // After upload, add to cache so it appears next time library is opened
         if (_libCache) _libCache.push({ path: data.path, cat: wrap.dataset.cmsSection || 'pages' });
         _applyImagePath(data.path, wrap);
       })
-      .catch(function () { alert('Снимката не можа да се качи. Опитайте отново.'); });
+      .catch(function () { window.OMUpload.notice('Снимката не можа да се качи. Проверете връзката и опитайте отново.'); });
   }
 
   // ── Photo framing ("Нагласи снимката") ────────────────────────────────────

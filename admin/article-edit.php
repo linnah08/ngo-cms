@@ -379,6 +379,7 @@ $badge_style       = 'font-size:.75rem;font-weight:600;border-radius:3px;padding
                style="position:absolute;width:1px;height:1px;opacity:0;">
         <button type="button" class="btn btn--outline" id="apLibrary" style="min-height:44px;">Избери от библиотека</button>
       </div>
+      <div id="apProgress"></div>
       <div id="apLive" role="status" aria-live="polite" style="position:absolute;left:-9999px;"></div>
     </div>
   </div>
@@ -932,12 +933,12 @@ document.getElementById('tagsInput').addEventListener('input', function () {
   }
 
   // Rejects with the reason (size | type | server) so the summary can say what went wrong.
-  function upload(file) {
+  // label: „Снимка 2 от 5“ when several go up, shown on the progress bar.
+  function upload(file, label) {
     if (MAX_BYTES && file.size > MAX_BYTES) return Promise.reject('size');
     var fd = new FormData();
     fd.append('image', file); fd.append('section', 'article'); fd.append('csrf_token', csrf);
-    return fetch('/admin/inline-upload.php', { method: 'POST', body: fd, credentials: 'same-origin' })
-      .then(function (r) { return r.json(); }, function () { throw 'server'; })
+    return OMUpload.send('/admin/inline-upload.php', fd, { into: document.getElementById('apProgress'), label: label })
       .then(function (d) { if (!d.ok) throw (d.reason || 'server'); return d.path; },
             function (e) { throw (typeof e === 'string' ? e : 'server'); });
   }
@@ -976,7 +977,8 @@ document.getElementById('tagsInput').addEventListener('input', function () {
     say('Качване на ' + files.length + (files.length === 1 ? ' снимка…' : ' снимки…'));
     files.reduce(function (p, f) {
       return p.then(function () {
-        return upload(f).then(function (path) { addRow(path); }, function (r) { failed++; why[why.hasOwnProperty(r) ? r : 'server']++; })
+        var label = files.length > 1 ? 'Снимка ' + (done + 1) + ' от ' + files.length : '';
+        return upload(f, label).then(function (path) { addRow(path); }, function (r) { failed++; why[why.hasOwnProperty(r) ? r : 'server']++; })
           .then(function () { uploading--; done++; if (done < files.length) say('Качване: ' + done + ' от ' + files.length); });
       });
     }, Promise.resolve()).then(function () {

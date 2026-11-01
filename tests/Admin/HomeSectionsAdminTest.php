@@ -462,7 +462,7 @@ final class HomeSectionsAdminTest extends TestCase
     public function test_photos_upload_when_picked_and_a_save_waits_for_them(): void
     {
         $src = $this->src();
-        $this->assertStringContainsString("fetch('/admin/home-upload.php'", $src);
+        $this->assertStringContainsString("OMUpload.send('/admin/home-upload.php'", $src);   // with a progress bar
         $this->assertStringContainsString("body.append('csrf_token'", $src);
         $this->assertStringContainsString("input.closest('[data-hs-image], [data-hs-upload-box]')", $src);
         $this->assertStringContainsString("input.value = '';", $src, 'an uploaded file is not sent again with the save');

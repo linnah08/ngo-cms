@@ -546,15 +546,15 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     if (!path) return;
     var file = input.files[0], token = input._hsUp = (input._hsUp || 0) + 1;
     pending++;
-    note(input, '', 'Снимката се качва…');
+    note(input, '', '');   // the progress bar after the field says what is happening
     shrink(file).then(function (blob) {
       var body = new FormData(), id = form.querySelector('input[name="id"]');
       body.append('csrf_token', form.querySelector('input[name="csrf_token"]').value);
       body.append('sid', id ? id.value : '');
       body.append('field', input.name);
       body.append('image', blob, blob === file ? file.name : file.name.replace(/\.[^.]*$/, '') + (blob.type === 'image/png' ? '.png' : '.jpg'));
-      return fetch('/admin/home-upload.php', { method: 'POST', body: body, credentials: 'same-origin' })
-        .then(function (r) { return r.json().catch(function () { return { ok: false }; }); });
+      return OMUpload.send('/admin/home-upload.php', body, { after: input })
+        .catch(function (e) { if (e.message === 'network') throw e; return { ok: false }; });
     }).then(function (res) {
       if (input._hsUp !== token) return;   // picked again, removed or replaced meanwhile
       input.value = '';

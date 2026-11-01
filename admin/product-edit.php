@@ -966,11 +966,9 @@ document.getElementById('pvBody').addEventListener('drop', function (e) {
     var fd = new FormData();
     fd.append('image', fileInput.files[0]);
     fd.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
-    status.textContent = 'Качва се…';
-    status.style.color = 'var(--text-muted)';
+    status.textContent = '';   // the progress bar below it says what is happening
     uploadZone.style.pointerEvents = 'none';
-    fetch('/admin/upload-product-image.php', { method: 'POST', body: fd })
-      .then(function(r){ return r.json(); })
+    OMUpload.send('/admin/upload-product-image.php', fd, { after: status })
       .then(function(d) {
         uploadZone.style.pointerEvents = '';
         fileInput.value = '';
@@ -991,7 +989,7 @@ document.getElementById('pvBody').addEventListener('drop', function (e) {
       .catch(function() {
         uploadZone.style.pointerEvents = '';
         fileInput.value = '';
-        status.textContent = 'Грешка при качването.';
+        status.textContent = 'Снимката не можа да се качи. Проверете връзката и опитайте отново.';
         status.style.color = '#c0392b';
       });
   });
@@ -1044,21 +1042,14 @@ document.getElementById('imageInput').addEventListener('change', function () {
     return;
   }
 
-  status.textContent = 'Качване…';
-  status.style.color = 'var(--text-muted)';
+  status.textContent = '';   // the progress bar below it says what is happening
   btn.disabled = true;
 
   var fd = new FormData();
   fd.append('image', file);
   fd.append('csrf_token', document.querySelector('[name=csrf_token]').value);
 
-  fetch('/admin/upload-product-image.php', { method: 'POST', body: fd })
-    .then(function(r) {
-      return r.text().then(function(text) {
-        try { return JSON.parse(text); }
-        catch(e) { throw new Error(text.substring(0, 200)); }
-      });
-    })
+  OMUpload.send('/admin/upload-product-image.php', fd, { after: status })
     .then(function(data) {
       if (data.filename) {
         document.getElementById('imageFilename').value = data.filename;
@@ -1074,7 +1065,9 @@ document.getElementById('imageInput').addEventListener('change', function () {
       btn.disabled = false;
     })
     .catch(function(e) {
-      status.textContent = 'Грешка: ' + e.message;
+      status.textContent = e.message === 'network'
+        ? 'Снимката не можа да се качи. Проверете връзката и опитайте отново.'
+        : 'Грешка: ' + e.message;
       status.style.color = '#c0392b';
       btn.disabled = false;
     });
@@ -1089,13 +1082,11 @@ document.getElementById('sizeGuideInput').addEventListener('change', function ()
     status.style.color = '#c0392b';
     return;
   }
-  status.textContent = 'Качване…';
-  status.style.color = 'var(--text-muted)';
+  status.textContent = '';   // the progress bar below it says what is happening
   var fd = new FormData();
   fd.append('image', file);
   fd.append('csrf_token', document.querySelector('[name=csrf_token]').value);
-  fetch('/admin/upload-product-image.php', { method: 'POST', body: fd })
-    .then(function(r) { return r.json(); })
+  OMUpload.send('/admin/upload-product-image.php', fd, { after: status })
     .then(function(data) {
       if (data.filename) {
         document.getElementById('sizeGuideFilename').value = data.filename;
@@ -1111,7 +1102,9 @@ document.getElementById('sizeGuideInput').addEventListener('change', function ()
       }
     })
     .catch(function(e) {
-      status.textContent = 'Грешка: ' + e.message;
+      status.textContent = e.message === 'network'
+        ? 'Снимката не можа да се качи. Проверете връзката и опитайте отново.'
+        : 'Грешка: ' + e.message;
       status.style.color = '#c0392b';
     });
 });
