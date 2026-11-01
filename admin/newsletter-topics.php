@@ -87,7 +87,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   </p>
   <div style="display:flex;flex-wrap:wrap;gap:.75rem;">
     <a href="/admin/newsletter-subscribers.php" class="btn btn--outline" style="font-size:.85rem;">Абонати</a>
-    <a href="/admin/newsletter.php" class="btn btn--outline" style="font-size:.85rem;">← Кампании</a>
+    <a href="/admin/newsletter.php" class="btn btn--outline" style="font-size:.85rem;">← Бюлетини</a>
   </div>
 </div>
 

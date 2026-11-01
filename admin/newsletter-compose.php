@@ -4,7 +4,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
-$page_title_admin = 'Кампания';
+$page_title_admin = 'Бюлетин';
 $active_nav       = 'newsletter-compose';
 admin_require_admin();
 module_admin_guard('newsletter');
@@ -25,7 +25,7 @@ if ($id) {
     $campaign = $stmt->fetch();
     if (!$campaign) { header('Location: /admin/newsletter.php'); exit; }
     if ($campaign['status'] === 'sent') {
-        flash_set('error', 'Изпратените кампании не могат да бъдат редактирани.');
+        flash_set('error', 'Изпратените бюлетини не могат да бъдат редактирани.');
         header('Location: /admin/newsletter.php'); exit;
     }
 }
@@ -92,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
         }
         // Stay in the editor after saving, so preview and sending are right here;
         // "← Назад" still leads to the list.
-        flash_set('success', 'Кампанията е записана.');
+        flash_set('success', 'Бюлетинът е записан.');
         header('Location: /admin/newsletter-compose.php?id=' . (int) $id . '&_asclear=' . urlencode('newsletter:' . $as_id));
         exit;
     }
@@ -116,7 +116,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 ?>
 
 <div class="admin-page-header">
-  <h1><?= $id ? 'Редактирай кампания' : 'Нова кампания' ?></h1>
+  <h1><?= $id ? 'Редактирай бюлетин' : 'Нов бюлетин' ?></h1>
   <div style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;">
     <a href="/admin/newsletter.php" class="btn btn--outline">← Назад</a>
     <button type="submit" form="saveForm" class="btn btn--primary" onclick="syncSubjectsAndSave()">Запази чернова</button>
@@ -158,7 +158,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <!-- Article picker -->
   <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;">
     <h3 style="margin:0 0 .5rem;font-size:.95rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);">Генерирай от статии</h3>
-    <p style="font-size:.85rem;color:var(--text-muted);margin:0 0 1rem;">Избери до 3 статии на всеки език — щом отметнеш статия, можеш да промениш текста ѝ само за тази кампания (самата статия не се променя). Генерирането ще замени съдържанието по-долу.</p>
+    <p style="font-size:.85rem;color:var(--text-muted);margin:0 0 1rem;">Избери до 3 статии на всеки език — щом отметнеш статия, можеш да промениш текста ѝ само за този бюлетин (самата статия не се променя). Генерирането ще замени съдържанието по-долу.</p>
     <form method="POST">
       <?= csrf_field() ?>
       <input type="hidden" name="action" value="format_articles">

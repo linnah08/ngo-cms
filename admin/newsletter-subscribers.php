@@ -154,7 +154,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <div style="display:flex;flex-wrap:wrap;gap:.75rem;">
     <a href="/admin/newsletter-topics.php" class="btn btn--outline" style="font-size:.85rem;">Теми</a>
     <a href="/admin/newsletter-import.php" class="btn btn--outline" style="font-size:.85rem;">↓ Импорт от клиенти</a>
-    <a href="/admin/newsletter.php" class="btn btn--outline" style="font-size:.85rem;">← Кампании</a>
+    <a href="/admin/newsletter.php" class="btn btn--outline" style="font-size:.85rem;">← Бюлетини</a>
   </div>
 </div>
 

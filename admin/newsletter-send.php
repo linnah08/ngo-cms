@@ -26,13 +26,13 @@ $recipient_total = (int)$pdo->query("SELECT COUNT(*) FROM newsletter_subscribers
 
 // ── Phase 1: confirm screen ────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    $page_title_admin = 'Изпращане на кампания';
+    $page_title_admin = 'Изпращане на бюлетин';
     $active_nav       = 'newsletter-send';
     require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     ?>
     <div style="max-width:600px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
-        <h2 style="margin:0;">Изпращане на кампания</h2>
+        <h2 style="margin:0;">Изпращане на бюлетин</h2>
         <a href="/admin/newsletter.php" style="font-size:.9rem;color:var(--text-muted);">← Откажи</a>
       </div>
 
@@ -69,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
       <?php if (!$campaign['subject_bg'] && !$campaign['subject_en']): ?>
       <div style="background:#fdf0ef;border:1px solid #f0c4c0;border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.5rem;color:#c0392b;font-size:.9rem;">
-        ⚠ Кампанията няма тема. Добавете тема преди изпращане.
+        ⚠ Бюлетинът няма тема. Добавете тема преди изпращане.
       </div>
       <?php elseif ($recipient_total === 0): ?>
       <div style="background:#fdf0ef;border:1px solid #f0c4c0;border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.5rem;color:#c0392b;font-size:.9rem;">
@@ -144,7 +144,7 @@ $active_nav       = 'newsletter-send';
   </style>
 </head>
 <body>
-<h2>Изпращане на кампания #<?= $id ?></h2>
+<h2>Изпращане на бюлетин #<?= $id ?></h2>
 <p style="color:#6b6560;">Абонати: <strong><?= $total ?></strong> &nbsp;·&nbsp; Не затваряйте прозореца.</p>
 <hr style="border:none;border-top:1px solid #e8ddd5;margin:1rem 0;">
 
@@ -183,7 +183,7 @@ $pdo->prepare("UPDATE newsletter_campaigns SET status='sent', sent_at=NOW(), rec
   ✓ Готово! Изпратени: <?= $sent ?><?= $failed ? " &nbsp;·&nbsp; <span class='err'>Грешки: {$failed}</span>" : '' ?>
 </div>
 <p style="margin-top:1.5rem;">
-  <a href="/admin/newsletter.php" style="color:#0387A5;">← Обратно към кампании</a>
+  <a href="/admin/newsletter.php" style="color:#0387A5;">← Обратно към бюлетините</a>
 </p>
 </body>
 </html>

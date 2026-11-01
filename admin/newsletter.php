@@ -19,10 +19,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($campaign_id) {
         if ($action === 'delete') {
             $pdo->prepare("DELETE FROM newsletter_campaigns WHERE id = ? AND status = 'draft'")->execute([$campaign_id]);
-            flash_set('success', 'Кампанията е изтрита.');
+            flash_set('success', 'Бюлетинът е изтрит.');
         } elseif ($action === 'reset') {
             $pdo->prepare("UPDATE newsletter_campaigns SET status = 'draft' WHERE id = ? AND status = 'sending'")->execute([$campaign_id]);
-            flash_set('success', 'Кампанията е върната в чернова.');
+            flash_set('success', 'Бюлетинът е върнат в чернова.');
         } elseif ($action === 'unschedule') {
             $pdo->prepare("UPDATE newsletter_campaigns SET send_date = NULL WHERE id = ? AND status = 'draft'")->execute([$campaign_id]);
             flash_set('success', 'Насрочването е отменено.');
@@ -95,7 +95,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </thead>
     <tbody>
       <?php if (empty($campaigns)): ?>
-      <tr><td colspan="9" style="padding:2.5rem;text-align:center;color:var(--text-muted);">Все още няма кампании. <a href="/admin/newsletter-compose.php">Създайте първата →</a></td></tr>
+      <tr><td colspan="9" style="padding:2.5rem;text-align:center;color:var(--text-muted);">Все още няма бюлетини. <a href="/admin/newsletter-compose.php">Създайте първия →</a></td></tr>
       <?php else: foreach ($campaigns as $c): ?>
       <?php [$lbl,$cls] = $status_labels[$c['status']] ?? [$c['status'],'badge--draft']; ?>
       <tr style="border-top:1px solid var(--border);">
@@ -171,7 +171,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
               <input type="hidden" name="campaign_id" value="<?= $c['id'] ?>">
               <input type="hidden" name="action" value="delete">
               <button class="btn btn--outline" style="font-size:.78rem;padding:.3rem .7rem;color:#c0392b;border-color:#f0c4c0;"
-                      data-confirm="Изтриване на кампанията?">Изтрий</button>
+                      data-confirm="Изтриване на бюлетина?">Изтрий</button>
             </form>
             <?php endif; ?>
           </div>

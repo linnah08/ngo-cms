@@ -76,7 +76,7 @@ if (($_GET['raw'] ?? '') === '1') {
 }
 
 // ── Render admin preview wrapper ──────────────────────────────────────────────
-$page_title_admin = 'Преглед на кампания';
+$page_title_admin = 'Преглед на бюлетин';
 $active_nav       = 'newsletter-compose';
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
