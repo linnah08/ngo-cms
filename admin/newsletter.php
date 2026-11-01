@@ -74,7 +74,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     &nbsp;·&nbsp;
     <a href="/admin/newsletter-topics.php" style="color:var(--teal);">Теми →</a>
   </div>
-  <a href="/admin/newsletter-compose.php" class="btn btn--primary">+ Нова кампания</a>
+  <a href="/admin/newsletter-compose.php" class="btn btn--primary">+ Нов бюлетин</a>
 </div>
 
 <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;">
