@@ -19,12 +19,8 @@ if (!in_array($type, $allowed_types, true)) add_json(['ok' => false, 'error' => 
 // Helper: upload an image file from $_FILES
 function _inline_add_upload(string $field, string $dir): string {
     if (empty($_FILES[$field]) || $_FILES[$field]['error'] !== UPLOAD_ERR_OK) return '';
-    $finfo = new finfo(FILEINFO_MIME_TYPE);
-    $mime  = $finfo->file($_FILES[$field]['tmp_name']);
-    if (!in_array($mime, ['image/jpeg','image/png','image/webp'], true)) return '';
-    $ext  = strtolower(pathinfo($_FILES[$field]['name'], PATHINFO_EXTENSION));
-    $allowed_ext = ['jpg','jpeg','png','webp'];
-    if (!in_array($ext, $allowed_ext, true)) return '';
+    $ext = image_upload_ext($_FILES[$field]['tmp_name']);
+    if ($ext === null) return '';
     $dest_dir = $_SERVER['DOCUMENT_ROOT'] . $dir;
     if (!is_dir($dest_dir)) mkdir($dest_dir, 0755, true);
     $name = bin2hex(random_bytes(8)) . '.' . $ext;

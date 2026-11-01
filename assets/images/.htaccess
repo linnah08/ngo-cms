@@ -1,0 +1,24 @@
+# Site images, including ones admins and shoppers upload: public on purpose.
+# Serve only image files; never run anything here, so a script that slips past
+# an upload check can't be executed.
+# Module-specific lines sit in IfModule blocks: on PHP-FPM hosts a bare php_flag
+# is a 500 error. Refusing every non-image file is what keeps scripts from running.
+<IfModule mod_php.c>
+  php_flag engine off
+</IfModule>
+<FilesMatch "\.(?!(jpe?g|png|webp|gif|svg|ico|avif)$)[^.]+$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Deny from all
+  </IfModule>
+</FilesMatch>
+<FilesMatch "\.svg$">
+  <IfModule mod_headers.c>
+    Header set Content-Security-Policy "script-src 'none'"
+  </IfModule>
+</FilesMatch>
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+</IfModule>

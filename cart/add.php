@@ -121,8 +121,7 @@ if ($product['type'] === 'print') {
             exit;
         }
 
-        $ext        = strtolower(pathinfo($_FILES['design']['name'], PATHINFO_EXTENSION));
-        $safe_name  = print_generate_filename($ext);
+        $safe_name  = print_generate_filename(image_upload_ext($_FILES['design']['tmp_name']) ?? 'jpg');
         $upload_dir = $_SERVER['DOCUMENT_ROOT'] . '/uploads/print-designs/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         if (!move_uploaded_file($_FILES['design']['tmp_name'], $upload_dir . $safe_name)) {

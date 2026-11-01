@@ -29,9 +29,6 @@ if (empty($_POST) && empty($_FILES) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 
 }
 csrf_verify(); // exits with 403 on failure — wrap in try for tests
 
-$allowed_mime = ['image/jpeg', 'image/png', 'image/webp'];
-$allowed_ext  = ['jpg', 'jpeg', 'png', 'webp'];
-
 $upload_err = $_FILES['image']['error'] ?? UPLOAD_ERR_NO_FILE;
 if (in_array($upload_err, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
     upload_fail('too large', 'size');
@@ -41,15 +38,8 @@ if ($upload_err !== UPLOAD_ERR_OK) {
 }
 
 $file   = $_FILES['image'];
-$finfo  = new finfo(FILEINFO_MIME_TYPE);
-$mime   = $finfo->file($file['tmp_name']);
-
-if (!in_array($mime, $allowed_mime, true)) {
-    upload_fail('invalid file type', 'type');
-}
-
-$ext    = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-if (!in_array($ext, $allowed_ext, true)) {
+$ext    = image_upload_ext($file['tmp_name']);
+if ($ext === null) {
     upload_fail('invalid file type', 'type');
 }
 

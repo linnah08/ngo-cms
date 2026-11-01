@@ -1,1 +1,11 @@
-Deny from all
+# Designs shoppers upload for printing: never served or run over the web.
+# Admin download endpoints read them from disk.
+<IfModule mod_php.c>
+  php_flag engine off
+</IfModule>
+<IfModule mod_authz_core.c>
+  Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+  Deny from all
+</IfModule>

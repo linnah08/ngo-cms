@@ -23,20 +23,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id     = slug($name) ?: 'partner-' . time();
         $logo   = '';
 
+        $has_logo_file = !empty($_FILES['logo']['tmp_name']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK;
+        // No SVG: an SVG logo can carry a script that runs when it is opened.
+        $ext = $has_logo_file ? image_upload_ext($_FILES['logo']['tmp_name']) : null;
+
         if (!$name) {
             $error = 'Името е задължително.';
+        } elseif ($has_logo_file && $ext === null) {
+            $error = 'Логото трябва да е снимка във формат JPG, PNG или WebP.';
         } else {
-            if (!empty($_FILES['logo']['tmp_name']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK) {
-                $ext     = strtolower(pathinfo($_FILES['logo']['name'], PATHINFO_EXTENSION));
-                $allowed = ['jpg','jpeg','png','webp','svg'];
-                if (in_array($ext, $allowed)) {
-                    $dir = $_SERVER['DOCUMENT_ROOT'] . '/assets/images/partners/';
-                    if (!is_dir($dir)) mkdir($dir, 0755, true);
-                    $filename = $id . '.' . $ext;
-                    if (move_uploaded_file($_FILES['logo']['tmp_name'], $dir . $filename)) {
-                        image_resize_to_fit($dir . $filename);
-                        $logo = '/assets/images/partners/' . $filename;
-                    }
+            if ($has_logo_file) {
+                $dir = $_SERVER['DOCUMENT_ROOT'] . '/assets/images/partners/';
+                if (!is_dir($dir)) mkdir($dir, 0755, true);
+                $filename = $id . '.' . $ext;
+                if (move_uploaded_file($_FILES['logo']['tmp_name'], $dir . $filename)) {
+                    image_resize_to_fit($dir . $filename);
+                    $logo = '/assets/images/partners/' . $filename;
                 }
             } elseif (!empty($_POST['logo_from_library'])) {
                 $lib = $_POST['logo_from_library'];
@@ -318,7 +320,7 @@ $partners = load_json(PARTNERS_FILE);
       <img id="logoPreviewImg" src="" alt="" style="max-height:60px;border-radius:4px;display:block;">
     </div>
     <input type="hidden" name="logo_from_library" id="logoFromLib">
-    <input type="file" id="logo" name="logo" accept="image/*" data-om-crop>
+    <input type="file" id="logo" name="logo" accept="image/jpeg,image/png,image/webp" data-om-crop>
     <button type="button" class="btn btn--outline"
             style="margin-top:.5rem;font-size:.82rem;"
             onclick="_pickPartnerLogo(this)">Избери от библиотека</button>

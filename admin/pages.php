@@ -144,8 +144,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $file_key = 'centre_image_' . $id;
             if (!empty($_FILES[$file_key]['tmp_name']) && $_FILES[$file_key]['error'] === UPLOAD_ERR_OK) {
-                $ext = strtolower(pathinfo($_FILES[$file_key]['name'], PATHINFO_EXTENSION));
-                if (in_array($ext, ['jpg','jpeg','png','webp'])) {
+                $ext = image_upload_ext($_FILES[$file_key]['tmp_name']);
+                if ($ext !== null) {
                     $dir = $_SERVER['DOCUMENT_ROOT'] . '/assets/images/centres/';
                     if (!is_dir($dir)) mkdir($dir, 0755, true);
                     $filename = $id . '.' . $ext;
@@ -191,8 +191,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             !empty($_FILES['proj_image_file']['tmp_name']) &&
             $_FILES['proj_image_file']['error'] === UPLOAD_ERR_OK
         ) {
-            $ext = strtolower(pathinfo($_FILES['proj_image_file']['name'], PATHINFO_EXTENSION));
-            if (in_array($ext, ['jpg','jpeg','png','webp'])) {
+            $ext = image_upload_ext($_FILES['proj_image_file']['tmp_name']);
+            if ($ext !== null) {
                 $dir = $_SERVER['DOCUMENT_ROOT'] . '/assets/images/projects/';
                 if (!is_dir($dir)) mkdir($dir, 0755, true);
                 $filename = 'project-' . uniqid() . '.' . $ext;

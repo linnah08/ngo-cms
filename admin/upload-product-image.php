@@ -31,9 +31,10 @@ if (empty($_FILES['image']['tmp_name']) || $_FILES['image']['error'] !== UPLOAD_
     exit;
 }
 
-$allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-$ftype   = mime_content_type($_FILES['image']['tmp_name']);
-if (!in_array($ftype, $allowed)) {
+$ext = image_upload_ext($_FILES['image']['tmp_name'], [
+    'image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif',
+]);
+if ($ext === null) {
     http_response_code(400);
     echo json_encode(['error' => 'Позволени формати: JPG, PNG, WebP, GIF.']);
     exit;
@@ -45,7 +46,6 @@ if ($_FILES['image']['size'] > 8 * 1024 * 1024) {
     exit;
 }
 
-$ext      = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
 $filename = 'upload-' . bin2hex(random_bytes(8)) . '.' . $ext;
 $dir      = $_SERVER['DOCUMENT_ROOT'] . '/assets/images/products/';
 

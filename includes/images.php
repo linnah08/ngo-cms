@@ -5,6 +5,20 @@
  */
 
 /**
+ * The extension to save an uploaded image under, read from what the file is
+ * (its content), or null when it isn't one of $allowed. Never take the
+ * extension from the uploaded file's name: a PHP script with an image header
+ * passes a content check, and saved as .php in a public folder the server runs it.
+ *
+ * @param array<string, string> $allowed MIME type => extension
+ */
+function image_upload_ext(string $tmpPath, array $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp']): ?string
+{
+    $mime = @mime_content_type($tmpPath);
+    return is_string($mime) ? ($allowed[$mime] ?? null) : null;
+}
+
+/**
  * The EXIF Orientation of a JPEG (1–8), or 1 when there is none, the file isn't
  * a JPEG, or the server has no exif extension. Phones store photos as the sensor
  * saw them and set this flag to say how to turn them upright. Browsers obey it;
