@@ -454,6 +454,7 @@
   "reviews.err.wait": "Изчакайте малко, преди да публикувате нов отзив.",
   "newsletter.unsub.page_title": "Отписани сте",
   "newsletter.email.unsubscribe": "Отпишете се от бюлетина",
+  "newsletter.email.follow_us": "Последвайте ни:",
   "distribution.protocol.price_label": "Цена за брой",
   "distribution.protocol.item_name": "{product}",
   "email.cert_sign.greeting": "Здравейте,",

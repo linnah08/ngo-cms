@@ -501,16 +501,17 @@ function newsletter_apply_excerpt_override(?array $article, array $overrides): ?
 // ── Article → email formatter ──────────────────────────────────────────────────
 
 /**
- * Convert 1–3 article arrays into an HTML newsletter body (inner HTML only,
- * not yet wrapped in email_wrap). All image src values are made absolute.
+ * Convert article arrays into an HTML newsletter body — the first as a large
+ * hero block, every other one as a card below it (inner HTML only, not yet
+ * wrapped in email_wrap). All image src values are made absolute.
  *
- * @param  array  $articles  Up to 3 items from get_articles()
+ * @param  array  $articles  Items from get_articles(), any number
  * @param  string $lang      'bg' or 'en'
  * @return string            Raw inner HTML suitable for pasting into body textarea
  */
 function newsletter_format_articles(array $articles, string $lang): string
 {
-    $articles   = array_slice($articles, 0, 3);
+    $articles   = array_values($articles);
     $read_more  = $lang === 'bg' ? 'Прочети повече →' : 'Read more →';
     $base       = defined('SITE_URL') ? SITE_URL : 'https://example.org';
     $url_prefix = $lang === 'bg' ? $base . '/novini/' : $base . '/en/news/';
@@ -652,9 +653,44 @@ function render_newsletter_email(
         ? '<p style="margin:0 0 20px;color:#4a4640;">' . htmlspecialchars($greeting, ENT_QUOTES, 'UTF-8') . '</p>'
         : '';
 
-    $inner = $greeting_html . $body_html . newsletter_cta_block($lang) . $unsub_block;
+    $inner = $greeting_html . $body_html . newsletter_cta_block($lang) . newsletter_social_block($lang) . $unsub_block;
 
     return email_wrap($inner);
+}
+
+// ── Follow-us links ───────────────────────────────────────────────────────────
+
+/**
+ * "Follow us: Facebook · Instagram · LinkedIn" line above the unsubscribe link
+ * of every newsletter. Plain text links — email clients don't show SVG icons.
+ * Uses the profile URLs from Admin → Организация; a network without a URL is
+ * left out, and with none at all the line is empty.
+ *
+ * @param array<string,string>|null $links label => URL; null reads SOCIAL_* (tests pass their own)
+ */
+function newsletter_social_block(string $lang, ?array $links = null): string
+{
+    $lang  = $lang === 'en' ? 'en' : 'bg';
+    $links ??= [
+        'Facebook'  => defined('SOCIAL_FACEBOOK')  ? (string) SOCIAL_FACEBOOK  : '',
+        'Instagram' => defined('SOCIAL_INSTAGRAM') ? (string) SOCIAL_INSTAGRAM : '',
+        'LinkedIn'  => defined('SOCIAL_LINKEDIN')  ? (string) SOCIAL_LINKEDIN  : '',
+    ];
+
+    $parts = [];
+    foreach ($links as $label => $url) {
+        $url = trim($url);
+        if (!preg_match('#^https?://#i', $url)) continue;
+        $parts[] = '<a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '" style="color:#0387A5;font-weight:600;text-decoration:none;">'
+                 . htmlspecialchars((string) $label, ENT_QUOTES, 'UTF-8') . '</a>';
+    }
+    if (!$parts) return '';
+
+    $lead = t_or('newsletter.email.follow_us', 'Последвайте ни:', 'Follow us:', $lang);
+    return '<p class="nl-social" style="margin:28px 0 0;font-size:14px;color:#4a4640;text-align:center;line-height:1.8;">'
+         . htmlspecialchars($lead, ENT_QUOTES, 'UTF-8') . ' '
+         . implode(' <span style="color:#9b9590;">&middot;</span> ', $parts)
+         . '</p>';
 }
 
 // ── Donate call-to-action ─────────────────────────────────────────────────────

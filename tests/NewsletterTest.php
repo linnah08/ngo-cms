@@ -210,6 +210,67 @@ final class NewsletterTest extends TestCase
         $this->assertStringContainsString('nl-card-body', $html);
     }
 
+    public function test_format_articles_keeps_every_article_not_just_three(): void
+    {
+        if (!function_exists('newsletter_format_articles')) {
+            require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
+        }
+        $articles = [];
+        for ($n = 1; $n <= 7; $n++) {
+            $articles[] = ['slug' => "a{$n}", 'title' => "Title {$n}", 'excerpt' => "E{$n}", 'image' => ''];
+        }
+        $html = newsletter_format_articles($articles, 'en');
+        for ($n = 1; $n <= 7; $n++) {
+            $this->assertStringContainsString('/en/news/a' . $n . '/', $html, "article {$n} must be in the newsletter");
+        }
+        $this->assertSame(1, substr_count($html, '<h2 '), 'only the first article is the hero');
+        $this->assertSame(6, substr_count($html, 'nl-card-body'));
+    }
+
+    public function test_compose_page_has_no_article_cap(): void
+    {
+        $src = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/admin/newsletter-compose.php');
+        $this->assertDoesNotMatchRegularExpression('/array_slice\(\$slugs_(bg|en),\s*0,\s*\d+\)/', $src);
+        $this->assertStringNotContainsString('до 3 статии', $src);
+    }
+
+    // ── Follow-us links ────────────────────────────────────────────────────────
+
+    public function test_social_block_lists_only_networks_with_a_url(): void
+    {
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
+        $html = newsletter_social_block('bg', [
+            'Facebook'  => 'https://facebook.com/example',
+            'Instagram' => '',
+            'LinkedIn'  => 'javascript:alert(1)',
+        ]);
+        $this->assertStringContainsString('href="https://facebook.com/example"', $html);
+        $this->assertStringContainsString('Facebook</a>', $html);
+        $this->assertStringNotContainsString('Instagram', $html);
+        $this->assertStringNotContainsString('javascript:', $html, 'only http(s) links reach the email');
+        $this->assertStringContainsString(t_or('newsletter.email.follow_us', 'Последвайте ни:', 'Follow us:', 'bg'), $html);
+        $this->assertStringNotContainsString('<svg', $html, 'email clients drop SVG');
+    }
+
+    public function test_social_block_is_empty_without_any_url(): void
+    {
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
+        $this->assertSame('', newsletter_social_block('en', ['Facebook' => '', 'Instagram' => ' ']));
+    }
+
+    public function test_social_block_sits_above_the_unsubscribe_link(): void
+    {
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/newsletter.php';
+        if (newsletter_social_block('en') === '') {
+            $this->markTestSkipped('this site has no social profile URLs configured');
+        }
+        $html = render_newsletter_email('', '<p>BODY</p>', 'https://example.org/newsletter/unsubscribe.php?token=x', 'en');
+        $social = strpos($html, 'nl-social');
+        $this->assertNotFalse($social);
+        $this->assertLessThan(strpos($html, 'Unsubscribe from this newsletter'), $social);
+        $this->assertLessThan($social, strpos($html, 'BODY'));
+    }
+
     public function test_email_wrap_defines_mobile_stacking_media_query(): void
     {
         if (!function_exists('email_wrap')) {

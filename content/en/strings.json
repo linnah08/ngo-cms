@@ -454,6 +454,7 @@
   "reviews.err.wait": "Please wait before posting another review.",
   "newsletter.unsub.page_title": "Unsubscribed",
   "newsletter.email.unsubscribe": "Unsubscribe from this newsletter",
+  "newsletter.email.follow_us": "Follow us:",
   "distribution.protocol.price_label": "Price per item",
   "distribution.protocol.item_name": "{product}",
   "email.cert_sign.greeting": "Hello,",

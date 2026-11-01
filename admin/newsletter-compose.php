@@ -49,11 +49,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'forma
 
     $articles_bg = array_filter(array_map(
         fn($s) => newsletter_apply_excerpt_override(get_article(basename((string)$s), 'bg'), $excerpt_overrides_bg),
-        array_slice($slugs_bg, 0, 3)
+        array_unique($slugs_bg)
     ));
     $articles_en = array_filter(array_map(
         fn($s) => newsletter_apply_excerpt_override(get_article(basename((string)$s), 'en'), $excerpt_overrides_en),
-        array_slice($slugs_en, 0, 3)
+        array_unique($slugs_en)
     ));
 
     // Carry current form state + inject generated bodies
@@ -158,7 +158,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   <!-- Article picker -->
   <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;">
     <h3 style="margin:0 0 .5rem;font-size:.95rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);">Генерирай от статии</h3>
-    <p style="font-size:.85rem;color:var(--text-muted);margin:0 0 1rem;">Избери до 3 статии на всеки език — щом отметнеш статия, можеш да промениш текста ѝ само за този бюлетин (самата статия не се променя). Генерирането ще замени съдържанието по-долу.</p>
+    <p style="font-size:.85rem;color:var(--text-muted);margin:0 0 1rem;">Избери колкото искаш статии на всеки език — първата излиза най-голяма, отгоре. Щом отметнеш статия, можеш да промениш текста ѝ само за този бюлетин (самата статия не се променя). Генерирането ще замени съдържанието по-долу.</p>
     <form method="POST">
       <?= csrf_field() ?>
       <input type="hidden" name="action" value="format_articles">
