@@ -18,26 +18,93 @@ if (!function_exists('claude_is_configured')) {
 }
 require_once __DIR__ . '/articles.php'; // article_excerpt_from_content()
 
+/**
+ * Article HTML as plain text for the excerpt prompt. Block-level tags become
+ * line breaks first, so the words on either side of a paragraph or heading
+ * don't get glued together by strip_tags().
+ */
+function claude_excerpt_source_text(string $html, int $max_len = 12000): string
+{
+    $html = preg_replace('~<br\s*/?>|</(p|div|h[1-6]|li|blockquote|tr)>~i', "\n", $html);
+    $text = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = preg_replace('/[ \t\x{00A0}]+/u', ' ', $text);
+    $text = trim(preg_replace('/\s*\n\s*/u', "\n", $text));
+    return mb_substr($text, 0, $max_len);
+}
+
+/**
+ * The instructions for the excerpt. The Bulgarian rules come from summaries
+ * an editor had to correct by hand: wrong gender/number agreement, Russian
+ * words, made-up words, "със" before any consonant, the renarrative "се
+ * зародила" for a plain past, calques, and details the article never said.
+ */
+function claude_excerpt_system_prompt(string $lang): string
+{
+    if ($lang === 'en') {
+        return <<<TXT
+You write the short summary shown under an article title on a charity's news page; it is also the page's description in search results.
+
+Rules:
+- One sentence, 120–170 characters, in natural, correct English.
+- Use only facts stated in the article. Don't add details, numbers, dates or timing words ("just", "recently") the article doesn't give.
+- Don't repeat the title.
+- Plain, warm tone. No hype, no clichés, no exclamation marks.
+- Don't address the reader (no "you can", "check out"); say what the article is about.
+- Never write an amount in Bulgarian lev. If the article gives an amount only in lev, leave the amount out.
+
+Reply with the summary only: no quotes, no markdown, no label.
+TXT;
+    }
+
+    return <<<TXT
+Пишеш краткото резюме, което стои под заглавието на статия в новините на благотворителна организация. Същото резюме Google показва като описание на страницата.
+
+Правила:
+- Едно изречение, 120–170 знака, на правилен, естествен български език — както би го написал грамотен български редактор.
+- Само факти, които ги има в статията. Не добавяй подробности, числа, дати или думи за време („току-що“, „скоро“), които статията не казва.
+- Не повтаряй заглавието.
+- Спокоен, топъл тон. Без реклама, клишета и удивителни.
+- Не се обръщай към читателя (без „можете“, „можеш“, „вижте“) — разкажи какво има в статията.
+- Никога не пиши суми в лева. Ако статията дава сума само в лева, не я споменавай.
+
+Правопис и граматика — провери всяка дума, преди да отговориш:
+- Никакви руски думи и руски правопис: „често“ (не „часто“), „създаде“ (не „создаде“), „започва“ (не „начева“).
+- Само думи, които съществуват в българския: „се бори“ (не „се борира“), „кауза“ (не „каза“).
+- Род и число се съгласуват: „второ гостуване“ (не „втора гостуване“), „парите, които отидоха“ (не „които отиде“), „която би могла“ (не „която могла“).
+- Минало време с обикновената форма: „идеята, която се зароди“ (не „която се зародила“ — това е преизказно наклонение).
+- „със“ само пред думи, които започват със „с“ или „з“: „с доброволци“, „със специални нужди“, „със застъпници“, но не „със доброволци“.
+- Без буквален превод от английски: „работни места“ (не „работни възможности“), „подкрепят“ (не „подпомогнат“).
+- Казвай „хора със специални нужди“, не „хора с увреждания“.
+- Ако статията описва проект на организацията, кажи го ясно („Нашият проект, в който…“), а не като общо твърдение.
+
+Примери за добри резюмета:
+- Второ посещение в центъра в селото, където доброволци и деца готвят заедно, играят, разговарят и споделят моменти, които остават за дълго.
+- Мария е 18-годишно момиче, което наскоро напусна приемна грижа и се бори за самостоятелен живот, докато учи и работи почасово.
+- Новите картички за благотворителния базар са готови за печат, а екипът подготвя опаковането им преди 2 декември.
+
+Отговори само с резюмето: без кавички, без markdown, без етикет.
+TXT;
+}
+
 function claude_suggest_excerpt(string $title, string $content, string $lang = 'bg'): string
 {
     $api_key = setting_get('claude_api_key');
     if ($api_key === '') return '';
 
-    $text = mb_substr(strip_tags($content), 0, 3000);
+    $text = claude_excerpt_source_text($content);
     if ($text === '') return '';
 
-    $lang_name = $lang === 'en' ? 'English' : 'Bulgarian';
-    $prompt  = "Write a single short excerpt (one sentence, about 120-170 characters) in {$lang_name} that summarizes the article below. ";
-    $prompt .= "It will be shown on a blog listing page and used as the meta description, so it must read naturally and stand on its own.\n\n";
-    $prompt .= "Title: {$title}\n";
-    $prompt .= "Content: {$text}\n\n";
-    $prompt .= "Return ONLY the excerpt text. No quotes, no markdown, no repeating the title.";
-
+    $label = $lang === 'en' ? ['Title', 'Article'] : ['Заглавие', 'Статия'];
+    // Haiku 5.5 thinks by default; high effort buys the extra checking pass
+    // over grammar that the old one-shot summaries lacked. max_tokens leaves
+    // room for that thinking on top of the one-sentence answer.
     $body = json_encode([
-        'model'      => 'claude-haiku-4-5-20251001',
-        'max_tokens' => 200,
-        'messages'   => [
-            ['role' => 'user', 'content' => $prompt],
+        'model'         => 'claude-haiku-5-5',
+        'max_tokens'    => 8000,
+        'output_config' => ['effort' => 'high'],
+        'system'        => claude_excerpt_system_prompt($lang),
+        'messages'      => [
+            ['role' => 'user', 'content' => "{$label[0]}: {$title}\n\n{$label[1]}:\n{$text}"],
         ],
     ]);
 
@@ -46,7 +113,7 @@ function claude_suggest_excerpt(string $title, string $content, string $lang = '
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => $body,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 30,
+        CURLOPT_TIMEOUT        => 90,
         CURLOPT_HTTPHEADER     => [
             'x-api-key: ' . $api_key,
             'anthropic-version: 2023-06-01',
@@ -68,9 +135,25 @@ function claude_suggest_excerpt(string $title, string $content, string $lang = '
         return '';
     }
 
-    $data = json_decode((string)$response, true);
-    $text = trim($data['content'][0]['text'] ?? '');
-    return trim($text, "\"' \t\n\r\0\x0B");
+    return claude_excerpt_from_response((string)$response);
+}
+
+/**
+ * The summary text out of a Messages API response. Thinking blocks come
+ * before the answer, so the text block has to be looked up by type — not
+ * read from content[0]. A cut-off or refused answer gives '' so the caller
+ * falls back to plain truncation instead of saving half a sentence.
+ */
+function claude_excerpt_from_response(string $response): string
+{
+    $data = json_decode($response, true);
+    if (($data['stop_reason'] ?? '') !== 'end_turn') return '';
+    foreach ($data['content'] ?? [] as $block) {
+        if (($block['type'] ?? '') === 'text') {
+            return trim(trim($block['text']), "\"'„“”«» \t\n\r\0\x0B");
+        }
+    }
+    return '';
 }
 
 /**

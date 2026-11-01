@@ -207,6 +207,40 @@ final class ArticleSaveLogicTest extends TestCase
         $this->assertSame('', article_auto_excerpt('Title', '<p></p>', 'en'));
     }
 
+    public function testExcerptSourceKeepsParagraphBreaks(): void
+    {
+        // strip_tags() alone glued "край." and "Второ" into "край.Второ".
+        $text = claude_excerpt_source_text('<p>Първи&nbsp;край.</p><p>Второ</p><ul><li>а</li><li>б</li></ul>');
+        $this->assertSame("Първи край.\nВторо\nа\nб", $text);
+    }
+
+    public function testExcerptIsReadFromTheTextBlockAfterThinking(): void
+    {
+        $resp = json_encode(['stop_reason' => 'end_turn', 'content' => [
+            ['type' => 'thinking', 'thinking' => ''],
+            ['type' => 'text', 'text' => "„Второ гостуване в селото.“\n"],
+        ]]);
+        $this->assertSame('Второ гостуване в селото.', claude_excerpt_from_response($resp));
+    }
+
+    public function testCutOffOrRefusedExcerptFallsBack(): void
+    {
+        foreach (['max_tokens', 'refusal'] as $stop) {
+            $resp = json_encode(['stop_reason' => $stop, 'content' => [['type' => 'text', 'text' => 'Половин из']]]);
+            $this->assertSame('', claude_excerpt_from_response($resp), $stop);
+        }
+        $this->assertSame('', claude_excerpt_from_response('not json'));
+    }
+
+    public function testBulgarianExcerptPromptCarriesTheGrammarRules(): void
+    {
+        $p = claude_excerpt_system_prompt('bg');
+        foreach (['часто', 'се борира', 'втора гостуване', 'се зародила', 'със доброволци', 'в лева'] as $wrong) {
+            $this->assertStringContainsString($wrong, $p);
+        }
+        $this->assertStringNotContainsString('лв', claude_excerpt_system_prompt('en'));
+    }
+
     public function testEditorKeepsTheStoredExcerptAndFillsAMissingOne(): void
     {
         // The editor form has no excerpt field: reading one from $_POST blanked the
