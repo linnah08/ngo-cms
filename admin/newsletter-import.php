@@ -9,8 +9,9 @@ module_admin_guard('newsletter');
 
 $pdo = get_pdo();
 
-// Require explicit confirmation to prevent accidental double-run
-if (($_GET['confirm'] ?? '') !== 'yes') {
+// Opening the page only shows the counts. The import runs on the button's POST,
+// with the CSRF token, so a link or image pointing here can't trigger it.
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     $stmt = $pdo->query("SELECT COUNT(DISTINCT customer_email) FROM orders WHERE payment_status='paid'");
     $eligible = (int)$stmt->fetchColumn();
@@ -27,9 +28,10 @@ if (($_GET['confirm'] ?? '') !== 'yes') {
       <div style="background:#fdf0ef;border:1px solid #f0c4c0;border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.5rem;color:#c0392b;font-size:.9rem;">
         ⚠ Това действие ще изпрати бюлетин на хора, които не са го поискали изрично. Уверете се, че разполагате с правно основание (например е-търговска комуникация по GDPR).
       </div>
-      <a href="/admin/newsletter-import.php?confirm=yes" class="btn btn--primary">
-        Потвърди импорта →
-      </a>
+      <form method="post" action="/admin/newsletter-import.php" style="display:inline;">
+        <?= csrf_field() ?>
+        <button type="submit" class="btn btn--primary">Потвърди импорта →</button>
+      </form>
       <a href="/admin/newsletter-subscribers.php" style="margin-left:1rem;font-size:.9rem;color:var(--text-muted);">Откажи</a>
     </div>
     <?php
@@ -38,6 +40,12 @@ if (($_GET['confirm'] ?? '') !== 'yes') {
 }
 
 // ── Run import ────────────────────────────────────────────────────────────────
+if (!csrf_verify()) {
+    flash_set('error', 'Импортът не беше направен: сесията изтече. Натиснете „Импорт от клиенти“ и потвърдете отново.');
+    header('Location: /admin/newsletter-subscribers.php');
+    exit;
+}
+
 $stmt = $pdo->query("
     SELECT DISTINCT customer_email, customer_name
     FROM orders
