@@ -73,6 +73,27 @@ final class GtagPurchaseEventTest extends TestCase
         $this->assertStringContainsString('"item_name":"Чаша"', $html);
     }
 
+    public function test_consent_is_signalled_before_any_google_tag_loads(): void
+    {
+        $html = $this->renderHeader(['GOOGLE_ADS_ID' => 'AW-123456789', 'GA4_ID' => 'G-AB12CD34EF', 'GTM_ID' => 'GTM-TEST123'], 'all', []);
+
+        $consent = strpos($html, "gtag('consent', 'default', {ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'granted', analytics_storage: 'granted'})");
+        $this->assertNotFalse($consent, $html);
+        $this->assertLessThan(strpos($html, 'gtm.js?id='), $consent, 'Tag Manager reads consent only if it is set first');
+        $this->assertLessThan(strpos($html, "gtag('config', 'AW-123456789')"), $consent);
+        $this->assertSame(1, substr_count($html, 'function gtag('), 'gtag is defined once');
+    }
+
+    public function test_accepting_on_the_banner_signals_consent_before_loading_tags(): void
+    {
+        $src = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/templates/footer.php');
+        $fn  = substr($src, (int) strpos($src, 'function cookieConsent('));
+        $consent = strpos($fn, "gtag('consent','default',{ad_storage:'granted',ad_user_data:'granted',ad_personalization:'granted',analytics_storage:'granted'})");
+        $this->assertNotFalse($consent);
+        $this->assertLessThan(strpos($fn, 'gtm.js?id='), $consent);
+        $this->assertLessThan(strpos($fn, "gtag('config',"), $consent);
+    }
+
     public function test_nothing_is_sent_without_cookie_consent(): void
     {
         $html = $this->renderHeader(['GOOGLE_ADS_ID' => 'AW-123456789', 'GA4_ID' => ''], 'necessary', self::PURCHASE);

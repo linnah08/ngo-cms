@@ -253,6 +253,12 @@ function cookieConsent(choice) {
     document.getElementById('cookieBanner').style.display = 'none';
     if (choice === 'all') {
 <?php $__gtm = defined('GTM_ID') ? GTM_ID : ''; $__ads = defined('GOOGLE_ADS_ID') ? GOOGLE_ADS_ID : ''; $__ga4 = defined('GA4_ID') ? GA4_ID : ''; ?>
+<?php if ($__gtm !== '' || $__ads !== '' || $__ga4 !== ''): ?>
+        // Tell Google the visitor accepted cookies (EU consent signal), before any tag loads
+        window.dataLayer=window.dataLayer||[];
+        window.gtag=function(){dataLayer.push(arguments);};
+        gtag('consent','default',{ad_storage:'granted',ad_user_data:'granted',ad_personalization:'granted',analytics_storage:'granted'});
+<?php endif; ?>
 <?php if ($__gtm !== ''): ?>
         // Load GTM immediately without requiring a page reload
         (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
@@ -267,8 +273,6 @@ function cookieConsent(choice) {
         (function(d){var s=d.createElement('script');s.async=true;
         s.src='https://www.googletagmanager.com/gtag/js?id=<?= h($__ads !== '' ? $__ads : $__ga4) ?>';
         d.head.appendChild(s);})(document);
-        window.dataLayer=window.dataLayer||[];
-        window.gtag=function(){dataLayer.push(arguments);};
         gtag('js',new Date());
 <?php if ($__ads !== ''): ?>        gtag('config','<?= h($__ads) ?>');
 <?php endif; ?>

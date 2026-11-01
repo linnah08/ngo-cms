@@ -80,6 +80,15 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
   <?php $__ads = defined('GOOGLE_ADS_ID') ? GOOGLE_ADS_ID : ''; ?>
   <?php $__ga4 = defined('GA4_ID') ? GA4_ID : ''; ?>
   <?php $__ads_label = defined('GOOGLE_ADS_PURCHASE_LABEL') ? GOOGLE_ADS_PURCHASE_LABEL : ''; ?>
+  <?php if ($__gtm !== '' || $__ads !== '' || $__ga4 !== ''): ?>
+  <!-- Tell Google the visitor accepted cookies (EU consent signal). It goes before
+       Tag Manager and gtag.js so every tag reads it from the start. -->
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('consent', 'default', {ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'granted', analytics_storage: 'granted'});
+  </script>
+  <?php endif; ?>
   <?php if ($__gtm !== ''): ?>
   <!-- Google Tag Manager (consent given) -->
   <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
@@ -94,8 +103,6 @@ $en_href = $lang === 'en' ? $current_path : _switch_lang($current_path, 'bg');
   <!-- Google Ads / GA4 (consent given) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=<?= h($__ads !== '' ? $__ads : $__ga4) ?>"></script>
   <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
     <?php if ($__ads !== ''): ?>gtag('config', '<?= h($__ads) ?>');<?php endif; ?>
     <?php if ($__ga4 !== ''): ?>gtag('config', '<?= h($__ga4) ?>');<?php endif; ?>
