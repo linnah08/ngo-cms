@@ -15,6 +15,7 @@ function run_migrations(): array
 {
     $root = __DIR__;
     require_once $root . '/db.config.php';
+    require_once $root . '/includes/migrations.php';
 
     // ── Connect ───────────────────────────────────────────────────────────────
     try {
@@ -57,32 +58,14 @@ function run_migrations(): array
         }
 
         echo "Applying $name ... ";
-        $sql = file_get_contents($file);
-
-        // Strip full-line `--` comments first. Otherwise a semicolon that appears
-        // inside a comment would be treated as a statement separator and the comment
-        // tail would be exec'd as (invalid) SQL.
-        $sql = preg_replace('/^\s*--.*$/m', '', $sql);
-
-        // Split on semicolons so multi-statement files work
-        try {
-            foreach (array_filter(array_map('trim', explode(';', $sql))) as $statement) {
-                $pdo->exec($statement);
-            }
-        } catch (PDOException $e) {
-            // "Duplicate column" / "already exists" errors are safe to ignore —
-            // it means a previous partial run already applied the DDL.
-            $msg = $e->getMessage();
-            $ignorable = str_contains($msg, 'Duplicate column')
-                      || str_contains($msg, 'already exists');
-            if (!$ignorable) {
-                $errMsg = "migrate: FAILED $name: $msg";
-                fwrite(STDERR, $errMsg . "\n");
-                echo "FAILED: $msg\n";
-                return ['success' => false, 'error' => $errMsg]; // real error — stop so we don't mark it as applied
-            }
-            echo "(already applied, skipping) ";
+        $result = migration_apply_sql($pdo, (string) file_get_contents($file));
+        if ($result['error'] !== null) {
+            $errMsg = "migrate: FAILED $name: {$result['error']}";
+            fwrite(STDERR, $errMsg . "\n");
+            echo "FAILED: {$result['error']}\n";
+            return ['success' => false, 'error' => $errMsg]; // real error — stop so we don't mark it as applied
         }
+        if ($result['skipped'] > 0) echo "(skipped {$result['skipped']} already-applied statement(s)) ";
 
         $pdo->prepare("INSERT INTO `_migrations` (`name`) VALUES (?)")->execute([$name]);
         echo "done\n";
