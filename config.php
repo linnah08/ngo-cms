@@ -783,6 +783,17 @@ function h(string $val): string {
     return htmlspecialchars($val, ENT_QUOTES, 'UTF-8');
 }
 
+/**
+ * A typed-in value made safe for a CSV cell. Spreadsheets run a cell that starts
+ * with = + - @ (or a tab / carriage return) as a formula, so a buyer named
+ * "=HYPERLINK(...)" would act when an admin opens the export. A leading
+ * apostrophe keeps it plain text. Only for text — amounts and dates stay numbers.
+ */
+function csv_text(?string $val): string {
+    $val = (string) $val;
+    return $val !== '' && strpbrk($val[0], "=+-@\t\r") !== false ? "'" . $val : $val;
+}
+
 // Percent-encode a URL path so Cyrillic/special filenames load on all browsers.
 function asset_url(string $path): string {
     $encoded = implode('/', array_map('rawurlencode', explode('/', $path)));

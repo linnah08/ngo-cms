@@ -106,6 +106,20 @@ final class MonthlyOrdersReportTest extends TestCase
         $this->assertStringContainsString('Сума (EUR)', $lines[0]);
     }
 
+    public function testACustomerNameCannotRunAsASpreadsheetFormula(): void
+    {
+        $number = 'T-CSV-' . substr(uniqid(), -8);
+        $this->insertOrder([
+            'order_number'  => $number,
+            'customer_name' => '=HYPERLINK("http://evil.test","Click")',
+            'created_at'    => '2026-04-11 09:00:00',
+        ]);
+        $row = $this->findRow(generate_monthly_orders_csv(2026, 4), $number);
+        $this->assertNotNull($row);
+        $this->assertSame('\'=HYPERLINK("http://evil.test","Click")', $row[5]);
+        $this->assertSame('15.00', $row[self::COL_AMOUNT], 'amounts stay numbers');
+    }
+
     public function testIncludesPaidOrder(): void
     {
         $this->insertOrder([

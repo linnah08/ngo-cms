@@ -323,12 +323,12 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       <div>
         <label style="<?= $lbl ?>">Описание (БГ)</label>
         <textarea name="campaign_description" id="campaignDesc" rows="5"
-                  style="<?= $inp ?> resize:vertical;"><?= $desc ?></textarea>
+                  style="<?= $inp ?> resize:vertical;"><?= h($desc) ?></textarea>
       </div>
       <div>
         <label style="<?= $lbl ?>">Description <?= $lbl_en_badge ?></label>
         <textarea name="campaign_description_en" id="campaignDescEn" rows="5"
-                  style="<?= $inp ?> resize:vertical;"><?= $desc_en ?></textarea>
+                  style="<?= $inp ?> resize:vertical;"><?= h($desc_en) ?></textarea>
       </div>
     </div>
 
@@ -396,12 +396,12 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
           <div>
             <label style="<?= $lbl ?>">Описание (БГ)</label>
             <textarea name="reward_desc[<?= $i ?>]" class="reward-desc" rows="2"
-                      style="<?= $inp ?> resize:vertical;"><?= $r['description'] ?></textarea>
+                      style="<?= $inp ?> resize:vertical;"><?= h($r['description'] ?? '') ?></textarea>
           </div>
           <div>
             <label style="<?= $lbl ?>">Description <?= $lbl_en_badge ?></label>
             <textarea name="reward_desc_en[<?= $i ?>]" class="reward-desc-en" rows="2"
-                      style="<?= $inp ?> resize:vertical;"><?= $r['description_en'] ?? '' ?></textarea>
+                      style="<?= $inp ?> resize:vertical;"><?= h($r['description_en'] ?? '') ?></textarea>
           </div>
         </div>
         <div style="width:50%;padding-right:.375rem;box-sizing:border-box;">
@@ -557,12 +557,12 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
           <div>
             <label style="<?= $lbl ?>">Отговор (БГ)</label>
             <textarea name="faq_a[]" class="faq-answer" rows="3"
-                      style="<?= $inp ?> resize:vertical;"><?= $row['a'] ?></textarea>
+                      style="<?= $inp ?> resize:vertical;"><?= h($row['a'] ?? '') ?></textarea>
           </div>
           <div>
             <label style="<?= $lbl ?>">Answer <?= $lbl_en_badge ?></label>
             <textarea name="faq_a_en[]" class="faq-answer-en" rows="3"
-                      style="<?= $inp ?> resize:vertical;"><?= $row['a_en'] ?? '' ?></textarea>
+                      style="<?= $inp ?> resize:vertical;"><?= h($row['a_en'] ?? '') ?></textarea>
           </div>
         </div>
       </div>
@@ -593,12 +593,12 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
       <div>
         <label style="<?= $lbl ?> margin-bottom:.4rem;">Рискове (БГ)</label>
         <textarea name="campaign_risks" id="campaignRisks" rows="6"
-                  style="<?= $inp ?> resize:vertical;"><?= $risks ?></textarea>
+                  style="<?= $inp ?> resize:vertical;"><?= h($risks) ?></textarea>
       </div>
       <div>
         <label style="<?= $lbl ?> margin-bottom:.4rem;">Risks <?= $lbl_en_badge ?></label>
         <textarea name="campaign_risks_en" id="campaignRisksEn" rows="6"
-                  style="<?= $inp ?> resize:vertical;"><?= $risks_en ?></textarea>
+                  style="<?= $inp ?> resize:vertical;"><?= h($risks_en) ?></textarea>
       </div>
     </div>
     <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--border);">

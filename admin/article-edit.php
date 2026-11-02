@@ -307,7 +307,7 @@ $badge_style       = 'font-size:.75rem;font-weight:600;border-radius:3px;padding
 
     <div class="form-group">
       <label>Съдържание</label>
-      <textarea id="content" name="content" class="rich-editor"><?= $article['content'] ?? '' ?></textarea>
+      <textarea id="content" name="content" class="rich-editor"><?= h($article['content'] ?? '') ?></textarea>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
@@ -424,7 +424,7 @@ $badge_style       = 'font-size:.75rem;font-weight:600;border-radius:3px;padding
 
     <div class="form-group">
       <label>Content (EN)</label>
-      <textarea id="content_en" name="content_en" class="rich-editor-en"><?= $article_en['content'] ?? '' ?></textarea>
+      <textarea id="content_en" name="content_en" class="rich-editor-en"><?= h($article_en['content'] ?? '') ?></textarea>
     </div>
 
     <div class="form-group">

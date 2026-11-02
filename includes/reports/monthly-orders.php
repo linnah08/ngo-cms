@@ -175,10 +175,10 @@ function generate_monthly_orders_csv(int $year, int $month): string
             fputcsv($buf, [
                 $date,
                 $row['order_number'],
-                $line['label'],
+                csv_text($line['label']),
                 $status,
                 number_format($line['amount'], 2, '.', ''),
-                $row['customer_name'],
+                csv_text($row['customer_name']),
             ], ',', '"', '');
         }
     }

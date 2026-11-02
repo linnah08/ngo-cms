@@ -105,12 +105,12 @@ if (($_GET['export'] ?? '') === 'csv') {
             : '';
         fputcsv($out, [
             $r['pledge_number'],
-            $r['name'],
-            $r['email'],
+            csv_text($r['name']),
+            csv_text($r['email']),
             number_format($r['amount_eur'], 2, '.', ''),
             $r['payment_status'],
-            $r['reward_title'] ?? '—',
-            $addr_str,
+            csv_text($r['reward_title'] ?? '—'),
+            csv_text($addr_str),
             $r['reward_shipped'] ? 'Да' : 'Не',
             substr($r['created_at'], 0, 10),
         ]);
