@@ -21,6 +21,14 @@ $id      = $body['id']   ?? '';
 $allowed_types = ['partner', 'impact', 'centre', 'article', 'product', 'faq'];
 if (!in_array($type, $allowed_types, true)) rm_json(['ok' => false, 'error' => 'unknown type']);
 
+// Each kind of item needs the role its admin page needs: articles — admin or author;
+// products — admin or shop manager; everything else is page content — admin only.
+$need = match ($type) { 'article' => 'articles', 'product' => 'products', default => 'pages' };
+if (!inline_edit_allowed($need)) {
+    http_response_code(403);
+    rm_json(['ok' => false, 'error' => 'forbidden']);
+}
+
 switch ($type) {
     case 'partner':
         $partners = load_json(PARTNERS_FILE);
@@ -70,11 +78,6 @@ switch ($type) {
         break;
 
     case 'product':
-        // Authors may remove articles, but products belong to whoever manages the shop.
-        if (!admin_can_manage_shop()) {
-            http_response_code(403);
-            rm_json(['ok' => false, 'error' => 'forbidden']);
-        }
         $pid = (int)$id;
         if ($pid > 0) {
             $pdo = get_pdo();

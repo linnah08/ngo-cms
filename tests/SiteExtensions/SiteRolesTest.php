@@ -56,7 +56,9 @@ final class SiteRolesTest extends TestCase
     public function test_site_roles_get_no_edit_bar_and_cannot_edit_pages(): void
     {
         $root = dirname(__DIR__, 2);
-        $this->assertStringContainsString('admin_role_is_site_role', (string) file_get_contents("$root/admin/inline-save.php"));
+        // inline-save.php lets only an admin save (inline_edit_allowed('pages')), so a site's
+        // own role is refused with every other non-admin role.
+        $this->assertStringContainsString("inline_edit_allowed('pages'", (string) file_get_contents("$root/admin/inline-save.php"));
         $this->assertStringContainsString('admin_role_is_site_role', (string) file_get_contents("$root/templates/header.php"));
         $this->assertStringContainsString('admin_role_is_site_role', (string) file_get_contents("$root/admin/includes/auth.php"));
         $this->assertStringContainsString('site_role_redirect', (string) file_get_contents("$root/config.php"));

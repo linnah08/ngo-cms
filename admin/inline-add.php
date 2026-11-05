@@ -9,6 +9,8 @@ header('Content-Type: application/json');
 function add_json(array $d): never { echo json_encode($d); exit; }
 
 admin_require_login();
+// Partners, impact numbers, centres and FAQ are page content: admins only, like Админ → Съдържание.
+if (!inline_edit_allowed('pages')) { http_response_code(403); add_json(['ok' => false, 'error' => 'forbidden']); }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') add_json(['ok' => false, 'error' => 'method']);
 if (!csrf_verify()) add_json(['ok' => false, 'error' => 'csrf']);
 
@@ -70,13 +72,13 @@ switch ($type) {
 
     case 'faq':
         // FAQ is stored in the DB `campaign_faq` setting as {q, a, q_en, a_en}.
-        $safe_tags = '<b><strong><em><i><a><ul><ol><li><br><p><h2><h3>';
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/inline_html.php';   // inline_clean_html()
         $faq = json_decode(setting_get('campaign_faq', '[]'), true) ?: [];
         $faq[] = [
             'q'    => trim(strip_tags($_POST['q_bg'] ?? '')),
-            'a'    => trim(strip_tags($_POST['a_bg'] ?? '', $safe_tags)),
+            'a'    => inline_clean_html($_POST['a_bg'] ?? ''),
             'q_en' => trim(strip_tags($_POST['q_en'] ?? '')),
-            'a_en' => trim(strip_tags($_POST['a_en'] ?? '', $safe_tags)),
+            'a_en' => inline_clean_html($_POST['a_en'] ?? ''),
         ];
         setting_set('campaign_faq', json_encode($faq, JSON_UNESCAPED_UNICODE));
         add_json(['ok' => true]);

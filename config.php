@@ -269,16 +269,25 @@ function _admin_bar_domain(): string {
     return site_session_cookie_domain();
 }
 
-function admin_bar_token_set(): void {
+/**
+ * The admin-bar cookie: "<expiry>|<role>|<signature>", issued at login. It carries the
+ * user's real role, because admin/inline-save.php accepts it as login on subdomains and
+ * must refuse a role that may not edit pages. The "v2|" in the signed text retires every
+ * cookie issued before the role was recorded (they all said "admin", whoever logged in).
+ */
+function _admin_bar_signed(string $exp, string $role, string $secret): string {
+    return hash_hmac('sha256', 'v2|' . $exp . '|' . $role, $secret);
+}
+
+function admin_bar_token_set(string $role): void {
     $secret  = _admin_bar_secret();
     if ($secret === null) return;
-    $exp     = time() + ADMIN_BAR_TTL;
-    $payload = $exp . '|admin';
-    $sig     = hash_hmac('sha256', $payload, $secret);
-    $value   = $payload . '|' . $sig;
+    if (!preg_match('/^[a-z0-9_]{1,40}$/', $role)) return;
+    $exp     = (string) (time() + ADMIN_BAR_TTL);
+    $value   = $exp . '|' . $role . '|' . _admin_bar_signed($exp, $role, $secret);
     $domain  = _admin_bar_domain();
     setcookie(ADMIN_BAR_COOKIE, $value, [
-        'expires'  => $exp,
+        'expires'  => (int) $exp,
         'path'     => '/',
         'domain'   => $domain,
         'secure'   => str_starts_with(SITE_URL, 'https'),
@@ -300,18 +309,21 @@ function admin_bar_token_clear(): void {
     unset($_COOKIE[ADMIN_BAR_COOKIE]);
 }
 
-function admin_bar_token_verify(): bool {
+/** The role a valid admin-bar cookie was issued to, or null (no cookie, expired, forged, old format). */
+function admin_bar_token_role(): ?string {
     $raw = $_COOKIE[ADMIN_BAR_COOKIE] ?? '';
-    if ($raw === '') return false;
+    if (!is_string($raw) || $raw === '') return null;
     $parts = explode('|', $raw, 3);
-    if (count($parts) !== 3) return false;
+    if (count($parts) !== 3) return null;
     [$exp, $role, $sig] = $parts;
-    if ((int)$exp < time()) return false;
-    $secret   = _admin_bar_secret();
-    if ($secret === null) return false;
-    $payload  = $exp . '|' . $role;
-    $expected = hash_hmac('sha256', $payload, $secret);
-    return hash_equals($expected, $sig);
+    if (!ctype_digit($exp) || (int) $exp < time()) return null;
+    $secret = _admin_bar_secret();
+    if ($secret === null) return null;
+    return hash_equals(_admin_bar_signed($exp, $role, $secret), $sig) ? $role : null;
+}
+
+function admin_bar_token_verify(): bool {
+    return admin_bar_token_role() !== null;
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -735,6 +747,24 @@ function admin_require_shop(): void {
 
 function admin_can_editorial(): bool {
     return in_array(admin_user()['role'] ?? '', ['admin', 'author']);
+}
+
+/**
+ * May the logged-in user change this kind of content from Edit mode on the public site?
+ * The same role its admin page requires, so Edit mode never reaches further than the admin:
+ *   'pages'    — page texts, FAQ, partners, centres, impact numbers (Админ → Съдържание): admin
+ *   'articles' — news articles: admin or author
+ *   'products' — shop products: admin or shop manager
+ * $token_role: the role from the admin-bar cookie, for a subdomain request with no session.
+ */
+function inline_edit_allowed(string $what, ?string $token_role = null): bool {
+    $role = admin_logged_in() ? (string) (admin_user()['role'] ?? '') : (string) $token_role;
+    return match ($what) {
+        'pages'    => $role === 'admin',
+        'articles' => in_array($role, ['admin', 'author'], true),
+        'products' => in_array($role, ['admin', 'shop_admin'], true),
+        default    => false,
+    };
 }
 
 function admin_require_editorial(): void {

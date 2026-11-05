@@ -864,10 +864,10 @@ window.OmCMS = (function () {
         if (data.ok) {
           el.remove();
         } else {
-          alert('Remove failed: ' + (data.error || 'unknown'));
+          alert('Не се премахна: ' + _saveErrorText(data.error));
         }
       })
-      .catch(function () { alert('Remove failed: network error'); });
+      .catch(function () { alert('Не се премахна: няма връзка. Опитайте пак.'); });
   }
 
   // ── Modal (Add item) ──────────────────────────────────────────────────────
@@ -934,7 +934,7 @@ window.OmCMS = (function () {
     fetch('/admin/inline-add.php', { method: 'POST', body: fd })
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        if (!data.ok) { alert('Error: ' + (data.error || 'unknown')); return; }
+        if (!data.ok) { alert('Не се добави: ' + _saveErrorText(data.error)); return; }
         closeModal();
         window.location.reload();
       });
@@ -1056,6 +1056,7 @@ window.OmCMS = (function () {
   function _saveErrorText(code) {
     var known = {
       unauthorized: 'изтекла сесия — влезте отново в админа и опитайте пак.',
+      forbidden: 'вашият профил няма право да променя това. Помолете администратор.',
       csrf: 'страницата е отворена твърде дълго — презаредете я и опитайте пак.',
       'unknown section': 'този текст не може да се променя оттук.',
       'unknown page': 'страницата не е намерена — презаредете я.',

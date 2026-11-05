@@ -22,9 +22,17 @@ final class AdminBarTokenTest extends TestCase
         unset($_COOKIE[ADMIN_BAR_COOKIE]);
     }
 
+    /** The current format: "<exp>|<role>|<sig>", the signature over "v2|<exp>|<role>". */
     private function token(string $key, ?int $exp = null, string $role = 'admin'): string
     {
         $payload = ($exp ?? time() + 3600) . '|' . $role;
+        return $payload . '|' . hash_hmac('sha256', 'v2|' . $payload, $key);
+    }
+
+    /** The format issued before the role was recorded: every user got "admin". */
+    private function oldToken(string $key, string $role = 'admin'): string
+    {
+        $payload = (time() + 3600) . '|' . $role;
         return $payload . '|' . hash_hmac('sha256', $payload, $key);
     }
 
@@ -32,6 +40,23 @@ final class AdminBarTokenTest extends TestCase
     {
         $_COOKIE[ADMIN_BAR_COOKIE] = $this->token((string) _admin_bar_secret());
         $this->assertTrue(admin_bar_token_verify());
+    }
+
+    public function test_token_carries_the_role_it_was_issued_to(): void
+    {
+        $key = (string) _admin_bar_secret();
+        $_COOKIE[ADMIN_BAR_COOKIE] = $this->token($key, null, 'author');
+        $this->assertSame('author', admin_bar_token_role());
+        $_COOKIE[ADMIN_BAR_COOKIE] = $this->token($key);
+        $this->assertSame('admin', admin_bar_token_role());
+    }
+
+    public function test_cookie_issued_before_roles_were_recorded_is_refused(): void
+    {
+        // It said "admin" for an author too, so it must not open the editor any more.
+        $_COOKIE[ADMIN_BAR_COOKIE] = $this->oldToken((string) _admin_bar_secret());
+        $this->assertNull(admin_bar_token_role());
+        $this->assertFalse(admin_bar_token_verify());
     }
 
     public function test_token_forged_from_public_site_details_is_rejected(): void

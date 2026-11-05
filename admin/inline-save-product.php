@@ -7,6 +7,9 @@ header('Content-Type: application/json');
 function prod_json(array $d): never { echo json_encode($d); exit; }
 
 admin_require_login();
+// The same people as Админ → Магазин: admin or shop manager. The description is saved as
+// the rich text it is, exactly as product-edit.php saves it — never by an author.
+if (!inline_edit_allowed('products')) { http_response_code(403); prod_json(['ok' => false, 'error' => 'forbidden']); }
 module_ajax_guard('shop');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') prod_json(['ok' => false, 'error' => 'method']);
 

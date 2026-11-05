@@ -7,6 +7,8 @@ header('Content-Type: application/json');
 function art_json(array $d): never { echo json_encode($d); exit; }
 
 admin_require_login();
+// The same people as Админ → Статии: admin or author.
+if (!inline_edit_allowed('articles')) { http_response_code(403); art_json(['ok' => false, 'error' => 'forbidden']); }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') art_json(['ok' => false, 'error' => 'method']);
 
 $raw  = $GLOBALS['_om_raw_input'] ?? file_get_contents('php://input');

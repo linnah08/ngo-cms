@@ -27,13 +27,19 @@ header('Content-Type: application/json');
 
 function save_json_response(array $data): never { echo json_encode($data); exit; }
 
-// Auth: session (main site) or signed admin-bar token (subdomain visitors)
-require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/site_extensions.php';
-$_session_auth = admin_logged_in() && !admin_role_is_site_role((string) (admin_user()['role'] ?? ''));   // a site's own role can't edit pages
-$_token_auth   = !$_session_auth && admin_bar_token_verify();
-if (!$_session_auth && !$_token_auth) {
+// Auth: session (main site) or signed admin-bar token (subdomain visitors).
+// Everything saved here is page content, which only an admin may change — the same rule as
+// Админ → Съдържание and the campaign page. An author or shop manager is logged in, but refused.
+$_session_auth = admin_logged_in();
+$_token_role   = $_session_auth ? null : admin_bar_token_role();
+if (!$_session_auth && $_token_role === null) {
     save_json_response(['ok' => false, 'error' => 'unauthorized']);
 }
+if (!inline_edit_allowed('pages', $_token_role)) {
+    http_response_code(403);
+    save_json_response(['ok' => false, 'error' => 'forbidden']);
+}
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/inline_html.php';   // inline_clean_html()
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') save_json_response(['ok' => false, 'error' => 'method']);
 
@@ -154,7 +160,6 @@ if ($section === 'partner') {
 // (richtext answer). Untouched language/field values are preserved.
 if ($section === 'faq') {
     $faq = json_decode(setting_get('campaign_faq', '[]'), true) ?: [];
-    $safe_tags = '<b><strong><em><i><a><ul><ol><li><br><p><h2><h3>';
     foreach ($fields as $field => $values) {
         if (!preg_match('/^([qa])_(\d+)$/', $field, $m)) continue;
         $which = $m[1];           // 'q' or 'a'
@@ -164,8 +169,8 @@ if ($section === 'faq') {
             $faq[$idx]['q']    = trim(strip_tags($values['bg'] ?? ''));
             $faq[$idx]['q_en'] = trim(strip_tags($values['en'] ?? ''));
         } else {
-            $faq[$idx]['a']    = trim(strip_tags($values['bg'] ?? '', $safe_tags));
-            $faq[$idx]['a_en'] = trim(strip_tags($values['en'] ?? '', $safe_tags));
+            $faq[$idx]['a']    = inline_clean_html($values['bg'] ?? '');
+            $faq[$idx]['a_en'] = inline_clean_html($values['en'] ?? '');
         }
     }
     setting_set('campaign_faq', json_encode($faq, JSON_UNESCAPED_UNICODE));
@@ -178,15 +183,14 @@ if ($section === 'campaign_settings') {
         'title'       => ['campaign_title',       'campaign_title_en'],
         'description' => ['campaign_description', 'campaign_description_en'],
     ];
-    $safe_tags = '<b><strong><em><i><a><ul><ol><li><br><p><h2><h3>';
     foreach ($fields as $field => $values) {
         if (!isset($allowed_settings[$field])) continue;
         [$bg_key, $en_key] = $allowed_settings[$field];
         $bg_val = $field === 'description'
-            ? trim(strip_tags($values['bg'] ?? '', $safe_tags))
+            ? inline_clean_html($values['bg'] ?? '')
             : trim(strip_tags($values['bg'] ?? ''));
         $en_val = $field === 'description'
-            ? trim(strip_tags($values['en'] ?? '', $safe_tags))
+            ? inline_clean_html($values['en'] ?? '')
             : trim(strip_tags($values['en'] ?? ''));
         setting_set($bg_key, $bg_val);
         setting_set($en_key, $en_val);
@@ -342,8 +346,8 @@ if (!isset($pages[$section])) $pages[$section] = [];
 foreach ($fields as $field => $values) {
     if (!isset($allowed[$section][$field])) continue; // skip unknown fields
     [$bg_key, $en_key] = $allowed[$section][$field];
-    $pages[$section][$bg_key] = trim(strip_tags($values['bg'] ?? '', '<b><strong><em><i><a><ul><ol><li><br><p><h2><h3>'));
-    $pages[$section][$en_key] = trim(strip_tags($values['en'] ?? '', '<b><strong><em><i><a><ul><ol><li><br><p><h2><h3>'));
+    $pages[$section][$bg_key] = inline_clean_html($values['bg'] ?? '');
+    $pages[$section][$en_key] = inline_clean_html($values['en'] ?? '');
 }
 
 save_json(CONTENT_PATH . '/pages.json', $pages);

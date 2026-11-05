@@ -83,7 +83,7 @@ function admin_start_session(array $user): void
     ];
     // A site's own role never gets the public site's edit bar (the token authorises inline edits).
     require_once dirname(__DIR__, 2) . '/includes/site_extensions.php';
-    if (!admin_role_is_site_role((string) $user['role'])) admin_bar_token_set();
+    if (!admin_role_is_site_role((string) $user['role'])) admin_bar_token_set((string) $user['role']);
 }
 
 /**
