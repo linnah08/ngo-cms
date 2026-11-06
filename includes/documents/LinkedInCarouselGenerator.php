@@ -46,13 +46,22 @@ final class LinkedInCarouselGenerator
         return $mpdf->Output('', 'S');
     }
 
-    /** Write the PDF next to the post's images; null when there are fewer than two photos. */
+    /**
+     * Where the PDFs go. Not next to the post's images: the server answers 403 for anything
+     * but an image under /assets/images/, so Buffer couldn't fetch the PDF from there
+     * ("Document could not be read from its URL"). This folder serves PDFs only.
+     */
+    public const DIR = '/assets/files/social';
+
+    /** Write the PDF where Buffer can download it; null when there are fewer than two photos. */
     public static function save(array $bg, array $en): ?string
     {
         if (count(article_photos($bg)) < 2) return null;
         $hash = substr(md5(json_encode([$bg['photos'] ?? [], $en['photos'] ?? [], $bg['image'] ?? ''])), 0, 10);
-        $path = '/assets/images/articles/linkedin-' . ascii_slug((string) ($bg['slug'] ?? 'post')) . '-' . $hash . '.pdf';
+        $path = self::DIR . '/linkedin-' . ascii_slug((string) ($bg['slug'] ?? 'post')) . '-' . $hash . '.pdf';
+        $dir  = $_SERVER['DOCUMENT_ROOT'] . self::DIR;
         $abs  = $_SERVER['DOCUMENT_ROOT'] . $path;
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return null;
         if (!is_file($abs) && file_put_contents($abs, self::build($bg, $en)) === false) return null;
         return $path;
     }

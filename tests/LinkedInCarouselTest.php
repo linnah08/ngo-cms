@@ -107,13 +107,39 @@ final class LinkedInCarouselTest extends TestCase
         foreach ([$p1, $p2] as $p) { $this->assertFileExists($_SERVER['DOCUMENT_ROOT'] . $p); unlink($_SERVER['DOCUMENT_ROOT'] . $p); }
     }
 
+    /**
+     * The live server answers 403 for anything but an image under /assets/images/, so a PDF
+     * saved there reached Buffer as "Document could not be read from its URL".
+     */
+    public function testPdfIsSavedWhereThePublicCanDownloadIt(): void
+    {
+        $a = $this->photo('a.jpg'); $b = $this->photo('b.jpg');
+        $bg = ['slug' => 'tst', 'title' => 'Т', 'image' => $a, 'photos' => [['src' => $a, 'caption' => ''], ['src' => $b, 'caption' => '']]];
+        $p = LinkedInCarouselGenerator::save($bg, []);
+        $this->assertNotNull($p);
+        $this->assertStringStartsWith('/assets/files/social/linkedin-tst-', $p);
+        $this->assertStringNotContainsString('/assets/images/', $p);
+        $this->assertFileExists($_SERVER['DOCUMENT_ROOT'] . $p);
+        unlink($_SERVER['DOCUMENT_ROOT'] . $p);
+    }
+
+    public function testThePdfFolderServesPdfsOnly(): void
+    {
+        $ht = dirname(__DIR__) . LinkedInCarouselGenerator::DIR . '/.htaccess';
+        $this->assertFileExists($ht);
+        $rules = (string) file_get_contents($ht);
+        $this->assertStringContainsString('<FilesMatch "\\.(?!pdf$)[^.]+$">', $rules);
+        $this->assertStringContainsString('Require all denied', $rules);
+        $this->assertStringContainsString('php_flag engine off', $rules);
+    }
+
     public function testSeveralPhotosGoAsOneDocument(): void
     {
         $a = $this->photo('a.jpg'); $b = $this->photo('b.jpg');
         $bg = ['slug' => 'tst', 'title' => 'Т', 'image' => $a, 'photos' => [['src' => $a, 'caption' => ''], ['src' => $b, 'caption' => '']]];
         $gql = social_linkedin_assets_gql($bg, ['title' => 'Camp "2026"']);
         $this->assertMatchesRegularExpression('#^assets: \[\{ document: \{ url: "[^"]+\.pdf", title: "Camp \\\\"2026\\\\"", thumbnailUrl: "[^"]+" \} \}\],$#', $gql);
-        foreach (glob($_SERVER['DOCUMENT_ROOT'] . '/assets/images/articles/linkedin-tst-*.pdf') as $f) unlink($f);
+        foreach (glob($_SERVER['DOCUMENT_ROOT'] . LinkedInCarouselGenerator::DIR . '/linkedin-tst-*.pdf') as $f) unlink($f);
     }
 
     public function testOnePhotoStaysAnImagePost(): void
