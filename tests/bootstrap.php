@@ -7,6 +7,8 @@ $_SERVER['REQUEST_URI']   = '/';   // makes get_lang() return 'bg'
 $_SERVER['HTTP_HOST']     = 'localhost';
 
 require_once $root . '/vendor/autoload.php';
+// Tests fake admin sessions for users that aren't in admin_users; AdminSessionRecheckTest covers the check.
+define('ADMIN_SESSION_RECHECK', false);
 
 // ── A site's own wording stays out of the tests ──────────────────────────────
 // A site checkout can have content/{bg,en}/strings.site.json, which rewords the
@@ -199,6 +201,7 @@ function run_admin_page(string $rel, array $post = [], array $opts = []): array 
         'json'   => $opts['json'] ?? null,
         'user'   => $opts['user'] ?? [],
         'globals' => $opts['globals'] ?? [],   // e.g. ['_om_pages_dir' => …]: point the page at a test's own files
+        'recheck' => $opts['recheck'] ?? false,   // true: re-read the session's user from admin_users, as on the live site
     ];
     $code = <<<'PHP'
 $s = json_decode($argv[1], true);
@@ -208,6 +211,7 @@ $_SERVER['REQUEST_URI']    = '/' . $s['rel'];
 $_SERVER['HTTP_HOST']      = 'localhost';
 $_SERVER['REMOTE_ADDR']    = $s['ip'];
 define('MAIL_DISABLED', true);   // a page under test must never mail anyone
+if (empty($s['recheck'])) define('ADMIN_SESSION_RECHECK', false);   // the session below is made up, not a real user
 $_GET  = $s['get'];
 $_POST = $s['post'];
 foreach ($s['globals'] as $k => $v) $GLOBALS[$k] = $v;

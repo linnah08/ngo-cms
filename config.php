@@ -688,6 +688,45 @@ function admin_logged_in(): bool {
         unset($_SESSION[ADMIN_SESSION_NAME]);
         return false;
     }
+    if (defined('ADMIN_SESSION_RECHECK') && !ADMIN_SESSION_RECHECK) return true;   // tests that fake a session
+    try {
+        require_once __DIR__ . '/admin/includes/db.php';
+        return admin_session_recheck(get_pdo());
+    } catch (Throwable $e) {
+        // Without the database no admin page works anyway; keep the session as it is.
+        error_log('admin_session_recheck: ' . $e->getMessage());
+        return true;
+    }
+}
+
+/**
+ * Read the signed-in user's row again, so a change takes effect on their next
+ * click instead of at their next login: a removed account is signed out, and a
+ * changed role, name or email replaces the one remembered at login. Without this
+ * a user moved to a more limited role kept their old access for as long as they
+ * stayed signed in.
+ */
+function admin_session_recheck(PDO $pdo): bool
+{
+    $sess = $_SESSION[ADMIN_SESSION_NAME] ?? [];
+    $stmt = $pdo->prepare('SELECT name, email, role FROM admin_users WHERE id = ? LIMIT 1');
+    $stmt->execute([(int) ($sess['id'] ?? 0)]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$user) {
+        unset($_SESSION[ADMIN_SESSION_NAME]);
+        if (!headers_sent()) admin_bar_token_clear();
+        return false;
+    }
+    $role_changed = (string) ($sess['role'] ?? '') !== (string) $user['role'];
+    $_SESSION[ADMIN_SESSION_NAME] = array_merge($sess, [
+        'name'  => $user['name'],
+        'email' => $user['email'],
+        'role'  => $user['role'],
+    ]);
+    if ($role_changed && !headers_sent()) {
+        // The public site's edit bar was granted for the old role; it is set again at the next login.
+        admin_bar_token_clear();
+    }
     return true;
 }
 
