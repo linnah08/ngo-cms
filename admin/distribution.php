@@ -622,9 +622,7 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
               <label for="<?= $eid ?>-n">Бележка<input type="text" id="<?= $eid ?>-n" name="notes" maxlength="1000" value="<?= h((string) $a['notes']) ?>"></label>
               <button type="submit" class="btn btn--primary">Запази</button>
             </form>
-            <?php if ($a['destination'] === 'online'): ?>
-              <p class="dist-hint" style="margin:.5rem 0 0;">Това поправя само записа. Наличността в магазина не се променя — за нея ползвайте „Поправи наличността“ горе.</p>
-            <?php endif; ?>
+            <p class="dist-hint" style="margin:.5rem 0 0;">Това поправя само записа. Наличността в магазина не се променя — за нея ползвайте „Поправи наличността“ горе.</p>
             <?php if ($a['protocol_file_path']): ?>
               <p class="dist-hint" style="margin:.5rem 0 0;">Запазването обновява протокол № <?= h($a['protocol_formatted_number']) ?> с новите данни. Ако вече е подписан, разпечатайте и подпишете новия.</p>
             <?php endif; ?>
@@ -922,12 +920,11 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
     show(sampleW, isSample);  sampleIn.required = isSample;
     show(priceW, !isSample);  priceIn.required  = !isSample;
     show(distHint, dest === 'distributor');
-    show(shopWrap, dest === 'online' || dest === 'personal' || dest === 'distributor');
     var shopNow = n ? ' (сега там: ' + n.shop + ' бр.)' : '';
     if (dest === 'online') shopText.textContent = 'Добави ги и към наличността в онлайн магазина' + shopNow;
-    if (dest === 'personal') shopText.textContent = 'Бройките са взети от онлайн магазина — извади ги от наличността там' + shopNow;
-    if (dest === 'distributor') shopText.textContent = 'Извади ги и от наличността в онлайн магазина' + shopNow;
-    if (dest !== lastDest) { shopBox.checked = dest === 'online' || dest === 'distributor'; lastDest = dest; }
+    if (dest !== 'online') shopText.textContent = 'Извади ги и от наличността в онлайн магазина' + shopNow;
+    // Ticked by default for every recipient; re-ticked when the recipient changes.
+    if (dest !== lastDest) { shopBox.checked = true; lastDest = dest; }
   }
   if (recipient) {
     recipient.addEventListener('change', refreshAlloc);

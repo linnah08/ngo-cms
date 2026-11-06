@@ -446,19 +446,6 @@ function distribution_update_batch(PDO $pdo, int $id, int $quantity, string $pro
 // ── Allocations ────────────────────────────────────────────────────────────────
 
 /**
- * Items in the 'online' records that can be taken back out: the lower of the
- * records and live shop stock (the two are kept separately and can differ),
- * never below 0.
- */
-function distribution_online_reclaimable(PDO $pdo, int $product_id, ?int $variant_id): int
-{
-    return max(0, min(
-        distribution_total_allocated($pdo, $product_id, $variant_id, 'online'),
-        distribution_online_stock($pdo, $product_id, $variant_id)
-    ));
-}
-
-/**
  * Take $quantity back out of the online shop: shrink the newest 'online'
  * records first (removing any that reach 0) and lower live shop stock by the
  * same amount. The caller checks availability and holds the transaction.
@@ -488,17 +475,13 @@ function _distribution_drain_online(PDO $pdo, int $product_id, ?int $variant_id,
 /**
  * Hand out stock of an item.
  *
- * $use_shop_stock is the per-entry checkbox on the form and means:
- *   - 'online':   also add the items to live shop stock (they are now for sale);
- *   - 'personal': the items sold in person came off the shop shelf — move them
- *                 out of the 'online' records and live stock instead of taking
- *                 them from the unallocated pool;
- *   - 'distributor': ticked by default — the items leave the shop's stock too
- *                 (lower live stock; whatever the 'online' records don't cover
- *                 comes from the unallocated pool);
- *   - ignored for 'sample'.
- * A 'sample' takes what it can from the unallocated pool and the rest, without
- * asking, from the shop (a given-away item has physically left either way).
+ * $use_shop_stock is the per-entry checkbox on the form (ticked by default for
+ * every destination) and means:
+ *   - 'online': also add the items to live shop stock (they are now for sale);
+ *   - 'distributor', 'personal', 'sample': the items came off the shop shelf —
+ *     live stock goes down by all of them; the 'online' records cover what they
+ *     can and the unallocated pool the rest.
+ * Unticked, every destination takes from the unallocated pool only.
  *
  * Does NOT issue the protocol for a distributor — see distribution_issue_protocol().
  *
@@ -538,7 +521,6 @@ function distribution_create_allocation(
     if ($destination === 'sample') $unit_price_eur = 0.0;
     if ($destination !== 'sample' && $unit_price_eur <= 0) return ['ok' => false, 'error' => 'Цената за брой трябва да е по-голяма от 0.'];
 
-    $use_shop_stock = $use_shop_stock && in_array($destination, ['online', 'personal', 'distributor'], true);
 
     return _distribution_tx($pdo, function () use (
         $pdo, $product_id, $variant_id, $destination, $distributor_id, $quantity,
@@ -547,24 +529,13 @@ function distribution_create_allocation(
         _distribution_lock_product($pdo, $product_id);
         $available = distribution_available($pdo, $product_id, $variant_id);
 
-        $from_shop = 0;
-        if ($destination === 'personal' && $use_shop_stock) {
-            // Reclassifying shop stock as sold in person — the pool is untouched.
-            $in_records = distribution_total_allocated($pdo, $product_id, $variant_id, 'online');
-            if ($quantity > $in_records) {
-                return ['ok' => false, 'error' => "Към онлайн магазина са записани само {$in_records} бр. — не може да прехвърлите {$quantity} бр. от там. Махнете отметката, ако бройките не са от магазина."];
-            }
-            $live = distribution_online_stock($pdo, $product_id, $variant_id);
-            if ($quantity > $live) {
-                return ['ok' => false, 'error' => "В магазина в момента има само {$live} бр. — не може да извадите {$quantity} бр. Първо поправете наличността в магазина (горе, „Наличност в магазина сега“)."];
-            }
-            $from_shop = $quantity;
-        } elseif ($destination === 'distributor' && $use_shop_stock) {
-            // The packs come off the shop shelf: live stock goes down by all of
+        if ($use_shop_stock && $destination !== 'online') {
+            // The items come off the shop shelf: live stock goes down by all of
             // them; the 'online' records cover what they can, the pool the rest.
+            // Same rule for a distributor, a sale in person and a free sample.
             $live = distribution_online_stock($pdo, $product_id, $variant_id);
             if ($quantity > $live) {
-                return ['ok' => false, 'error' => "В магазина в момента има само {$live} бр. — не може да извадите {$quantity} бр. Махнете отметката, ако бройките не са от магазина, или първо поправете наличността в магазина."];
+                return ['ok' => false, 'error' => "В магазина в момента има само " . max(0, $live) . " бр. — не може да извадите {$quantity} бр. Махнете отметката, ако бройките не са от магазина, или първо поправете наличността в магазина (горе, „Поправи наличността“)."];
             }
             $in_records = distribution_total_allocated($pdo, $product_id, $variant_id, 'online');
             $from_pool  = $quantity - min($quantity, $in_records);
@@ -573,20 +544,10 @@ function distribution_create_allocation(
             }
             _distribution_drain_online($pdo, $product_id, $variant_id, $quantity - $from_pool);
             if ($from_pool > 0) distribution_adjust_online_stock($pdo, $product_id, $variant_id, -$from_pool);
-        } elseif ($destination === 'sample') {
-            $from_shop = max(0, $quantity - max(0, $available));
-            if ($from_shop > 0) {
-                $reclaimable = distribution_online_reclaimable($pdo, $product_id, $variant_id);
-                if ($from_shop > $reclaimable) {
-                    $free = max(0, $available);
-                    return ['ok' => false, 'error' => "Няма достатъчно бройки за {$quantity} бр. мостри. Неразпределени: {$free} бр., в магазина: {$reclaimable} бр."];
-                }
-            }
         } elseif ($quantity > $available) {
-            return ['ok' => false, 'error' => 'Няма толкова неразпределени бройки. Налични: ' . max(0, $available) . ' бр. Добавете партида, ако има нова стока.'];
+            $hint = $destination === 'online' ? '' : ' Ако бройките са взети от онлайн магазина, сложете отметката „Извади ги и от наличността в онлайн магазина“.';
+            return ['ok' => false, 'error' => 'Няма толкова неразпределени бройки. Налични: ' . max(0, $available) . ' бр. Добавете партида, ако има нова стока.' . $hint];
         }
-
-        _distribution_drain_online($pdo, $product_id, $variant_id, $from_shop);
 
         $pdo->prepare(
             'INSERT INTO distribution_allocations

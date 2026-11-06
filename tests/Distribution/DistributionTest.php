@@ -273,22 +273,46 @@ final class DistributionTest extends TestCase
         $this->assertSame(31, distribution_online_stock(self::$pdo, $pid, null));
     }
 
-    public function testSampleUsesPoolFirstThenShop(): void
+    public function testSampleComesOffTheShopWhenTicked(): void
     {
         $pid = $this->product();
         $this->batch($pid, 10);
         $this->assertTrue($this->alloc($pid, 'online', 8, ['shop' => true])['ok']); // pool 2, shop 8
 
-        $this->assertFalse($this->alloc($pid, 'sample', 2)['ok'], 'needs a recipient');
-        $this->assertFalse($this->alloc($pid, 'sample', 11, ['recipient' => 'Училище'])['ok'], 'pool 2 + shop 8 < 11');
+        $this->assertFalse($this->alloc($pid, 'sample', 2, ['shop' => true])['ok'], 'needs a recipient');
+        $r = $this->alloc($pid, 'sample', 9, ['recipient' => 'Училище', 'shop' => true]);
+        $this->assertFalse($r['ok'], 'the shop holds only 8');
+        $this->assertStringContainsString('само 8', $r['error']);
 
-        $r = $this->alloc($pid, 'sample', 5, ['recipient' => 'Училище', 'price' => 99]);
+        // Ticked: the samples leave the shop even though the pool has some.
+        $r = $this->alloc($pid, 'sample', 5, ['recipient' => 'Училище', 'price' => 99, 'shop' => true]);
         $this->assertTrue($r['ok']);
-        $this->assertSame(0, distribution_available(self::$pdo, $pid, null));
-        $this->assertSame(5, distribution_online_stock(self::$pdo, $pid, null));
+        $this->assertSame(3, distribution_online_stock(self::$pdo, $pid, null), 'shop count goes down by the samples');
+        $this->assertSame(3, distribution_total_allocated(self::$pdo, $pid, null, 'online'));
+        $this->assertSame(2, distribution_available(self::$pdo, $pid, null), 'pool untouched');
         $row = self::$pdo->query('SELECT unit_price_eur, sample_recipient FROM distribution_allocations WHERE id = ' . (int) $r['id'])->fetch();
         $this->assertSame(0.0, (float) $row['unit_price_eur'], 'samples are free');
         $this->assertSame('Училище', $row['sample_recipient']);
+
+        // Unticked: pool only, shop untouched — and too many says so plainly.
+        $this->assertTrue($this->alloc($pid, 'sample', 2, ['recipient' => 'Читалище'])['ok']);
+        $this->assertSame(3, distribution_online_stock(self::$pdo, $pid, null));
+        $r = $this->alloc($pid, 'sample', 1, ['recipient' => 'Читалище']);
+        $this->assertFalse($r['ok']);
+        $this->assertStringContainsString('отметката', $r['error']);
+    }
+
+    public function testSampleAndPersonalComeOffShopStockKeptByHand(): void
+    {
+        // Shop stock typed in on the product, nothing recorded as sent to the shop:
+        // the items still leave the shop count, and the pool covers the records.
+        $pid = $this->product(12);
+        $this->batch($pid, 20);
+
+        $this->assertTrue($this->alloc($pid, 'sample', 3, ['recipient' => 'Партньор', 'shop' => true])['ok']);
+        $this->assertTrue($this->alloc($pid, 'personal', 4, ['shop' => true])['ok']);
+        $this->assertSame(5, distribution_online_stock(self::$pdo, $pid, null));
+        $this->assertSame(13, distribution_available(self::$pdo, $pid, null));
     }
 
     public function testUpdateAllocationLimits(): void
