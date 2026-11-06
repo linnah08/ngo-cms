@@ -186,6 +186,43 @@ final class DistributionTest extends TestCase
         $this->assertSame(10, $sum['total']['available']);
     }
 
+    public function testSummarySplitsProducedIntoSoldDistributorsRemainingAndSamples(): void
+    {
+        $pid = $this->product(0, 'variant');
+        $a   = $this->variant($pid, 'A');
+        $b   = $this->variant($pid, 'B');
+        $d   = $this->distributor();
+        $this->batch($pid, 100, $a);
+        $this->batch($pid, 20, $b);
+
+        $this->assertTrue($this->alloc($pid, 'distributor', 15, ['variant' => $a, 'distributor' => $d])['ok']);
+        $this->assertTrue($this->alloc($pid, 'online', 40, ['variant' => $a, 'shop' => true])['ok']);
+        $this->assertTrue($this->alloc($pid, 'personal', 12, ['variant' => $a])['ok']);
+        $this->assertTrue($this->alloc($pid, 'sample', 3, ['variant' => $a, 'recipient' => 'Училище'])['ok']);
+        $this->assertTrue(distribution_record_sale(self::$pdo, $d, $pid, $a, 6, '2026-03-01', false)['ok']);
+        // Checkout (orders, tickets…) takes 9 off the shelf.
+        distribution_adjust_online_stock(self::$pdo, $pid, $a, -9);
+
+        $s = distribution_item_summary(self::$pdo, $pid, $a);
+        $this->assertSame(9, $s['sold_online']);
+        $this->assertSame(6 + 12 + 9, $s['sold']);
+        $this->assertSame(15 - 6, $s['with_distributors']);
+        $this->assertSame(30 + 31, $s['remaining'], 'unallocated 30 + 31 still in the shop');
+        $this->assertSame(0, $s['shop_surplus']);
+        $this->assertSame(100, $s['sold'] + $s['with_distributors'] + $s['remaining'] + $s['to_samples']);
+
+        // Stock typed straight into the shop, with no 'online' record behind it.
+        distribution_set_online_stock(self::$pdo, $pid, $b, 5);
+        $s = distribution_item_summary(self::$pdo, $pid, $b);
+        $this->assertSame(0, $s['sold_online'], 'never negative');
+        $this->assertSame(5, $s['shop_surplus']);
+        $this->assertSame(25, $s['remaining']);
+
+        $sum = distribution_product_summary(self::$pdo, distribution_product(self::$pdo, $pid));
+        $this->assertSame(27, $sum['total']['sold']);
+        $this->assertSame(86, $sum['total']['remaining']);
+    }
+
     // ── allocations ────────────────────────────────────────────────────────────
 
     public function testDistributorAllocationChecksPoolAndDistributor(): void

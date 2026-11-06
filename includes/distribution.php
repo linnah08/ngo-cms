@@ -226,8 +226,21 @@ function distribution_shop_ordered_qty(PDO $pdo, int $product_id, ?int $variant_
 /**
  * Every figure of one item's ledger.
  *
+ * The four headline numbers split everything produced:
+ *   produced = sold + with_distributors + remaining + to_samples
+ * where
+ *   sold              = distributors' reported sales + sold in person + sold_online
+ *   sold_online       = sent to the shop − still in the shop: website orders,
+ *                       tickets and anything else checkout took off live stock
+ *   with_distributors = handed to distributors − what they reported sold
+ *   remaining         = unallocated + still in the shop (what the NGO still has)
+ * shop_surplus is how many more items the shop holds than its 'online' records
+ * cover (stock typed in by hand); then the split adds up to more than produced.
+ *
  * @return array{produced:int, to_distributors:int, to_online:int, to_personal:int,
- *               to_samples:int, available:int, online_stock:int, shop_ordered:int}
+ *               to_samples:int, available:int, online_stock:int, shop_ordered:int,
+ *               distributor_sold:int, sold_online:int, sold:int,
+ *               with_distributors:int, remaining:int, shop_surplus:int}
  */
 function distribution_item_summary(PDO $pdo, int $product_id, ?int $variant_id): array
 {
@@ -239,15 +252,29 @@ function distribution_item_summary(PDO $pdo, int $product_id, ?int $variant_id):
     foreach ($stmt->fetchAll(PDO::FETCH_KEY_PAIR) as $dest => $sum) {
         $by_dest[$dest] = (int) $sum;
     }
+    $stmt = $pdo->prepare("SELECT COALESCE(SUM(quantity), 0) FROM distribution_sales WHERE $where");
+    $stmt->execute($params);
+    $distributor_sold = (int) $stmt->fetchColumn();
+
+    $available    = $produced - array_sum($by_dest);
+    $online_stock = distribution_online_stock($pdo, $product_id, $variant_id);
+    $sold_online  = max(0, $by_dest['online'] - $online_stock);
+
     return [
-        'produced'        => $produced,
-        'to_distributors' => $by_dest['distributor'],
-        'to_online'       => $by_dest['online'],
-        'to_personal'     => $by_dest['personal'],
-        'to_samples'      => $by_dest['sample'],
-        'available'       => $produced - array_sum($by_dest),
-        'online_stock'    => distribution_online_stock($pdo, $product_id, $variant_id),
-        'shop_ordered'    => distribution_shop_ordered_qty($pdo, $product_id, $variant_id),
+        'produced'          => $produced,
+        'to_distributors'   => $by_dest['distributor'],
+        'to_online'         => $by_dest['online'],
+        'to_personal'       => $by_dest['personal'],
+        'to_samples'        => $by_dest['sample'],
+        'available'         => $available,
+        'online_stock'      => $online_stock,
+        'shop_ordered'      => distribution_shop_ordered_qty($pdo, $product_id, $variant_id),
+        'distributor_sold'  => $distributor_sold,
+        'sold_online'       => $sold_online,
+        'sold'              => $distributor_sold + $by_dest['personal'] + $sold_online,
+        'with_distributors' => $by_dest['distributor'] - $distributor_sold,
+        'remaining'         => max(0, $available) + max(0, $online_stock),
+        'shop_surplus'      => max(0, $online_stock - $by_dest['online']),
     ];
 }
 
