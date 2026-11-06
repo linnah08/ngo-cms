@@ -803,7 +803,11 @@ document.getElementById('pvBody').addEventListener('click', function (e) {
   if (!photo || !row) return;
   var data = pvGet(row);
   var fn   = photo.dataset.fn;
-  if (star) { data.primary = fn; }
+  if (star) {
+    // The main photo moves to the front, so the strip order is the order customers see.
+    data.primary = fn;
+    data.images = [fn].concat((data.images || []).filter(function (f) { return f !== fn; }));
+  }
   else if (del) { data.images = (data.images || []).filter(function (f) { return f !== fn; }); }
   pvSet(row, data);
 });

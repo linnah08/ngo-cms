@@ -992,7 +992,10 @@ document.getElementById('tagsInput').addEventListener('input', function () {
     var b = e.target.closest('button'); if (!b) return;
     var row = b.closest('.ap-photo'), rs = rows(), i = rs.indexOf(row);
     if (b.classList.contains('ap-main')) {
-      setMain(row); sync(); say('Снимка ' + (i + 1) + ' е основна');
+      // The main photo moves to the front, so the order on screen is the order readers see.
+      if (i > 0) grid.insertBefore(row, rs[0]);
+      setMain(row); sync(); b.focus();
+      say(i > 0 ? 'Снимка ' + (i + 1) + ' е основна и е преместена на първо място' : 'Снимка 1 е основна');
     } else if (b.classList.contains('ap-up') && i > 0) {
       grid.insertBefore(row, rs[i - 1]); sync(); b.focus(); say('Снимка е преместена на място ' + i);
     } else if (b.classList.contains('ap-down') && i < rs.length - 1) {

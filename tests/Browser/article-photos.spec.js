@@ -54,14 +54,16 @@ test('English captions stay with their photos through main, move and remove', as
   expect(await enCaps(page)).toEqual(['One', 'Two', 'Three']);
 
   await page.getByRole('button', { name: 'Направи снимка 2 основна' }).click();
-  expect(await enCaps(page)).toEqual(['One', 'Two', 'Three']);
+  // The main photo moves to the front, and its captions go with it.
+  expect(await bgCaps(page)).toEqual(['Две', 'Едно', 'Три']);
+  expect(await enCaps(page)).toEqual(['Two', 'One', 'Three']);
 
   await page.getByRole('button', { name: 'Премести снимка 3 нагоре' }).click();
-  expect(await bgCaps(page)).toEqual(['Едно', 'Три', 'Две']);
-  expect(await enCaps(page)).toEqual(['One', 'Three', 'Two']);
+  expect(await bgCaps(page)).toEqual(['Две', 'Три', 'Едно']);
+  expect(await enCaps(page)).toEqual(['Two', 'Three', 'One']);
 
   await page.getByRole('button', { name: 'Премахни снимка 1' }).click();
-  expect(await enCaps(page)).toEqual(['Three', 'Two']);
+  expect(await enCaps(page)).toEqual(['Three', 'One']);
 });
 
 test('the main photo is visibly marked and follows the choice', async ({ page }) => {
@@ -69,19 +71,24 @@ test('the main photo is visibly marked and follows the choice', async ({ page })
   const cards = page.locator('#apGrid .ap-photo');
   await expect(cards.nth(0).locator('.ap-main')).toHaveText(/Основна снимка/);
   await page.getByRole('button', { name: 'Направи снимка 3 основна' }).click();
-  await expect(cards.nth(2).locator('.ap-main')).toHaveText(/Основна снимка/);
-  await expect(cards.nth(0).locator('.ap-main')).toHaveText('Направи основна');
-  const border = await cards.nth(2).evaluate((el) => getComputedStyle(el).borderTopWidth);
+  // It moves to the leftmost spot, so it is clearly the first photo shown.
+  await expect(cards.nth(0).locator('img')).toHaveAttribute('src', src(3));
+  await expect(cards.nth(0).locator('.ap-main')).toHaveText(/Основна снимка/);
+  await expect(cards.nth(1).locator('.ap-main')).toHaveText('Направи основна');
+  await expect(page.locator('#apMain')).toHaveValue('0');
+  await expect(cards.nth(0).locator('.ap-main')).toBeFocused();
+  const border = await cards.nth(0).evaluate((el) => getComputedStyle(el).borderTopWidth);
   expect(border).toBe('3px');
 });
 
 test('removing the main photo makes the next one main', async ({ page }) => {
   await page.goto('/admin/article-edit.php?slug=' + SLUG);
   await page.getByRole('button', { name: 'Направи снимка 2 основна' }).click();
-  await page.getByRole('button', { name: 'Премахни снимка 2' }).click();
-  // The old photo 3 is now photo 2 and becomes main.
-  await expect(page.locator('#apGrid .ap-photo').nth(1).locator('.ap-main')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('#apMain')).toHaveValue('1');
+  // Photo 2 is now first; removing it makes the next one (old photo 1) main.
+  await page.getByRole('button', { name: 'Премахни снимка 1' }).click();
+  await expect(page.locator('#apGrid .ap-photo').nth(0).locator('.ap-main')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#apGrid .ap-photo').nth(0).locator('img')).toHaveAttribute('src', src(1));
+  await expect(page.locator('#apMain')).toHaveValue('0');
 });
 
 test('dropping a photo does not let the browser navigate away', async ({ page }) => {
