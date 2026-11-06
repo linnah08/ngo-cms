@@ -1,7 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/auth.php';
-admin_require_login();
+admin_require_admin();   // the same people as Админ → Партньори
 
 header('Content-Type: application/json');
 

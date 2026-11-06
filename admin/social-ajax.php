@@ -33,7 +33,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/social_images.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/buffer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/articles.php';
-admin_require_login();
+admin_require_editorial();   // the same people as the article editor that calls it: admin or author
 module_ajax_guard('social');
 
 header('Content-Type: application/json; charset=UTF-8');
