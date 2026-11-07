@@ -74,6 +74,18 @@ define('GOOGLE_ADS_PURCHASE_LABEL', '');  // add-to-cart conversion label
 // it on invoices and the legal pages (a card acquirer requires one published).
 // define('SITE_PHONE_PUBLIC', false);
 
+// ── Shared stock (optional) ───────────────────────────────────────────────────
+// Sell items whose stock another site on the same MySQL server keeps, so both
+// shops sell from one count. Map this site's product / variant ids to the other
+// site's; this site's database user needs SELECT and UPDATE on that database.
+// If it can't be reached, those items show as sold out. See includes/shared_stock.php.
+// define('SHARED_STOCK', [
+//     'db'       => 'other_site_db',
+//     'name'     => 'example.org',
+//     'products' => [],          // this site's product id => the other site's
+//     'variants' => [41 => 8],   // this site's variant id => the other site's
+// ]);
+
 // ── Optional feature modules ──────────────────────────────────────────────────
 // Initial values only: an admin switches these on and off in Admin → Модули,
 // and once that page is saved its choice wins over the lines below. A missing

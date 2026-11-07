@@ -16,6 +16,8 @@
  * stopped at zero.
  */
 
+require_once __DIR__ . '/shared_stock.php';
+
 /**
  * Product lines of an order that hold stock.
  *
@@ -79,13 +81,7 @@ function order_return_stock(PDO $pdo, array $order): bool
         if ($claim->rowCount() === 0) return false;
 
         foreach ($lines as $l) {
-            if ($l['variant_id'] > 0) {
-                $pdo->prepare('UPDATE product_variants SET stock = stock + ? WHERE id = ? AND product_id = ?')
-                    ->execute([$l['quantity'], $l['variant_id'], $l['product_id']]);
-            } else {
-                $pdo->prepare('UPDATE products SET stock = stock + ? WHERE id = ?')
-                    ->execute([$l['quantity'], $l['product_id']]);
-            }
+            stock_move($pdo, $l['product_id'], $l['variant_id'] ?: null, $l['quantity']);
         }
         return true;
     });
@@ -113,30 +109,11 @@ function order_take_stock_again(PDO $pdo, array $order, bool $allow_short = fals
 
         $short = [];
         foreach ($lines as $l) {
-            $q = $l['quantity'];
-            if ($l['preorder']) {
-                // Same as checkout: pre-order stock is allowed to go negative.
-                if ($l['variant_id'] > 0) {
-                    $pdo->prepare('UPDATE product_variants SET stock = stock - ? WHERE id = ? AND product_id = ?')
-                        ->execute([$q, $l['variant_id'], $l['product_id']]);
-                } else {
-                    $pdo->prepare('UPDATE products SET stock = stock - ? WHERE id = ?')
-                        ->execute([$q, $l['product_id']]);
-                }
-                continue;
+            // Same as checkout: pre-order stock is allowed to go negative.
+            $mode = $l['preorder'] ? 'free' : ($allow_short ? 'floor' : 'guard');
+            if (!stock_move($pdo, $l['product_id'], $l['variant_id'] ?: null, -$l['quantity'], $mode) && $mode === 'guard') {
+                $short[] = $l['name'];
             }
-            if ($l['variant_id'] > 0) {
-                $stmt = $allow_short
-                    ? $pdo->prepare('UPDATE product_variants SET stock = GREATEST(stock - ?, 0) WHERE id = ? AND product_id = ?')
-                    : $pdo->prepare('UPDATE product_variants SET stock = stock - ? WHERE id = ? AND product_id = ? AND stock >= ?');
-                $stmt->execute($allow_short ? [$q, $l['variant_id'], $l['product_id']] : [$q, $l['variant_id'], $l['product_id'], $q]);
-            } else {
-                $stmt = $allow_short
-                    ? $pdo->prepare('UPDATE products SET stock = GREATEST(stock - ?, 0) WHERE id = ?')
-                    : $pdo->prepare('UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?');
-                $stmt->execute($allow_short ? [$q, $l['product_id']] : [$q, $l['product_id'], $q]);
-            }
-            if (!$allow_short && $stmt->rowCount() === 0) $short[] = $l['name'];
         }
         if ($short) throw new OrderStockShortException($short);
         return [];

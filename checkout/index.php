@@ -5,6 +5,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/shared_stock.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/site_extensions.php';   // donation recipients
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/form_validation.php';
 start_session();
@@ -437,22 +438,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $p = $row['product'];
                 // A pre-order line skips the "enough stock" guard: its stock goes
                 // below zero, and that is the count of pre-ordered items still owed.
-                $guard = !empty($row['preorder']) ? '' : ' AND stock >= ?';
-                if ($p['type'] === 'variant' && !empty($row['variant_id'])) {
-                    $args = [$row['quantity'], $row['variant_id'], $p['id']];
-                    if ($guard) $args[] = $row['quantity'];
-                    $pdo->prepare(
-                        'UPDATE product_variants SET stock = stock - ? WHERE id = ? AND product_id = ?' . $guard
-                    )->execute($args);
-                } else {
-                    $args = [$row['quantity'], $p['id']];
-                    if ($guard) $args[] = $row['quantity'];
-                    $pdo->prepare(
-                        'UPDATE products SET stock = stock - ? WHERE id = ?' . $guard
-                    )->execute($args);
-                }
-                $affected = $pdo->query('SELECT ROW_COUNT()')->fetchColumn();
-                if ((int)$affected === 0) {
+                $variant_id = $p['type'] === 'variant' && !empty($row['variant_id']) ? (int)$row['variant_id'] : null;
+                $taken = stock_move($pdo, (int)$p['id'], $variant_id, -(int)$row['quantity'], !empty($row['preorder']) ? 'free' : 'guard');
+                if (!$taken) {
                     throw new RuntimeException(t_or('checkout.err.out_of_stock', '{name} вече не е в наличност.', '{name} is no longer in stock.', $order_lang, [
                         'name' => $order_lang === 'en' ? ($p['name_en'] ?: $p['name_bg']) : $p['name_bg'],
                     ]));

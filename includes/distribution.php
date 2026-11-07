@@ -28,6 +28,8 @@ declare(strict_types=1);
  * Bulgarian message meant to be shown to the admin as-is.
  */
 
+require_once __DIR__ . '/shared_stock.php';
+
 const DISTRIBUTION_DESTINATIONS = ['distributor', 'online', 'personal', 'sample'];
 
 /**
@@ -180,13 +182,7 @@ function distribution_online_stock(PDO $pdo, int $product_id, ?int $variant_id):
 /** Move live shop stock of an item by $delta (positive adds, negative removes). */
 function distribution_adjust_online_stock(PDO $pdo, int $product_id, ?int $variant_id, int $delta): void
 {
-    if ($delta === 0) return;
-    if ($variant_id) {
-        $pdo->prepare('UPDATE product_variants SET stock = stock + ? WHERE id = ? AND product_id = ?')
-            ->execute([$delta, $variant_id, $product_id]);
-    } else {
-        $pdo->prepare('UPDATE products SET stock = stock + ? WHERE id = ?')->execute([$delta, $product_id]);
-    }
+    stock_move($pdo, $product_id, $variant_id, $delta);
 }
 
 /**

@@ -15,5 +15,10 @@ function get_pdo(): PDO
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES   => false,
     ]);
+    // Products whose stock another site keeps: refresh their count once per request.
+    if (defined('SHARED_STOCK')) {
+        require_once dirname(__DIR__, 2) . '/includes/shared_stock.php';
+        shared_stock_sync($pdo);
+    }
     return $pdo;
 }

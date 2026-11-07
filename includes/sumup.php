@@ -21,6 +21,7 @@
  */
 
 require_once __DIR__ . '/settings.php';
+require_once __DIR__ . '/shared_stock.php';
 
 const SUMUP_API_BASE = 'https://api.sumup.com';
 /** The nightly check looks back this much before the last check, in case SumUp records a sale late. */
@@ -226,13 +227,7 @@ function sumup_name_map(PDO $pdo): array
  */
 function sumup_stock_move(PDO $pdo, int $product_id, ?int $variant_id, int $delta): void
 {
-    if ($variant_id) {
-        $pdo->prepare('UPDATE product_variants SET stock = GREATEST(stock + ?, 0) WHERE id = ? AND product_id = ?')
-            ->execute([$delta, $variant_id, $product_id]);
-    } else {
-        $pdo->prepare('UPDATE products SET stock = GREATEST(stock + ?, 0) WHERE id = ?')
-            ->execute([$delta, $product_id]);
-    }
+    stock_move($pdo, $product_id, $variant_id, $delta, 'floor');
 }
 
 /** Does any line still wait for the admin? A sale with no lines at all does. */

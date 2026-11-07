@@ -7,6 +7,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/payment_errors.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/shared_stock.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/signer.php';   // who signs certificates (also for a site that kept an older config.php)
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/DSKBankPayment.php';
@@ -255,11 +256,10 @@ function reduce_icebreaker_stock(PDO $pdo, array $pledge): void
     }
     if ($qty <= 0) return;
 
-    $stmt = $pdo->prepare(
-        'UPDATE product_variants SET stock = stock - ? WHERE id = ? AND stock >= ?'
-    );
-    $stmt->execute([$qty, ICEBREAKER_VARIANT_ID, $qty]);
-    if ($stmt->rowCount() === 0) {
+    $variant = $pdo->prepare('SELECT product_id FROM product_variants WHERE id = ?');
+    $variant->execute([(int)ICEBREAKER_VARIANT_ID]);
+    $product_id = (int)$variant->fetchColumn();
+    if (!$product_id || !stock_move($pdo, $product_id, (int)ICEBREAKER_VARIANT_ID, -$qty, 'guard')) {
         error_log("reduce_icebreaker_stock: insufficient stock for pledge {$pledge['pledge_number']}, wanted {$qty}");
     }
 }

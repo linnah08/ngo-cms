@@ -5,6 +5,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/translator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/distribution.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/shared_stock.php';
 
 admin_require_shop();
 module_admin_guard('shop');
@@ -111,6 +112,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$errors) {
+        // Stock another site keeps: what it was before this save, so only the
+        // change made here reaches it (see shared_stock_after_edit()).
+        $shared_before = $is_new ? [] : shared_stock_snapshot($pdo, $id);
         if ($is_new) {
             // New products go to the end of the shop ordering.
             $next_sort = (int)$pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM products')->fetchColumn();
@@ -164,7 +168,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Stay in the editor after saving (reviews, preview and the next edit are
         // right here); "← Назад" still leads to the list.
-        flash_set('success', 'Продуктът е запазен.');
+        if (shared_stock_after_edit($pdo, $saved_id, $shared_before)) {
+            flash_set('success', 'Продуктът е запазен.');
+        } else {
+            $shared_name = shared_stock_config()['name'] ?? '';
+            flash_set('error', 'Продуктът е запазен, но новата наличност не стигна до ' . ($shared_name ?: 'другия сайт')
+                . ', защото връзката с него не проработи. Наличността там е непроменена — опитайте пак след малко.');
+        }
         header('Location: /admin/product-edit.php?id=' . (int) $saved_id . '&_asclear=' . urlencode('product:' . ($id ?: 'new')));
         exit;
     }
@@ -252,6 +262,15 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </label>
     <small style="color:var(--text-muted);">Auto-generated from name. Edit if needed. Only a-z, 0-9, hyphens.</small>
   </div>
+
+  <?php $shared_items = shared_stock_snapshot($pdo, (int)$product['id']); ?>
+  <?php if ($shared_items): $shared_name = shared_stock_config()['name'] ?: 'друг сайт'; ?>
+  <p role="note" style="margin:1rem 0 0;padding:.75rem 1rem;border-left:4px solid #2563eb;background:#eff6ff;color:#1e3a8a;border-radius:6px;font-size:.875rem;line-height:1.5;">
+    <strong>Обща наличност с <?= h($shared_name) ?>.</strong>
+    <?= count($shared_items) === 1 && isset($shared_items[0]) ? 'Наличността на този продукт' : 'Наличността на вариантите, отбелязани с „обща“,' ?>
+    е едно число за двата сайта: продажба в който и да е от тях го намалява, а промяна тук важи и там.
+  </p>
+  <?php endif; ?>
 
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-top:1rem;">
     <label style="font-size:.875rem;font-weight:600;">Цена (EUR) *
@@ -575,6 +594,7 @@ if (($product['type'] ?? '') === 'variant' && !$is_new) {
             <td style="padding:.4rem .5rem;vertical-align:middle;">
               <input type="number" name="pv_stock[]" value="<?= (int)$pvr['stock'] ?>" <?= !empty($product['preorder_enabled']) ? '' : 'min="0"' ?>
                      style="width:70px;padding:.35rem .5rem;border:1px solid var(--border);border-radius:4px;font-size:.85rem;">
+              <?php if (isset($shared_items[(int)$pvr['id']])): ?><span style="display:block;font-size:.75rem;color:#1e3a8a;">обща</span><?php endif; ?>
             </td>
             <td style="padding:.4rem .5rem;vertical-align:middle;text-align:center;">
               <button type="button" onclick="removePvRow(this)" aria-label="Премахни варианта"
