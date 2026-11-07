@@ -14,6 +14,10 @@
  *       'variants' => [41 => 8],       // this site's variant id => the home site's variant id
  *   ]);
  *
+ * When the two sites set an item up differently — a product of its own on one,
+ * a variant on the other — name the other kind: 'products' => [2 => ['variant' => 10]]
+ * or 'variants' => [41 => ['product' => 3]].
+ *
  * This site's database user needs SELECT and UPDATE on the home database. The
  * home site needs nothing: to it, the other site's sales are stock changes.
  *
@@ -30,25 +34,33 @@ require_once __DIR__ . '/error-alerts.php';
 /**
  * The SHARED_STOCK setting, checked. Tests set $GLOBALS['_shared_stock_config'].
  *
- * @return array{db:string, name:string, products:array<int,int>, variants:array<int,int>}|null
+ * 'products' / 'variants' come back keyed by this site's id, each pointing at
+ * ['table' => 'products'|'product_variants', 'id' => the home site's id].
+ *
+ * @return array{db:string, name:string, products:array<int,array{table:string,id:int}>, variants:array<int,array{table:string,id:int}>}|null
  */
 function shared_stock_config(): ?array
 {
     $c = $GLOBALS['_shared_stock_config'] ?? (defined('SHARED_STOCK') ? SHARED_STOCK : null);
     if (!is_array($c) || !preg_match('/^[A-Za-z0-9_]{1,64}$/', (string)($c['db'] ?? ''))) return null;
 
-    $ids = function ($map): array {
+    $ids = function ($map, string $same_table): array {
         $out = [];
         foreach ((array)$map as $local => $home) {
-            if ((int)$local > 0 && (int)$home > 0) $out[(int)$local] = (int)$home;
+            $table = $same_table;
+            if (is_array($home)) {
+                $table = isset($home['variant']) ? 'product_variants' : 'products';
+                $home  = $home['variant'] ?? $home['product'] ?? 0;
+            }
+            if ((int)$local > 0 && (int)$home > 0) $out[(int)$local] = ['table' => $table, 'id' => (int)$home];
         }
         return $out;
     };
     return [
         'db'       => $c['db'],
         'name'     => trim((string)($c['name'] ?? '')),
-        'products' => $ids($c['products'] ?? []),
-        'variants' => $ids($c['variants'] ?? []),
+        'products' => $ids($c['products'] ?? [], 'products'),
+        'variants' => $ids($c['variants'] ?? [], 'product_variants'),
     ];
 }
 
@@ -59,8 +71,7 @@ function _shared_stock_target(int $product_id, ?int $variant_id): ?array
     if (!$c) return null;
     $home = $variant_id ? ($c['variants'][$variant_id] ?? null) : ($c['products'][$product_id] ?? null);
     if (!$home) return null;
-    $table = $variant_id ? 'product_variants' : 'products';
-    return ['local' => $table, 'home' => "`{$c['db']}`.`$table`", 'id' => $home];
+    return ['home' => "`{$c['db']}`.`{$home['table']}`", 'id' => $home['id']];
 }
 
 /** Is this item's stock kept by the other site? */
@@ -133,8 +144,8 @@ function shared_stock_sync(PDO $pdo): void
     try {
         foreach (['product_variants' => $c['variants'], 'products' => $c['products']] as $table => $map) {
             foreach ($map as $local => $home) {
-                $pdo->prepare("UPDATE `$table` l JOIN `{$c['db']}`.`$table` h ON h.id = ? SET l.stock = h.stock WHERE l.id = ? AND l.stock <> h.stock")
-                    ->execute([$home, $local]);
+                $pdo->prepare("UPDATE `$table` l JOIN `{$c['db']}`.`{$home['table']}` h ON h.id = ? SET l.stock = h.stock WHERE l.id = ? AND l.stock <> h.stock")
+                    ->execute([$home['id'], $local]);
             }
         }
     } catch (PDOException $e) {

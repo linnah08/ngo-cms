@@ -85,6 +85,7 @@ define('GOOGLE_ADS_PURCHASE_LABEL', '');  // add-to-cart conversion label
 //     'products' => [],          // this site's product id => the other site's
 //     'variants' => [41 => 8],   // this site's variant id => the other site's
 // ]);
+// A product here that is a variant there: 'products' => [2 => ['variant' => 10]].
 
 // ── Optional feature modules ──────────────────────────────────────────────────
 // Initial values only: an admin switches these on and off in Admin → Модули,

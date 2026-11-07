@@ -90,7 +90,23 @@ final class SharedStockTest extends TestCase
         $GLOBALS['_shared_stock_config'] = ['db' => 'x`; DROP TABLE orders; --', 'variants' => [1 => 2]];
         $this->assertNull(shared_stock_config());
         $GLOBALS['_shared_stock_config'] = ['db' => 'site_db', 'variants' => ['3' => '7', 0 => 5, 4 => -1]];
-        $this->assertSame([3 => 7], shared_stock_config()['variants']);
+        $this->assertSame([3 => ['table' => 'product_variants', 'id' => 7]], shared_stock_config()['variants']);
+    }
+
+    public function testAProductHereCanShareAVariantsStockThere(): void
+    {
+        $this->requireDb();
+        $home_product = $this->product();
+        $home_variant = $this->variant($home_product, 9);
+        $local = $this->product(0);
+        $GLOBALS['_shared_stock_config'] = ['db' => DB_NAME, 'products' => [$local => ['variant' => $home_variant]]];
+
+        shared_stock_sync(self::$pdo);
+        $this->assertSame(9, $this->stock('products', $local));
+        $this->assertTrue(stock_move(self::$pdo, $local, null, -4, 'guard'));
+        $this->assertSame(5, $this->stock('product_variants', $home_variant));
+        $this->assertSame(5, $this->stock('products', $local));
+        $this->assertFalse(stock_move(self::$pdo, $local, null, -6, 'guard'));
     }
 
     public function testASaleComesOffTheOtherSitesCountAndIsCopiedHere(): void
