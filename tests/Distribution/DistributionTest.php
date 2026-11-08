@@ -497,4 +497,100 @@ final class DistributionTest extends TestCase
         $this->assertFalse(distribution_variant_has_records(self::$pdo, $this->variant($without, 'Y')));
         $this->assertSame([], distribution_products_with_records(self::$pdo, []));
     }
+
+    // ── samples / write-off for several products at once ───────────────────────
+
+    public function testWriteOffIsFreeAndCountedApartFromSamples(): void
+    {
+        $pid = $this->product();
+        $this->batch($pid, 20);
+        $this->assertTrue($this->alloc($pid, 'sample', 2, ['recipient' => 'Училище'])['ok']);
+        $r = $this->alloc($pid, 'writeoff', 3, ['price' => 50]);
+        $this->assertTrue($r['ok'], 'a write-off needs no recipient');
+        $this->assertSame(0.0, (float) self::$pdo->query('SELECT unit_price_eur FROM distribution_allocations WHERE id = ' . (int) $r['id'])->fetchColumn());
+
+        $s = distribution_item_summary(self::$pdo, $pid, null);
+        $this->assertSame(2, $s['to_samples']);
+        $this->assertSame(3, $s['to_writeoff']);
+        $this->assertSame(15, $s['remaining']);
+        $this->assertSame(20, $s['sold'] + $s['with_distributors'] + $s['remaining'] + $s['to_samples'] + $s['to_writeoff']);
+
+        // Correcting a write-off keeps it free.
+        $this->assertTrue(distribution_update_allocation(self::$pdo, $r['id'], 4, 0.0, '2026-02-02')['ok']);
+        $this->assertSame(4, distribution_item_summary(self::$pdo, $pid, null)['to_writeoff']);
+    }
+
+    public function testOverviewListsOnlyProductsWithRecords(): void
+    {
+        $with    = $this->product();
+        $without = $this->product();
+        $var     = $this->product(0, 'variant');
+        $a       = $this->variant($var, 'Серия А');
+        $this->batch($with, 7);
+        $this->batch($var, 5, $a);
+
+        $rows = [];
+        foreach (distribution_overview(self::$pdo) as $o) $rows[(int) $o['product']['id']] = $o;
+        $this->assertArrayHasKey($with, $rows);
+        $this->assertArrayHasKey($var, $rows);
+        $this->assertArrayNotHasKey($without, $rows, 'a product with no batches or hand-outs stays out');
+        $this->assertSame(7, $rows[$with]['total']['remaining']);
+        $this->assertSame($a, $rows[$var]['items'][0]['variant_id']);
+        $this->assertSame(5, $rows[$var]['total']['produced']);
+    }
+
+    public function testGiveOutManySavesOneSamplePerSeries(): void
+    {
+        $p1  = $this->product(4);
+        $p2  = $this->product();
+        $var = $this->product(0, 'variant');
+        $v   = $this->variant($var, 'Серия 3', 2);
+        $this->batch($p1, 10);
+        $this->batch($p2, 10);
+        $this->batch($var, 10, $v);
+        $this->assertTrue($this->alloc($p1, 'online', 4)['ok']); // record only; the shop already holds 4
+        $this->assertTrue($this->alloc($var, 'online', 2, ['variant' => $v])['ok']);
+
+        $lines = [
+            ['product_id' => $p1,  'variant_id' => null, 'quantity' => 1],
+            ['product_id' => $p2,  'variant_id' => null, 'quantity' => 0],   // empty box: skipped
+            ['product_id' => $var, 'variant_id' => $v,   'quantity' => 1],
+        ];
+        $r = distribution_give_out_many(self::$pdo, 'sample', $lines, '2026-03-01', 'Партньор', 'мостри', true);
+        $this->assertTrue($r['ok'], $r['error'] ?? '');
+        $this->assertSame(2, $r['count']);
+        $this->assertSame(2, $r['quantity']);
+        $this->assertSame(3, distribution_online_stock(self::$pdo, $p1, null), 'taken off the shop shelf');
+        $this->assertSame(1, distribution_online_stock(self::$pdo, $var, $v));
+        $this->assertSame(0, distribution_total_allocated(self::$pdo, $p2, null));
+        $row = self::$pdo->query("SELECT sample_recipient, notes, unit_price_eur FROM distribution_allocations WHERE product_id = $p1 AND destination = 'sample'")->fetch();
+        $this->assertSame('Партньор', $row['sample_recipient']);
+        $this->assertSame('мостри', $row['notes']);
+        $this->assertSame(0.0, (float) $row['unit_price_eur']);
+    }
+
+    public function testGiveOutManyIsAllOrNothing(): void
+    {
+        $ok    = $this->product();
+        $short = $this->product();
+        $this->batch($ok, 10);
+        $this->batch($short, 1);
+        $before = distribution_total_allocated(self::$pdo, $ok, null);
+
+        $r = distribution_give_out_many(self::$pdo, 'writeoff', [
+            ['product_id' => $ok,    'variant_id' => null, 'quantity' => 2],
+            ['product_id' => $short, 'variant_id' => null, 'quantity' => 5],
+        ], '2026-03-01');
+        $this->assertFalse($r['ok']);
+        $this->assertStringContainsString('Тестова книга', $r['error'], 'the error names the short product');
+        $this->assertStringContainsString('Нищо не е записано', $r['error']);
+        $this->assertSame($before, distribution_total_allocated(self::$pdo, $ok, null), 'the first line was rolled back');
+
+        $this->assertFalse(distribution_give_out_many(self::$pdo, 'sample', [['product_id' => $ok, 'variant_id' => null, 'quantity' => 1]], '2026-03-01', '  ')['ok'], 'samples need a recipient');
+        $this->assertStringContainsString('поне за един', distribution_give_out_many(self::$pdo, 'writeoff', [['product_id' => $ok, 'variant_id' => null, 'quantity' => 0]], '2026-03-01')['error']);
+        $this->assertFalse(distribution_give_out_many(self::$pdo, 'writeoff', [['product_id' => $ok, 'variant_id' => null, 'quantity' => -1]], '2026-03-01')['ok']);
+        $this->assertFalse(distribution_give_out_many(self::$pdo, 'personal', [['product_id' => $ok, 'variant_id' => null, 'quantity' => 1]], '2026-03-01')['ok'], 'only free destinations');
+        $this->assertFalse(distribution_give_out_many(self::$pdo, 'writeoff', [['product_id' => $ok, 'variant_id' => null, 'quantity' => 1]], '01.03.2026')['ok']);
+        $this->assertSame($before, distribution_total_allocated(self::$pdo, $ok, null));
+    }
 }

@@ -264,4 +264,50 @@ final class DistributionHttpTest extends TestCase
         $this->req('/admin/distribution.php', $base + ['action' => 'distributors_active', 'active' => '0', 'ids' => [$did]]);
         $this->assertSame(0, (int) $pdo->query("SELECT active FROM distribution_distributors WHERE id = $did")->fetchColumn());
     }
+
+    public function testSamplesForSeveralProductsRoundTrip(): void
+    {
+        $pdo   = get_pdo();
+        $token = $this->login();
+        $pid   = self::$productId;
+        $base  = ['csrf_token' => $token, 'product_id' => $pid];
+        $this->req('/admin/distribution.php', $base + ['action' => 'add_batch', 'quantity' => 10, 'produced_on' => '2026-06-01']);
+
+        [, $body] = $this->req('/admin/distribution.php?product=' . $pid);
+        $this->assertStringContainsString('Наличност — всички продукти', $body);
+        $this->assertStringContainsString('name="qty[' . $pid . '_0]"', $body);
+
+        $count = fn(string $dest) => (int) $pdo->query("SELECT COALESCE(SUM(quantity), 0) FROM distribution_allocations WHERE product_id = $pid AND destination = '$dest'")->fetchColumn();
+        $samples = $count('sample');
+
+        // No recipient: refused, visibly, nothing written.
+        [$code, , $loc] = $this->req('/admin/distribution.php', $base + [
+            'action' => 'give_out_many', 'kind' => 'sample', 'allocated_on' => '2026-06-02', 'qty' => [$pid . '_0' => '1'],
+        ]);
+        $this->assertSame(302, $code);
+        $this->assertStringEndsWith('#stock-all', $loc);
+        [, $body] = $this->req('/admin/distribution.php?product=' . $pid);
+        $this->assertStringContainsString('на кого са дадени', $body);
+        $this->assertSame($samples, $count('sample'));
+
+        $this->req('/admin/distribution.php', $base + [
+            'action' => 'give_out_many', 'kind' => 'sample', 'sample_recipient' => 'Партньор тест',
+            'allocated_on' => '2026-06-02', 'qty' => [$pid . '_0' => '2', '999999999_0' => ''],
+        ]);
+        $this->assertSame($samples + 2, $count('sample'));
+
+        $this->req('/admin/distribution.php', $base + [
+            'action' => 'give_out_many', 'kind' => 'writeoff', 'allocated_on' => '2026-06-02', 'qty' => [$pid . '_0' => '1'],
+        ]);
+        $this->assertSame(1, $count('writeoff'));
+        [, $body] = $this->req('/admin/distribution.php?product=' . $pid);
+        $this->assertStringContainsString('Отписани: 1 бр.', $body);
+        $this->assertStringNotContainsString('Warning:', $body);
+
+        // Junk quantities are refused.
+        $this->req('/admin/distribution.php', $base + [
+            'action' => 'give_out_many', 'kind' => 'writeoff', 'allocated_on' => '2026-06-02', 'qty' => [$pid . '_0' => 'две'],
+        ]);
+        $this->assertSame(1, $count('writeoff'));
+    }
 }

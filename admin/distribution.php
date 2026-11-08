@@ -154,6 +154,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             dist_redirect($pid, 'allocations', $keep);
 
+        case 'give_out_many':
+            // Free samples / write-off for several products at once (the
+            // "всички продукти" form). Boxes are named qty[<product>_<variant or 0>].
+            $kind  = in_array($_POST['kind'] ?? '', DISTRIBUTION_FREE_DESTINATIONS, true) ? (string) $_POST['kind'] : '';
+            $lines = [];
+            foreach ((array) ($_POST['qty'] ?? []) as $key => $q) {
+                if (!preg_match('/^(\d+)_(\d+)$/', (string) $key, $m)) continue;
+                $q = trim((string) $q);
+                if ($q === '') continue;
+                $qi = filter_var($q, FILTER_VALIDATE_INT);
+                if ($qi === false) {
+                    $fail('Броят трябва да е цяло число.');
+                    dist_redirect($pid, 'stock-all', $keep);
+                }
+                $lines[] = ['product_id' => (int) $m[1], 'variant_id' => (int) $m[2] ?: null, 'quantity' => (int) $qi];
+            }
+            $recipient = $kind === 'sample' ? dist_post_text('sample_recipient', 150) : null;
+            $r = distribution_give_out_many(
+                $pdo, $kind, $lines, trim((string) ($_POST['allocated_on'] ?? '')),
+                $recipient, dist_post_text('notes'), !empty($_POST['use_shop_stock'])
+            );
+            $of = fn(array $r): string => $r['count'] . ($r['count'] === 1 ? ' продукт' : ' продукта');
+            if (!$r['ok']) {
+                $fail($r['error']);
+            } elseif ($kind === 'sample') {
+                $ok('Записани безплатни мостри: ' . $r['quantity'] . ' бр. (' . $of($r) . ') за „' . $recipient . '“.');
+            } else {
+                $ok('Отписани: ' . $r['quantity'] . ' бр. (' . $of($r) . ').');
+            }
+            dist_redirect($pid, 'stock-all', $keep);
+
         case 'update_allocation':
             $id = (int) ($_POST['id'] ?? 0);
             $r  = distribution_update_allocation($pdo, $id, (int) ($_POST['quantity'] ?? 0), dist_post_price('unit_price_eur'),
@@ -225,6 +256,7 @@ if (!$product && $products) {
 $items        = $product ? distribution_product_items($pdo, $product) : [];
 $has_variants = $product && $product['type'] === 'variant';
 $summary      = $product ? distribution_product_summary($pdo, $product) : ['items' => [], 'total' => []];
+$overview     = distribution_overview($pdo);
 $today        = date('Y-m-d');
 
 // Filters (GET), all narrowed on the server.
@@ -252,7 +284,7 @@ if ($product) {
 
     $where  = ['a.product_id = ?'];
     $params = [$product_id];
-    if (in_array($f_alloc, ['online', 'personal', 'sample', 'distributor'], true)) {
+    if (in_array($f_alloc, ['online', 'personal', 'sample', 'writeoff', 'distributor'], true)) {
         $where[] = 'a.destination = ?'; $params[] = $f_alloc;
     } elseif (preg_match('/^d(\d+)$/', $f_alloc, $m)) {
         $where[] = 'a.distributor_id = ?'; $params[] = (int) $m[1];
@@ -300,6 +332,7 @@ $dest_labels = [
     'online'   => 'Онлайн магазин',
     'personal' => 'Продадени лично',
     'sample'   => 'Безплатни мостри',
+    'writeoff' => 'Отписани (повредени, изгубени)',
 ];
 
 $page_head_extra = '<style>
@@ -362,6 +395,136 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
   (дистрибутори, магазина, лично продадени, подаръци) и какво са продали и платили дистрибуторите.
 </p>
 
+<!-- ── All products at a glance + samples / write-off for several at once ─────── -->
+<?php if ($overview): ?>
+<?php
+  $ov_n        = fn(int $v): string => number_format($v, 0, ',', ' ');
+  $ov_writeoff = array_sum(array_map(fn($o) => (int) ($o['total']['to_writeoff'] ?? 0), $overview)) > 0;
+  $ov_cell     = 'text-align:right;font-variant-numeric:tabular-nums;';
+  $ov_rowhead  = 'text-align:left;font-weight:600;text-transform:none;letter-spacing:normal;font-size:.95rem;color:var(--text);background:transparent;';
+  /** One row of numbers; $s is an item or a product total. */
+  $ov_numbers  = function (array $s, bool $bold) use ($ov_n, $ov_writeoff, $ov_cell): string {
+      $w    = $bold ? 'font-weight:700;' : '';
+      $html = '<td style="' . $ov_cell . $w . '">' . $ov_n((int) $s['produced']) . '</td>'
+            . '<td style="' . $ov_cell . $w . '">' . $ov_n((int) $s['sold']) . '</td>'
+            . '<td style="' . $ov_cell . $w . '">' . $ov_n((int) $s['to_samples']) . '</td>';
+      if ($ov_writeoff) $html .= '<td style="' . $ov_cell . $w . '">' . $ov_n((int) ($s['to_writeoff'] ?? 0)) . '</td>';
+      $html .= '<td style="' . $ov_cell . '"><strong>' . $ov_n((int) $s['remaining']) . '</strong>';
+      if ((int) $s['with_distributors'] > 0) {
+          $html .= '<br><span class="dist-hint">+ ' . $ov_n((int) $s['with_distributors']) . ' при дистрибутори</span>';
+      }
+      return $html . '</td>';
+  };
+  // Rows of the samples / write-off form: every active item of these products.
+  $ov_form_rows = [];
+  foreach ($overview as $o) {
+      $multi = count($o['items']) > 1 || $o['product']['type'] === 'variant';
+      foreach ($o['items'] as $it) {
+          // Hidden variants, and items with nothing left anywhere, can't be given.
+          if (!$it['active'] || ((int) $it['available'] <= 0 && (int) $it['online_stock'] <= 0)) continue;
+          $ov_form_rows[] = [
+              'key'       => (int) $o['product']['id'] . '_' . (int) ($it['variant_id'] ?? 0),
+              'label'     => $multi ? $o['product']['name_bg'] . ' — ' . $it['label'] : $o['product']['name_bg'],
+              'available' => max(0, (int) $it['available']),
+              'shop'      => max(0, (int) $it['online_stock']),
+          ];
+      }
+  }
+?>
+<section id="stock-all" style="<?= $box ?>padding:1.5rem;" aria-labelledby="distAllTitle">
+  <h2 id="distAllTitle" style="font-size:1.15rem;margin:0 0 .35rem;">Наличност — всички продукти</h2>
+  <p class="dist-hint" style="margin:0 0 1rem;max-width:75ch;line-height:1.55;">
+    „Продадени“ е всичко продадено — онлайн, лично и от дистрибуторите. „Налични за продажба“ е това, което още е при вас:
+    в склада и в онлайн магазина. Бройките, дадени на дистрибутори и още непродадени, са отделно.
+  </p>
+  <div class="admin-table-wrap" style="max-height:none;">
+    <table class="admin-table" style="font-variant-numeric:tabular-nums;">
+      <caption style="position:absolute;left:-9999px;">Произведени, продадени, подарени и налични бройки по продукти</caption>
+      <thead><tr>
+        <th scope="col" style="min-width:12rem;">Продукт</th>
+        <th scope="col" style="text-align:right;">Произведени</th>
+        <th scope="col" style="text-align:right;">Продадени</th>
+        <th scope="col" style="text-align:right;">Подарени</th>
+        <?php if ($ov_writeoff): ?><th scope="col" style="text-align:right;">Отписани</th><?php endif; ?>
+        <th scope="col" style="text-align:right;">Налични за продажба</th>
+      </tr></thead>
+      <tbody>
+      <?php foreach ($overview as $o): $op = $o['product']; $is_var = $op['type'] === 'variant'; ?>
+        <tr>
+          <th scope="row" style="<?= $ov_rowhead ?>">
+            <a href="/admin/distribution.php?product=<?= (int) $op['id'] ?>"><?= h($op['name_bg']) ?></a><?= $op['active'] ? '' : ' <span class="dist-hint">(неактивен)</span>' ?>
+          </th>
+          <?= $ov_numbers($o['total'] + ['produced' => 0, 'sold' => 0, 'to_samples' => 0, 'remaining' => 0, 'with_distributors' => 0], $is_var) ?>
+        </tr>
+        <?php if ($is_var): foreach ($o['items'] as $it): ?>
+        <tr>
+          <th scope="row" style="<?= $ov_rowhead ?>font-weight:400;padding-left:2rem;">
+            <?= h($it['label']) ?><?= $it['active'] ? '' : ' <span class="dist-hint">(скрит)</span>' ?>
+          </th>
+          <?= $ov_numbers($it, false) ?>
+        </tr>
+        <?php endforeach; endif; ?>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+
+  <?php if ($ov_form_rows): ?>
+  <form method="post" id="multiForm" autocomplete="off" style="margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid var(--border);">
+    <?= $common() ?>
+    <input type="hidden" name="action" value="give_out_many">
+    <h3 style="font-size:1.05rem;margin:0 0 .35rem;">Подари или отпиши — няколко продукта наведнъж</h3>
+    <p class="dist-hint" style="margin:0 0 1rem;line-height:1.55;">Напишете брой срещу всеки продукт, който давате. Празните се пропускат. Записва се всичко или нищо.</p>
+
+    <fieldset style="border:0;padding:0;margin:0 0 1rem;">
+      <legend style="text-transform:none;letter-spacing:normal;font-weight:600;font-size:.9rem;margin-bottom:.4rem;">Какво записвате</legend>
+      <div style="display:flex;flex-wrap:wrap;gap:.5rem 1.5rem;">
+        <label style="text-transform:none;letter-spacing:normal;display:flex;align-items:center;gap:.5rem;min-height:44px;font-weight:400;margin:0;cursor:pointer;">
+          <input type="radio" name="kind" value="sample" checked style="width:20px;height:20px;"> Безплатни мостри (подарък)
+        </label>
+        <label style="text-transform:none;letter-spacing:normal;display:flex;align-items:center;gap:.5rem;min-height:44px;font-weight:400;margin:0;cursor:pointer;">
+          <input type="radio" name="kind" value="writeoff" style="width:20px;height:20px;"> Отписване (повредени, изгубени)
+        </label>
+      </div>
+    </fieldset>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:1rem;">
+      <label for="multiRecipient" id="multiRecipientWrap" style="text-transform:none;letter-spacing:normal;display:flex;flex-direction:column;gap:.35rem;font-weight:600;font-size:.875rem;margin:0;">На кого са подарени
+        <input type="text" name="sample_recipient" id="multiRecipient" maxlength="150" required
+               style="padding:.5rem .75rem;border:1px solid #6b7280;border-radius:6px;font-size:.9rem;min-height:44px;box-sizing:border-box;">
+        <span class="dist-hint">напр. училище, читалище, партньор</span>
+      </label>
+      <label for="multiDate" style="text-transform:none;letter-spacing:normal;display:flex;flex-direction:column;gap:.35rem;font-weight:600;font-size:.875rem;margin:0;">Дата
+        <input type="date" name="allocated_on" id="multiDate" value="<?= h($today) ?>" required>
+      </label>
+      <label for="multiNotes" style="text-transform:none;letter-spacing:normal;display:flex;flex-direction:column;gap:.35rem;font-weight:600;font-size:.875rem;margin:0;"><span id="multiNotesLabel">Бележка <span class="dist-hint">(по желание)</span></span>
+        <input type="text" name="notes" id="multiNotes" maxlength="1000"
+               style="padding:.5rem .75rem;border:1px solid #6b7280;border-radius:6px;font-size:.9rem;min-height:44px;box-sizing:border-box;">
+      </label>
+    </div>
+
+    <div style="margin-top:1.25rem;display:flex;flex-direction:column;gap:.5rem;">
+      <?php foreach ($ov_form_rows as $i => $r): $fid = 'multiQty' . $i; ?>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1rem;padding:.4rem 0;border-bottom:1px solid var(--border);">
+          <label for="<?= $fid ?>" style="text-transform:none;letter-spacing:normal;flex:1 1 14rem;font-weight:600;font-size:.95rem;margin:0;"><?= h($r['label']) ?></label>
+          <span class="dist-hint" id="<?= $fid ?>-h" style="flex:0 1 16rem;">в склада <?= $ov_n($r['available']) ?> · в магазина <?= $ov_n($r['shop']) ?></span>
+          <input type="number" name="qty[<?= h($r['key']) ?>]" id="<?= $fid ?>" min="0" step="1" inputmode="numeric"
+                 aria-describedby="<?= $fid ?>-h" placeholder="0" style="width:6rem;">
+        </div>
+      <?php endforeach; ?>
+    </div>
+
+    <label class="admin-checkbox" style="text-transform:none;letter-spacing:normal;text-transform:none;letter-spacing:normal;margin-top:1rem;min-height:44px;">
+      <input type="checkbox" name="use_shop_stock" value="1" checked>
+      <span>Извади ги и от наличността в онлайн магазина</span>
+    </label>
+    <p class="dist-hint" style="margin:.25rem 0 0;">Махнете отметката, ако бройките не са взети от стоката за онлайн магазина, а от склада.</p>
+    <button type="submit" class="btn btn--primary" id="multiSubmit" style="margin-top:1rem;min-height:44px;">Запиши мострите</button>
+  </form>
+  <?php endif; ?>
+</section>
+<?php endif; ?>
+
 <form method="get" action="/admin/distribution.php" class="dist-inline" style="<?= $box ?>display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;">
   <label for="distProduct" style="display:flex;flex-direction:column;gap:.35rem;font-weight:600;font-size:.875rem;flex:1 1 240px;">Продукт
     <select name="product" id="distProduct" onchange="this.form.submit()">
@@ -377,22 +540,23 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
 
 <!-- ── Stock overview ─────────────────────────────────────────────────────── -->
 <?php
-  $t = $summary['total'] + ['produced' => 0, 'sold' => 0, 'with_distributors' => 0, 'remaining' => 0, 'to_samples' => 0,
+  $t = $summary['total'] + ['produced' => 0, 'sold' => 0, 'with_distributors' => 0, 'remaining' => 0, 'to_samples' => 0, 'to_writeoff' => 0,
                             'to_personal' => 0, 'sold_online' => 0, 'distributor_sold' => 0, 'to_distributors' => 0,
                             'available' => 0, 'online_stock' => 0, 'shop_surplus' => 0];
   // Each part of "produced": key, label, colour (≥3:1 on white, and always shown with its number as text).
   $parts = [
       'sold'              => ['Продадени', '#14796d'],
       'with_distributors' => ['При дистрибутори', '#b45309'],
-      'remaining'         => ['Остават при вас', '#2563eb'],
+      'remaining'         => ['Налични за продажба', '#2563eb'],
       'to_samples'        => ['Безплатни мостри', '#6b7280'],
+      'to_writeoff'       => ['Отписани', '#7c3aed'],
   ];
   /** A bar splitting one item's produced quantity into its parts — decoration; the numbers are in the text next to it. */
   $bar = function (array $s, string $height) use ($parts): string {
-      $whole = max(1, $s['produced'], $s['sold'] + $s['with_distributors'] + $s['remaining'] + $s['to_samples']);
+      $whole = max(1, $s['produced'], $s['sold'] + $s['with_distributors'] + $s['remaining'] + $s['to_samples'] + ($s['to_writeoff'] ?? 0));
       $html  = '<div aria-hidden="true" style="display:flex;height:' . $height . ';border-radius:999px;overflow:hidden;background:#e5e7eb;">';
       foreach ($parts as $key => [, $colour]) {
-          $v = max(0, (int) $s[$key]);
+          $v = max(0, (int) ($s[$key] ?? 0));
           if ($v > 0) $html .= '<span style="flex:0 0 ' . round($v / $whole * 100, 2) . '%;background:' . $colour . ';"></span>';
       }
       return $html . '</div>';
@@ -401,12 +565,13 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
   $row_head = 'text-align:left;font-weight:600;text-transform:none;letter-spacing:normal;font-size:.95rem;color:var(--text);background:transparent;';
   $n = fn(int $v): string => number_format($v, 0, ',', ' ');
   $cards = [
-      ['produced', 'Произведени', '#111827', ['всички партиди', 'от тях ' . $n($t['to_samples']) . ' безплатни мостри']],
+      ['produced', 'Произведени', '#111827', ['всички партиди', 'от тях ' . $n($t['to_samples']) . ' безплатни мостри'
+          . ($t['to_writeoff'] ? ' · ' . $n($t['to_writeoff']) . ' отписани' : '')]],
       ['sold', 'Продадени', $parts['sold'][1],
           ['лично ' . $n($t['to_personal']) . ' · онлайн ' . $n($t['sold_online']), 'от дистрибутори ' . $n($t['distributor_sold'])]],
       ['with_distributors', 'При дистрибутори', $parts['with_distributors'][1],
           ['дадени ' . $n($t['to_distributors']), 'от тях продадени ' . $n($t['distributor_sold'])]],
-      ['remaining', 'Остават при вас', $parts['remaining'][1],
+      ['remaining', 'Налични за продажба', $parts['remaining'][1],
           ['в склада ' . $n(max(0, $t['available'])), 'в онлайн магазина ' . $n(max(0, $t['online_stock']))]],
   ];
 ?>
@@ -427,7 +592,7 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
   <div style="margin-top:1.25rem;">
     <?= $bar($t, '14px') ?>
     <ul style="list-style:none;display:flex;flex-wrap:wrap;gap:.4rem 1.25rem;padding:0;margin:.6rem 0 0;font-size:.8rem;color:#374151;">
-      <?php foreach ($parts as $key => [$label, $colour]): ?>
+      <?php foreach ($parts as $key => [$label, $colour]): if ($key === 'to_writeoff' && !$t['to_writeoff']) continue; ?>
         <li style="display:flex;align-items:center;gap:.4rem;">
           <span aria-hidden="true" style="width:.75rem;height:.75rem;border-radius:3px;background:<?= $colour ?>;"></span>
           <?= h($label) ?> <?= $n((int) $t[$key]) ?>
@@ -446,7 +611,7 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
         <th scope="col" style="text-align:right;">Произведени</th>
         <th scope="col" style="text-align:right;">Продадени</th>
         <th scope="col" style="text-align:right;">При дистрибутори</th>
-        <th scope="col" style="text-align:right;">Остават при вас</th>
+        <th scope="col" style="text-align:right;">Налични за продажба</th>
       </tr></thead>
       <tbody>
       <?php foreach ($summary['items'] as $it): ?>
@@ -483,7 +648,7 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
 
   <p class="dist-hint" style="margin:1.25rem 0 0;line-height:1.55;max-width:75ch;">
     „Продадени“ събира всичко продадено: лично, от дистрибуторите (по техните отчети) и онлайн — поръчки, билети и всичко
-    друго, което е излязло от наличността в онлайн магазина. „Остават при вас“ е неразпределеното плюс това, което е в онлайн магазина сега.
+    друго, което е излязло от наличността в онлайн магазина. „Налични за продажба“ е неразпределеното плюс това, което е в онлайн магазина сега.
   </p>
 
   <details style="margin-top:1rem;border-top:1px solid var(--border);padding-top:1rem;">
@@ -656,7 +821,7 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
           </td>
           <?php if ($has_variants): ?><td><?= h((string) $a['variant_label']) ?></td><?php endif; ?>
           <td><?= (int) $a['quantity'] ?></td>
-          <td><?= $a['destination'] === 'sample' ? '<span class="dist-hint">безплатно</span>' : h(format_eur((float) $a['unit_price_eur'])) ?></td>
+          <td><?= in_array($a['destination'], DISTRIBUTION_FREE_DESTINATIONS, true) ? '<span class="dist-hint">безплатно</span>' : h(format_eur((float) $a['unit_price_eur'])) ?></td>
           <td>
             <?php if ($a['protocol_file_path']): ?>
               <a href="/admin/download-distribution-protocol.php?id=<?= (int) $a['id'] ?>" target="_blank" rel="noopener" class="btn-link">№ <?= h($a['protocol_formatted_number']) ?> <span style="position:absolute;left:-9999px;">(PDF, отваря се в нов раздел)</span></a>
@@ -680,7 +845,7 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
               <input type="hidden" name="action" value="update_allocation">
               <input type="hidden" name="id" value="<?= (int) $a['id'] ?>">
               <label for="<?= $eid ?>-q">Количество (бр.)<input type="number" id="<?= $eid ?>-q" name="quantity" min="1" step="1" value="<?= (int) $a['quantity'] ?>" required></label>
-              <?php if ($a['destination'] !== 'sample'): ?>
+              <?php if (!in_array($a['destination'], DISTRIBUTION_FREE_DESTINATIONS, true)): ?>
               <label for="<?= $eid ?>-p">Цена за брой (€)<input type="text" inputmode="decimal" id="<?= $eid ?>-p" name="unit_price_eur" value="<?= h(number_format((float) $a['unit_price_eur'], 2, '.', '')) ?>" required></label>
               <?php endif; ?>
               <label for="<?= $eid ?>-d">Дата<input type="date" id="<?= $eid ?>-d" name="allocated_on" value="<?= h(substr($a['allocated_on'], 0, 10)) ?>" required></label>
@@ -949,6 +1114,26 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
       if (!row.hidden) { var f = row.querySelector('input:not([type=hidden])'); if (f) f.focus(); }
     });
   });
+
+  // Samples / write-off form: the recipient is only for samples.
+  var multi = document.getElementById('multiForm');
+  if (multi) {
+    var mWrap = document.getElementById('multiRecipientWrap');
+    var mIn   = document.getElementById('multiRecipient');
+    var mBtn  = document.getElementById('multiSubmit');
+    var mNote = document.getElementById('multiNotesLabel');
+    var refreshMulti = function () {
+      var k = multi.querySelector('input[name=kind]:checked');
+      var isSample = !k || k.value === 'sample';
+      // style.display + required together: a hidden required field would block submit invisibly.
+      mWrap.style.display = isSample ? 'flex' : 'none';
+      mIn.required = isSample;
+      mBtn.textContent = isSample ? 'Запиши мострите' : 'Отпиши бройките';
+      mNote.innerHTML = isSample ? 'Бележка <span class="dist-hint">(по желание)</span>' : 'Причина <span class="dist-hint">(по желание, напр. „повредени при транспорт“)</span>';
+    };
+    multi.querySelectorAll('input[name=kind]').forEach(function (r) { r.addEventListener('change', refreshMulti); });
+    refreshMulti();
+  }
 
   // Allocation form: fields follow the chosen recipient
   var numbers   = <?= json_encode($item_numbers, JSON_HEX_TAG | JSON_HEX_AMP) ?>;

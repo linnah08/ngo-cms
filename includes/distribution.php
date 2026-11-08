@@ -11,6 +11,7 @@ declare(strict_types=1);
  *                 'online'       the online shop
  *                 'personal'     sold in person, on the spot
  *                 'sample'       given away free (named recipient)
+ *                 'writeoff'     written off: damaged, lost (free, no recipient)
  *   sale        what a distributor reports as sold, and whether they paid
  *
  * Works for any product. A product with variants keeps a separate ledger per
@@ -30,7 +31,10 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/shared_stock.php';
 
-const DISTRIBUTION_DESTINATIONS = ['distributor', 'online', 'personal', 'sample'];
+const DISTRIBUTION_DESTINATIONS = ['distributor', 'online', 'personal', 'sample', 'writeoff'];
+
+/** Destinations that hand items out for nothing — no price on the record. */
+const DISTRIBUTION_FREE_DESTINATIONS = ['sample', 'writeoff'];
 
 /**
  * Stop here when the module is switched off.
@@ -226,8 +230,8 @@ function distribution_shop_ordered_qty(PDO $pdo, int $product_id, ?int $variant_
 /**
  * Every figure of one item's ledger.
  *
- * The four headline numbers split everything produced:
- *   produced = sold + with_distributors + remaining + to_samples
+ * The headline numbers split everything produced:
+ *   produced = sold + with_distributors + remaining + to_samples + to_writeoff
  * where
  *   sold              = distributors' reported sales + sold in person + sold_online
  *   sold_online       = sent to the shop − still in the shop: website orders,
@@ -238,7 +242,7 @@ function distribution_shop_ordered_qty(PDO $pdo, int $product_id, ?int $variant_
  * cover (stock typed in by hand); then the split adds up to more than produced.
  *
  * @return array{produced:int, to_distributors:int, to_online:int, to_personal:int,
- *               to_samples:int, available:int, online_stock:int, shop_ordered:int,
+ *               to_samples:int, to_writeoff:int, available:int, online_stock:int, shop_ordered:int,
  *               distributor_sold:int, sold_online:int, sold:int,
  *               with_distributors:int, remaining:int, shop_surplus:int}
  */
@@ -266,6 +270,7 @@ function distribution_item_summary(PDO $pdo, int $product_id, ?int $variant_id):
         'to_online'         => $by_dest['online'],
         'to_personal'       => $by_dest['personal'],
         'to_samples'        => $by_dest['sample'],
+        'to_writeoff'       => $by_dest['writeoff'],
         'available'         => $available,
         'online_stock'      => $online_stock,
         'shop_ordered'      => distribution_shop_ordered_qty($pdo, $product_id, $variant_id),
@@ -293,6 +298,29 @@ function distribution_product_summary(PDO $pdo, array $product): array
         foreach ($s as $k => $v) $total[$k] = ($total[$k] ?? 0) + $v;
     }
     return ['items' => $rows, 'total' => $total];
+}
+
+/**
+ * Every product that has distribution records (a batch or anything handed out),
+ * each with its ledger — the "all products at a glance" table.
+ *
+ * @return list<array{product: array, items: list<array>, total: array<string,int>}>
+ */
+function distribution_overview(PDO $pdo): array
+{
+    $ids = array_map('intval', $pdo->query(
+        'SELECT product_id FROM distribution_batches UNION SELECT product_id FROM distribution_allocations'
+    )->fetchAll(PDO::FETCH_COLUMN));
+    if (!$ids) return [];
+
+    $out = [];
+    foreach (distribution_products($pdo) as $p) {
+        if (!in_array((int) $p['id'], $ids, true)) continue;
+        $product = distribution_product($pdo, (int) $p['id']);
+        if (!$product) continue;
+        $out[] = ['product' => $product] + distribution_product_summary($pdo, $product);
+    }
+    return $out;
 }
 
 // ── Distributors ───────────────────────────────────────────────────────────────
@@ -539,11 +567,11 @@ function distribution_create_allocation(
         $distributor_id = null;
     }
 
+    $free             = in_array($destination, DISTRIBUTION_FREE_DESTINATIONS, true);
     $sample_recipient = $destination === 'sample' ? mb_substr(trim((string) $sample_recipient), 0, 150) : null;
     if ($destination === 'sample' && $sample_recipient === '') return ['ok' => false, 'error' => 'Моля напишете на кого са дадени безплатните бройки.'];
-    if ($destination === 'sample') $unit_price_eur = 0.0;
-    if ($destination !== 'sample' && $unit_price_eur <= 0) return ['ok' => false, 'error' => 'Цената за брой трябва да е по-голяма от 0.'];
-
+    if ($free) $unit_price_eur = 0.0;
+    if (!$free && $unit_price_eur <= 0) return ['ok' => false, 'error' => 'Цената за брой трябва да е по-голяма от 0.'];
 
     return _distribution_tx($pdo, function () use (
         $pdo, $product_id, $variant_id, $destination, $distributor_id, $quantity,
@@ -555,7 +583,7 @@ function distribution_create_allocation(
         if ($use_shop_stock && $destination !== 'online') {
             // The items come off the shop shelf: live stock goes down by all of
             // them; the 'online' records cover what they can, the pool the rest.
-            // Same rule for a distributor, a sale in person and a free sample.
+            // Same rule for a distributor, a sale in person, a sample and a write-off.
             $live = distribution_online_stock($pdo, $product_id, $variant_id);
             if ($quantity > $live) {
                 return ['ok' => false, 'error' => "В магазина в момента има само " . max(0, $live) . " бр. — не може да извадите {$quantity} бр. Махнете отметката, ако бройките не са от магазина, или първо поправете наличността в магазина (горе, „Поправи наличността“)."];
@@ -604,8 +632,9 @@ function distribution_update_allocation(PDO $pdo, int $id, int $quantity, float 
         $a = $stmt->fetch();
         if (!$a) return ['ok' => false, 'error' => 'Записът не е намерен.'];
 
-        $price = $a['destination'] === 'sample' ? 0.0 : $unit_price_eur;
-        if ($a['destination'] !== 'sample' && $price <= 0) return ['ok' => false, 'error' => 'Цената за брой трябва да е по-голяма от 0.'];
+        $free  = in_array($a['destination'], DISTRIBUTION_FREE_DESTINATIONS, true);
+        $price = $free ? 0.0 : $unit_price_eur;
+        if (!$free && $price <= 0) return ['ok' => false, 'error' => 'Цената за брой трябва да е по-голяма от 0.'];
 
         $pid = (int) $a['product_id'];
         $vid = $a['variant_id'] !== null ? (int) $a['variant_id'] : null;
@@ -625,6 +654,60 @@ function distribution_update_allocation(PDO $pdo, int $id, int $quantity, float 
         $pdo->prepare('UPDATE distribution_allocations SET quantity = ?, unit_price_eur = ?, allocated_on = ?, notes = ? WHERE id = ?')
             ->execute([$quantity, $price, $allocated_on, $notes, $id]);
         return ['ok' => true];
+    });
+}
+
+/**
+ * Free samples or a write-off for several items in one go — e.g. one pack of
+ * each series for a partner. Either every line is saved or none is: the first
+ * line that can't be (not enough stock, wrong item) cancels the lot and its
+ * error names the item.
+ *
+ * @param 'sample'|'writeoff' $destination
+ * @param list<array{product_id:int, variant_id:?int, quantity:int}> $lines lines with quantity 0 are skipped
+ * @return array{ok: bool, count?: int, quantity?: int, error?: string}
+ */
+function distribution_give_out_many(
+    PDO $pdo,
+    string $destination,
+    array $lines,
+    string $allocated_on,
+    ?string $sample_recipient = null,
+    ?string $notes = null,
+    bool $use_shop_stock = false
+): array {
+    if (!in_array($destination, DISTRIBUTION_FREE_DESTINATIONS, true)) {
+        return ['ok' => false, 'error' => 'Моля изберете „Безплатни мостри“ или „Отписване“.'];
+    }
+    // Checked once here, so the error doesn't name one product as if only it were wrong.
+    if (!distribution_date($allocated_on)) return ['ok' => false, 'error' => 'Моля въведете валидна дата.'];
+    if ($destination === 'sample' && trim((string) $sample_recipient) === '') {
+        return ['ok' => false, 'error' => 'Моля напишете на кого са дадени безплатните бройки.'];
+    }
+    $todo = [];
+    foreach ($lines as $l) {
+        $q = (int) ($l['quantity'] ?? 0);
+        if ($q < 0) return ['ok' => false, 'error' => 'Броят не може да е отрицателен.'];
+        if ($q === 0) continue;
+        $todo[] = ['product_id' => (int) $l['product_id'], 'variant_id' => !empty($l['variant_id']) ? (int) $l['variant_id'] : null, 'quantity' => $q];
+    }
+    if (!$todo) return ['ok' => false, 'error' => 'Въведете брой поне за един продукт.'];
+
+    // Lock products in id order, so two admins saving at once can't deadlock.
+    usort($todo, fn($a, $b) => [$a['product_id'], (int) $a['variant_id']] <=> [$b['product_id'], (int) $b['variant_id']]);
+
+    return _distribution_tx($pdo, function () use ($pdo, $destination, $todo, $allocated_on, $sample_recipient, $notes, $use_shop_stock): array {
+        foreach ($todo as $l) {
+            $r = distribution_create_allocation(
+                $pdo, $l['product_id'], $l['variant_id'], $destination, null, $l['quantity'], 0.0,
+                $allocated_on, $notes, $use_shop_stock, $sample_recipient
+            );
+            if (!$r['ok']) {
+                $label = distribution_item_label($pdo, $l['product_id'], $l['variant_id']);
+                return ['ok' => false, 'error' => '„' . $label . '“: ' . $r['error'] . ' Нищо не е записано.'];
+            }
+        }
+        return ['ok' => true, 'count' => count($todo), 'quantity' => array_sum(array_column($todo, 'quantity'))];
     });
 }
 
