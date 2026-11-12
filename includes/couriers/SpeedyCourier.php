@@ -69,12 +69,31 @@ class SpeedyCourier
             throw new RuntimeException('Speedy invalid JSON response: ' . $response);
         }
 
-        if ($httpCode >= 400) {
-            $msg = $data['error']['message'] ?? ($data['message'] ?? "HTTP $httpCode");
+        $msg = self::errorFromResponse((int) $httpCode, $data);
+        if ($msg !== null) {
             throw new RuntimeException('Speedy API error: ' . $msg);
         }
 
         return $data;
+    }
+
+    /**
+     * The error a Speedy reply carries, or null when it succeeded.
+     *
+     * Speedy answers most failures with HTTP 200 and an "error" object in the
+     * body, so the status code alone is not enough: a refused cancel used to
+     * look like a success and the waybill stayed open (and was billed).
+     */
+    public static function errorFromResponse(int $httpCode, mixed $data): ?string
+    {
+        $err = is_array($data) ? ($data['error'] ?? null) : null;
+        if (!empty($err)) {
+            return is_array($err) ? (string) ($err['message'] ?? json_encode($err, JSON_UNESCAPED_UNICODE)) : (string) $err;
+        }
+        if ($httpCode >= 400) {
+            return (string) ((is_array($data) ? ($data['message'] ?? null) : null) ?? "HTTP $httpCode");
+        }
+        return null;
     }
 
     private function postRaw(string $endpoint, array $body): string
@@ -102,9 +121,10 @@ class SpeedyCourier
             throw new RuntimeException('Speedy cURL error: ' . $error);
         }
 
-        if ($httpCode >= 400) {
-            $data = json_decode((string)$response, true);
-            $msg  = $data['error']['message'] ?? ($data['message'] ?? "HTTP $httpCode");
+        // A PDF on success; a JSON error object (often with HTTP 200) on failure.
+        $data = str_starts_with(ltrim((string) $response), '{') ? json_decode((string) $response, true) : null;
+        $msg  = self::errorFromResponse((int) $httpCode, $data);
+        if ($msg !== null) {
             throw new RuntimeException('Speedy print error: ' . $msg);
         }
 

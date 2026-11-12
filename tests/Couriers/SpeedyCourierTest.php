@@ -1,13 +1,14 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use PHPUnit\Framework\Attributes\Depends;
 use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Integration tests for SpeedyCourier.
  *
- * Requires courier.config.php with SPEEDY_TEST_MODE=true and valid credentials.
+ * Reads only, except the opt-in create/cancel test at the end. Speedy has no
+ * sandbox: SPEEDY_TEST_MODE points at a host that does not exist, so with it on
+ * these tests skip as unreachable.
  *
  * Run:  vendor/bin/phpunit --group speedy
  * Skip: vendor/bin/phpunit --exclude-group speedy
@@ -206,38 +207,38 @@ class SpeedyCourierTest extends TestCase
 
     // ── createShipment / cancelShipment ────────────────────────────────────────
 
-    public function testCreateShipmentReturnsShipmentNumber(): string
+    /**
+     * Opt-in only. Speedy has no sandbox (test.api.speedy.bg does not resolve),
+     * so this makes a REAL waybill on the account and cancels it again. Run by
+     * default it billed the organisation for every waybill whose cancel failed.
+     *
+     *   SPEEDY_LIVE_SHIPMENT_TEST=1 vendor/bin/phpunit --filter testCreateAndCancelShipment
+     */
+    public function testCreateAndCancelShipment(): void
     {
-        try {
-            $result = $this->speedy->createShipment([
-                'weight'           => 0.5,
-                'pack_count'       => 1,
-                'description'      => 'Тест пратка',
-                'receiver_name'    => 'Тест Получател',
-                'receiver_phone'   => '0888123456',
-                'receiver_city'    => 'София',
-                'receiver_address' => 'бул. Витоша 1',
-                'receiver_office'  => null,
-                'delivery_type'    => 'door',
-            ]);
-
-            $this->assertIsArray($result);
-            $this->assertArrayHasKey('shipment_number', $result);
-            $this->assertNotEmpty($result['shipment_number'], 'Expected a non-empty shipment number');
-
-            return (string) $result['shipment_number'];
-        } catch (RuntimeException $e) {
-            if (str_contains($e->getMessage(), 'cURL error')) {
-                $this->markTestSkipped('Speedy test API unreachable: ' . $e->getMessage());
-            }
-            throw $e; // API errors (wrong fields, auth, etc.) should fail, not skip
+        if (getenv('SPEEDY_LIVE_SHIPMENT_TEST') !== '1') {
+            $this->markTestSkipped('Creates a real, billable Speedy waybill; set SPEEDY_LIVE_SHIPMENT_TEST=1 to run.');
         }
-    }
 
-    #[Depends('testCreateShipmentReturnsShipmentNumber')]
-    public function testCancelShipmentDoesNotThrow(string $shipmentId): void
-    {
-        $this->speedy->cancelShipment($shipmentId);
-        $this->assertTrue(true); // reaching here means no exception was thrown
+        $result = $this->speedy->createShipment([
+            'weight'           => 0.5,
+            'pack_count'       => 1,
+            'description'      => 'Тест пратка',
+            'receiver_name'    => 'Тест Получател',
+            'receiver_phone'   => '0888123456',
+            'receiver_city'    => 'София',
+            'receiver_address' => 'бул. Витоша 1',
+            'receiver_office'  => null,
+            'delivery_type'    => 'door',
+        ]);
+        $number = (string) ($result['shipment_number'] ?? '');
+        $this->assertNotSame('', $number, 'Expected a shipment number');
+
+        try {
+            $this->speedy->cancelShipment($number);
+        } catch (RuntimeException $e) {
+            $this->fail("Waybill $number was NOT cancelled and will be billed — cancel it in the Speedy account. " . $e->getMessage());
+        }
+        $this->addToAssertionCount(1);
     }
 }
