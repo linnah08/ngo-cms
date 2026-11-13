@@ -218,4 +218,64 @@ final class SocialAjaxTest extends TestCase
         $this->assertStringNotContainsString('liGenerate', $edit);
         $this->assertStringContainsString('id="liText"', $edit);
     }
+
+    // ── „Планирай навсякъде“ ──────────────────────────────────────────────────
+
+    public function testScheduleEverywhereRowHasLabelledControls(): void
+    {
+        $src = file_get_contents($this->articleEdit);
+        $this->assertStringContainsString('<label for="socAllAt"', $src);
+        $this->assertStringContainsString('Планирай навсякъде за', $src);
+        $this->assertMatchesRegularExpression('/id="socAllAt" value="<\?= h\(\$default_social_at\) \?>"/', $src,
+            'The shared time must default to the same time Facebook uses');
+        $this->assertStringContainsString('id="socAllBtn"', $src);
+        $this->assertStringContainsString('Планирай навсякъде', $src);
+        // One real <label for> per network checkbox.
+        $this->assertStringContainsString('<label for="socAll_<?= $_net ?>"', $src);
+        $this->assertStringContainsString('<input type="checkbox" id="socAll_<?= $_net ?>"', $src);
+        foreach (["'fb' => 'Facebook'", "'insta' => 'Instagram'", "'li' => 'LinkedIn'"] as $net) {
+            $this->assertStringContainsString($net, $src);
+        }
+        // Above the Facebook panel.
+        $this->assertLessThan(strpos($src, 'id="socialPanel"'), strpos($src, 'id="socAllPanel"'));
+    }
+
+    public function testScheduleEverywhereSummaryIsALiveRegion(): void
+    {
+        $src = file_get_contents($this->articleEdit);
+        $this->assertMatchesRegularExpression('/id="socAllSummary"[^>]*role="status"/', $src);
+        $this->assertStringContainsString("(ok ? '✓ ' : '✗ ')", $src, 'Success/failure must carry an icon, not colour alone');
+        $this->assertStringContainsString("allBtn.textContent = 'Изпраща се…'", $src);
+        $this->assertStringContainsString('allBtn.disabled    = true', $src);
+    }
+
+    public function testEachNetworkScheduleHandlerIsASharedFunction(): void
+    {
+        $src = file_get_contents($this->articleEdit);
+        foreach (['_fbSchedule', '_instaSchedule', '_liSchedule'] as $fn) {
+            $this->assertStringContainsString('function ' . $fn . '()', $src);
+        }
+        // The network's own button calls the same function the shared button uses.
+        $this->assertStringContainsString("fbBtn.addEventListener('click', function() { _fbSchedule(); })", $src);
+        $this->assertStringContainsString("instaBtn.addEventListener('click', function() { _instaSchedule(); })", $src);
+        $this->assertStringContainsString("scheduleBtn.addEventListener('click', function() { _liSchedule(); })", $src);
+        $this->assertStringContainsString('run: _fbSchedule', $src);
+        $this->assertStringContainsString('run:   _instaSchedule', $src);
+        $this->assertStringContainsString('run: _liSchedule', $src);
+        // Both send helpers resolve to {ok, error}.
+        $this->assertSame(2, substr_count($src, 'return result;'));
+    }
+
+    public function testScheduleEverywhereRunsNetworksOneAfterAnother(): void
+    {
+        $src = file_get_contents($this->articleEdit);
+        $start = strpos($src, "var allBtn = document.getElementById('socAllBtn');");
+        $this->assertNotFalse($start);
+        $block = substr($src, $start, 3000);
+        $this->assertStringContainsString('res = await net.run();', $block, 'Each network must be awaited in turn');
+        $this->assertMatchesRegularExpression('/for \(var i = 0; i < nets\.length; i\+\+\)/', $block);
+        $this->assertStringNotContainsString('Promise.all', $block, 'Parallel requests can lose writes to the article JSON');
+        $this->assertStringContainsString('field.value = when;', $block, 'The shared time must be copied into each network\'s own field');
+        $this->assertStringContainsString('catch (e)', $block, 'One failing network must not stop the others');
+    }
 }

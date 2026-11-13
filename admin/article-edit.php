@@ -501,6 +501,46 @@ window._showSiteNotice = function (msg, afterEl) {
   near.textContent = '✓ ' + msg;
 };
 </script>
+<!-- ── Schedule on every network at once ───────────────────────────────────
+     Copies one time into each ticked network's own field and schedules them
+     one after another, each with its own text and settings (window._socSchedule).
+     The Facebook/Instagram and LinkedIn panels below are rendered under this
+     same condition, so all three networks always have a checkbox here. -->
+<style>
+  #socAllPanel input:focus-visible,#socAllPanel button:focus-visible{outline:3px solid #0387A5;outline-offset:2px;}
+  #socAllBtn:disabled{opacity:.7;cursor:wait;}
+</style>
+<div id="socAllPanel" style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;margin-bottom:1.5rem;">
+  <h2 style="font-size:.95rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:0 0 1rem;">Всички мрежи наведнъж</h2>
+  <div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:1rem 1.5rem;">
+    <div>
+      <label for="socAllAt" style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.3rem;">Планирай навсякъде за</label>
+      <input type="datetime-local" id="socAllAt" value="<?= h($default_social_at) ?>"
+             style="font-size:.88rem;min-height:44px;">
+    </div>
+    <fieldset style="border:none;margin:0;padding:0;min-width:0;">
+      <legend style="font-size:.85rem;font-weight:600;margin-bottom:.3rem;padding:0;">Къде</legend>
+      <div style="display:flex;flex-wrap:wrap;gap:.25rem 1rem;">
+        <?php foreach (['fb' => 'Facebook', 'insta' => 'Instagram', 'li' => 'LinkedIn'] as $_net => $_net_label): ?>
+        <label for="socAll_<?= $_net ?>" style="display:inline-flex;align-items:center;gap:.4rem;min-height:44px;font-size:.88rem;cursor:pointer;">
+          <input type="checkbox" id="socAll_<?= $_net ?>" class="soc-all-net" value="<?= $_net ?>" checked
+                 style="width:20px;height:20px;margin:0;">
+          <?= h($_net_label) ?>
+        </label>
+        <?php endforeach; ?>
+      </div>
+    </fieldset>
+    <button type="button" id="socAllBtn" class="btn btn--primary" style="font-size:.88rem;min-height:44px;white-space:nowrap;">
+      Планирай навсякъде
+    </button>
+  </div>
+  <p style="margin:.6rem 0 0;font-size:.78rem;color:var(--text-muted);">
+    Всяка мрежа получава своя текст от полетата по-долу. За Instagram важи избраното отдолу — „Публикация“ или „Story“.
+  </p>
+  <ul id="socAllSummary" role="status" aria-live="polite"
+      style="list-style:none;margin:.75rem 0 0;padding:0;font-size:.88rem;font-weight:600;line-height:1.6;"></ul>
+</div>
+
 <!-- ── FB / Insta panel ───────────────────────────────────────────────────── -->
 <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;" id="socialPanel">
   <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap;">
@@ -1288,19 +1328,23 @@ if (translateBtn) {
     return useTitle + (bodyText ? '\n\n' + bodyText : '');
   }
 
+  // Resolves to {ok, error} — shared by this panel's buttons and „Планирай навсякъде“.
   async function _liSend(scheduled_at, btn) {
     var text    = _liGetText();
     var spinner = document.getElementById('liScheduleSpinner');
     var errEl   = document.getElementById('liScheduleError');
+    var result  = { ok: false, error: '' };
     btn.disabled          = true;
     spinner.style.display = '';
     errEl.style.display   = 'none';
     try {
       var data = await liPost({ action: 'schedule', linkedin_text: text, scheduled_at: scheduled_at });
       if (!data.ok) {
-        errEl.textContent   = data.error;
+        result.error        = data.error || 'Не се получи. Опитайте пак.';
+        errEl.textContent   = result.error;
         errEl.style.display = '';
       } else {
+        result.ok = true;
         var badge = document.getElementById('liStatusBadge');
         if (data.due_at) {
           var dt      = new Date(data.due_at);
@@ -1314,21 +1358,30 @@ if (translateBtn) {
         _showSiteNotice(data.site_notice, errEl);
       }
     } catch(e) {
-      errEl.textContent   = 'Грешка при свързване.';
+      result.error        = 'Грешка при свързване.';
+      errEl.textContent   = result.error;
       errEl.style.display = '';
     }
     btn.disabled          = false;
     spinner.style.display = 'none';
+    return result;
   }
 
-  // Schedule via Buffer
+  // Schedule via Buffer at the time in #liScheduleAt. Resolves to {ok, error}.
+  function _liSchedule() {
+    var schedAt = document.getElementById('liScheduleAt').value;
+    var errEl   = document.getElementById('liScheduleError');
+    if (!schedAt) {
+      errEl.textContent = 'Изберете дата и час.'; errEl.style.display = '';
+      return Promise.resolve({ ok: false, error: 'Изберете дата и час.' });
+    }
+    return _liSend(schedAt, scheduleBtn);
+  }
+  window._socSchedule    = window._socSchedule || {};
+  window._socSchedule.li = { field: function () { return 'liScheduleAt'; }, label: function () { return 'LinkedIn'; }, run: _liSchedule };
+
   if (scheduleBtn) {
-    scheduleBtn.addEventListener('click', function() {
-      var schedAt = document.getElementById('liScheduleAt').value;
-      var errEl   = document.getElementById('liScheduleError');
-      if (!schedAt) { errEl.textContent = 'Изберете дата и час.'; errEl.style.display = ''; return; }
-      _liSend(schedAt, scheduleBtn);
-    });
+    scheduleBtn.addEventListener('click', function() { _liSchedule(); });
   }
 
   // Publish now
@@ -1631,9 +1684,11 @@ if (translateBtn) {
   window._toggleEmojiPicker = _toggleEmojiPicker;
   window._insertEmoji       = _insertEmoji;
 
-  // Schedule / publish-now helper
+  // Schedule / publish-now helper. Resolves to {ok, error} — shared by this
+  // panel's buttons and „Планирай навсякъде“.
   async function scheduleChannel(channel, scheduled_at, btn, spinner, errEl, badgeId, extra, label) {
-    var text = channel === 'fb' ? _fbGetText() : _instaGetText();
+    var text   = channel === 'fb' ? _fbGetText() : _instaGetText();
+    var result = { ok: false, error: '' };
     btn.disabled          = true;
     spinner.style.display = '';
     errEl.style.display   = 'none';
@@ -1641,9 +1696,11 @@ if (translateBtn) {
       var body = Object.assign({ action: 'schedule', social_text: text, scheduled_at: scheduled_at, channel: channel }, extra || {});
       var data = await socPost(body);
       if (!data.ok) {
-        errEl.textContent   = data.error;
+        result.error        = data.error || 'Не се получи. Опитайте пак.';
+        errEl.textContent   = result.error;
         errEl.style.display = '';
       } else {
+        result.ok = true;
         if (channel === 'insta') {
           var noteBox = document.getElementById(extra && extra.post_type === 'story' ? 'igCropStory' : 'igCropPost');
           var note = noteBox && noteBox.querySelector('.ig-crop-sched-note');
@@ -1660,22 +1717,31 @@ if (translateBtn) {
         _showSiteNotice(data.site_notice, errEl);
       }
     } catch(e) {
-      errEl.textContent   = 'Грешка при свързване.';
+      result.error        = 'Грешка при свързване.';
+      errEl.textContent   = result.error;
       errEl.style.display = '';
     }
     btn.disabled          = false;
     spinner.style.display = 'none';
+    return result;
   }
 
+  function _needTime(errEl) {
+    errEl.textContent = 'Изберете дата и час.'; errEl.style.display = '';
+    return Promise.resolve({ ok: false, error: 'Изберете дата и час.' });
+  }
+
+  // Schedule Facebook at the time in #fbScheduleAt. Resolves to {ok, error}.
   var fbBtn = document.getElementById('socFbBtn');
+  function _fbSchedule() {
+    var schedAt = document.getElementById('fbScheduleAt').value;
+    var errEl   = document.getElementById('socFbError');
+    if (!schedAt) return _needTime(errEl);
+    return scheduleChannel('fb', schedAt, fbBtn,
+      document.getElementById('socFbSpinner'), errEl, 'fbStatusBadge');
+  }
   if (fbBtn) {
-    fbBtn.addEventListener('click', function() {
-      var schedAt = document.getElementById('fbScheduleAt').value;
-      var errEl   = document.getElementById('socFbError');
-      if (!schedAt) { errEl.textContent = 'Изберете дата и час.'; errEl.style.display = ''; return; }
-      scheduleChannel('fb', schedAt, fbBtn,
-        document.getElementById('socFbSpinner'), errEl, 'fbStatusBadge');
-    });
+    fbBtn.addEventListener('click', function() { _fbSchedule(); });
   }
 
   var fbNowBtn = document.getElementById('socFbNowBtn');
@@ -1696,17 +1762,29 @@ if (translateBtn) {
     return { extra: { post_type: 'post' }, badgeId: 'instaStatusBadge', label: 'IG' };
   }
 
+  // Schedule Instagram (Post or Story, whichever is selected) at that mode's
+  // own time field. Resolves to {ok, error}.
   var instaBtn = document.getElementById('socInstaBtn');
-  if (instaBtn) {
-    instaBtn.addEventListener('click', function() {
-      var schedAt = document.getElementById(igMode === 'story' ? 'instaStoryScheduleAt' : 'instaScheduleAt').value;
-      var errEl   = document.getElementById('socInstaError');
-      if (!schedAt) { errEl.textContent = 'Изберете дата и час.'; errEl.style.display = ''; return; }
-      var cfg = _igConfig();
-      scheduleChannel('insta', schedAt, instaBtn,
-        document.getElementById('socInstaSpinner'), errEl, cfg.badgeId, cfg.extra, cfg.label);
-    });
+  function _igTimeField() { return igMode === 'story' ? 'instaStoryScheduleAt' : 'instaScheduleAt'; }
+  function _instaSchedule() {
+    var schedAt = document.getElementById(_igTimeField()).value;
+    var errEl   = document.getElementById('socInstaError');
+    if (!schedAt) return _needTime(errEl);
+    var cfg = _igConfig();
+    return scheduleChannel('insta', schedAt, instaBtn,
+      document.getElementById('socInstaSpinner'), errEl, cfg.badgeId, cfg.extra, cfg.label);
   }
+  if (instaBtn) {
+    instaBtn.addEventListener('click', function() { _instaSchedule(); });
+  }
+
+  window._socSchedule       = window._socSchedule || {};
+  window._socSchedule.fb    = { field: function () { return 'fbScheduleAt'; }, label: function () { return 'Facebook'; }, run: _fbSchedule };
+  window._socSchedule.insta = {
+    field: _igTimeField,
+    label: function () { return igMode === 'story' ? 'Instagram Story' : 'Instagram'; },
+    run:   _instaSchedule
+  };
 
   var instaNowBtn = document.getElementById('socInstaNowBtn');
   if (instaNowBtn) {
@@ -1718,6 +1796,67 @@ if (translateBtn) {
         cfg.badgeId, cfg.extra, cfg.label);
     });
   }
+})();
+
+// ── „Планирай навсякъде“ ───────────────────────────────────────────────────────
+// Copies the shared time into each ticked network's own field, then runs that
+// network's own schedule function (window._socSchedule) ONE AT A TIME: every
+// schedule call rewrites the same article JSON (and may publish the BG+EN
+// draft), so parallel requests could lose writes. A failure on one network
+// doesn't stop the rest.
+(function () {
+  var allBtn = document.getElementById('socAllBtn');
+  if (!allBtn) return;
+  var allAt   = document.getElementById('socAllAt');
+  var summary = document.getElementById('socAllSummary');
+  var btnText = allBtn.textContent;
+  var ORDER   = ['fb', 'insta', 'li'];
+
+  // '2026-11-14T11:00' → '14.11 11:00'
+  function _fmtLocal(v) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(v || '');
+    return m ? m[3] + '.' + m[2] + ' ' + m[4] + ':' + m[5] : v;
+  }
+
+  function _line(ok, text) {
+    var li = document.createElement('li');
+    li.style.color = ok ? '#14532d' : '#b91c1c';
+    li.textContent = (ok ? '✓ ' : '✗ ') + text;
+    summary.appendChild(li);
+  }
+
+  allBtn.addEventListener('click', async function () {
+    var when = allAt.value;
+    summary.innerHTML = '';
+    if (!when) { _line(false, 'Изберете дата и час.'); allAt.focus(); return; }
+
+    var nets = ORDER.filter(function (n) {
+      var box = document.getElementById('socAll_' + n);
+      return box && box.checked && window._socSchedule && window._socSchedule[n];
+    });
+    if (!nets.length) { _line(false, 'Изберете поне една мрежа.'); return; }
+
+    allBtn.disabled    = true;
+    allBtn.textContent = 'Изпраща се…';
+    for (var i = 0; i < nets.length; i++) {
+      var net = window._socSchedule[nets[i]];
+      var label = net.label();
+      var field = document.getElementById(net.field());
+      if (field) {
+        field.value = when;
+        field.dispatchEvent(new Event('change'));
+      }
+      var res;
+      try {
+        res = await net.run();   // sequential on purpose — see above
+      } catch (e) {
+        res = { ok: false, error: 'Грешка при свързване.' };
+      }
+      _line(res.ok, label + ' — ' + (res.ok ? _fmtLocal(when) : (res.error || 'Не се получи.')));
+    }
+    allBtn.disabled    = false;
+    allBtn.textContent = btnText;
+  });
 })();
 
 // ── Character counters ─────────────────────────────────────────────────────────
