@@ -50,6 +50,99 @@ function html_to_social_text(string $html): string {
 }
 
 /**
+ * Public address of an article. $lang is 'bg' or 'en'.
+ */
+function article_public_url(string $slug, string $lang): string {
+    return $lang === 'en'
+        ? SITE_URL . '/en/news/' . $slug . '/'
+        : SITE_URL . '/novini/' . $slug . '/';
+}
+
+/**
+ * Length of a text the way the social platforms count it: UTF-16 code units, so a
+ * bold letter from html_to_social_text() (outside the basic plane) counts as two.
+ */
+function social_text_length(string $text): int {
+    return intdiv(strlen(mb_convert_encoding($text, 'UTF-16LE', 'UTF-8')), 2);
+}
+
+/** Character limit of a post. $platform is 'fb', 'insta' or 'linkedin'. */
+function social_post_limit(string $platform): int {
+    return match ($platform) {
+        'insta'    => 2200,
+        'linkedin' => 3000,
+        default    => 63206,   // Facebook: effectively unlimited
+    };
+}
+
+/**
+ * The post for one platform: title, blank line, article text, blank line, link line.
+ * A text over the platform's limit is cut at the last full sentence that fits
+ * (else at a whole word) and ends with " …" before the link — posting is never refused.
+ * Facebook and Instagram take the Bulgarian wording, LinkedIn the English.
+ *
+ * @return array{text:string,length:int,limit:int,cut:bool}
+ */
+function social_post_text(string $title, string $html, string $url, string $platform): array {
+    $limit = social_post_limit($platform);
+    $lang  = $platform === 'linkedin' ? 'en' : 'bg';
+    $title = trim($title);
+    $body  = html_to_social_text($html);
+    if ($title === '' && $body === '') {
+        return ['text' => '', 'length' => 0, 'limit' => $limit, 'cut' => false];
+    }
+    $link = t_or('social.read_more', 'Прочетете повече', 'Read more', $lang) . ': ' . $url;
+    $main = implode("\n\n", array_filter([$title, $body], static fn($p) => $p !== ''));
+    $full = $main . "\n\n" . $link;
+
+    if (social_text_length($full) <= $limit) {
+        return ['text' => $full, 'length' => social_text_length($full), 'limit' => $limit, 'cut' => false];
+    }
+
+    $tail   = " …\n\n" . $link;
+    $budget = max(0, $limit - social_text_length($tail));
+
+    // The longest start of $main that fits the budget, counted in UTF-16 units.
+    $chars = mb_str_split($main);
+    $used = 0;
+    $n = 0;
+    foreach ($chars as $c) {
+        $w = mb_ord($c) > 0xFFFF ? 2 : 1;
+        if ($used + $w > $budget) break;
+        $used += $w;
+        $n++;
+    }
+    $prefix = implode('', array_slice($chars, 0, $n));
+    $next   = $chars[$n] ?? '';
+
+    // Abbreviations that end in a full stop without ending a sentence.
+    static $abbr = ['ул', 'бул', 'гр', 'с', 'др', 'напр', 'вкл', 'т.е', 'т.н', 'стр', 'тел', 'г',
+                    'мин', 'ч', 'бл', 'вх', 'ет', 'ап', 'пл', 'кв', 'ок', 'проф', 'д-р'];
+    $cut_at = null;
+    if (preg_match_all('/[.!?…]["»”]?(?=\s+[\p{Lu}\d"«„]|\s*$)/u', $prefix, $m, PREG_OFFSET_CAPTURE)) {
+        foreach (array_reverse($m[0]) as [$hit, $off]) {
+            $before = substr($prefix, 0, $off);
+            $token  = preg_match('/[\p{L}.\-]+$/u', $before, $t) ? mb_strtolower($t[0]) : '';
+            if (mb_strlen($token) === 1 && preg_match('/^\p{L}$/u', $token)) continue;
+            if (in_array($token, $abbr, true)) continue;
+            $cut_at = $off + strlen($hit);
+            break;
+        }
+    }
+    if ($cut_at !== null) {
+        $cut = substr($prefix, 0, $cut_at);
+    } elseif ($next === '' || preg_match('/^\s$/u', $next)) {
+        $cut = $prefix;   // the cut already falls between two words
+    } elseif (preg_match('/^(.*)\s/su', $prefix, $w)) {
+        $cut = $w[1];
+    } else {
+        $cut = $prefix;   // one endless word: hard cut
+    }
+    $text = rtrim($cut) . $tail;
+    return ['text' => $text, 'length' => social_text_length($text), 'limit' => $limit, 'cut' => true];
+}
+
+/**
  * Derive the BG and EN slugs from the submitted slug/title fields.
  *
  * BG keeps the source language by default (slug() allows Cyrillic; only path-unsafe
