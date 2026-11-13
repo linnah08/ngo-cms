@@ -285,6 +285,16 @@ function article_build_en_data(array $f): array {
     ] + ((!empty($f['slug_legacy'])) ? ['slug_legacy' => $f['slug_legacy']] : []);
 }
 
+/**
+ * "Publish now" on save (the Socials panel's Schedule button): the article goes live
+ * straight away and is no longer waiting for a date. Without it, inputs pass through.
+ *
+ * @return array{0:string,1:bool} [status, scheduled]
+ */
+function article_apply_publish_now(string $status, bool $scheduled, bool $publish_now): array {
+    return $publish_now ? ['published', false] : [$status, $scheduled];
+}
+
 /** The stored `scheduled` flag: only a draft can be scheduled. */
 function article_scheduled_flag(array $f): bool {
     return ($f['status'] ?? '') === 'draft' && !empty($f['scheduled']);

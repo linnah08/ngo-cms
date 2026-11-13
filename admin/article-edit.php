@@ -27,7 +27,18 @@ $error   = '';
 $success = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!csrf_verify()) { http_response_code(400); exit('Invalid token'); }
+    // The Socials panel saves in the background (_ajax=1) and wants JSON back, not a redirect.
+    $is_ajax = ($_POST['_ajax'] ?? '') === '1';
+    $ajax_reply = static function (array $body, int $code = 200): never {
+        http_response_code($code);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($body, JSON_UNESCAPED_UNICODE);
+        exit;
+    };
+    if (!csrf_verify()) {
+        if ($is_ajax) $ajax_reply(['ok' => false, 'error' => 'Сесията е изтекла — презаредете страницата.'], 400);
+        http_response_code(400); exit('Invalid token');
+    }
 
     // ── BG fields ──────────────────────────────────────────────────────────────
     $title   = trim($_POST['title']   ?? '');
@@ -40,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $status  = in_array($_POST['status'] ?? '', ['published','draft']) ? $_POST['status'] : 'draft';
     $date    = is_string($_POST['date'] ?? null) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['date']) ? $_POST['date'] : date('Y-m-d');
     $scheduled = $status === 'draft' && !empty($_POST['scheduled']);
+    [$status, $scheduled] = article_apply_publish_now($status, $scheduled, !empty($_POST['publish_now']));
     $tags    = array_values(array_filter(array_map('trim', explode(',', $_POST['tags'] ?? ''))));
 
     // ── EN fields (optional) ───────────────────────────────────────────────────
@@ -63,6 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$title) {
         $error = 'Заглавието е задължително.';
+        if ($is_ajax) $ajax_reply(['ok' => false, 'error' => $error]);
     } else {
         $image       = $article['image'] ?? '';
         // Image problems never block saving the article text — a rejected or
@@ -177,6 +190,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Stay in the editor after saving: the next steps (the Social tab, the
         // public preview) are right here. "← Обратно" still leads to the list.
+        if ($is_ajax) {
+            $ajax_reply([
+                'ok' => true, 'slug' => $new_slug, 'slug_en' => $new_slug_en, 'status' => $status,
+                'warnings' => $image_error !== '' ? ['Снимката не бе запазена: ' . $image_error] : [],
+            ]);
+        }
         $as_key = 'article:' . ($is_new ? 'new' : $slug_param);
         flash_set('success', 'Статията е запазена.');
         if ($image_error !== '') {

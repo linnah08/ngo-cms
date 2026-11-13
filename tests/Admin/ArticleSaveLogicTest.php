@@ -313,4 +313,12 @@ final class ArticleSaveLogicTest extends TestCase
         $photos = article_photos($stored, static fn() => true);
         $this->assertSame([['src' => '/assets/images/articles/old.jpg', 'caption' => '']], $photos);
     }
+
+    public function testPublishNowForcesPublished(): void
+    {
+        $this->assertSame(['published', false], article_apply_publish_now('draft', true, true));
+        $this->assertSame(['published', false], article_apply_publish_now('published', false, true));
+        $this->assertSame(['draft', true], article_apply_publish_now('draft', true, false));
+        $this->assertSame(['published', false], article_apply_publish_now('published', false, false));
+    }
 }
