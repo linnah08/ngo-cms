@@ -4,7 +4,7 @@ declare(strict_types=1);
 use PHPUnit\Framework\TestCase;
 
 /**
- * The post editor's Content / Social tabs and the folded English section.
+ * The post editor's layout (no Content / Social tabs any more) and the folded English section.
  * Behaviour is covered end-to-end in tests/Browser/article-tabs.spec.js; these
  * guard the server-side pieces that a browser test can't see go wrong quietly.
  */
@@ -17,21 +17,11 @@ final class ArticleEditTabsTest extends TestCase
         $this->src = file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/admin/article-edit.php');
     }
 
-    public function testTabIsAWhitelistDefaultingToContent(): void
+    public function testThereAreNoTabsAndTheFormAlwaysRenders(): void
     {
-        $this->assertStringContainsString(
-            // The Social tab only exists while the social module is on (Admin → Модули).
-            "\$tab      = \$social_on && (\$_GET['tab'] ?? 'content') === 'social' ? 'social' : 'content';",
-            $this->src
-        );
-    }
-
-    public function testTheFormOnlyRendersOnTheContentTab(): void
-    {
-        $this->assertMatchesRegularExpression(
-            "/<\\?php if \\(\\\$tab === 'content'\\): \\?>\\s*<form method=\"POST\"/",
-            $this->src
-        );
+        // The Content / Social tabs are gone: the Socials panel opens beside the form.
+        $this->assertStringNotContainsString("\$_GET['tab']", $this->src);
+        $this->assertMatchesRegularExpression('/<div id="editorLayout"[^>]*>\s*<form method="POST"/', $this->src);
     }
 
     public function testEnglishEditorStartsOnlyWhenTheSectionOpens(): void

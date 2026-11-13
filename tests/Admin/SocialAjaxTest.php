@@ -163,7 +163,7 @@ final class SocialAjaxTest extends TestCase
         $src = file_get_contents($this->articleEdit);
         $this->assertStringContainsString('window._toggleEmojiPicker = _toggleEmojiPicker;', $src);
         $this->assertStringContainsString('window._insertEmoji       = _insertEmoji;', $src);
-        $this->assertStringContainsString('data-emoji-target="instaText"', $src);
+        $this->assertStringContainsString('data-emoji-target="content"', $src);
     }
 
     // ── LinkedIn tests ────────────────────────────────────────────────────────

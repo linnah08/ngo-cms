@@ -1,5 +1,5 @@
 // @ts-check
-// The Social tab's Instagram previews: each photo shown cut exactly as Instagram gets
+// The Socials panel's Instagram previews: each photo shown cut exactly as Instagram gets
 // it, and a click on one lets the author choose which part is shown (saved at once).
 const { test, expect } = require('@playwright/test');
 const fs   = require('fs');
@@ -41,9 +41,16 @@ test.afterAll(() => {
 
 const rectOf = (loc) => loc.evaluate((el) => JSON.parse(el.dataset.rect));
 
+// The Socials panel beside the editor, on its Instagram tab.
+async function openInstagram(page) {
+  await page.goto('/admin/article-edit.php?slug=' + SLUG);
+  test.skip(await page.locator('#socialToggle').count() === 0, 'The social module is off in this database');
+  if (await page.locator('#socialToggle').getAttribute('aria-expanded') !== 'true') await page.locator('#socialToggle').click();
+  await page.getByRole('tab', { name: 'Instagram' }).click();
+}
+
 test('previews show the carousel shape, a picked shape redraws them, and a chosen crop is saved and kept', async ({ page }) => {
-  await page.goto('/admin/article-edit.php?slug=' + SLUG + '&tab=social');
-  test.skip(await page.locator('#socialPanel').count() === 0, 'Social panels need a Claude key in this database');
+  await openInstagram(page);
 
   const post  = page.getByRole('list', { name: 'Снимки за публикацията в Instagram' });
   const thumbs = post.locator('.ig-crop-thumb');
@@ -107,8 +114,7 @@ test('previews show the carousel shape, a picked shape redraws them, and a chose
 });
 
 test('Story mode shows the main photo alone at 9:16', async ({ page }) => {
-  await page.goto('/admin/article-edit.php?slug=' + SLUG + '&tab=social');
-  test.skip(await page.locator('#socialPanel').count() === 0, 'Social panels need a Claude key in this database');
+  await openInstagram(page);
 
   await expect(page.locator('#igCropStory')).toBeHidden();
   await page.locator('#igModeStoryBtn').click();
@@ -125,8 +131,7 @@ test('landscape photos make a landscape carousel with nothing to fix', async ({ 
   a.image = WIDE;
   a.photos = [{ src: WIDE, caption: '' }, { src: WIDE2, caption: '' }];
   fs.writeFileSync(BG_FILE, JSON.stringify(a));
-  await page.goto('/admin/article-edit.php?slug=' + SLUG + '&tab=social');
-  test.skip(await page.locator('#socialPanel').count() === 0, 'Social panels need a Claude key in this database');
+  await openInstagram(page);
 
   const thumbs = page.getByRole('list', { name: 'Снимки за публикацията в Instagram' }).locator('.ig-crop-thumb');
   await expect(thumbs).toHaveCount(2);

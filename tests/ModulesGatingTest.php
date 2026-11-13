@@ -348,8 +348,9 @@ final class ModulesGatingTest extends TestCase
             $this->assertLessThan($guard, $auth, "$f: auth first");
         }
         $edit = self::src('admin/article-edit.php');
-        $this->assertStringContainsString("\$tab      = \$social_on && (\$_GET['tab'] ?? 'content') === 'social' ? 'social' : 'content';", $edit);
-        $this->assertMatchesRegularExpression('/<\?php if \(\$social_on\): \?>\s*<nav aria-label="Части на статията"/', $edit);
+        $this->assertStringContainsString("\$social_on = module_enabled_with_needs('social');", $edit);
+        $this->assertMatchesRegularExpression('/<\?php if \(\$social_on\): \?>\s*<button type="button" id="socialToggle"/', $edit);
+        $this->assertMatchesRegularExpression('/<\?php if \(\$social_on\): \?>\s*<aside id="socialPanel"/', $edit);
         $this->assertStringContainsString("if (!module_enabled_with_needs('social')) continue;", self::src('admin/dashboard.php'), 'calendar');
         $this->assertMatchesRegularExpression("/module_enabled_with_needs\('social'\)\): \?>\s*<!-- ── Buffer/u", self::src('admin/payment.php'));
     }

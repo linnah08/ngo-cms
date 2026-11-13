@@ -405,14 +405,14 @@ final class ModulesOffHttpTest extends TestCase
 
     // ── social ───────────────────────────────────────────────────────────────
 
-    public function test_article_editor_has_no_social_tab_when_social_is_off(): void
+    public function test_article_editor_has_no_social_panel_when_social_is_off(): void
     {
         $this->switchOff('social');
-        [$code, $body] = $this->http('/admin/article-edit.php?tab=social', true);
+        [$code, $body] = $this->http('/admin/article-edit.php', true);
         $this->assertSame(200, $code);
-        $this->assertStringNotContainsString('tab=social', $body);
-        $this->assertStringNotContainsString('>Социални мрежи</a>', $body);
-        $this->assertStringNotContainsString('/admin/linkedin-ajax.php', $body);
+        $this->assertStringNotContainsString('id="socialToggle"', $body);
+        $this->assertStringNotContainsString('id="socialPanel"', $body);
+        $this->assertStringNotContainsString('/admin/js/social-panel.js', $body);
 
         [, $pay] = $this->http('/admin/payment.php', true);
         $this->assertStringNotContainsString('bufferConnectBtn', $pay, 'Buffer settings step aside');
@@ -423,7 +423,8 @@ final class ModulesOffHttpTest extends TestCase
 
         $this->switchOff();
         [, $on] = $this->http('/admin/article-edit.php', true);
-        $this->assertStringContainsString('>Социални мрежи</a>', $on, 'back when on');
+        $this->assertStringContainsString('id="socialToggle"', $on, 'back when on');
+        $this->assertStringContainsString('/admin/js/social-panel.js', $on);
     }
 
     // ── ai_helpers ───────────────────────────────────────────────────────────

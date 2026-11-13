@@ -210,6 +210,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $page_title_admin = $is_new ? 'Нова статия' : 'Редактиране: ' . h($article['title'] ?? '');
 $active_nav       = 'articles';
+// 960px for the article alone; the Socials panel widens it to 1400px while open (social-panel.js).
 $page_head_extra  = tinymce_script_tag()
                   . '<style>.admin-content{max-width:960px;}</style>';
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
@@ -229,23 +230,16 @@ $grid_en   = $article_en ? article_photos_for_editor(array_merge($article_en, ['
 $grid_main = article_main_photo_index($article, $grid_bg);
 $en_caps   = array_column($grid_en, 'caption', 'src');
 
-// ── Content / Social tabs — split so editing an article doesn't require
-// scrolling past FB/Instagram/LinkedIn panels you may not be touching today.
-// „Социални мрежи“ switched off in Admin → Модули: no Social tab, no badges.
+// ── Socials panel — the Facebook / Instagram / LinkedIn posts beside the article,
+// built live from the unsaved text (admin/js/social-panel.js). New and saved articles
+// alike. „Социални мрежи“ switched off in Admin → Модули: no toggle, no panel.
 $social_on = module_enabled_with_needs('social');
-$tab      = $social_on && ($_GET['tab'] ?? 'content') === 'social' ? 'social' : 'content';
-$tab_base = $is_new ? '/admin/article-edit.php' : '/admin/article-edit.php?slug=' . urlencode($slug_param);
-$tab_sep  = $is_new ? '?' : '&';
 
-// Social status — used for the compact badges on the Content tab and the full
-// panels on the Social tab.
 $li_scheduled      = !empty($article['linkedin_scheduled_at']);
 $li_posted         = !empty($article['linkedin_posted_at']);
 $fb_sched          = !empty($article['fb_scheduled_at']);
 $insta_sched       = !empty($article['insta_scheduled_at']);
 $insta_story_sched = !empty($article['insta_story_scheduled_at']);
-$has_social_badge  = $social_on && ($fb_sched || $insta_sched || $insta_story_sched || $li_scheduled || $li_posted);
-$badge_style       = 'font-size:.75rem;font-weight:600;border-radius:3px;padding:.15rem .5rem;';
 ?>
 
 <div class="admin-page-header">
@@ -258,39 +252,13 @@ $badge_style       = 'font-size:.75rem;font-weight:600;border-radius:3px;padding
     <?php if (!$is_new && $has_en_version): ?>
       <a href="/en/news/<?= urlencode($edit_slug_en ?: $edit_slug) ?>/" target="_blank" class="btn btn--outline" style="font-size:.85rem;">↗ EN</a>
     <?php endif; ?>
-    <?php if ($tab === 'content'): ?>
-      <button type="submit" form="articleForm" class="btn btn--primary">Запази</button>
+    <?php if ($social_on): ?>
+      <button type="button" id="socialToggle" class="btn btn--outline" aria-expanded="false" aria-controls="socialPanel"
+              style="min-height:44px;"><span aria-hidden="true">📣</span> Социални мрежи <span id="socialToggleState" aria-hidden="true">▸</span></button>
     <?php endif; ?>
+    <button type="submit" form="articleForm" class="btn btn--primary">Запази</button>
   </div>
 </div>
-
-<?php if ($tab === 'content' && $has_social_badge): ?>
-  <ul aria-label="Социални мрежи" style="display:flex;gap:.4rem;flex-wrap:wrap;margin:-.5rem 0 1.25rem;padding:0;list-style:none;">
-    <?php if ($fb_sched): ?>
-      <li style="<?= $badge_style ?>background:#fef3c7;color:#92400e;">⏱ FB <?= h(date('d.m H:i', strtotime($article['fb_scheduled_at']))) ?></li>
-    <?php endif; ?>
-    <?php if ($insta_sched): ?>
-      <li style="<?= $badge_style ?>background:#fef3c7;color:#92400e;">⏱ IG <?= h(date('d.m H:i', strtotime($article['insta_scheduled_at']))) ?></li>
-    <?php endif; ?>
-    <?php if ($insta_story_sched): ?>
-      <li style="<?= $badge_style ?>background:#fef3c7;color:#92400e;">⏱ IG Story <?= h(date('d.m H:i', strtotime($article['insta_story_scheduled_at']))) ?></li>
-    <?php endif; ?>
-    <?php if ($li_posted): ?>
-      <li style="<?= $badge_style ?>background:#dcfce7;color:#166534;">✓ LinkedIn <?= h(date('d.m', strtotime($article['linkedin_posted_at']))) ?></li>
-    <?php elseif ($li_scheduled): ?>
-      <li style="<?= $badge_style ?>background:#fef3c7;color:#92400e;">⏱ LinkedIn <?= h(date('d.m H:i', strtotime($article['linkedin_scheduled_at']))) ?></li>
-    <?php endif; ?>
-  </ul>
-<?php endif; ?>
-
-<?php if ($social_on): ?>
-<nav aria-label="Части на статията" style="display:flex;gap:1.75rem;border-bottom:1px solid var(--border);margin-bottom:1.5rem;">
-  <a href="<?= h($tab_base . $tab_sep . 'tab=content') ?>"<?= $tab === 'content' ? ' aria-current="page"' : '' ?>
-     style="display:inline-flex;align-items:center;min-height:44px;font-size:.9rem;font-weight:600;text-decoration:none;border-bottom:3px solid <?= $tab === 'content' ? 'var(--teal)' : 'transparent' ?>;color:<?= $tab === 'content' ? 'var(--teal)' : 'var(--text-muted)' ?>;">Съдържание</a>
-  <a href="<?= h($tab_base . $tab_sep . 'tab=social') ?>"<?= $tab === 'social' ? ' aria-current="page"' : '' ?>
-     style="display:inline-flex;align-items:center;min-height:44px;font-size:.9rem;font-weight:600;text-decoration:none;border-bottom:3px solid <?= $tab === 'social' ? 'var(--teal)' : 'transparent' ?>;color:<?= $tab === 'social' ? 'var(--teal)' : 'var(--text-muted)' ?>;">Социални мрежи</a>
-</nav>
-<?php endif; ?>
 
 <?php foreach (flash_get() as $_flash): ?>
   <div class="admin-alert admin-alert--<?= h($_flash['type']) ?>" role="<?= $_flash['type'] === 'error' ? 'alert' : 'status' ?>" style="margin-bottom:1.5rem;"><?= h($_flash['message']) ?></div>
@@ -299,7 +267,9 @@ $badge_style       = 'font-size:.75rem;font-weight:600;border-radius:3px;padding
   <div class="admin-alert admin-alert--error" style="margin-bottom:1.5rem;"><?= h($error) ?></div>
 <?php endif; ?>
 
-<?php if ($tab === 'content'): ?>
+<!-- The article, and the Socials panel beside it when open (two columns from 1100px,
+     stacked below that — set by admin/js/social-panel.js, since the styles are inline). -->
+<div id="editorLayout" style="display:block;">
 <form method="POST" action="/admin/article-edit.php<?= $is_new ? '' : '?slug=' . urlencode($slug_param) ?>"
       enctype="multipart/form-data" class="admin-form" id="articleForm">
   <?= csrf_field() ?>
@@ -471,277 +441,219 @@ $badge_style       = 'font-size:.75rem;font-weight:600;border-radius:3px;padding
     <button type="submit" class="btn btn--primary">Запази</button>
   </div>
 </form>
-<?php endif; // $tab === 'content' ?>
-
-<?php if ($tab === 'social' && $is_new): ?>
-<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem;text-align:center;color:var(--text-muted);">
-  <p style="margin:0 0 1rem;">Запазете статията, за да публикувате в социалните мрежи.</p>
-  <a href="<?= h($tab_base . $tab_sep . 'tab=content') ?>" class="btn btn--outline">← Към съдържанието</a>
-</div>
-<?php endif; ?>
-
-<?php if ($tab === 'social' && !$is_new && $claude_ready): ?>
 <?php
-$buffer_ready      = setting_is_set('buffer_linkedin_channel_id') && setting_is_set('buffer_api_key');
-$fb_ready          = setting_is_set('buffer_facebook_channel_id')  && setting_is_set('buffer_api_key');
-$insta_ready       = setting_is_set('buffer_instagram_channel_id') && setting_is_set('buffer_api_key');
-$default_social_at = date('Y-m-d\TH:i', strtotime('+1 day 11:00'));
-
-// Which Instagram tab (Post/Story) should be shown on load. A scheduled post/story
-// always wins (it's the thing most likely to need attention).
-$ig_default_story = !$insta_sched && $insta_story_sched;
-
-// Previews of exactly what Instagram gets: each photo cut to the shape it is sent at.
-require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/social_images.php';
-$ig_preview = social_insta_preview($article);
+if ($social_on):
+    $default_social_at = date('Y-m-d\TH:i', strtotime('+1 day 11:00'));
+    // Which Instagram mode (Post/Story) is shown on load. A scheduled post/story
+    // always wins (it's the thing most likely to need attention).
+    $ig_default_story = !$insta_sched && $insta_story_sched;
+    // Previews of exactly what Instagram gets: each photo cut to the shape it is sent at.
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/social_images.php';
+    $ig_preview = social_insta_preview($article);
+endif;
 ?>
-<!-- A social post links to the site post, so a draft goes live with it
-     (article_publish_with_social). Say so up front, and say what happened. -->
-<p id="siteNotice" <?= ($article['status'] ?? '') === 'draft' ? '' : 'hidden' ?>
-   style="border:2px solid #1d4ed8;background:#eff6ff;color:#1e3a8a;border-radius:8px;padding:.75rem 1rem;margin:0 0 1.5rem;font-weight:600;">
-  ℹ Статията е чернова. Когато планирате или публикувате пост тук, статията ще се публикува на сайта заедно с него.</p>
-<script>
-// Show the server's message at the top and right under the button that was clicked.
-window._showSiteNotice = function (msg, afterEl) {
-  if (!msg) return;
-  var top = document.getElementById('siteNotice');
-  top.textContent = '✓ ' + msg;
-  top.style.borderColor = '#166534'; top.style.background = '#f0fdf4'; top.style.color = '#14532d';
-  top.hidden = false;
-  if (!afterEl) return;
-  var near = afterEl.parentNode.querySelector('.site-notice-near');
-  if (!near) {
-    near = document.createElement('p');
-    near.className = 'site-notice-near';
-    near.setAttribute('role', 'status');
-    near.style.cssText = 'margin:.5rem 0 0;font-size:.85rem;font-weight:600;color:#14532d;';
-    afterEl.parentNode.insertBefore(near, afterEl.nextSibling);
-  }
-  near.textContent = '✓ ' + msg;
-};
-</script>
-<!-- ── FB / Insta panel ───────────────────────────────────────────────────── -->
-<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;" id="socialPanel">
-  <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap;">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="#1877f2" style="flex-shrink:0;"><path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.236 2.686.236v2.97h-1.513c-1.491 0-1.956.93-1.956 1.886v2.267h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/></svg>
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="url(#ig)" style="flex-shrink:0;">
-      <defs><linearGradient id="ig" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#f09433"/><stop offset="25%" stop-color="#e6683c"/><stop offset="50%" stop-color="#dc2743"/><stop offset="75%" stop-color="#cc2366"/><stop offset="100%" stop-color="#bc1888"/></linearGradient></defs>
-      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/>
-    </svg>
-    <h2 style="font-size:.95rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:0;">Facebook / Instagram</h2>
-    <span role="status" style="margin-left:auto;font-size:.82rem;font-weight:600;display:flex;gap:.75rem;flex-wrap:wrap;">
-      <span id="fbStatusBadge"><?php if ($fb_sched): ?><span style="color:#b45309;">⏱ FB: <?= h(date('d.m.Y H:i', strtotime($article['fb_scheduled_at']))) ?></span><?php endif; ?></span>
-      <span id="instaStatusBadge"><?php if ($insta_sched): ?><span style="color:#b45309;">⏱ IG: <?= h(date('d.m.Y H:i', strtotime($article['insta_scheduled_at']))) ?></span><?php endif; ?></span>
-      <span id="instaStoryStatusBadge"><?php if ($insta_story_sched): ?><span style="color:#b45309;">⏱ IG Story: <?= h(date('d.m.Y H:i', strtotime($article['insta_story_scheduled_at']))) ?></span><?php endif; ?></span>
-    </span>
+<?php if ($social_on): ?>
+<aside id="socialPanel" aria-labelledby="socialPanelTitle" hidden
+       data-slug="<?= h($edit_slug) ?>" data-ig-mode="<?= $ig_default_story ? 'story' : 'post' ?>"
+       style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.5rem;box-sizing:border-box;min-width:0;">
+  <style>
+    #socialPanel .soc-tab:focus-visible,#socialPanel [role="tabpanel"]:focus-visible{outline:3px solid #0387A5;outline-offset:2px;}
+  </style>
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin-bottom:.5rem;">
+    <h2 id="socialPanelTitle" style="font-size:.95rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:0;">Социални мрежи</h2>
+    <button type="button" id="socialClose" class="btn btn--outline" aria-label="Затвори социалните мрежи" style="min-height:44px;min-width:44px;font-size:.85rem;"><span aria-hidden="true">✕</span> Затвори</button>
+  </div>
+  <p style="margin:0 0 .75rem;font-size:.85rem;color:var(--text-muted);">Публикациите са текстът на статията, съкратен за всяка мрежа. Обновяват се, докато пишете.</p>
+
+  <p id="socStatus" role="status" aria-live="polite" style="margin:0 0 .5rem;min-height:1.2em;font-size:.8rem;color:var(--text-muted);"></p>
+  <div id="socError" role="alert" hidden
+       style="border:2px solid #b91c1c;background:#fef2f2;color:#7f1d1d;border-radius:8px;padding:.6rem .85rem;margin:0 0 .75rem;font-weight:600;font-size:.85rem;">
+    <span aria-hidden="true">⚠</span> <span id="socErrorMsg">Прегледът не е обновен — опитайте отново</span>
+    <button type="button" id="socRetry" class="btn btn--outline" style="min-height:44px;margin-left:.5rem;font-size:.82rem;">Опитай отново</button>
+  </div>
+
+  <!-- A social post links to the site post, so a draft goes live with it
+       (article_publish_with_social). Say so up front, and say what happened. -->
+  <p id="siteNotice" <?= ($article['status'] ?? 'draft') === 'draft' ? '' : 'hidden' ?>
+     style="border:2px solid #1d4ed8;background:#eff6ff;color:#1e3a8a;border-radius:8px;padding:.6rem .85rem;margin:0 0 1rem;font-weight:600;font-size:.85rem;">
+    ℹ Статията е чернова. Когато планирате или публикувате пост тук, статията ще се публикува на сайта заедно с него.</p>
+
+  <div role="tablist" aria-label="Социална мрежа" style="display:flex;gap:.25rem;border-bottom:1px solid var(--border);margin-bottom:1rem;flex-wrap:wrap;">
+    <?php foreach (['fb' => 'Facebook', 'insta' => 'Instagram', 'linkedin' => 'LinkedIn'] as $_p => $_name): $_sel = $_p === 'fb'; ?>
+    <button type="button" role="tab" id="socTab-<?= $_p ?>" class="soc-tab" data-platform="<?= $_p ?>"
+            aria-selected="<?= $_sel ? 'true' : 'false' ?>" aria-controls="socTabpanel-<?= $_p ?>" tabindex="<?= $_sel ? '0' : '-1' ?>"
+            style="min-height:44px;padding:.4rem .85rem;background:none;border:none;border-bottom:3px solid <?= $_sel ? 'var(--teal)' : 'transparent' ?>;margin-bottom:-1px;cursor:pointer;font-size:.9rem;font-weight:<?= $_sel ? '700' : '500' ?>;color:<?= $_sel ? 'var(--text)' : 'var(--text-muted)' ?>;"><?= h($_name) ?></button>
+    <?php endforeach; ?>
   </div>
 
   <!-- ── Facebook ──────────────────────────────────────────────────────────── -->
-  <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="#1877f2"><path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.236 2.686.236v2.97h-1.513c-1.491 0-1.956.93-1.956 1.886v2.267h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/></svg>
-    <span style="font-size:.82rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">Facebook</span>
-  </div>
-
-  <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;">
-    <button type="button" id="socGenerateNewsBtn" class="btn btn--outline" style="font-size:.82rem;">
-      ✦ Генерирай FB новина
-    </button>
-    <button type="button" id="socGeneratePostBtn" class="btn btn--outline" style="font-size:.82rem;">
-      ✦ Генерирай FB пост
-    </button>
-    <span id="socSpinner" style="display:none;font-size:.82rem;color:var(--text-muted);">Генерира се…</span>
-    <span id="socError"   style="display:none;font-size:.82rem;color:#c0392b;"></span>
-  </div>
-
-  <div class="form-group" style="margin-bottom:1rem;">
-    <label style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;">
-      <span style="font-size:.85rem;font-weight:600;">Текст за Facebook</span>
-      <span style="display:flex;gap:.4rem;">
-        <button type="button" id="socEmojiBtn" class="btn btn--outline" style="font-size:.75rem;padding:.25rem .6rem;" data-emoji-target="fbText" aria-controls="socEmojiPicker" aria-expanded="false" onclick="_toggleEmojiPicker(this)">😊 Емоджи</button>
-        <button type="button" id="socCopyBtn" class="btn btn--outline" style="font-size:.75rem;padding:.25rem .6rem;">Копирай</button>
-      </span>
-    </label>
-    <div id="socEmojiPicker" style="display:none;background:#fff;border:1px solid var(--border);border-radius:8px;padding:.6rem;margin-bottom:.5rem;line-height:1.8;font-size:1.2rem;max-height:160px;overflow-y:auto;">
-      <?php
-      $emojis = ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙',
-                 '🥲','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐','😑','😶','😏','😒','🙄','😬',
-                 '🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤧','🥵','🥶','🥴','😵','🤯','🤠','🥳','🥸','😎',
-                 '🤓','🧐','😕','😟','🙁','☹️','😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥','😢','😭','😱','😖',
-                 '😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽',
-                 '👾','🤖','😺','😸','😹','😻','😼','😽','🙀','😿','😾',
-                 '👋','🤚','🖐️','✋','🖖','👌','🤌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍',
-                 '👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','💪','🦾','🦿','🦵','🦶','👂','🦻','👃',
-                 '❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖','💘','💝','💟','☮️',
-                 '✨','🌟','⭐','💫','🔥','🎉','🎊','🎈','🎁','🏆','🥇','🌈','☀️','🌙','⚡','❄️','🌺','🌸','🌻','🌹',
-                 '🙏','🌍','🌎','🌏','💡','📢','📣','🔔','💬','💭','🗣️','👥','🫶','💪','🚀','🛡️','🔑','🌱','🤝'];
-      foreach ($emojis as $e) {
-          echo '<span onclick="_insertEmoji(\'' . $e . '\')" style="cursor:pointer;padding:.1rem .15rem;border-radius:4px;display:inline-block;" title="' . $e . '">' . $e . '</span>';
-      }
-      ?>
+  <div role="tabpanel" id="socTabpanel-fb" aria-labelledby="socTab-fb" tabindex="0">
+    <p role="status" style="margin:0 0 .5rem;font-size:.82rem;font-weight:600;min-height:0;"><span id="fbStatusBadge"><?php if ($fb_sched): ?><span style="color:#b45309;">⏱ FB: <?= h(date('d.m.Y H:i', strtotime($article['fb_scheduled_at']))) ?></span><?php endif; ?></span></p>
+    <div style="border:1px solid var(--border);border-radius:8px;padding:.85rem;background:#fafafa;margin-bottom:.4rem;">
+      <div id="socPreview-fb" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:.88rem;line-height:1.55;">Зарежда се прегледът…</div>
+      <img class="soc-photo" alt="Главната снимка на статията" style="display:none;width:100%;height:auto;margin-top:.75rem;border-radius:6px;">
     </div>
-    <textarea id="fbText" rows="7"
-              style="width:100%;font-size:.88rem;line-height:1.65;resize:vertical;"><?php
-      if (!empty($article['fb_text'])) {
-          echo h($article['fb_text']);
-      } elseif (!empty($article['social_text'])) {
-          echo h($article['social_text']);
-      } else {
-          $_soc_body = html_to_social_text($article['content'] ?? '');
-          echo h(trim(($article['title'] ?? '') . ($_soc_body ? "\n\n" . $_soc_body : '')));
-      }
-    ?></textarea>
-    <div id="fbCounter" style="display:flex;gap:1.25rem;margin-top:.3rem;font-size:.78rem;font-variant-numeric:tabular-nums;"></div>
-  </div>
+    <p id="socCount-fb" style="margin:0;font-size:.8rem;color:var(--text-muted);font-variant-numeric:tabular-nums;"></p>
+    <p id="socCut-fb" hidden style="margin:.25rem 0 0;font-size:.8rem;font-weight:600;color:#92400e;"><span aria-hidden="true">✂</span> Текстът е съкратен до последното цяло изречение</p>
+    <div data-emoji-anchor style="display:flex;gap:.4rem;flex-wrap:wrap;margin:.6rem 0 1rem;">
+      <button type="button" class="btn btn--outline soc-copy" data-platform="fb" style="font-size:.8rem;min-height:44px;">Копирай текста</button>
+      <!-- Task 6 makes the emoji go into the article itself; hidden until then (display:none — .btn overrides [hidden]). -->
+      <button type="button" id="socEmojiBtn" class="btn btn--outline" style="display:none;font-size:.8rem;min-height:44px;" data-emoji-target="content" aria-controls="socEmojiPicker" aria-expanded="false" onclick="_toggleEmojiPicker(this)">😊 Емоджи</button>
+    </div>
+      <div id="socEmojiPicker" style="display:none;background:#fff;border:1px solid var(--border);border-radius:8px;padding:.6rem;margin-bottom:.5rem;line-height:1.8;font-size:1.2rem;max-height:160px;overflow-y:auto;">
+        <?php
+        $emojis = ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙',
+                   '🥲','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐','😑','😶','😏','😒','🙄','😬',
+                   '🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤧','🥵','🥶','🥴','😵','🤯','🤠','🥳','🥸','😎',
+                   '🤓','🧐','😕','😟','🙁','☹️','😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥','😢','😭','😱','😖',
+                   '😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽',
+                   '👾','🤖','😺','😸','😹','😻','😼','😽','🙀','😿','😾',
+                   '👋','🤚','🖐️','✋','🖖','👌','🤌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍',
+                   '👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','💪','🦾','🦿','🦵','🦶','👂','🦻','👃',
+                   '❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖','💘','💝','💟','☮️',
+                   '✨','🌟','⭐','💫','🔥','🎉','🎊','🎈','🎁','🏆','🥇','🌈','☀️','🌙','⚡','❄️','🌺','🌸','🌻','🌹',
+                   '🙏','🌍','🌎','🌏','💡','📢','📣','🔔','💬','💭','🗣️','👥','🫶','💪','🚀','🛡️','🔑','🌱','🤝'];
+        foreach ($emojis as $e) {
+            echo '<span onclick="_insertEmoji(\'' . $e . '\')" style="cursor:pointer;padding:.1rem .15rem;border-radius:4px;display:inline-block;" title="' . $e . '">' . $e . '</span>';
+        }
+        ?>
+      </div>
 
-  <div style="margin-bottom:.75rem;">
-    <label for="fbScheduleAt" style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.3rem;">Планирай за</label>
-    <input type="datetime-local" id="fbScheduleAt"
-           value="<?= h(!empty($article['fb_scheduled_at']) ? date('Y-m-d\TH:i', strtotime($article['fb_scheduled_at'])) : $default_social_at) ?>"
-           style="font-size:.88rem;">
+    <div style="margin-bottom:.75rem;">
+      <label for="fbScheduleAt" style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.3rem;">Планирай за</label>
+      <input type="datetime-local" id="fbScheduleAt"
+             value="<?= h(!empty($article['fb_scheduled_at']) ? date('Y-m-d\TH:i', strtotime($article['fb_scheduled_at'])) : $default_social_at) ?>"
+             style="font-size:.88rem;min-height:44px;">
+    </div>
+    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.5rem;">
+      <button type="button" id="socFbBtn" class="btn btn--primary" style="font-size:.85rem;min-height:44px;white-space:nowrap;background:#1877f2;border-color:#1877f2;">
+        Планирай в Facebook
+      </button>
+      <button type="button" id="socFbNowBtn" class="btn btn--outline" style="font-size:.85rem;min-height:44px;white-space:nowrap;">
+        Публикувай сега (FB)
+      </button>
+      <span id="socFbSpinner" style="display:none;font-size:.85rem;color:var(--text-muted);">Изпраща се…</span>
+      <span id="socFbError" role="alert" style="display:none;font-size:.85rem;color:#c0392b;"></span>
+    </div>
+    <p style="margin:.25rem 0 0;font-size:.78rem;color:var(--text-muted);">
+      Публикацията ще бъде планирана в Buffer. Редактирайте я в <a href="https://publish.buffer.com" target="_blank" rel="noopener">publish.buffer.com</a>.
+    </p>
   </div>
-  <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.5rem;">
-    <button type="button" id="socFbBtn" class="btn btn--primary" style="font-size:.85rem;white-space:nowrap;background:#1877f2;border-color:#1877f2;">
-      Планирай в Facebook
-    </button>
-    <button type="button" id="socFbNowBtn" class="btn btn--outline" style="font-size:.85rem;white-space:nowrap;">
-      Публикувай сега (FB)
-    </button>
-    <span id="socFbSpinner" style="display:none;font-size:.85rem;color:var(--text-muted);">Изпраща се…</span>
-    <span id="socFbError" role="alert" style="display:none;font-size:.85rem;color:#c0392b;"></span>
-  </div>
-  <p style="margin:.25rem 0 1.25rem;font-size:.78rem;color:var(--text-muted);">
-    Публикацията ще бъде планирана в Buffer. Редактирайте я в <a href="https://publish.buffer.com" target="_blank" rel="noopener">publish.buffer.com</a>.
-  </p>
-
-  <!-- ── Divider ────────────────────────────────────────────────────────────── -->
-  <hr style="border:none;border-top:1px solid var(--border);margin:1.25rem 0;">
 
   <!-- ── Instagram ─────────────────────────────────────────────────────────── -->
-  <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="url(#ig2)" style="flex-shrink:0;">
-      <defs><linearGradient id="ig2" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#f09433"/><stop offset="25%" stop-color="#e6683c"/><stop offset="50%" stop-color="#dc2743"/><stop offset="75%" stop-color="#cc2366"/><stop offset="100%" stop-color="#bc1888"/></linearGradient></defs>
-      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/>
-    </svg>
-    <span style="font-size:.82rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">Instagram</span>
-  </div>
+  <div role="tabpanel" id="socTabpanel-insta" aria-labelledby="socTab-insta" tabindex="0" hidden>
+    <p role="status" style="margin:0 0 .5rem;font-size:.82rem;font-weight:600;display:flex;gap:.75rem;flex-wrap:wrap;">
+      <span id="instaStatusBadge"><?php if ($insta_sched): ?><span style="color:#b45309;">⏱ IG: <?= h(date('d.m.Y H:i', strtotime($article['insta_scheduled_at']))) ?></span><?php endif; ?></span>
+      <span id="instaStoryStatusBadge"><?php if ($insta_story_sched): ?><span style="color:#b45309;">⏱ IG Story: <?= h(date('d.m.Y H:i', strtotime($article['insta_story_scheduled_at']))) ?></span><?php endif; ?></span>
+    </p>
 
-  <div role="group" aria-label="Вид публикация в Instagram" style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;">
-    <button type="button" id="igModePostBtn" class="btn <?= $ig_default_story ? 'btn--outline' : 'btn--primary' ?>" aria-pressed="<?= $ig_default_story ? 'false' : 'true' ?>" style="font-size:.82rem;min-height:44px;">📷 Публикация</button>
-    <button type="button" id="igModeStoryBtn" class="btn <?= $ig_default_story ? 'btn--primary' : 'btn--outline' ?>" aria-pressed="<?= $ig_default_story ? 'true' : 'false' ?>" style="font-size:.82rem;min-height:44px;">🎬 Story</button>
-  </div>
+    <div role="group" aria-label="Вид публикация в Instagram" style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+      <button type="button" id="igModePostBtn" class="btn <?= $ig_default_story ? 'btn--outline' : 'btn--primary' ?>" aria-pressed="<?= $ig_default_story ? 'false' : 'true' ?>" style="font-size:.82rem;min-height:44px;">📷 Публикация</button>
+      <button type="button" id="igModeStoryBtn" class="btn <?= $ig_default_story ? 'btn--primary' : 'btn--outline' ?>" aria-pressed="<?= $ig_default_story ? 'true' : 'false' ?>" style="font-size:.82rem;min-height:44px;">🎬 Story</button>
+    </div>
 
-  <!-- What Instagram will receive: click a photo to choose which part is shown. -->
-  <style>.ig-crop-thumb:focus-visible{outline:3px solid #0387A5;outline-offset:2px;}.ig-crop-thumb:hover{border-color:#0387A5 !important;}</style>
-  <?php foreach (['post' => 'igCropPost', 'story' => 'igCropStory'] as $_kind => $_id):
-      $_shown = $_kind === 'story' ? $ig_default_story : !$ig_default_story;
-      $_items = $ig_preview[$_kind];
-      $_sched = $_kind === 'story' ? $insta_story_sched : $insta_sched; ?>
-  <div id="<?= $_id ?>" data-kind="<?= $_kind ?>" style="<?= $_shown ? '' : 'display:none;' ?>margin-bottom:1rem;">
-    <?php if (!$_items): ?>
-      <p style="margin:0;font-size:.82rem;color:var(--text-muted);">Добавете снимка към статията, за да видите как ще изглежда в Instagram.</p>
-    <?php else: ?>
-      <?php if ($_kind === 'post'): ?>
-      <div role="group" aria-label="Форма на публикацията в Instagram" style="display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;margin-bottom:.6rem;">
-        <span aria-hidden="true" style="font-size:.82rem;font-weight:600;margin-right:.2rem;">Форма:</span>
-        <?php foreach (['auto' => 'Автоматично', 'landscape' => '▭ Хоризонтална', 'square' => '□ Квадрат', 'portrait' => '▯ Вертикална'] as $_sv => $_sl):
-            $_on = $ig_preview['shape'] === $_sv; ?>
-        <button type="button" class="ig-shape-btn btn <?= $_on ? 'btn--primary' : 'btn--outline' ?>" data-shape="<?= $_sv ?>" aria-pressed="<?= $_on ? 'true' : 'false' ?>"
-                style="font-size:.78rem;min-height:44px;padding:.3rem .7rem;"><?= h($_sl) ?></button>
-        <?php endforeach; ?>
-      </div>
-      <?php endif; ?>
-      <div role="list" aria-label="<?= $_kind === 'story' ? 'Снимка за Instagram Story' : 'Снимки за публикацията в Instagram' ?>" style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:flex-end;margin-bottom:.4rem;">
-        <?php foreach ($_items as $_i => $_p):
-            $_h  = $_kind === 'story' ? 128 : 104;
-            $_w  = (int) round($_h * $_p['ar']);
-            $_r  = $_p['rect'];
-            $_lbl = $_kind === 'story'
-                ? 'Главната снимка в Story. Натиснете, за да изберете коя част да се вижда.'
-                : 'Снимка ' . ($_i + 1) . ' от ' . count($_items) . ($_i === 0 ? ' (главна)' : '') . '. Натиснете, за да изберете коя част да се вижда.';
-            $_fit = $_p['fit'] ?? 'fill'; ?>
-        <div role="listitem" style="display:flex;flex-direction:column;align-items:center;gap:.2rem;">
-          <button type="button" class="ig-crop-thumb" aria-label="<?= h($_lbl) ?>"
-                  data-src="<?= h($_p['src']) ?>" data-w="<?= (int) $_p['w'] ?>" data-h="<?= (int) $_p['h'] ?>" data-ar="<?= h((string) $_p['ar']) ?>" data-rect="<?= h(json_encode($_r)) ?>" data-fit="<?= h($_fit) ?>" data-fill-rect="<?= h(json_encode($_p['fill_rect'] ?? $_r)) ?>"
-                  style="display:block;padding:0;margin:0;border:2px solid var(--border,#e8ddd5);border-radius:6px;background:#f3efe9;cursor:pointer;width:<?= $_w + 4 ?>px;height:<?= $_h + 4 ?>px;overflow:hidden;">
-            <span style="display:block;position:relative;width:<?= $_w ?>px;height:<?= $_h ?>px;overflow:hidden;background:#fff;">
-              <img src="<?= h($_p['src']) ?>" alt="" loading="lazy" draggable="false"
-                   style="position:absolute;display:block;max-width:none;margin:0;width:<?= round(100 / $_r['w'], 4) ?>%;height:<?= round(100 / $_r['h'], 4) ?>%;left:<?= round(-100 * $_r['x'] / $_r['w'], 4) ?>%;top:<?= round(-100 * $_r['y'] / $_r['h'], 4) ?>%;">
-            </span>
-          </button>
-          <span aria-hidden="true" style="font-size:.72rem;color:var(--text-muted);"><?= $_kind === 'story' ? '9:16' : ($_i === 0 ? 'Главна' : (string) ($_i + 1)) ?></span>
-          <?php if ($_kind === 'post'): ?>
-          <button type="button" class="ig-fit-btn btn <?= $_fit === 'whole' ? 'btn--primary' : 'btn--outline' ?>" aria-pressed="<?= $_fit === 'whole' ? 'true' : 'false' ?>"
-                  aria-label="Снимка <?= $_i + 1 ?>: покажи цялата снимка, с бяла рамка" data-src="<?= h($_p['src']) ?>"
-                  style="font-size:.72rem;min-height:44px;padding:.2rem .55rem;white-space:nowrap;"><span class="ig-fit-tick" aria-hidden="true"><?= $_fit === 'whole' ? '✓ ' : '' ?></span>Цялата снимка</button>
-          <?php endif; ?>
+    <style>.ig-crop-thumb:focus-visible{outline:3px solid #0387A5;outline-offset:2px;}.ig-crop-thumb:hover{border-color:#0387A5 !important;}</style>
+    <?php foreach (['post' => 'igCropPost', 'story' => 'igCropStory'] as $_kind => $_id):
+        $_shown = $_kind === 'story' ? $ig_default_story : !$ig_default_story;
+        $_items = $ig_preview[$_kind];
+        $_sched = $_kind === 'story' ? $insta_story_sched : $insta_sched; ?>
+    <div id="<?= $_id ?>" data-kind="<?= $_kind ?>" style="<?= $_shown ? '' : 'display:none;' ?>margin-bottom:1rem;">
+      <?php if (!$_items): ?>
+        <p style="margin:0;font-size:.82rem;color:var(--text-muted);">Добавете снимка към статията и я запазете, за да видите как ще изглежда в Instagram.</p>
+      <?php else: ?>
+        <?php if ($_kind === 'post'): ?>
+        <div role="group" aria-label="Форма на публикацията в Instagram" style="display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;margin-bottom:.6rem;">
+          <span aria-hidden="true" style="font-size:.82rem;font-weight:600;margin-right:.2rem;">Форма:</span>
+          <?php foreach (['auto' => 'Автоматично', 'landscape' => '▭ Хоризонтална', 'square' => '□ Квадрат', 'portrait' => '▯ Вертикална'] as $_sv => $_sl):
+              $_on = $ig_preview['shape'] === $_sv; ?>
+          <button type="button" class="ig-shape-btn btn <?= $_on ? 'btn--primary' : 'btn--outline' ?>" data-shape="<?= $_sv ?>" aria-pressed="<?= $_on ? 'true' : 'false' ?>"
+                  style="font-size:.78rem;min-height:44px;padding:.3rem .7rem;"><?= h($_sl) ?></button>
+          <?php endforeach; ?>
         </div>
-        <?php endforeach; ?>
+        <?php endif; ?>
+        <div role="list" aria-label="<?= $_kind === 'story' ? 'Снимка за Instagram Story' : 'Снимки за публикацията в Instagram' ?>" style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:flex-end;margin-bottom:.4rem;">
+          <?php foreach ($_items as $_i => $_p):
+              $_h  = $_kind === 'story' ? 128 : 104;
+              $_w  = (int) round($_h * $_p['ar']);
+              $_r  = $_p['rect'];
+              $_lbl = $_kind === 'story'
+                  ? 'Главната снимка в Story. Натиснете, за да изберете коя част да се вижда.'
+                  : 'Снимка ' . ($_i + 1) . ' от ' . count($_items) . ($_i === 0 ? ' (главна)' : '') . '. Натиснете, за да изберете коя част да се вижда.';
+              $_fit = $_p['fit'] ?? 'fill'; ?>
+          <div role="listitem" style="display:flex;flex-direction:column;align-items:center;gap:.2rem;">
+            <button type="button" class="ig-crop-thumb" aria-label="<?= h($_lbl) ?>"
+                    data-src="<?= h($_p['src']) ?>" data-w="<?= (int) $_p['w'] ?>" data-h="<?= (int) $_p['h'] ?>" data-ar="<?= h((string) $_p['ar']) ?>" data-rect="<?= h(json_encode($_r)) ?>" data-fit="<?= h($_fit) ?>" data-fill-rect="<?= h(json_encode($_p['fill_rect'] ?? $_r)) ?>"
+                    style="display:block;padding:0;margin:0;border:2px solid var(--border,#e8ddd5);border-radius:6px;background:#f3efe9;cursor:pointer;width:<?= $_w + 4 ?>px;height:<?= $_h + 4 ?>px;overflow:hidden;">
+              <span style="display:block;position:relative;width:<?= $_w ?>px;height:<?= $_h ?>px;overflow:hidden;background:#fff;">
+                <img src="<?= h($_p['src']) ?>" alt="" loading="lazy" draggable="false"
+                     style="position:absolute;display:block;max-width:none;margin:0;width:<?= round(100 / $_r['w'], 4) ?>%;height:<?= round(100 / $_r['h'], 4) ?>%;left:<?= round(-100 * $_r['x'] / $_r['w'], 4) ?>%;top:<?= round(-100 * $_r['y'] / $_r['h'], 4) ?>%;">
+              </span>
+            </button>
+            <span aria-hidden="true" style="font-size:.72rem;color:var(--text-muted);"><?= $_kind === 'story' ? '9:16' : ($_i === 0 ? 'Главна' : (string) ($_i + 1)) ?></span>
+            <?php if ($_kind === 'post'): ?>
+            <button type="button" class="ig-fit-btn btn <?= $_fit === 'whole' ? 'btn--primary' : 'btn--outline' ?>" aria-pressed="<?= $_fit === 'whole' ? 'true' : 'false' ?>"
+                    aria-label="Снимка <?= $_i + 1 ?>: покажи цялата снимка, с бяла рамка" data-src="<?= h($_p['src']) ?>"
+                    style="font-size:.72rem;min-height:44px;padding:.2rem .55rem;white-space:nowrap;"><span class="ig-fit-tick" aria-hidden="true"><?= $_fit === 'whole' ? '✓ ' : '' ?></span>Цялата снимка</button>
+            <?php endif; ?>
+          </div>
+          <?php endforeach; ?>
+        </div>
+        <p style="margin:0;font-size:.8rem;color:var(--text-muted);">Натиснете снимка, за да изберете коя част да се вижда в Instagram.<?php if ($_kind === 'post'): ?> „Цялата снимка“ я показва цяла, с бяла рамка отстрани — като „Mixed“ в Instagram.<?php endif; ?></p>
+        <p class="ig-crop-sched-note" style="<?= $_sched ? '' : 'display:none;' ?>margin:.25rem 0 0;font-size:.8rem;color:#92400e;">
+          <?= $_kind === 'story' ? 'Story-то вече е планирано.' : 'Публикацията вече е планирана.' ?> Ако промените изрязването, натиснете отново „Планирай в Instagram“, за да стигне промяната до Instagram.
+        </p>
+      <?php endif; ?>
+    </div>
+    <?php endforeach; ?>
+    <p id="igCropStatus" role="status" aria-live="polite" style="margin:0 0 .75rem;font-size:.82rem;color:#2e7d32;min-height:0;"></p>
+    <p id="igCropError" role="alert" style="display:none;margin:0 0 .75rem;font-size:.82rem;color:#c0392b;"></p>
+
+    <div id="igPostTextGroup" style="<?= $ig_default_story ? 'display:none;' : '' ?>margin-bottom:1rem;">
+      <div style="border:1px solid var(--border);border-radius:8px;padding:.85rem;background:#fafafa;margin-bottom:.4rem;">
+        <div id="socPreview-insta" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:.88rem;line-height:1.55;">Зарежда се прегледът…</div>
       </div>
-      <p style="margin:0;font-size:.8rem;color:var(--text-muted);">Натиснете снимка, за да изберете коя част да се вижда в Instagram.<?php if ($_kind === 'post'): ?> „Цялата снимка“ я показва цяла, с бяла рамка отстрани — като „Mixed“ в Instagram.<?php endif; ?></p>
-      <p class="ig-crop-sched-note" style="<?= $_sched ? '' : 'display:none;' ?>margin:.25rem 0 0;font-size:.8rem;color:#92400e;">
-        <?= $_kind === 'story' ? 'Story-то вече е планирано.' : 'Публикацията вече е планирана.' ?> Ако промените изрязването, натиснете отново „Планирай в Instagram“, за да стигне промяната до Instagram.
-      </p>
-    <?php endif; ?>
-  </div>
-  <?php endforeach; ?>
-  <p id="igCropStatus" role="status" aria-live="polite" style="margin:0 0 .75rem;font-size:.82rem;color:#2e7d32;min-height:0;"></p>
-  <p id="igCropError" role="alert" style="display:none;margin:0 0 .75rem;font-size:.82rem;color:#c0392b;"></p>
+      <p id="socCount-insta" style="margin:0;font-size:.8rem;color:var(--text-muted);font-variant-numeric:tabular-nums;"></p>
+      <p id="socCut-insta" hidden style="margin:.25rem 0 0;font-size:.8rem;font-weight:600;color:#92400e;"><span aria-hidden="true">✂</span> Текстът е съкратен до последното цяло изречение</p>
+      <div data-emoji-anchor style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.6rem;">
+        <button type="button" class="btn btn--outline soc-copy" data-platform="insta" style="font-size:.8rem;min-height:44px;">Копирай текста</button>
+        <button type="button" id="socEmojiBtnInsta" class="btn btn--outline" style="display:none;font-size:.8rem;min-height:44px;" data-emoji-target="content" aria-controls="socEmojiPicker" aria-expanded="false" onclick="_toggleEmojiPicker(this)">😊 Емоджи</button>
+      </div>
+    </div>
 
-  <div class="form-group" id="igPostTextGroup" style="<?= $ig_default_story ? 'display:none;' : '' ?>margin-bottom:1rem;">
-    <label style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;">
-      <span style="font-size:.85rem;font-weight:600;">Текст за Instagram</span>
-      <span style="display:flex;gap:.4rem;flex-wrap:wrap;">
-        <button type="button" id="socEmojiBtnInsta" class="btn btn--outline" style="font-size:.75rem;padding:.25rem .6rem;" data-emoji-target="instaText" aria-controls="socEmojiPicker" aria-expanded="false" onclick="_toggleEmojiPicker(this)">😊 Емоджи</button>
-        <button type="button" id="socCopyFromFbBtn" class="btn btn--outline" style="font-size:.75rem;padding:.25rem .6rem;">📋 Копирай от FB</button>
-        <button type="button" id="instaCopyBtn" class="btn btn--outline" style="font-size:.75rem;padding:.25rem .6rem;">Копирай</button>
-      </span>
-    </label>
-    <textarea id="instaText" rows="7"
-              style="width:100%;font-size:.88rem;line-height:1.65;resize:vertical;"><?php
-      if (!empty($article['insta_text'])) {
-          echo h($article['insta_text']);
-      }
-    ?></textarea>
-    <div id="instaCounter" style="display:flex;gap:1.25rem;margin-top:.3rem;font-size:.78rem;font-variant-numeric:tabular-nums;"></div>
+    <p id="igStoryNoteGroup" style="<?= $ig_default_story ? '' : 'display:none;' ?>margin:0 0 1rem;font-size:.82rem;color:var(--text-muted);">
+      Instagram Story се публикува само с главната снимка на статията, изрязана вертикално (9:16). Instagram не позволява текст или линк върху Story, публикувано автоматично.
+    </p>
+
+    <div style="margin-bottom:.75rem;<?= $ig_default_story ? 'display:none;' : '' ?>" id="igPostScheduleGroup">
+      <label for="instaScheduleAt" style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.3rem;">Планирай за</label>
+      <input type="datetime-local" id="instaScheduleAt"
+             value="<?= h(!empty($article['insta_scheduled_at']) ? date('Y-m-d\TH:i', strtotime($article['insta_scheduled_at'])) : $default_social_at) ?>"
+             style="font-size:.88rem;min-height:44px;">
+    </div>
+    <div style="margin-bottom:.75rem;<?= $ig_default_story ? '' : 'display:none;' ?>" id="igStoryScheduleGroup">
+      <label for="instaStoryScheduleAt" style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.3rem;">Планирай Story за</label>
+      <input type="datetime-local" id="instaStoryScheduleAt"
+             value="<?= h(!empty($article['insta_story_scheduled_at']) ? date('Y-m-d\TH:i', strtotime($article['insta_story_scheduled_at'])) : $default_social_at) ?>"
+             style="font-size:.88rem;min-height:44px;">
+    </div>
+    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.5rem;">
+      <button type="button" id="socInstaBtn" class="btn btn--primary" style="font-size:.85rem;min-height:44px;white-space:nowrap;background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);border:none;">
+        Планирай в Instagram
+      </button>
+      <button type="button" id="socInstaNowBtn" class="btn btn--outline" style="font-size:.85rem;min-height:44px;white-space:nowrap;">
+        Публикувай сега (IG)
+      </button>
+      <span id="socInstaSpinner" style="display:none;font-size:.85rem;color:var(--text-muted);">Изпраща се…</span>
+      <span id="socInstaError" role="alert" style="display:none;font-size:.85rem;color:#c0392b;"></span>
+    </div>
+    <p style="margin:.25rem 0 0;font-size:.78rem;color:var(--text-muted);">
+      Публикацията ще бъде планирана в Buffer. Редактирайте я в <a href="https://publish.buffer.com" target="_blank" rel="noopener">publish.buffer.com</a>.
+    </p>
   </div>
 
-  <p id="igStoryNoteGroup" style="<?= $ig_default_story ? '' : 'display:none;' ?>margin:0 0 1rem;font-size:.82rem;color:var(--text-muted);">
-    Instagram Story се публикува само с главната снимка на статията, изрязана вертикално (9:16). Instagram не позволява текст или линк върху Story, публикувано автоматично.
-  </p>
-
-  <div style="margin-bottom:.75rem;<?= $ig_default_story ? 'display:none;' : '' ?>" id="igPostScheduleGroup">
-    <label for="instaScheduleAt" style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.3rem;">Планирай за</label>
-    <input type="datetime-local" id="instaScheduleAt"
-           value="<?= h(!empty($article['insta_scheduled_at']) ? date('Y-m-d\TH:i', strtotime($article['insta_scheduled_at'])) : $default_social_at) ?>"
-           style="font-size:.88rem;">
-  </div>
-  <div style="margin-bottom:.75rem;<?= $ig_default_story ? '' : 'display:none;' ?>" id="igStoryScheduleGroup">
-    <label for="instaStoryScheduleAt" style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.3rem;">Планирай Story за</label>
-    <input type="datetime-local" id="instaStoryScheduleAt"
-           value="<?= h(!empty($article['insta_story_scheduled_at']) ? date('Y-m-d\TH:i', strtotime($article['insta_story_scheduled_at'])) : $default_social_at) ?>"
-           style="font-size:.88rem;">
-  </div>
-  <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.5rem;">
-    <button type="button" id="socInstaBtn" class="btn btn--primary" style="font-size:.85rem;white-space:nowrap;background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);border:none;">
-      Планирай в Instagram
-    </button>
-    <button type="button" id="socInstaNowBtn" class="btn btn--outline" style="font-size:.85rem;white-space:nowrap;">
-      Публикувай сега (IG)
-    </button>
-    <span id="socInstaSpinner" style="display:none;font-size:.85rem;color:var(--text-muted);">Изпраща се…</span>
-    <span id="socInstaError" role="alert" style="display:none;font-size:.85rem;color:#c0392b;"></span>
-  </div>
-  <p style="margin:.25rem 0 0;font-size:.78rem;color:var(--text-muted);">
-    Публикацията ще бъде планирана в Buffer. Редактирайте я в <a href="https://publish.buffer.com" target="_blank" rel="noopener">publish.buffer.com</a>.
-  </p>
-</div>
-
-<!-- ── LinkedIn panel ─────────────────────────────────────────────────────── -->
-<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;margin-top:1.5rem;" id="linkedinPanel">
-  <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap;">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="#0a66c2" style="flex-shrink:0;"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
-    <h2 style="font-size:.95rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:0;">LinkedIn</h2>
-    <span id="liStatusBadge" style="margin-left:auto;font-size:.82rem;font-weight:600;">
+  <!-- ── LinkedIn (the English version) ────────────────────────────────────── -->
+  <div role="tabpanel" id="socTabpanel-linkedin" aria-labelledby="socTab-linkedin" tabindex="0" hidden>
+    <p id="liStatusBadge" role="status" style="margin:0 0 .5rem;font-size:.82rem;font-weight:600;">
       <?php if ($li_posted): ?>
         <span style="color:#2e7d32;">✓ Публикувано <?= h(date('d.m.Y', strtotime($article['linkedin_posted_at']))) ?>
         <?php if (!empty($article['linkedin_url'])): ?>
@@ -751,107 +663,57 @@ window._showSiteNotice = function (msg, afterEl) {
       <?php elseif ($li_scheduled): ?>
         <span style="color:#b45309;">⏱ Планирано за <?= h(date('d.m.Y H:i', strtotime($article['linkedin_scheduled_at']))) ?></span>
       <?php endif; ?>
-    </span>
-  </div>
-
-  <!-- Generate + actions row -->
-  <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;">
-    <button type="button" id="liGenerateNewsBtn" class="btn btn--outline" style="font-size:.82rem;">
-      ✦ Генерирай LinkedIn новина
-    </button>
-    <button type="button" id="liGeneratePostBtn" class="btn btn--outline" style="font-size:.82rem;">
-      ✦ Генерирай LinkedIn пост
-    </button>
-    <span id="liSpinner" style="display:none;font-size:.82rem;color:var(--text-muted);">Генерира се…</span>
-    <span id="liError" style="display:none;font-size:.82rem;color:#c0392b;"></span>
-  </div>
-
-  <!-- Text + scheduling (hidden until text is generated or already exists) -->
-  <div id="liTextWrap">
-    <div class="form-group" style="margin-bottom:1rem;">
-      <label style="display:flex;justify-content:space-between;align-items:center;">
-        <span>Текст за LinkedIn (EN)</span>
-        <div style="display:flex;gap:.4rem;">
-          <button type="button" id="liBoldBtn" title="Bold selected text (Unicode)"
-                  style="padding:.2rem .55rem;border:1px solid var(--border);border-radius:4px;background:#fff;cursor:pointer;font-weight:700;font-size:.88rem;line-height:1.4;">𝗕</button>
-          <button type="button" id="liCopyBtn" class="btn btn--outline" style="font-size:.75rem;padding:.25rem .6rem;">Копирай</button>
-        </div>
-      </label>
-      <textarea id="liText" rows="8"
-                style="width:100%;font-size:.88rem;line-height:1.65;resize:vertical;"><?php
-        if (!empty($article['linkedin_text'])) {
-            echo h($article['linkedin_text']);
-        } else {
-            $_li_title = ($article_en['title'] ?? '') ?: ($article['title'] ?? '');
-            $_li_raw   = ($article_en['content'] ?? '') ?: ($article['content'] ?? '');
-            $_li_body  = html_to_social_text($_li_raw);
-            echo h(trim($_li_title . ($_li_body ? "\n\n" . $_li_body : '')));
-        }
-      ?></textarea>
-      <div id="liCounter" style="display:flex;gap:1.25rem;margin-top:.3rem;font-size:.78rem;font-variant-numeric:tabular-nums;"></div>
+    </p>
+    <p style="margin:0 0 .5rem;font-size:.8rem;color:var(--text-muted);">LinkedIn получава английската версия на статията.</p>
+    <div style="border:1px solid var(--border);border-radius:8px;padding:.85rem;background:#fafafa;margin-bottom:.4rem;">
+      <div id="socPreview-linkedin" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:.88rem;line-height:1.55;">Зарежда се прегледът…</div>
+      <img class="soc-photo" alt="Главната снимка на статията" style="display:none;width:100%;height:auto;margin-top:.75rem;border-radius:6px;">
+    </div>
+    <div id="socEnEmpty" hidden style="margin:.5rem 0;">
+      <p style="margin:0 0 .5rem;font-size:.85rem;font-weight:600;"><span aria-hidden="true">ℹ</span> Няма английски текст — преведете статията</p>
+      <button type="button" id="socTranslateBtn" class="btn btn--outline" style="font-size:.82rem;min-height:44px;"><?= $deepl_ready ? '✦ Преведи на английски' : 'Към английската версия' ?></button>
+    </div>
+    <p id="socCount-linkedin" style="margin:0;font-size:.8rem;color:var(--text-muted);font-variant-numeric:tabular-nums;"></p>
+    <p id="socCut-linkedin" hidden style="margin:.25rem 0 0;font-size:.8rem;font-weight:600;color:#92400e;"><span aria-hidden="true">✂</span> Текстът е съкратен до последното цяло изречение</p>
+    <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin:.6rem 0 1rem;">
+      <button type="button" class="btn btn--outline soc-copy" data-platform="linkedin" style="font-size:.8rem;min-height:44px;">Копирай текста</button>
     </div>
 
-    <!-- Buffer scheduling -->
     <div style="margin-bottom:.75rem;">
       <label for="liScheduleAt" style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.3rem;">Планирай за</label>
       <input type="datetime-local" id="liScheduleAt"
              value="<?= h(!empty($article['linkedin_scheduled_at']) ? date('Y-m-d\TH:i', strtotime($article['linkedin_scheduled_at'])) : date('Y-m-d\TH:i', strtotime('+1 day 09:00'))) ?>"
-             style="font-size:.88rem;">
+             style="font-size:.88rem;min-height:44px;">
     </div>
     <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-      <button type="button" id="liScheduleBtn" class="btn btn--primary" style="font-size:.85rem;white-space:nowrap;">
-        Планирай в Buffer
+      <button type="button" id="liScheduleBtn" class="btn btn--primary" style="font-size:.85rem;min-height:44px;white-space:nowrap;">
+        Планирай в LinkedIn
       </button>
-      <button type="button" id="liNowBtn" class="btn btn--outline" style="font-size:.85rem;white-space:nowrap;">
-        Публикувай сега
+      <button type="button" id="liNowBtn" class="btn btn--outline" style="font-size:.85rem;min-height:44px;white-space:nowrap;">
+        Публикувай сега (LinkedIn)
       </button>
       <span id="liScheduleSpinner" style="display:none;font-size:.85rem;color:var(--text-muted);">Изпраща се…</span>
-      <span id="liScheduleError" style="display:none;font-size:.85rem;color:#c0392b;"></span>
+      <span id="liScheduleError" role="alert" style="display:none;font-size:.85rem;color:#c0392b;"></span>
     </div>
     <p style="margin:.4rem 0 0;font-size:.78rem;color:var(--text-muted);">
       Публикацията ще бъде планирана в Buffer за избрания час. Можете да я редактирате в <a href="https://publish.buffer.com" target="_blank" rel="noopener">publish.buffer.com</a>.
     </p>
-
   </div>
-</div>
-<?php endif; // $tab === 'social' && !$is_new && $claude_ready ?>
-<?php if ($tab === 'social' && !$is_new && !$claude_ready): ?>
-<div style="margin-top:1.5rem;padding:1rem;background:#f9fafb;border:1px solid var(--border);border-radius:var(--radius-lg);font-size:.88rem;color:var(--text-muted);">
-  Социални мрежи: конфигурирайте Claude API ключ в <a href="/admin/payment.php">Плащания → Claude</a>.
-</div>
-<?php endif; ?>
+</aside>
+<?php endif; // $social_on ?>
+</div><!-- /#editorLayout -->
 
-<?php if ($tab === 'content'): ?>
 <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--border);">
   <button type="submit" form="articleForm" class="btn btn--primary">Запази статията</button>
 </div>
-<?php endif; ?>
 
 <script>
-// ── Shared helpers — used by both tabs (the Content tab has the editors; the
-// Social tab's text generation falls back to reading them when they're there) ──
+// ── Shared helpers ──────────────────────────────────────────────────────────────
 function _tinyGet(id) {
   var ed = tinymce.get(id);
   if (ed) return ed.getContent();
   var el = document.getElementById(id);
   return el ? el.value : '';
-}
-// Plain text for a social post, keeping the layout — mirrors html_to_social_text()
-// in includes/articles.php (paragraphs → empty line, <br> → line, <li> → "• ").
-function _htmlToSocialText(html) {
-  html = String(html || '')
-    .replace(/\s*\n\s*/g, ' ')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<li(?:\s[^>]*)?>/gi, '• ')
-    .replace(/<\/li>/gi, '\n')
-    .replace(/<\/(?:p|div|h[1-6]|blockquote|ul|ol|table|tr)>/gi, '\n\n');
-  var tmp = document.createElement('textarea');
-  tmp.innerHTML = html.replace(/<[^>]*>/g, '');
-  return tmp.value
-    .replace(/ /g, ' ')
-    .replace(/[ \t]*\n[ \t]*/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
 }
 function _tinySet(id, html) {
   var ed = tinymce.get(id);
@@ -860,7 +722,6 @@ function _tinySet(id, html) {
   if (el) el.value = html;
 }
 
-<?php if ($tab === 'content'): ?>
 document.getElementById('tagsInput').addEventListener('input', function () {
   document.getElementById('tagsHidden').value = this.value;
 });
@@ -1224,451 +1085,13 @@ if (translateBtn) {
   });
 }
 
-<?php endif; // $tab === 'content' ?>
 
-<?php if ($tab === 'social'): ?>
-// ── LinkedIn panel ─────────────────────────────────────────────────────────────
+<?php if ($social_on): ?>
+// ── Emoji picker (Socials panel) ────────────────────────────────────────────────
+// Its buttons are hidden for now: the post text is the article itself, so Task 6
+// points the picker at the article editors (content / content_en).
 (function () {
-  var generateNewsBtn = document.getElementById('liGenerateNewsBtn');
-  if (!generateNewsBtn) return;  // not shown for new articles
-
-  var liTextArea   = document.getElementById('liText');
-  var copyBtn      = document.getElementById('liCopyBtn');
-  var scheduleBtn  = document.getElementById('liScheduleBtn');
-  var slug         = '<?= h($edit_slug) ?>';
-
-  // Unicode bold sans-serif map (LinkedIn-compatible)
-  var _boldMap = (function () {
-    var m = {};
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'.split('').forEach(function (c) {
-      var code = c.charCodeAt(0);
-      var bold;
-      if (c >= 'A' && c <= 'Z') bold = 0x1D5D4 + (code - 65);
-      else if (c >= 'a' && c <= 'z') bold = 0x1D5EE + (code - 97);
-      else bold = 0x1D7EC + (code - 48);
-      m[c] = String.fromCodePoint(bold);
-    });
-    return m;
-  })();
-
-  function _toBold(str) {
-    return str.split('').map(function (c) { return _boldMap[c] || c; }).join('');
-  }
-
-  function _isAlreadyBold(str) {
-    // Check if first alphanumeric char is already a Unicode bold codepoint
-    for (var i = 0; i < str.length; i++) {
-      var cp = str.codePointAt(i);
-      if ((cp >= 0x1D5D4 && cp <= 0x1D607) || (cp >= 0x1D7EC && cp <= 0x1D7F5)) return true;
-      if (/[A-Za-z0-9]/.test(str[i])) return false;
-    }
-    return false;
-  }
-
-  function _fromBold(str) {
-    return Array.from(str).map(function (c) {
-      var cp = c.codePointAt(0);
-      if (cp >= 0x1D5D4 && cp <= 0x1D5ED) return String.fromCharCode(cp - 0x1D5D4 + 65); // A-Z
-      if (cp >= 0x1D5EE && cp <= 0x1D607) return String.fromCharCode(cp - 0x1D5EE + 97); // a-z
-      if (cp >= 0x1D7EC && cp <= 0x1D7F5) return String.fromCharCode(cp - 0x1D7EC + 48); // 0-9
-      return c;
-    }).join('');
-  }
-
-  // Bold button — toggle bold on selection
-  var boldBtn = document.getElementById('liBoldBtn');
-  if (boldBtn) {
-    boldBtn.addEventListener('click', function () {
-      var start = liTextArea.selectionStart;
-      var end   = liTextArea.selectionEnd;
-      if (start === end) return; // nothing selected
-      var sel     = liTextArea.value.substring(start, end);
-      var toggled = _isAlreadyBold(sel) ? _fromBold(sel) : _toBold(sel);
-      liTextArea.setRangeText(toggled, start, end, 'select');
-      liTextArea.dispatchEvent(new Event('input'));
-    });
-  }
-
-  async function liPost(body) {
-    var r = await fetch('/admin/linkedin-ajax.php', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(Object.assign({ csrf_token: '<?= csrf_token() ?>', slug: slug }, body))
-    });
-    return r.json();
-  }
-
-  // Generate — shared handler for both buttons
-  function _liGenerate(generateType) {
-    var spinner = document.getElementById('liSpinner');
-    var errEl   = document.getElementById('liError');
-    generateNewsBtn.disabled = true;
-    document.getElementById('liGeneratePostBtn').disabled = true;
-    spinner.style.display = '';
-    errEl.style.display   = 'none';
-    liPost({ action: 'generate', generate_type: generateType })
-      .then(function(data) {
-        if (!data.ok) {
-          errEl.textContent   = data.error;
-          errEl.style.display = '';
-        } else {
-          liTextArea.value = data.text;
-          document.getElementById('liTextWrap').style.display = '';
-        }
-      })
-      .catch(function() {
-        errEl.textContent   = 'Грешка при свързване.';
-        errEl.style.display = '';
-      })
-      .finally(function() {
-        generateNewsBtn.disabled = false;
-        document.getElementById('liGeneratePostBtn').disabled = false;
-        spinner.style.display = 'none';
-      });
-  }
-
-  generateNewsBtn.addEventListener('click', function() { _liGenerate('news'); });
-  document.getElementById('liGeneratePostBtn').addEventListener('click', function() { _liGenerate('post'); });
-
-  // Copy
-  if (copyBtn) {
-    copyBtn.addEventListener('click', function() {
-      navigator.clipboard.writeText(liTextArea.value).then(function() {
-        var orig = copyBtn.textContent;
-        copyBtn.textContent = '✓ Копирано';
-        setTimeout(function() { copyBtn.textContent = orig; }, 1500);
-      }).catch(function() { liTextArea.select(); document.execCommand('copy'); });
-    });
-  }
-
-  function _liGetText() {
-    var text = liTextArea.value.trim();
-    if (text) return text;
-    // Fallback: build from EN title/content (or BG if EN not filled)
-    var enTitle   = (document.getElementById('title_en') || {}).value || '';
-    var bgTitle   = (document.getElementById('title')    || {}).value || '';
-    var useTitle  = enTitle.trim() || bgTitle.trim();
-    var enContent = _tinyGet('content_en');
-    var bgContent = _tinyGet('content');
-    var rawHtml   = enContent.trim() || bgContent.trim();
-    var bodyText  = _htmlToSocialText(rawHtml);
-    return useTitle + (bodyText ? '\n\n' + bodyText : '');
-  }
-
-  async function _liSend(scheduled_at, btn) {
-    var text    = _liGetText();
-    var spinner = document.getElementById('liScheduleSpinner');
-    var errEl   = document.getElementById('liScheduleError');
-    btn.disabled          = true;
-    spinner.style.display = '';
-    errEl.style.display   = 'none';
-    try {
-      var data = await liPost({ action: 'schedule', linkedin_text: text, scheduled_at: scheduled_at });
-      if (!data.ok) {
-        errEl.textContent   = data.error;
-        errEl.style.display = '';
-      } else {
-        var badge = document.getElementById('liStatusBadge');
-        if (data.due_at) {
-          var dt      = new Date(data.due_at);
-          var dateStr = dt.toLocaleString('bg-BG', {
-            timeZone: 'Europe/Sofia', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'
-          });
-          badge.innerHTML = '<span style="color:#b45309;">⏱ Планирано за ' + dateStr + ' (Sofia)</span>';
-        } else {
-          badge.innerHTML = '<span style="color:#2e7d32;">✓ Публикувано сега</span>';
-        }
-        _showSiteNotice(data.site_notice, errEl);
-      }
-    } catch(e) {
-      errEl.textContent   = 'Грешка при свързване.';
-      errEl.style.display = '';
-    }
-    btn.disabled          = false;
-    spinner.style.display = 'none';
-  }
-
-  // Schedule via Buffer
-  if (scheduleBtn) {
-    scheduleBtn.addEventListener('click', function() {
-      var schedAt = document.getElementById('liScheduleAt').value;
-      var errEl   = document.getElementById('liScheduleError');
-      if (!schedAt) { errEl.textContent = 'Изберете дата и час.'; errEl.style.display = ''; return; }
-      _liSend(schedAt, scheduleBtn);
-    });
-  }
-
-  // Publish now
-  var liNowBtn = document.getElementById('liNowBtn');
-  if (liNowBtn) {
-    liNowBtn.addEventListener('click', function() { _liSend('now', liNowBtn); });
-  }
-})();
-
-// ── Facebook / Instagram panel ─────────────────────────────────────────────────
-(function () {
-  var generateNewsBtn = document.getElementById('socGenerateNewsBtn');
-  if (!generateNewsBtn) return;
-
-  var fbText    = document.getElementById('fbText');
-  var instaText = document.getElementById('instaText');
-  var slug      = '<?= h($edit_slug) ?>';
-
-  // ── Instagram Feed Post / Story mode toggle ────────────────────────────────
-  // Story has no text/link — Instagram doesn't support either on an
-  // automatically-published Story — so switching modes only ever affects the
-  // Feed Post's text box and the schedule-time field.
-  var igMode = <?= $ig_default_story ? "'story'" : "'post'" ?>;
-
-  function _igSetMode(mode) {
-    if (mode === igMode) return;
-    igMode = mode;
-    document.getElementById('igPostTextGroup').style.display      = mode === 'post'  ? '' : 'none';
-    document.getElementById('igStoryNoteGroup').style.display     = mode === 'story' ? '' : 'none';
-    document.getElementById('igPostScheduleGroup').style.display  = mode === 'post'  ? '' : 'none';
-    document.getElementById('igStoryScheduleGroup').style.display = mode === 'story' ? '' : 'none';
-    var postBtn  = document.getElementById('igModePostBtn');
-    var storyBtn = document.getElementById('igModeStoryBtn');
-    postBtn.className  = 'btn ' + (mode === 'post'  ? 'btn--primary' : 'btn--outline');
-    storyBtn.className = 'btn ' + (mode === 'story' ? 'btn--primary' : 'btn--outline');
-    postBtn.setAttribute('aria-pressed',  mode === 'post'  ? 'true' : 'false');
-    storyBtn.setAttribute('aria-pressed', mode === 'story' ? 'true' : 'false');
-    document.getElementById('igCropPost').style.display  = mode === 'post'  ? '' : 'none';
-    document.getElementById('igCropStory').style.display = mode === 'story' ? '' : 'none';
-    document.getElementById('igCropStatus').textContent = '';
-    document.getElementById('igCropError').style.display = 'none';
-    document.getElementById('socInstaError').style.display = 'none';
-  }
-
-  // ── Instagram crop previews ──────────────────────────────────────────────
-  // Each thumbnail shows the exact part Instagram gets (the original photo, shifted
-  // and scaled inside a box of the final shape). Clicking opens the shared cropper
-  // locked to that shape; "Готово" saves the choice and the thumbnail follows.
-  var cropStatus = document.getElementById('igCropStatus');
-  var cropError  = document.getElementById('igCropError');
-  function _igPlace(btn, r) {
-    var img = btn.querySelector('img');
-    img.style.width  = (100 / r.w) + '%';
-    img.style.height = (100 / r.h) + '%';
-    img.style.left   = (-100 * r.x / r.w) + '%';
-    img.style.top    = (-100 * r.y / r.h) + '%';
-    btn.dataset.rect = JSON.stringify({ x: r.x, y: r.y, w: r.w, h: r.h });
-  }
-  // Redraw the post's photos from a fresh preview (after the shape, a crop or "whole"
-  // changes): size, part shown, and whether each is shown whole on white.
-  function _igRedraw(items) {
-    var btns = document.querySelectorAll('#igCropPost .ig-crop-thumb');
-    items.forEach(function (it, i) {
-      var b = btns[i];
-      if (!b || b.dataset.src !== it.src) return;
-      var w = Math.round(104 * it.ar);
-      b.dataset.ar = it.ar;
-      b.dataset.fit = it.fit;
-      b.dataset.fillRect = JSON.stringify(it.fill_rect);
-      b.style.width = (w + 4) + 'px';
-      b.querySelector('span').style.width = w + 'px';
-      _igPlace(b, it.rect);
-      var fb = b.parentNode.querySelector('.ig-fit-btn');
-      if (fb) {
-        var whole = it.fit === 'whole';
-        fb.setAttribute('aria-pressed', whole ? 'true' : 'false');
-        fb.classList.toggle('btn--primary', whole);
-        fb.classList.toggle('btn--outline', !whole);
-        fb.querySelector('.ig-fit-tick').textContent = whole ? '✓ ' : '';
-      }
-    });
-  }
-  document.querySelectorAll('.ig-fit-btn').forEach(function (fb) {
-    fb.addEventListener('click', function () {
-      var fit = fb.getAttribute('aria-pressed') === 'true' ? 'fill' : 'whole';
-      cropError.style.display = 'none';
-      cropStatus.textContent = 'Запазва се…';
-      socPost({ action: 'save_fit', src: fb.dataset.src, fit: fit }).then(function (res) {
-        if (!res.ok) { var err = new Error(res.error || ''); err.fromServer = true; throw err; }
-        _igRedraw(res.post || []);
-        cropStatus.textContent = fit === 'whole'
-          ? 'Запазено. Instagram ще покаже цялата снимка, с бяла рамка.'
-          : 'Запазено. Снимката ще запълни рамката.';
-      }).catch(function (e) {
-        cropStatus.textContent = '';
-        cropError.textContent = (e && e.fromServer && e.message) || 'Изборът не можа да се запази. Проверете връзката и опитайте отново.';
-        cropError.style.display = '';
-      });
-    });
-  });
-  document.querySelectorAll('.ig-shape-btn').forEach(function (sb) {
-    sb.addEventListener('click', function () {
-      var all = document.querySelectorAll('.ig-shape-btn');
-      var prev = document.querySelector('.ig-shape-btn[aria-pressed="true"]');
-      var press = function (on) {
-        all.forEach(function (x) {
-          var p = x === on;
-          x.setAttribute('aria-pressed', p ? 'true' : 'false');
-          x.classList.toggle('btn--primary', p);
-          x.classList.toggle('btn--outline', !p);
-        });
-      };
-      press(sb);
-      cropError.style.display = 'none';
-      cropStatus.textContent = 'Запазва се…';
-      socPost({ action: 'save_shape', shape: sb.dataset.shape }).then(function (res) {
-        if (!res.ok) { var err = new Error(res.error || ''); err.fromServer = true; throw err; }
-        _igRedraw(res.post || []);
-        cropStatus.textContent = 'Запазено. Instagram ще получи снимките в тази форма.';
-      }).catch(function (e) {
-        press(prev);
-        cropStatus.textContent = '';
-        cropError.textContent = (e && e.fromServer && e.message) || 'Формата не можа да се запази. Проверете връзката и опитайте отново.';
-        cropError.style.display = '';
-      });
-    });
-  });
-  document.querySelectorAll('.ig-crop-thumb').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      if (!window.OMCrop || !OMCrop.pick) return;
-      var kind = btn.closest('[data-kind]').dataset.kind;
-      var w = +btn.dataset.w, h = +btn.dataset.h, ar = +btn.dataset.ar;
-      var cur = JSON.parse(btn.dataset.rect);   // what Instagram gets now, as fractions
-      // Shown whole: the cropper starts from the part a fill would show.
-      var start = btn.dataset.fit === 'whole' ? JSON.parse(btn.dataset.fillRect) : cur;
-      cropError.style.display = 'none';
-      OMCrop.pick(btn.dataset.src, {
-        aspectRatio: ar,
-        data: { x: start.x * w, y: start.y * h, width: start.w * w, height: start.h * h }
-      }).then(function (d) {
-        if (!d) return;
-        var nw = d.naturalWidth || w, nh = d.naturalHeight || h;
-        var rect = { x: d.x / nw, y: d.y / nh, w: d.width / nw, h: d.height / nh, ar: ar };
-        _igPlace(btn, rect);   // the thumbnail follows at once
-        cropStatus.textContent = 'Запазва се…';
-        return socPost({ action: 'save_crop', kind: kind, src: btn.dataset.src, rect: rect }).then(function (res) {
-          if (!res.ok) { var err = new Error(res.error || ''); err.fromServer = true; throw err; }
-          _igPlace(btn, res.rect);
-          if (res.post) _igRedraw(res.post);   // a chosen crop means the photo fills the frame
-          cropStatus.textContent = 'Запазено. Instagram ще покаже тази част от снимката.';
-        }).catch(function (e) {
-          _igPlace(btn, cur);   // not saved — show what Instagram will really get
-          throw e;
-        });
-      }).catch(function (e) {
-        cropStatus.textContent = '';
-        cropError.textContent = (e && e.fromServer && e.message) || 'Изрязването не можа да се запази. Проверете връзката и опитайте отново.';
-        cropError.style.display = '';
-      });
-    });
-  });
-
-  document.getElementById('igModePostBtn').addEventListener('click', function() { _igSetMode('post'); });
-  document.getElementById('igModeStoryBtn').addEventListener('click', function() { _igSetMode('story'); });
-
-  async function socPost(body) {
-    var r = await fetch('/admin/social-ajax.php', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(Object.assign({ csrf_token: '<?= csrf_token() ?>', slug: slug }, body))
-    });
-    return r.json();
-  }
-
-  function fmtSofia(due_at) {
-    return new Date(due_at).toLocaleString('bg-BG', {
-      timeZone: 'Europe/Sofia', day:'2-digit', month:'2-digit', year:'numeric',
-      hour:'2-digit', minute:'2-digit'
-    });
-  }
-
-  function _fbGetText() {
-    var text = fbText.value.trim();
-    if (text) return text;
-    var title   = (document.getElementById('title') || {}).value || '';
-    var bodyText = _htmlToSocialText(_tinyGet('content'));
-    return title.trim() + (bodyText ? '\n\n' + bodyText : '');
-  }
-
-  function _instaGetText() {
-    // Story mode has no text box — Instagram doesn't support captions on
-    // automatically-published Stories — so nothing is sent for it.
-    return igMode === 'story' ? '' : instaText.value.trim();
-  }
-
-  // Generate — shared handler for both buttons
-  function _generate(generateType) {
-    var spinner = document.getElementById('socSpinner');
-    var errEl   = document.getElementById('socError');
-    generateNewsBtn.disabled = true;
-    document.getElementById('socGeneratePostBtn').disabled = true;
-    spinner.style.display = '';
-    errEl.style.display   = 'none';
-    socPost({ action: 'generate', generate_type: generateType })
-      .then(function(data) {
-        if (!data.ok) {
-          errEl.textContent   = data.error;
-          errEl.style.display = '';
-        } else {
-          fbText.value = data.text;
-          fbText.dispatchEvent(new Event('input'));
-        }
-      })
-      .catch(function() {
-        errEl.textContent   = 'Грешка при свързване.';
-        errEl.style.display = '';
-      })
-      .finally(function() {
-        generateNewsBtn.disabled = false;
-        document.getElementById('socGeneratePostBtn').disabled = false;
-        spinner.style.display = 'none';
-      });
-  }
-
-  generateNewsBtn.addEventListener('click', function() { _generate('news'); });
-  document.getElementById('socGeneratePostBtn').addEventListener('click', function() { _generate('post'); });
-
-  // Copy FB text
-  var copyBtn = document.getElementById('socCopyBtn');
-  if (copyBtn) {
-    copyBtn.addEventListener('click', function() {
-      navigator.clipboard.writeText(fbText.value).then(function() {
-        var orig = copyBtn.textContent;
-        copyBtn.textContent = '✓ Копирано';
-        setTimeout(function() { copyBtn.textContent = orig; }, 1500);
-      }).catch(function() { fbText.select(); document.execCommand('copy'); });
-    });
-  }
-
-  // Copy Instagram text
-  var instaCopyBtn = document.getElementById('instaCopyBtn');
-  if (instaCopyBtn) {
-    instaCopyBtn.addEventListener('click', function() {
-      navigator.clipboard.writeText(instaText.value).then(function() {
-        var orig = instaCopyBtn.textContent;
-        instaCopyBtn.textContent = '✓ Копирано';
-        setTimeout(function() { instaCopyBtn.textContent = orig; }, 1500);
-      }).catch(function() { instaText.select(); document.execCommand('copy'); });
-    });
-  }
-
-  // Copy FB → Instagram, stripping link lines
-  var copyFromFbBtn = document.getElementById('socCopyFromFbBtn');
-  if (copyFromFbBtn) {
-    copyFromFbBtn.addEventListener('click', function() {
-      var val = fbText.value.trim();
-      if (!val) return;
-      var stripped = val.split('\n')
-        .filter(function(line) {
-          var t = line.trim();
-          if (/^👉/.test(t)) return false;
-          if (/^https?:\/\/\S+$/.test(t)) return false;
-          return true;
-        })
-        .join('\n')
-        .replace(/\n{3,}/g, '\n\n')
-        .trim();
-      instaText.value = stripped;
-      instaText.dispatchEvent(new Event('input'));
-    });
-  }
-
-  var _emojiTarget = 'fbText';
+  var _emojiTarget = 'content';
 
   function _toggleEmojiPicker(btn) {
     var p          = document.getElementById('socEmojiPicker');
@@ -1680,160 +1103,27 @@ if (translateBtn) {
       return;
     }
     _emojiTarget = targetId;
-    // Move the shared picker right after whichever box's emoji button was clicked.
-    btn.closest('label').insertAdjacentElement('afterend', p);
+    // Move the shared picker right after the row of the emoji button that was clicked.
+    btn.closest('[data-emoji-anchor]').insertAdjacentElement('afterend', p);
     p.style.display = 'block';
     btn.setAttribute('aria-expanded', 'true');
   }
 
   function _insertEmoji(emoji) {
-    var ta    = document.getElementById(_emojiTarget) || fbText;
-    var start = ta.selectionStart;
-    var end   = ta.selectionEnd;
-    ta.value  = ta.value.slice(0, start) + emoji + ta.value.slice(end);
-    ta.selectionStart = ta.selectionEnd = start + emoji.length;
-    ta.focus();
-    ta.dispatchEvent(new Event('input'));
+    var ed = window.tinymce && tinymce.get(_emojiTarget);
+    if (ed) ed.insertContent(emoji);
   }
 
   // Exposed on window: the emoji buttons/spans call these via inline onclick=
   // attributes, which run in global scope and can't see IIFE-local functions.
   window._toggleEmojiPicker = _toggleEmojiPicker;
   window._insertEmoji       = _insertEmoji;
-
-  // Schedule / publish-now helper
-  async function scheduleChannel(channel, scheduled_at, btn, spinner, errEl, badgeId, extra, label) {
-    var text = channel === 'fb' ? _fbGetText() : _instaGetText();
-    btn.disabled          = true;
-    spinner.style.display = '';
-    errEl.style.display   = 'none';
-    try {
-      var body = Object.assign({ action: 'schedule', social_text: text, scheduled_at: scheduled_at, channel: channel }, extra || {});
-      var data = await socPost(body);
-      if (!data.ok) {
-        errEl.textContent   = data.error;
-        errEl.style.display = '';
-      } else {
-        if (channel === 'insta') {
-          var noteBox = document.getElementById(extra && extra.post_type === 'story' ? 'igCropStory' : 'igCropPost');
-          var note = noteBox && noteBox.querySelector('.ig-crop-sched-note');
-          if (note && data.due_at) note.style.display = '';
-        }
-        label = label || (channel === 'fb' ? 'FB' : 'IG');
-        if (data.due_at) {
-          document.getElementById(badgeId).innerHTML =
-            '<span style="color:#b45309;">⏱ ' + label + ': ' + fmtSofia(data.due_at) + '</span>';
-        } else {
-          document.getElementById(badgeId).innerHTML =
-            '<span style="color:#2e7d32;">✓ ' + label + ': Публикувано сега</span>';
-        }
-        _showSiteNotice(data.site_notice, errEl);
-      }
-    } catch(e) {
-      errEl.textContent   = 'Грешка при свързване.';
-      errEl.style.display = '';
-    }
-    btn.disabled          = false;
-    spinner.style.display = 'none';
-  }
-
-  var fbBtn = document.getElementById('socFbBtn');
-  if (fbBtn) {
-    fbBtn.addEventListener('click', function() {
-      var schedAt = document.getElementById('fbScheduleAt').value;
-      var errEl   = document.getElementById('socFbError');
-      if (!schedAt) { errEl.textContent = 'Изберете дата и час.'; errEl.style.display = ''; return; }
-      scheduleChannel('fb', schedAt, fbBtn,
-        document.getElementById('socFbSpinner'), errEl, 'fbStatusBadge');
-    });
-  }
-
-  var fbNowBtn = document.getElementById('socFbNowBtn');
-  if (fbNowBtn) {
-    fbNowBtn.addEventListener('click', function() {
-      scheduleChannel('fb', 'now', fbNowBtn,
-        document.getElementById('socFbSpinner'),
-        document.getElementById('socFbError'),
-        'fbStatusBadge');
-    });
-  }
-
-  // The extra payload + target badge/label for the current IG mode.
-  function _igConfig() {
-    if (igMode === 'story') {
-      return { extra: { post_type: 'story' }, badgeId: 'instaStoryStatusBadge', label: 'IG Story' };
-    }
-    return { extra: { post_type: 'post' }, badgeId: 'instaStatusBadge', label: 'IG' };
-  }
-
-  var instaBtn = document.getElementById('socInstaBtn');
-  if (instaBtn) {
-    instaBtn.addEventListener('click', function() {
-      var schedAt = document.getElementById(igMode === 'story' ? 'instaStoryScheduleAt' : 'instaScheduleAt').value;
-      var errEl   = document.getElementById('socInstaError');
-      if (!schedAt) { errEl.textContent = 'Изберете дата и час.'; errEl.style.display = ''; return; }
-      var cfg = _igConfig();
-      scheduleChannel('insta', schedAt, instaBtn,
-        document.getElementById('socInstaSpinner'), errEl, cfg.badgeId, cfg.extra, cfg.label);
-    });
-  }
-
-  var instaNowBtn = document.getElementById('socInstaNowBtn');
-  if (instaNowBtn) {
-    instaNowBtn.addEventListener('click', function() {
-      var cfg = _igConfig();
-      scheduleChannel('insta', 'now', instaNowBtn,
-        document.getElementById('socInstaSpinner'),
-        document.getElementById('socInstaError'),
-        cfg.badgeId, cfg.extra, cfg.label);
-    });
-  }
 })();
-
-// ── Character counters ─────────────────────────────────────────────────────────
-(function () {
-  var LIMITS = { ig: 2200, fb: 63206, li: 3000 };
-
-  function counterSpan(label, count, limit) {
-    var over   = count > limit;
-    var warn   = count > limit * 0.9;
-    var color  = over ? '#c0392b' : warn ? '#b45309' : '#6b7280';
-    var weight = (over || warn) ? '600' : '400';
-    return '<span style="color:' + color + ';font-weight:' + weight + ';">'
-         + label + ': ' + count.toLocaleString('bg-BG') + ' / ' + limit.toLocaleString('bg-BG')
-         + (over ? ' ✕' : '')
-         + '</span>';
-  }
-
-  var fbEl  = document.getElementById('fbText');
-  var fbOut = document.getElementById('fbCounter');
-  if (fbEl && fbOut) {
-    fbEl.addEventListener('input', function() {
-      fbOut.innerHTML = counterSpan('Facebook', fbEl.value.length, LIMITS.fb);
-    });
-    fbOut.innerHTML = counterSpan('Facebook', fbEl.value.length, LIMITS.fb);
-  }
-
-  var igEl  = document.getElementById('instaText');
-  var igOut = document.getElementById('instaCounter');
-  if (igEl && igOut) {
-    igEl.addEventListener('input', function() {
-      igOut.innerHTML = counterSpan('Instagram', igEl.value.length, LIMITS.ig);
-    });
-    igOut.innerHTML = counterSpan('Instagram', igEl.value.length, LIMITS.ig);
-  }
-
-  var liEl  = document.getElementById('liText');
-  var liOut = document.getElementById('liCounter');
-  if (liEl && liOut) {
-    liEl.addEventListener('input', function() {
-      liOut.innerHTML = counterSpan('LinkedIn', liEl.value.length, LIMITS.li);
-    });
-    liOut.innerHTML = counterSpan('LinkedIn', liEl.value.length, LIMITS.li);
-  }
-})();
-<?php endif; // $tab === 'social' ?>
+<?php endif; ?>
 </script>
+<?php if ($social_on): ?>
+<script src="<?= h(versioned_asset('/admin/js/social-panel.js')) ?>"></script>
+<?php endif; ?>
 <script>
 // „Публикувай автоматично“ only applies to drafts.
 (function () {

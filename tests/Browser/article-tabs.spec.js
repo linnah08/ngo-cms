@@ -1,6 +1,6 @@
 // @ts-check
-// The post editor is split into a Content tab (the form) and a Social tab (Facebook,
-// Instagram, LinkedIn), and the English section starts folded away.
+// The post editor: the Socials panel (Facebook, Instagram, LinkedIn previews) opens
+// beside the article, and the English section starts folded away.
 const { test, expect } = require('@playwright/test');
 const fs   = require('fs');
 const path = require('path');
@@ -36,36 +36,44 @@ test.afterAll(() => {
   for (const f of [BG_FILE, EN_FILE]) if (fs.existsSync(f)) fs.unlinkSync(f);
 });
 
-test('the Content tab is the default: the form, the save button and social badges', async ({ page }) => {
+test('the Socials toggle opens the panel beside the article and remembers it', async ({ page }) => {
   await page.goto('/admin/article-edit.php?slug=' + SLUG);
-  await expect(page.getByRole('navigation', { name: 'Части на статията' }).getByRole('link', { name: 'Съдържание' })).toHaveAttribute('aria-current', 'page');
+  const toggle = page.locator('#socialToggle');
   await expect(page.locator('#articleForm')).toBeVisible();
-  await expect(page.locator('.admin-page-header button[type="submit"]')).toBeVisible();
-  await expect(page.locator('#socialPanel')).toHaveCount(0);
-  const badges = page.getByRole('list', { name: 'Социални мрежи' });
-  await expect(badges).toContainText('FB 02.01 11:00');
-  await expect(badges).toContainText('IG Story 03.01 12:30');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('#socialPanel')).toBeHidden();
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('#socialPanel')).toBeVisible();
+  await expect(page.locator('#articleForm')).toBeVisible();
+  await expect(page.locator('#fbStatusBadge')).toContainText('FB: 02.01.2030 11:00');
+  await expect(page.locator('#socStatus')).toHaveText('Прегледът е обновен');
+  await expect(page.locator('#socPreview-fb')).toContainText('PW табове');
+
+  await page.reload();
+  await expect(page.locator('#socialPanel')).toBeVisible();
+  await page.locator('#socialClose').click();
+  await expect(page.locator('#socialPanel')).toBeHidden();
+  await expect(toggle).toBeFocused();
 });
 
-test('the Social tab has no article form and no save button', async ({ page }) => {
-  await page.goto('/admin/article-edit.php?slug=' + SLUG + '&tab=social');
-  await expect(page.getByRole('navigation', { name: 'Части на статията' }).getByRole('link', { name: 'Социални мрежи' })).toHaveAttribute('aria-current', 'page');
-  await expect(page.locator('#articleForm')).toHaveCount(0);
-  await expect(page.locator('button[type="submit"]')).toHaveCount(0);
-  // Either the panels (Claude configured) or the note saying how to turn them on.
-  await expect(page.locator('#socialPanel, a[href="/admin/payment.php"]').first()).toBeVisible();
+test('the platform tabs move with the arrow keys', async ({ page }) => {
+  await page.goto('/admin/article-edit.php?slug=' + SLUG);
+  await page.locator('#socialToggle').click();
+  await page.getByRole('tab', { name: 'Facebook' }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('tab', { name: 'Instagram' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#socTabpanel-insta')).toBeVisible();
+  await expect(page.locator('#instaStoryStatusBadge')).toContainText('IG Story: 03.01.2030 12:30');
 });
 
-test('an unknown tab falls back to Content', async ({ page }) => {
-  await page.goto('/admin/article-edit.php?slug=' + SLUG + '&tab=<script>');
-  await expect(page.locator('#articleForm')).toBeVisible();
-});
-
-test('a new article asks to be saved before the Social tab', async ({ page }) => {
-  await page.goto('/admin/article-edit.php?tab=social');
-  await expect(page.getByText('Запазете статията, за да публикувате в социалните мрежи.')).toBeVisible();
-  await page.getByRole('link', { name: '← Към съдържанието' }).click();
-  await expect(page.locator('#articleForm')).toBeVisible();
+test('a new article shows previews while it is written', async ({ page }) => {
+  await page.goto('/admin/article-edit.php');
+  await page.locator('#socialToggle').click();
+  await expect(page.locator('#socPreview-fb')).toHaveText('Започнете да пишете — тук ще видите публикациите.');
+  await page.locator('#title').fill('Нова PW статия');
+  await expect(page.locator('#socPreview-fb')).toContainText('Нова PW статия');
 });
 
 test('the English section starts folded, opens with its editor, and keeps its text on save', async ({ page }) => {
