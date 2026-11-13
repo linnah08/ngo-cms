@@ -240,6 +240,12 @@ $li_posted         = !empty($article['linkedin_posted_at']);
 $fb_sched          = !empty($article['fb_scheduled_at']);
 $insta_sched       = !empty($article['insta_scheduled_at']);
 $insta_story_sched = !empty($article['insta_story_scheduled_at']);
+// Switching back to draft doesn't cancel posts already in Buffer — the editor warns.
+$has_social_scheduled = $fb_sched || $insta_sched || $insta_story_sched || $li_scheduled;
+// Scheduling a post publishes the article; until then each platform says so.
+$draft_note_hidden = ($article['status'] ?? 'draft') === 'published' ? ' hidden' : '';
+$draft_note = '<p class="soc-draft-note"' . $draft_note_hidden . ' style="margin:0 0 .6rem;font-size:.82rem;font-weight:600;color:#1e3a8a;">'
+            . '<span aria-hidden="true">ℹ</span> Статията още е чернова — ще бъде публикувана веднага щом планирате публикацията.</p>';
 ?>
 
 <div class="admin-page-header">
@@ -327,6 +333,10 @@ $insta_story_sched = !empty($article['insta_story_scheduled_at']);
             </small>
           </span>
         </label>
+        <?php if ($social_on): ?>
+        <!-- Filled by admin/js/social-panel.js while the status is „Чернова“ and posts are scheduled. -->
+        <div id="socDraftWarn" role="status" aria-live="polite"></div>
+        <?php endif; ?>
       </div>
       <div class="form-group">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.4rem;">
@@ -454,7 +464,7 @@ endif;
 ?>
 <?php if ($social_on): ?>
 <aside id="socialPanel" aria-labelledby="socialPanelTitle" hidden
-       data-slug="<?= h($edit_slug) ?>" data-ig-mode="<?= $ig_default_story ? 'story' : 'post' ?>"
+       data-slug="<?= h($edit_slug) ?>" data-has-scheduled="<?= $has_social_scheduled ? '1' : '0' ?>" data-ig-mode="<?= $ig_default_story ? 'story' : 'post' ?>"
        style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.5rem;box-sizing:border-box;min-width:0;">
   <style>
     #socialPanel .soc-tab:focus-visible,#socialPanel [role="tabpanel"]:focus-visible{outline:3px solid #0387A5;outline-offset:2px;}
@@ -472,11 +482,14 @@ endif;
     <button type="button" id="socRetry" class="btn btn--outline" style="min-height:44px;margin-left:.5rem;font-size:.82rem;">Опитай отново</button>
   </div>
 
-  <!-- A social post links to the site post, so a draft goes live with it
-       (article_publish_with_social). Say so up front, and say what happened. -->
-  <p id="siteNotice" <?= ($article['status'] ?? 'draft') === 'draft' ? '' : 'hidden' ?>
-     style="border:2px solid #1d4ed8;background:#eff6ff;color:#1e3a8a;border-radius:8px;padding:.6rem .85rem;margin:0 0 1rem;font-weight:600;font-size:.85rem;">
-    ℹ Статията е чернова. Когато планирате или публикувате пост тук, статията ще се публикува на сайта заедно с него.</p>
+  <!-- Problems the background save reported (e.g. a photo that wasn't stored). Stays until the next save. -->
+  <p id="socSaveWarn" role="alert" hidden
+     style="border:2px solid #b45309;background:#fffbeb;color:#78350f;border-radius:8px;padding:.6rem .85rem;margin:0 0 .75rem;font-weight:600;font-size:.85rem;"></p>
+
+  <!-- What happened to the site post when a post was scheduled (social-panel.js). Before
+       that, each platform's .soc-draft-note says a draft will be published. -->
+  <p id="siteNotice" role="status" hidden
+     style="border:2px solid #1d4ed8;background:#eff6ff;color:#1e3a8a;border-radius:8px;padding:.6rem .85rem;margin:0 0 1rem;font-weight:600;font-size:.85rem;"></p>
 
   <div role="tablist" aria-label="Социална мрежа" style="display:flex;gap:.25rem;border-bottom:1px solid var(--border);margin-bottom:1rem;flex-wrap:wrap;">
     <?php foreach (['fb' => 'Facebook', 'insta' => 'Instagram', 'linkedin' => 'LinkedIn'] as $_p => $_name): $_sel = $_p === 'fb'; ?>
@@ -497,10 +510,10 @@ endif;
     <p id="socCut-fb" hidden style="margin:.25rem 0 0;font-size:.8rem;font-weight:600;color:#92400e;"><span aria-hidden="true">✂</span> Текстът е съкратен до последното цяло изречение</p>
     <div data-emoji-anchor style="display:flex;gap:.4rem;flex-wrap:wrap;margin:.6rem 0 1rem;">
       <button type="button" class="btn btn--outline soc-copy" data-platform="fb" style="font-size:.8rem;min-height:44px;">Копирай текста</button>
-      <!-- Task 6 makes the emoji go into the article itself; hidden until then (display:none — .btn overrides [hidden]). -->
-      <button type="button" id="socEmojiBtn" class="btn btn--outline" style="display:none;font-size:.8rem;min-height:44px;" data-emoji-target="content" aria-controls="socEmojiPicker" aria-expanded="false" onclick="_toggleEmojiPicker(this)">😊 Емоджи</button>
+      <!-- The emoji goes into the article itself (the BG text), at the cursor. -->
+      <button type="button" id="socEmojiBtn" class="btn btn--outline" style="font-size:.8rem;min-height:44px;" data-emoji-target="content" aria-controls="socEmojiPicker" aria-expanded="false" onclick="_toggleEmojiPicker(this)"><span aria-hidden="true">😊</span> Емоджи в статията</button>
     </div>
-      <div id="socEmojiPicker" style="display:none;background:#fff;border:1px solid var(--border);border-radius:8px;padding:.6rem;margin-bottom:.5rem;line-height:1.8;font-size:1.2rem;max-height:160px;overflow-y:auto;">
+      <div id="socEmojiPicker" role="group" aria-label="Емоджи" style="display:none;background:#fff;border:1px solid var(--border);border-radius:8px;padding:.4rem;margin-bottom:.5rem;max-height:220px;overflow-y:auto;">
         <?php
         $emojis = ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙',
                    '🥲','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐','😑','😶','😏','😒','🙄','😬',
@@ -514,7 +527,7 @@ endif;
                    '✨','🌟','⭐','💫','🔥','🎉','🎊','🎈','🎁','🏆','🥇','🌈','☀️','🌙','⚡','❄️','🌺','🌸','🌻','🌹',
                    '🙏','🌍','🌎','🌏','💡','📢','📣','🔔','💬','💭','🗣️','👥','🫶','💪','🚀','🛡️','🔑','🌱','🤝'];
         foreach ($emojis as $e) {
-            echo '<span onclick="_insertEmoji(\'' . $e . '\')" style="cursor:pointer;padding:.1rem .15rem;border-radius:4px;display:inline-block;" title="' . $e . '">' . $e . '</span>';
+            echo '<button type="button" onclick="_insertEmoji(this.textContent)" style="width:44px;height:44px;padding:0;border:none;background:none;border-radius:4px;cursor:pointer;font-size:1.3rem;line-height:1;">' . $e . '</button>';
         }
         ?>
       </div>
@@ -525,6 +538,7 @@ endif;
              value="<?= h(!empty($article['fb_scheduled_at']) ? date('Y-m-d\TH:i', strtotime($article['fb_scheduled_at'])) : $default_social_at) ?>"
              style="font-size:.88rem;min-height:44px;">
     </div>
+    <?= $draft_note ?>
     <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.5rem;">
       <button type="button" id="socFbBtn" class="btn btn--primary" style="font-size:.85rem;min-height:44px;white-space:nowrap;background:#1877f2;border-color:#1877f2;">
         Планирай в Facebook
@@ -616,7 +630,7 @@ endif;
       <p id="socCut-insta" hidden style="margin:.25rem 0 0;font-size:.8rem;font-weight:600;color:#92400e;"><span aria-hidden="true">✂</span> Текстът е съкратен до последното цяло изречение</p>
       <div data-emoji-anchor style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.6rem;">
         <button type="button" class="btn btn--outline soc-copy" data-platform="insta" style="font-size:.8rem;min-height:44px;">Копирай текста</button>
-        <button type="button" id="socEmojiBtnInsta" class="btn btn--outline" style="display:none;font-size:.8rem;min-height:44px;" data-emoji-target="content" aria-controls="socEmojiPicker" aria-expanded="false" onclick="_toggleEmojiPicker(this)">😊 Емоджи</button>
+        <button type="button" id="socEmojiBtnInsta" class="btn btn--outline" style="font-size:.8rem;min-height:44px;" data-emoji-target="content" aria-controls="socEmojiPicker" aria-expanded="false" onclick="_toggleEmojiPicker(this)"><span aria-hidden="true">😊</span> Емоджи в статията</button>
       </div>
     </div>
 
@@ -636,6 +650,7 @@ endif;
              value="<?= h(!empty($article['insta_story_scheduled_at']) ? date('Y-m-d\TH:i', strtotime($article['insta_story_scheduled_at'])) : $default_social_at) ?>"
              style="font-size:.88rem;min-height:44px;">
     </div>
+    <?= $draft_note ?>
     <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.5rem;">
       <button type="button" id="socInstaBtn" class="btn btn--primary" style="font-size:.85rem;min-height:44px;white-space:nowrap;background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);border:none;">
         Планирай в Instagram
@@ -675,8 +690,10 @@ endif;
     </div>
     <p id="socCount-linkedin" style="margin:0;font-size:.8rem;color:var(--text-muted);font-variant-numeric:tabular-nums;"></p>
     <p id="socCut-linkedin" hidden style="margin:.25rem 0 0;font-size:.8rem;font-weight:600;color:#92400e;"><span aria-hidden="true">✂</span> Текстът е съкратен до последното цяло изречение</p>
-    <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin:.6rem 0 1rem;">
+    <div data-emoji-anchor style="display:flex;gap:.4rem;flex-wrap:wrap;margin:.6rem 0 1rem;">
       <button type="button" class="btn btn--outline soc-copy" data-platform="linkedin" style="font-size:.8rem;min-height:44px;">Копирай текста</button>
+      <!-- LinkedIn is the English version, so its emoji go into the EN text. -->
+      <button type="button" id="socEmojiBtnLi" class="btn btn--outline" style="font-size:.8rem;min-height:44px;" data-emoji-target="content_en" aria-controls="socEmojiPicker" aria-expanded="false" onclick="_toggleEmojiPicker(this)"><span aria-hidden="true">😊</span> Емоджи в английския текст</button>
     </div>
 
     <div style="margin-bottom:.75rem;">
@@ -685,6 +702,7 @@ endif;
              value="<?= h(!empty($article['linkedin_scheduled_at']) ? date('Y-m-d\TH:i', strtotime($article['linkedin_scheduled_at'])) : date('Y-m-d\TH:i', strtotime('+1 day 09:00'))) ?>"
              style="font-size:.88rem;min-height:44px;">
     </div>
+    <?= $draft_note ?>
     <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
       <button type="button" id="liScheduleBtn" class="btn btn--primary" style="font-size:.85rem;min-height:44px;white-space:nowrap;">
         Планирай в LinkedIn
@@ -927,7 +945,8 @@ document.getElementById('tagsInput').addEventListener('input', function () {
 
 // ── TinyMCE rich text editors ─────────────────────────────────────────────────
 tinymce.init(Object.assign({}, window._tinyBase, { selector: 'textarea.rich-editor', min_height: 300 }));
-initAutosave({
+// Kept so the Socials panel's background save can clear the draft (social-panel.js).
+window._articleAutosave = initAutosave({
   key:     <?= json_encode('article:' . ($is_new ? 'new' : $slug_param)) ?>,
   formId:  'articleForm',
   tinyIds: ['content', 'content_en']
@@ -1088,33 +1107,63 @@ if (translateBtn) {
 
 <?php if ($social_on): ?>
 // ── Emoji picker (Socials panel) ────────────────────────────────────────────────
-// Its buttons are hidden for now: the post text is the article itself, so Task 6
-// points the picker at the article editors (content / content_en).
+// The post is the article, so an emoji goes into the article at the cursor: the BG
+// text for Facebook/Instagram (data-emoji-target="content"), the EN text for LinkedIn
+// ("content_en"). It then shows on the website too, and the previews refresh.
 (function () {
   var _emojiTarget = 'content';
+  var _emojiOpener = null;
+
+  function _closeEmojiPicker(returnFocus) {
+    var p = document.getElementById('socEmojiPicker');
+    p.style.display = 'none';
+    document.querySelectorAll('[data-emoji-target]').forEach(function(b) { b.setAttribute('aria-expanded', 'false'); });
+    if (returnFocus && _emojiOpener) _emojiOpener.focus();
+  }
 
   function _toggleEmojiPicker(btn) {
     var p          = document.getElementById('socEmojiPicker');
     var targetId   = btn.getAttribute('data-emoji-target');
     var isOpenHere = p.style.display !== 'none' && _emojiTarget === targetId;
-    document.querySelectorAll('[data-emoji-target]').forEach(function(b) { b.setAttribute('aria-expanded', 'false'); });
-    if (isOpenHere) {
-      p.style.display = 'none';
-      return;
-    }
+    _closeEmojiPicker(false);
+    if (isOpenHere) return;
     _emojiTarget = targetId;
+    _emojiOpener = btn;
     // Move the shared picker right after the row of the emoji button that was clicked.
     btn.closest('[data-emoji-anchor]').insertAdjacentElement('afterend', p);
     p.style.display = 'block';
     btn.setAttribute('aria-expanded', 'true');
   }
 
-  function _insertEmoji(emoji) {
-    var ed = window.tinymce && tinymce.get(_emojiTarget);
-    if (ed) ed.insertContent(emoji);
+  // Escape closes the picker and hands focus back to its button.
+  document.getElementById('socEmojiPicker').addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { e.preventDefault(); _closeEmojiPicker(true); }
+  });
+
+  // Runs fn(editor) once the editor is ready. The EN editor starts only when its
+  // section opens, so LinkedIn's emoji opens that section first.
+  function _withEditor(id, fn) {
+    var ed = window.tinymce && tinymce.get(id);
+    if (ed && ed.initialized) { fn(ed); return; }
+    if (!window.tinymce) return;
+    if (ed) { ed.once('init', function () { fn(ed); }); return; }
+    var onAdd = function (e) {
+      if (e.editor.id !== id) return;
+      tinymce.off('AddEditor', onAdd);
+      e.editor.once('init', function () { fn(e.editor); });
+    };
+    tinymce.on('AddEditor', onAdd);
+    if (id === 'content_en' && typeof window._expandEnSection === 'function') window._expandEnSection();
   }
 
-  // Exposed on window: the emoji buttons/spans call these via inline onclick=
+  function _insertEmoji(emoji) {
+    _withEditor(_emojiTarget, function (ed) {
+      ed.insertContent(emoji);
+      if (window.SocialPanel) window.SocialPanel.refresh();
+    });
+  }
+
+  // Exposed on window: the emoji buttons call these via inline onclick=
   // attributes, which run in global scope and can't see IIFE-local functions.
   window._toggleEmojiPicker = _toggleEmojiPicker;
   window._insertEmoji       = _insertEmoji;

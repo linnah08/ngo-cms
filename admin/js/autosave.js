@@ -113,6 +113,23 @@
       });
     }());
 
+    // A save that doesn't leave the page (the Socials panel saves in the background)
+    // gets no ?_asclear redirect, so it clears the draft through this instead.
+    // clear(before) keeps a draft written after `before` (ms): text typed while the
+    // save was on its way is newer than what was saved. setKey() follows the
+    // article's new address, as the redirect after a normal save would.
+    return {
+      clear: function (before) {
+        clearTimeout(timer);
+        try {
+          var raw = localStorage.getItem(storageKey);
+          var kept = raw ? JSON.parse(raw) : null;
+          if (!before || !kept || (kept.ts || 0) <= before) localStorage.removeItem(storageKey);
+        } catch (e) {}
+      },
+      setKey: function (key) { storageKey = 'autosave:' + key; }
+    };
+
     function restore(data) {
       Object.keys(data).forEach(function (name) {
         if (name.indexOf('_tiny_') === 0) return;

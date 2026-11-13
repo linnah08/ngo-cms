@@ -6,7 +6,11 @@
 // typing stops. Only the newest reply is shown, so a slow old reply can't overwrite
 // a newer preview.
 //
-// Exposes window.SocialPanel = { refresh(): Promise, isOpen(): boolean }.
+// Scheduling a post first saves the article in the background and publishes it
+// (author's decision), then schedules it under the address the save returned.
+//
+// Exposes window.SocialPanel = { refresh(): Promise, isOpen(): boolean,
+//   saveThenSchedule(channel: 'fb'|'insta'|'linkedin', body): Promise }.
 (function () {
   'use strict';
 
@@ -27,29 +31,40 @@
   var MSG_FAILED   = 'Прегледът не е обновен — опитайте отново';
   var MSG_SESSION  = 'Сесията е изтекла — презаредете страницата.';
   var MSG_START    = 'Започнете да пишете — тук ще видите публикациите.';
-  var MSG_NO_SLUG  = 'Запазете статията, преди да планирате публикация.';
   var MSG_NETWORK  = 'Грешка при свързване.';
+  var MSG_BAD_REPLY = 'Нещо се обърка — опитайте отново.';
+  var MSG_NOT_SAVED = 'Статията не е запазена, затова публикацията не е планирана: ';
+  var MSG_PUBLISHED = 'Статията е запазена и публикувана на сайта.';
+  var MSG_COPY_FAIL = 'Копирането не успя — маркирайте текста в прегледа и го копирайте ръчно.';
+  var MSG_DRAFT_SCHEDULED = 'Статията има планирани публикации в социалните мрежи. Връщането в чернова не ги отменя'
+    + ' — те ще излязат в уречения час, с линк към статия, която не се вижда. Ако не трябва да излизат,'
+    + ' изтрийте ги в publish.buffer.com.';
 
   function csrf() {
     var f = document.querySelector('#articleForm input[name="csrf_token"]');
     return f ? f.value : (window._csrfToken || '');
   }
 
-  // POST JSON and read JSON back. An expired session answers with a redirect to the
-  // login page (HTML), so anything that isn't JSON is reported as that, in plain words.
+  // Read a JSON reply. An expired session answers with a redirect to the login page
+  // (or 401/403): that is said in plain words. Any other reply that isn't JSON (a
+  // server error page) is a plain failure — each caller words that for its own action.
+  function readJson(r) {
+    var type = r.headers.get('Content-Type') || '';
+    if (type.indexOf('application/json') !== -1) return r.json();
+    var e = new Error('');
+    if (r.redirected || r.status === 401 || r.status === 403) e.userMessage = MSG_SESSION;
+    else e.badReply = true;
+    throw e;
+  }
+
+  // POST JSON and read JSON back.
   function postJson(url, body) {
     return fetch(url, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(Object.assign({ csrf_token: csrf() }, body))
-    }).then(function (r) {
-      var type = r.headers.get('Content-Type') || '';
-      if (r.redirected || type.indexOf('application/json') === -1) {
-        var e = new Error(MSG_SESSION); e.userMessage = MSG_SESSION; throw e;
-      }
-      return r.json();
-    });
+    }).then(readJson);
   }
 
   // ── Open / close, and the two-column layout ──────────────────────────────────
@@ -157,9 +172,16 @@
     }[platform].map(function (id) { return document.getElementById(id); });
   }
 
+  var sending = false;   // one save-and-schedule at a time: two saves of a new article would make two articles
+
   function setBlocked(platform, on) {
     blocked[platform] = on;
-    scheduleButtons(platform).forEach(function (b) { if (b) b.disabled = on; });
+    scheduleButtons(platform).forEach(function (b) { if (b) b.disabled = on || sending; });
+  }
+
+  // A post needs text — except an Instagram Story, which has no caption.
+  function needsText(platform) {
+    return platform !== 'insta' || igMode === 'post';
   }
 
   function renderPlatform(platform, post, emptyText) {
@@ -175,11 +197,14 @@
       cut.hidden          = true;
     } else {
       preview.textContent = text;
-      count.textContent   = 'Дължина: ' + groupDigits(post.length) + ' / ' + groupDigits(post.limit) + ' знака';
+      // Facebook has no practical limit, so it shows the length alone.
+      count.textContent   = platform === 'fb'
+        ? 'Дължина: ' + groupDigits(post.length) + ' знака'
+        : 'Дължина: ' + groupDigits(post.length) + ' / ' + groupDigits(post.limit) + ' знака';
       cut.hidden          = !post.cut;
     }
     if (copyBtn) copyBtn.disabled = !text;
-    setBlocked(platform, !text);
+    setBlocked(platform, !text && needsText(platform));
   }
 
   function renderLinkedIn(post) {
@@ -217,9 +242,15 @@
     });
   }
 
+  var announceTimer = null;
   function announce(msg) {
     statusEl.textContent = '';
-    setTimeout(function () { statusEl.textContent = msg; }, 50);
+    clearTimeout(announceTimer);
+    announceTimer = setTimeout(function () { statusEl.textContent = msg; }, 50);
+  }
+  function clearStatus() {
+    clearTimeout(announceTimer);
+    statusEl.textContent = '';
   }
   function showError(msg) {
     errorMsg.textContent = msg;
@@ -258,6 +289,7 @@
       announce(MSG_UPDATED);
     }).catch(function (e) {
       if (mySeq !== seq) return;
+      clearStatus();
       // The old preview stays; the error says so and offers another try.
       if (e && e.userMessage) showError(e.userMessage);
       else if (e && e.fromServer && e.message) showError(MSG_FAILED + '. ' + e.message);
@@ -295,18 +327,33 @@
       var text = lastText[btn.dataset.platform] || '';
       if (!text) return;
       var done = function () {
+        var stale = btn.parentNode.querySelector('.soc-copy-fail');
+        if (stale) stale.remove();
         var orig = btn.textContent;
         btn.textContent = '✓ Копирано';
         setTimeout(function () { btn.textContent = orig; }, 1500);
+      };
+      var failed = function () {
+        var note = btn.parentNode.querySelector('.soc-copy-fail');
+        if (!note) {
+          note = document.createElement('p');
+          note.className = 'soc-copy-fail';
+          note.setAttribute('role', 'alert');
+          note.style.cssText = 'flex-basis:100%;margin:.25rem 0 0;font-size:.82rem;font-weight:600;color:#b91c1c;';
+          btn.parentNode.appendChild(note);
+        }
+        note.textContent = '⚠ ' + MSG_COPY_FAIL;
       };
       var fallback = function () {
         var ta = document.createElement('textarea');
         ta.value = text; ta.setAttribute('readonly', '');
         ta.style.position = 'absolute'; ta.style.left = '-9999px';
         document.body.appendChild(ta); ta.select();
-        try { document.execCommand('copy'); done(); } catch (e) {}
+        var ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) {}
         ta.remove();
         btn.focus();
+        if (ok) done(); else failed();
       };
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(done, fallback);
@@ -344,8 +391,8 @@
     near.textContent = '✓ ' + msg;
   };
 
+  // Crops and shapes are saved straight to the article (they need its address).
   function socPost(body) { return postJson('/admin/social-ajax.php', Object.assign({ slug: slug }, body)); }
-  function liPost(body)  { return postJson('/admin/linkedin-ajax.php', Object.assign({ slug: slug }, body)); }
 
   function fmtSofia(due_at) {
     return new Date(due_at).toLocaleString('bg-BG', {
@@ -362,6 +409,7 @@
   function _igSetMode(mode) {
     if (mode === igMode) return;
     igMode = mode;
+    setBlocked('insta', !lastText.insta && needsText('insta'));   // a Story needs no text
     document.getElementById('igPostTextGroup').style.display      = mode === 'post'  ? '' : 'none';
     document.getElementById('igStoryNoteGroup').style.display     = mode === 'story' ? '' : 'none';
     document.getElementById('igPostScheduleGroup').style.display  = mode === 'post'  ? '' : 'none';
@@ -500,32 +548,141 @@
     });
   });
 
+  // ── Draft notices ───────────────────────────────────────────────────────────
+  // Scheduling publishes the article, so while it's a draft each platform says so.
+  // A draft that already has posts in Buffer gets a lasting warning by the status
+  // field: going back to draft doesn't cancel them.
+  var form      = document.getElementById('articleForm');
+  var statusSel = document.getElementById('status');
+  var autoBox   = document.getElementById('scheduled');
+  var draftWarn = document.getElementById('socDraftWarn');
+
+  function updateDraftNotices() {
+    var draft = statusSel && statusSel.value !== 'published';
+    panel.querySelectorAll('.soc-draft-note').forEach(function (p) { p.hidden = !draft; });
+    if (!draftWarn) return;
+    var warn = draft && panel.dataset.hasScheduled === '1';
+    var box = draftWarn.querySelector('p');
+    if (!warn) { if (box) box.remove(); return; }
+    if (box) return;
+    box = document.createElement('p');
+    box.style.cssText = 'border:2px solid #b45309;background:#fffbeb;color:#78350f;border-radius:8px;'
+      + 'padding:.6rem .85rem;margin:.75rem 0 0;font-weight:600;font-size:.85rem;line-height:1.5;'
+      + 'text-transform:none;letter-spacing:normal;';
+    box.textContent = '⚠ ' + MSG_DRAFT_SCHEDULED;
+    draftWarn.appendChild(box);
+  }
+  if (statusSel) statusSel.addEventListener('change', updateDraftNotices);
+
+  // ── Saving the article in the background ────────────────────────────────────
+  // The same form, to the same handler; _ajax=1 asks for JSON instead of a redirect,
+  // publish_now=1 publishes it (and drops any auto-publish date).
+  function saveArticle() {
+    if (window.tinymce) tinymce.triggerSave();
+    var fd = new FormData(form);
+    fd.append('_ajax', '1');
+    fd.append('publish_now', '1');
+    return fetch(form.action, { method: 'POST', credentials: 'same-origin', body: fd }).then(readJson);
+  }
+
+  function showWarnings(list) {
+    var el = document.getElementById('socSaveWarn');
+    if (!el) return;
+    list = (list || []).filter(Boolean);
+    el.textContent = list.length ? '⚠ ' + list.join(' ') : '';
+    el.hidden = !list.length;
+  }
+
+  // The save reply becomes the page's state, as the redirect after „Запази“ would do.
+  function applySave(saved, startedAt) {
+    var wasDraft = statusSel && statusSel.value !== 'published';
+    slug = saved.slug;
+    panel.dataset.slug = slug;
+    var slugIn = document.getElementById('slug'), slugEnIn = document.getElementById('slug_en');
+    if (slugIn) slugIn.value = saved.slug;
+    if (slugEnIn && saved.slug_en) slugEnIn.value = saved.slug_en;
+    // The next save — from here or „Запази“ — edits this article, not a new one.
+    form.action = '/admin/article-edit.php?slug=' + encodeURIComponent(slug);
+    if (statusSel) {
+      statusSel.value = 'published';
+      // Not bubbling: the auto-publish switch follows, autosave doesn't keep a new draft.
+      statusSel.dispatchEvent(new Event('change'));
+    }
+    if (autoBox) autoBox.checked = false;
+    try {
+      var u = new URL(window.location.href);
+      u.searchParams.set('slug', slug);
+      u.searchParams.delete('_asclear');
+      history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+    } catch (e) {}
+    // Saved: drop the autosave draft (a normal save does it through ?_asclear).
+    if (window._articleAutosave) {
+      window._articleAutosave.clear(startedAt);
+      window._articleAutosave.setKey('article:' + slug);
+    }
+    showWarnings(saved.warnings);
+    return wasDraft && saved.status === 'published';
+  }
+
+  // Save (and publish) the article, then schedule the post under the address the
+  // save returned — saving can change it (a new title). Nothing but the time and
+  // the channel is sent: the server builds the post from the saved article.
+  function saveThenSchedule(channel, body) {
+    var startedAt = Date.now();
+    var published = false;
+    return saveArticle().then(function (saved) {
+      if (!saved || !saved.ok) {
+        var e = new Error(''); e.userMessage = MSG_NOT_SAVED + ((saved && saved.error) || MSG_BAD_REPLY); throw e;
+      }
+      published = applySave(saved, startedAt);
+      var url = channel === 'linkedin' ? '/admin/linkedin-ajax.php' : '/admin/social-ajax.php';
+      var req = Object.assign({}, body, { action: 'schedule', slug: saved.slug });
+      if (channel !== 'linkedin') req.channel = channel;
+      return postJson(url, req);
+    }).then(function (data) {
+      if (published && data && !data.site_notice) data.site_notice = MSG_PUBLISHED;
+      if (data && data.ok) panel.dataset.hasScheduled = '1';
+      return data;
+    }, function (e) {
+      // The article may be saved even if scheduling then failed — say so too.
+      if (published) e.published = true;
+      throw e;
+    });
+  }
+
   // ── Scheduling ──────────────────────────────────────────────────────────────
-  // The server builds the post from the saved article; nothing but the time is sent.
-  // (Task 6 saves the article first, so the newest text and a new article work too.)
+  function allButtons() {
+    return PLATFORMS.reduce(function (all, p) { return all.concat(scheduleButtons(p)); }, []);
+  }
   function startSend(btn, spinner, errEl) {
-    if (!slug) { errEl.textContent = MSG_NO_SLUG; errEl.style.display = ''; return false; }
-    btn.disabled = true;
+    if (sending) return false;
+    sending = true;
+    allButtons().forEach(function (b) { if (b) b.disabled = true; });
     spinner.style.display = '';
     errEl.style.display = 'none';
     return true;
   }
-  function endSend(platform, btn, spinner) {
-    btn.disabled = blocked[platform];
+  function endSend(spinner) {
+    sending = false;
+    PLATFORMS.forEach(function (p) { setBlocked(p, blocked[p]); });
     spinner.style.display = 'none';
+    updateDraftNotices();
+    if (isOpen()) refresh();   // the address may have changed: the link line follows
   }
   function sendFailed(errEl, e) {
-    errEl.textContent = (e && e.userMessage) || MSG_NETWORK;
+    errEl.textContent = (e && e.userMessage) || (e && e.badReply ? MSG_BAD_REPLY : MSG_NETWORK);
+    if (e && e.published) errEl.textContent += ' ' + MSG_PUBLISHED;
     errEl.style.display = '';
   }
 
   function scheduleChannel(channel, scheduled_at, btn, spinner, errEl, badgeId, extra, label) {
     if (!startSend(btn, spinner, errEl)) return;
-    var body = Object.assign({ action: 'schedule', scheduled_at: scheduled_at, channel: channel }, extra || {});
-    socPost(body).then(function (data) {
+    var body = Object.assign({ scheduled_at: scheduled_at }, extra || {});
+    saveThenSchedule(channel, body).then(function (data) {
       if (!data.ok) {
         errEl.textContent   = data.error;
         errEl.style.display = '';
+        window._showSiteNotice(data.site_notice, errEl);
         return;
       }
       if (channel === 'insta') {
@@ -539,7 +696,7 @@
         : '<span style="color:#2e7d32;">✓ ' + label + ': Публикувано сега</span>';
       window._showSiteNotice(data.site_notice, errEl);
     }).catch(function (e) { sendFailed(errEl, e); })
-      .then(function () { endSend(channel, btn, spinner); });
+      .then(function () { endSend(spinner); });
   }
 
   function needTime(inputId, errEl) {
@@ -579,10 +736,11 @@
     var spinner = document.getElementById('liScheduleSpinner');
     var errEl   = document.getElementById('liScheduleError');
     if (!startSend(btn, spinner, errEl)) return;
-    liPost({ action: 'schedule', scheduled_at: scheduled_at }).then(function (data) {
+    saveThenSchedule('linkedin', { scheduled_at: scheduled_at }).then(function (data) {
       if (!data.ok) {
         errEl.textContent   = data.error;
         errEl.style.display = '';
+        window._showSiteNotice(data.site_notice, errEl);
         return;
       }
       document.getElementById('liStatusBadge').innerHTML = data.due_at
@@ -590,7 +748,7 @@
         : '<span style="color:#2e7d32;">✓ Публикувано сега</span>';
       window._showSiteNotice(data.site_notice, errEl);
     }).catch(function (e) { sendFailed(errEl, e); })
-      .then(function () { endSend('linkedin', btn, spinner); });
+      .then(function () { endSend(spinner); });
   }
   var liBtn = document.getElementById('liScheduleBtn'), liNowBtn = document.getElementById('liNowBtn');
   liBtn.addEventListener('click', function () {
@@ -600,7 +758,11 @@
   liNowBtn.addEventListener('click', function () { liSend('now', liNowBtn); });
 
   // ── Start ───────────────────────────────────────────────────────────────────
-  window.SocialPanel = { refresh: refresh, isOpen: isOpen };
+  window.SocialPanel = { refresh: refresh, isOpen: isOpen, saveThenSchedule: saveThenSchedule };
+
+  // LinkedIn needs the English text: blocked until a preview confirms there is some.
+  setBlocked('linkedin', true);
+  updateDraftNotices();
 
   var startOpen = false;
   try { startOpen = localStorage.getItem(STORAGE_KEY) === '1'; } catch (e) {}
