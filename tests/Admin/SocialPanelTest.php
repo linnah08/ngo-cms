@@ -229,7 +229,10 @@ final class SocialPanelTest extends TestCase
         $this->assertNotFalse($end);
         $insert = substr($this->edit, $start, $end - $start);
         $this->assertStringContainsString('tinymce.get(', $insert);
-        $this->assertStringContainsString('insertContent(', $insert);
+        $this->assertStringContainsString("execCommand('mceInsertContent', false, emoji, { skip_focus: true })", $insert, 'inserted without taking the focus from the picker');
+        // An editor never visited (the collapsed EN one) takes the emoji at the end, not the start.
+        $this->assertStringContainsString("ed.on('focus'", $insert);
+        $this->assertMatchesRegularExpression('/if \(!ed\._emojiHadFocus\) \{.*setCursorLocation\(last, n\)/s', $insert);
         $this->assertStringContainsString('_expandEnSection()', $insert, 'the EN editor is started first for LinkedIn');
         $this->assertStringContainsString('SocialPanel.refresh()', $insert);
         $this->assertStringContainsString('data-emoji-target="content_en"', $this->edit, 'LinkedIn emoji go into the English text');
@@ -276,5 +279,75 @@ final class SocialPanelTest extends TestCase
     {
         $this->assertStringContainsString("ok = document.execCommand('copy')", $this->js);
         $this->assertStringContainsString('Копирането не успя', $this->js);
+    }
+
+    // ── Fix wave: final review ──────────────────────────────────────────────────
+
+    public function testScheduleIsCheckedBeforeTheArticleIsSaved(): void
+    {
+        $check = $this->jsFunction('checkSchedule');
+        $this->assertStringContainsString("action: 'check'", $check);
+        foreach (["fieldValue('title')", "editorHtml('content')", "fieldValue('title_en')", "editorHtml('content_en')", 'photoPaths()'] as $f) {
+            $this->assertStringContainsString($f, $check, 'the dry run gets the unsaved ' . $f);
+        }
+        $flow = $this->jsFunction('saveThenSchedule');
+        $checkAt = strpos($flow, 'checkSchedule(channel, body)');
+        $saveAt  = strpos($flow, 'saveArticle()');
+        $this->assertNotFalse($checkAt);
+        $this->assertNotFalse($saveAt);
+        $this->assertLessThan($saveAt, $checkAt, 'the check runs before the save');
+        $this->assertMatchesRegularExpression('/if \(!check \|\| !check\.ok\) \{\s*refused = /', $flow, 'a refusal stops before the save');
+        $this->assertStringContainsString('if (refused) return refused;', $flow, 'the refusal is shown, the article stays as it was');
+    }
+
+    public function testFormSubmitIsLockedWhileSending(): void
+    {
+        $this->assertStringContainsString('lockForm(true);', $this->jsFunction('startSend'));
+        $this->assertStringContainsString('lockForm(false);', $this->jsFunction('endSend'));
+        $buttons = $this->jsFunction('formSubmitButtons');
+        $this->assertStringContainsString('button[type="submit"][form="articleForm"]', $buttons, 'the header „Запази“ outside the form');
+        $this->assertStringContainsString("form.querySelectorAll('button[type=\"submit\"]", $buttons, 'the buttons inside the form');
+        $this->assertMatchesRegularExpression(
+            "/form\.addEventListener\('submit', function \(e\) \{\s*if \(!sending\) return;\s*e\.preventDefault\(\);/", $this->js,
+            'Enter in a field can\'t submit either');
+        // The page has three „Запази“ buttons; all of them are submit buttons the lock finds.
+        $this->assertSame(2, substr_count($this->edit, '<button type="submit" form="articleForm"'));
+        $this->assertStringContainsString('<button type="submit" class="btn btn--primary">Запази</button>', $this->edit);
+    }
+
+    public function testPreviewLinkFollowsTheSavedAddress(): void
+    {
+        $this->assertStringContainsString('current_slug: slug', $this->jsFunction('refresh'));
+        $ep = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/admin/social-preview-ajax.php');
+        $this->assertStringContainsString("article_slugs_latin(), \$current_slug)", $ep, 'the 7th argument, as the save passes it');
+    }
+
+    public function testTitleWithoutTextBlocksSchedulingWithAnExplanation(): void
+    {
+        $refresh = $this->jsFunction('refresh');
+        $this->assertStringContainsString('var bgNoBody = !hasText(html);', $refresh);
+        $this->assertStringContainsString("renderPlatform('fb', bgNoBody ? null : d.fb, bgMsg)", $refresh);
+        $this->assertStringContainsString("renderPlatform('insta', bgNoBody ? null : d.insta, bgMsg)", $refresh);
+        $this->assertStringContainsString("var MSG_NO_BODY  = 'Статията още няма текст.", $this->js);
+    }
+
+    public function testUpdatedIsAnnouncedOnlyWhenItIsNews(): void
+    {
+        $refresh = $this->jsFunction('refresh');
+        $this->assertStringContainsString('if (announceNext) { announceNext = false; announce(MSG_UPDATED); }', $refresh);
+        $this->assertStringNotContainsString("\n      announce(MSG_UPDATED);", $refresh, 'not after every pause in typing');
+        $this->assertMatchesRegularExpression('/clearStatus\(\);\s*announceNext = true;/', $refresh, 'the first preview after a failure is announced');
+        $this->assertMatchesRegularExpression('/if \(open\) \{\s*announceNext = true;/', $this->jsFunction('setOpen'), 'and the first one after opening');
+    }
+
+    public function testAutosaveKeepsANewerDraftAndMovesIt(): void
+    {
+        $autosave = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/admin/js/autosave.js');
+        $this->assertMatchesRegularExpression(
+            '/clear: function \(before\) \{\s*try \{.*?<= before\) \{\s*clearTimeout\(timer\);\s*localStorage\.removeItem\(storageKey\);/s', $autosave,
+            'the pending write is cancelled only with the draft it would replace');
+        $this->assertMatchesRegularExpression(
+            '/setKey: function \(key\) \{.*localStorage\.setItem\(next, raw\);\s*localStorage\.removeItem\(storageKey\);.*storageKey = next;/s', $autosave,
+            'a kept draft moves to the new address');
     }
 }

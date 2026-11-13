@@ -3,9 +3,15 @@
  * LinkedIn panel AJAX handler.
  *
  * POST body (JSON):
- *   action      'schedule'
+ *   action      'check' | 'schedule'
  *   csrf_token  string
- *   slug        string  — article slug (BG)
+ *   slug        string  — article slug (BG; not needed for 'check')
+ *
+ * For 'check' (a dry run: runs every check 'schedule' runs, calls nothing, writes nothing):
+ *   scheduled_at                       — as for 'schedule'
+ *   title, title_en, content_en string — the editor's unsaved titles and English text
+ *   The panel calls it before it saves and publishes the article. It works from the
+ *   editor's fields — what the save is about to write — so a new article is checked too.
  *
  * For 'schedule':
  *   scheduled_at  string — datetime-local (Europe/Sofia) or 'now'
@@ -39,7 +45,19 @@ if (!csrf_verify()) {
     exit;
 }
 $action = $body['action'] ?? '';
-$slug   = basename(str_replace(['..', "\0"], '', $body['slug'] ?? ''));
+$slug   = basename(str_replace(['..', "\0"], '', is_string($body['slug'] ?? null) ? $body['slug'] : ''));
+$scheduled_at = is_string($body['scheduled_at'] ?? null) ? trim($body['scheduled_at']) : '';
+
+// ── Dry run before the panel saves and publishes ─────────────────────────────
+if ($action === 'check') {
+    $str = static fn(string $k): string => is_string($body[$k] ?? null) ? trim($body[$k]) : '';
+    [$channel_id, $api_key] = social_buffer_credentials('linkedin');
+    // An empty EN title is saved as the BG one (article-edit.php), so it is checked that way too.
+    $check = social_schedule_check('linkedin', false, $scheduled_at, $channel_id, $api_key, [],
+        ['title' => $str('title_en') !== '' ? $str('title_en') : $str('title'), 'content' => $str('content_en')]);
+    echo json_encode($check['ok'] ? ['ok' => true] : ['ok' => false, 'error' => $check['error']], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
 if (!$slug) {
     echo json_encode(['ok' => false, 'error' => 'Missing slug']);
@@ -54,54 +72,21 @@ if (!file_exists($file)) {
 
 // ── Schedule via Buffer ───────────────────────────────────────────────────────
 if ($action === 'schedule') {
-    $scheduled_at  = trim($body['scheduled_at']  ?? '');
-
-    if ($scheduled_at === '') {
-        echo json_encode(['ok' => false, 'error' => 'Изберете дата и час.']);
-        exit;
-    }
-
-    // datetime-local sends local (Sofia) time with no TZ suffix — parse explicitly as Europe/Sofia
-    $publish_now = ($scheduled_at === 'now');
-    if ($publish_now) {
-        $ts = time() + 120; // 2 minutes from now
-    } else {
-        try {
-            $dt = new DateTimeImmutable($scheduled_at, new DateTimeZone('Europe/Sofia'));
-            $ts = $dt->getTimestamp();
-        } catch (Exception) {
-            $ts = 0;
-        }
-        if (!$ts || $ts <= time()) {
-            echo json_encode(['ok' => false, 'error' => 'Датата трябва да е в бъдещето.']);
-            exit;
-        }
-    }
-
-    $channel_id = setting_resolve('buffer_linkedin_channel_id', 'BUFFER_LINKEDIN_CHANNEL_ID');
-    if ($channel_id === '') {
-        echo json_encode(['ok' => false, 'error' => 'Buffer LinkedIn Channel ID не е конфигуриран (Плащания → Buffer).']);
-        exit;
-    }
-
-    $api_key = setting_resolve('buffer_api_key', 'BUFFER_API_KEY');
-    if ($api_key === '') {
-        echo json_encode(['ok' => false, 'error' => 'Buffer API ключ не е конфигуриран (Плащания → Buffer).']);
-        exit;
-    }
-
-    $due_at = gmdate('Y-m-d\TH:i:s\Z', $ts);
-
-    // The photos this post sends now (one image, or the PDF carousel for several).
     $existing_data      = load_json($file);
     $en_data            = load_json(ARTICLES_PATH . '/en/' . basename((string) ($existing_data['slug_en'] ?? $slug)) . '.json') ?: [];
 
-    // The post IS the saved English article, cut to LinkedIn's limit. Nothing comes from the browser.
-    $linkedin_text = social_schedule_text($existing_data, $en_data, 'linkedin');
-    if ($linkedin_text === '') {
-        echo json_encode(['ok' => false, 'error' => 'Няма английски текст — преведете статията.']);
+    // The same checks the panel's dry run made, now on the saved article.
+    [$channel_id, $api_key] = social_buffer_credentials('linkedin');
+    $check = social_schedule_check('linkedin', false, $scheduled_at, $channel_id, $api_key, $existing_data, $en_data);
+    if (!$check['ok']) {
+        echo json_encode(['ok' => false, 'error' => $check['error']]);
         exit;
     }
+    $ts     = $check['ts'];
+    $due_at = gmdate('Y-m-d\TH:i:s\Z', $ts);
+
+    // The post IS the saved English article, cut to LinkedIn's limit. Nothing comes from the browser.
+    $linkedin_text = social_schedule_text($existing_data, $en_data, 'linkedin');
     $assets_gql         = social_linkedin_assets_gql($existing_data, $en_data);
     _om_log('INFO', 'linkedin-ajax schedule: ' . (str_contains($assets_gql, 'document:') ? 'PDF carousel' : ($assets_gql ? 'one image' : 'no image')));
 

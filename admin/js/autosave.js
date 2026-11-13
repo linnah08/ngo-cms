@@ -116,18 +116,33 @@
     // A save that doesn't leave the page (the Socials panel saves in the background)
     // gets no ?_asclear redirect, so it clears the draft through this instead.
     // clear(before) keeps a draft written after `before` (ms): text typed while the
-    // save was on its way is newer than what was saved. setKey() follows the
-    // article's new address, as the redirect after a normal save would.
+    // save was on its way is newer than what was saved. Only a removed draft cancels
+    // the pending write — text typed just now still gets saved. setKey() follows the
+    // article's new address, as the redirect after a normal save would, and takes a
+    // kept draft along so it is offered under the new address.
     return {
       clear: function (before) {
-        clearTimeout(timer);
         try {
           var raw = localStorage.getItem(storageKey);
           var kept = raw ? JSON.parse(raw) : null;
-          if (!before || !kept || (kept.ts || 0) <= before) localStorage.removeItem(storageKey);
+          if (!before || !kept || (kept.ts || 0) <= before) {
+            clearTimeout(timer);
+            localStorage.removeItem(storageKey);
+          }
         } catch (e) {}
       },
-      setKey: function (key) { storageKey = 'autosave:' + key; }
+      setKey: function (key) {
+        var next = 'autosave:' + key;
+        if (next === storageKey) return;
+        try {
+          var raw = localStorage.getItem(storageKey);
+          if (raw) {
+            localStorage.setItem(next, raw);
+            localStorage.removeItem(storageKey);
+          }
+        } catch (e) {}
+        storageKey = next;
+      }
     };
 
     function restore(data) {

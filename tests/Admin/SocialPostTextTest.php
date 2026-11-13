@@ -89,6 +89,40 @@ final class SocialPostTextTest extends TestCase
         $this->assertStringEndsWith('/en/news/y/', article_public_url('y', 'en'));
     }
 
+    public function testCyrillicAddressIsPercentEncoded(): void
+    {
+        $this->assertSame(SITE_URL . '/novini/' . rawurlencode('новина-1') . '/', article_public_url('новина-1', 'bg'));
+        $this->assertStringEndsWith('/novini/%D0%BD%D0%BE%D0%B2%D0%B8%D0%BD%D0%B0/', article_public_url('новина', 'bg'));
+        $this->assertSame(SITE_URL . '/en/news/news-1/', article_public_url('news-1', 'en'), 'a plain address stays as it is');
+    }
+
+    /** A body whose longest fitting start ends exactly at $end, followed by $after. */
+    private function cutAt(string $end, string $after): array
+    {
+        $tail   = " …\n\nПрочетете повече: " . self::URL;
+        $budget = 2200 - social_text_length($tail);
+        $head   = "Заглавие\n\nПърво изречение. ";
+        $filler = 'Д' . str_repeat('д', $budget - mb_strlen($head) - mb_strlen(' ' . $end) - 1);
+        $r = social_post_text('Заглавие', '<p>Първо изречение. ' . $filler . ' ' . $end . $after . '</p>', self::URL, 'insta');
+        $this->assertTrue($r['cut']);
+        return $r;
+    }
+
+    public function testStopAtTheEndOfWhatFitsIsNoSentenceEndInsideAWord(): void
+    {
+        // "www." and "3." cut off from what follows them are not the end of a sentence.
+        $r = $this->cutAt('www.', 'example.org и още текст.');
+        $this->assertStringEndsWith("Първо изречение. …\n\nПрочетете повече: " . self::URL, $r['text']);
+        $r = $this->cutAt('т. 3.', '5 от закона и още текст.');
+        $this->assertStringEndsWith("Първо изречение. …\n\nПрочетете повече: " . self::URL, $r['text']);
+    }
+
+    public function testStopAtTheEndOfWhatFitsFollowedByASpaceEndsTheSentence(): void
+    {
+        $r = $this->cutAt('Край.', ' Още текст след края.');
+        $this->assertStringEndsWith("Край. …\n\nПрочетете повече: " . self::URL, $r['text']);
+    }
+
     public function testScheduleTextFromSavedArticle(): void
     {
         $bg = ['title' => 'Заглавие', 'content' => '<p>Едно.</p>', 'slug' => 'a'];
@@ -106,5 +140,16 @@ final class SocialPostTextTest extends TestCase
         $bg = ['title' => 'Заглавие', 'content' => '<p>Едно.</p>', 'slug' => 'a'];
         $this->assertSame('', social_schedule_text($bg, [], 'linkedin'));
         $this->assertSame('', social_schedule_text([], [], 'fb'));
+        // An English title alone is no post — the same rule as the panel.
+        $this->assertSame('', social_schedule_text($bg, ['title' => 'Title', 'content' => ''], 'linkedin'));
+        $this->assertSame('', social_schedule_text($bg, ['title' => 'Title', 'content' => '<p>&nbsp;</p>'], 'linkedin'));
+    }
+
+    public function testTitleWithoutBodyIsNoPost(): void
+    {
+        foreach (['fb', 'insta'] as $ch) {
+            $this->assertSame('', social_schedule_text(['title' => 'Заглавие', 'content' => '', 'slug' => 'a'], [], $ch), $ch);
+            $this->assertSame('', social_schedule_text(['title' => 'Заглавие', 'content' => '<p><br></p>', 'slug' => 'a'], [], $ch), $ch);
+        }
     }
 }

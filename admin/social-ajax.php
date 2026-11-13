@@ -3,9 +3,17 @@
  * Facebook / Instagram post AJAX handler.
  *
  * POST body (JSON):
- *   action      'schedule' | 'save_crop' | 'save_shape' | 'save_fit'
+ *   action      'check' | 'schedule' | 'save_crop' | 'save_shape' | 'save_fit'
  *   csrf_token  string
- *   slug        string   — BG article slug
+ *   slug        string   — BG article slug (not needed for 'check')
+ *
+ * For 'check' (a dry run: runs every check 'schedule' runs, calls nothing, writes nothing):
+ *   scheduled_at, channel, post_type — as for 'schedule'
+ *   title, content  string   — the editor's unsaved BG title and text
+ *   photos          string[] — the editor's photo paths
+ *   The panel calls it before it saves and publishes the article, so a post that would be
+ *   refused never publishes a draft. It works from the editor's fields — exactly what the
+ *   save is about to write — so a new, never-saved article is checked the same way.
  *
  * For 'schedule':
  *   (no text is accepted: the post is built on the server from the saved article)
@@ -52,7 +60,27 @@ if (!csrf_verify()) {
 }
 
 $action = $body['action'] ?? '';
-$slug   = basename(str_replace(['..', "\0"], '', $body['slug'] ?? ''));
+$slug   = basename(str_replace(['..', "\0"], '', is_string($body['slug'] ?? null) ? $body['slug'] : ''));
+
+// What 'check' and 'schedule' are asked to do: the same parsing for both.
+$scheduled_at = is_string($body['scheduled_at'] ?? null) ? trim($body['scheduled_at']) : '';
+$channel      = in_array($body['channel'] ?? '', ['fb', 'insta'], true) ? $body['channel'] : '';
+$post_type    = in_array($body['post_type'] ?? 'post', ['post', 'story'], true) ? $body['post_type'] : 'post';
+$is_story     = ($channel === 'insta' && $post_type === 'story');
+
+// ── Dry run before the panel saves and publishes ─────────────────────────────
+if ($action === 'check') {
+    $str    = static fn(string $k): string => is_string($body[$k] ?? null) ? $body[$k] : '';
+    $photos = [];
+    foreach ((is_array($body['photos'] ?? null) ? $body['photos'] : []) as $src) {
+        if (is_string($src)) $photos[] = ['src' => $src, 'caption' => ''];
+    }
+    [$channel_id, $api_key] = social_buffer_credentials($channel);
+    $check = social_schedule_check($channel, $is_story, $scheduled_at, $channel_id, $api_key,
+        ['title' => trim($str('title')), 'content' => $str('content'), 'photos' => $photos], []);
+    echo json_encode($check['ok'] ? ['ok' => true] : ['ok' => false, 'error' => $check['error']], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
 if (!$slug) {
     echo json_encode(['ok' => false, 'error' => 'Missing slug']);
@@ -141,73 +169,32 @@ if ($action === 'save_shape') {
 
 // ── Schedule via Buffer ───────────────────────────────────────────────────────
 if ($action === 'schedule') {
-    $scheduled_at = trim($body['scheduled_at'] ?? '');
-    $channel      = $body['channel'] ?? '';
-    $post_type    = in_array($body['post_type'] ?? 'post', ['post', 'story'], true) ? $body['post_type'] : 'post';
-    $is_story     = ($channel === 'insta' && $post_type === 'story');
+    $data = load_json($file);
 
-    // Instagram Stories have no caption — the API doesn't support one — so
-    // there's nothing for the admin to type and nothing to require here.
-    if ($scheduled_at === '') {
-        echo json_encode(['ok' => false, 'error' => 'Изберете дата и час.']);
+    // The same checks the panel's dry run made, now on the saved article.
+    [$channel_id, $api_key] = social_buffer_credentials($channel);
+    $check = social_schedule_check($channel, $is_story, $scheduled_at, $channel_id, $api_key, $data, []);
+    if (!$check['ok']) {
+        echo json_encode(['ok' => false, 'error' => $check['error']]);
         exit;
     }
-    if (!in_array($channel, ['fb', 'insta'], true)) {
-        echo json_encode(['ok' => false, 'error' => 'Невалиден канал.']);
-        exit;
-    }
-
-    $publish_now = ($scheduled_at === 'now');
-    if ($publish_now) {
-        $ts = time() + 120; // 2 minutes from now
-    } else {
-        try {
-            $dt = new DateTimeImmutable($scheduled_at, new DateTimeZone('Europe/Sofia'));
-            $ts = $dt->getTimestamp();
-        } catch (Exception) {
-            $ts = 0;
-        }
-        if (!$ts || $ts <= time()) {
-            echo json_encode(['ok' => false, 'error' => 'Датата трябва да е в бъдещето.']);
-            exit;
-        }
-    }
-
-    $setting_key = $channel === 'fb' ? 'buffer_facebook_channel_id' : 'buffer_instagram_channel_id';
-    $const_key   = $channel === 'fb' ? 'BUFFER_FACEBOOK_CHANNEL_ID' : 'BUFFER_INSTAGRAM_CHANNEL_ID';
-    $channel_id  = setting_resolve($setting_key, $const_key);
+    $ts            = $check['ts'];
     $channel_label = $channel === 'fb' ? 'Facebook' : 'Instagram';
-
-    if ($channel_id === '') {
-        echo json_encode(['ok' => false, 'error' => "Buffer {$channel_label} Channel ID не е конфигуриран (Плащания → Buffer)."]);
-        exit;
-    }
-
-    $api_key = setting_resolve('buffer_api_key', 'BUFFER_API_KEY');
-    if ($api_key === '') {
-        echo json_encode(['ok' => false, 'error' => 'Buffer API ключ не е конфигуриран (Плащания → Buffer).']);
-        exit;
-    }
 
     $due_at       = gmdate('Y-m-d\TH:i:s\Z', $ts);
     $post_id_key  = $channel === 'fb' ? 'fb_buffer_post_id' : ($is_story ? 'insta_story_buffer_post_id' : 'insta_buffer_post_id');
     $sched_key    = $channel === 'fb' ? 'fb_scheduled_at'   : ($is_story ? 'insta_story_scheduled_at'   : 'insta_scheduled_at');
     $due_key      = $channel === 'fb' ? 'fb_due_at'         : ($is_story ? 'insta_story_due_at'         : 'insta_due_at');
 
-    $data               = load_json($file);
-
     // The post IS the saved article, cut to the platform's limit. Nothing comes from the browser.
-    $post_text = social_schedule_text($data, [], $channel);
-    if (!$is_story && $post_text === '') {
-        echo json_encode(['ok' => false, 'error' => 'Статията няма текст за публикуване.']);
-        exit;
-    }
+    // A Story has no caption, so it sends no text.
+    $post_text = $is_story ? '' : social_schedule_text($data, [], $channel);
     $old_buffer_post_id = $data[$post_id_key] ?? '';
 
     $req = social_fb_insta_request($data, $channel, $is_story);
     _om_log('INFO', "social-ajax schedule/{$channel}: " . count($req['urls']) . ' photo(s)');
 
-    // Instagram requires an image
+    // Instagram requires an image — a photo that couldn't be made ready counts as none.
     if ($channel === 'insta' && !$req['urls']) {
         echo json_encode(['ok' => false, 'error' => 'Instagram изисква снимка. Добавете снимка към статията преди да планирате.']);
         exit;

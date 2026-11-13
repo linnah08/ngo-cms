@@ -7,7 +7,8 @@ use PHPUnit\Framework\Attributes\Group;
 /**
  * The social preview endpoint (admin/social-preview-ajax.php) over real HTTP: login and
  * CSRF are required, it builds the three posts from the editor's unsaved text, and it
- * refuses an oversized body.
+ * refuses an oversized body. Also the schedule endpoints' dry run (`check`), which the
+ * panel calls with the same unsaved text before it saves and publishes the article.
  */
 #[Group('http')]
 #[Group('admin')]
@@ -191,5 +192,62 @@ final class SocialPreviewHttpTest extends TestCase
         @unlink($jar);
         $this->assertFalse($res['ok']);
         $this->assertStringContainsString('твърде дълъг', $res['error']);
+    }
+
+    public function test_linkedin_takes_the_bulgarian_title_when_the_english_one_is_empty(): void
+    {
+        // The save stores an empty EN title as the BG one, so the post gets it too.
+        [$jar, $csrf] = $this->login();
+        [, $res] = $this->preview($jar, [
+            'csrf_token' => $csrf, 'title' => 'Заглавие', 'content' => '<p>Текст.</p>',
+            'title_en' => '', 'content_en' => '<p>Body.</p>', 'slug' => '', 'slug_en' => 'en-x',
+        ]);
+        @unlink($jar);
+        $this->assertTrue($res['ok']);
+        $this->assertStringStartsWith("Заглавие\n\nBody.", $res['linkedin']['text']);
+    }
+
+    // ── The dry run before scheduling ────────────────────────────────────────
+
+    private function check(?string $jar, string $endpoint, array $body): array
+    {
+        [$code, $out, $loc] = $this->http('/admin/' . $endpoint, $jar, json_encode($body + ['action' => 'check']));
+        return [$code, json_decode($out, true), $loc];
+    }
+
+    /** @return string[] the article files, to show the dry run writes none */
+    private function articleFiles(): array
+    {
+        return array_merge(glob(self::$root . '/content/articles/bg/*.json') ?: [], glob(self::$root . '/content/articles/en/*.json') ?: []);
+    }
+
+    public function test_check_needs_login_and_csrf(): void
+    {
+        [$code, , $loc] = $this->check(null, 'social-ajax.php', ['csrf_token' => 'x', 'channel' => 'fb', 'scheduled_at' => 'now']);
+        $this->assertContains($code, [302, 303]);
+        $this->assertStringContainsString('login', $loc);
+        [$jar] = $this->login();
+        [, $res] = $this->check($jar, 'linkedin-ajax.php', ['csrf_token' => 'deadbeef', 'scheduled_at' => 'now']);
+        @unlink($jar);
+        $this->assertFalse($res['ok']);
+    }
+
+    public function test_check_refuses_in_plain_words_for_a_new_article_and_writes_nothing(): void
+    {
+        [$jar, $csrf] = $this->login();
+        $before = $this->articleFiles();
+        $unsaved = ['csrf_token' => $csrf, 'title' => 'Нова', 'content' => '<p>Текст.</p>', 'photos' => []];
+        [, $past]    = $this->check($jar, 'social-ajax.php', $unsaved + ['channel' => 'fb', 'scheduled_at' => '2001-01-01T10:00']);
+        [, $noTime]  = $this->check($jar, 'social-ajax.php', $unsaved + ['channel' => 'insta', 'scheduled_at' => '']);
+        [, $badCh]   = $this->check($jar, 'social-ajax.php', $unsaved + ['channel' => 'linkedin', 'scheduled_at' => 'now']);
+        [, $liPast]  = $this->check($jar, 'linkedin-ajax.php', $unsaved + ['title_en' => '', 'content_en' => '<p>Body.</p>', 'scheduled_at' => '2001-01-01T10:00']);
+        [, $badType] = $this->check($jar, 'social-ajax.php', ['csrf_token' => $csrf, 'channel' => 'fb', 'scheduled_at' => ['x'], 'title' => ['x'], 'photos' => 'x']);
+        @unlink($jar);
+        $this->assertSame(['ok' => false, 'error' => 'Датата трябва да е в бъдещето.'], $past);
+        $this->assertSame(['ok' => false, 'error' => 'Изберете дата и час.'], $noTime);
+        $this->assertSame(['ok' => false, 'error' => 'Невалиден канал.'], $badCh, 'LinkedIn goes through its own endpoint');
+        $this->assertSame(['ok' => false, 'error' => 'Датата трябва да е в бъдещето.'], $liPast);
+        $this->assertSame(['ok' => false, 'error' => 'Изберете дата и час.'], $badType, 'wrong types are refused, not a server error');
+        $this->assertSame($before, $this->articleFiles(), 'the dry run saves no article');
     }
 }

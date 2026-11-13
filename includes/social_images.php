@@ -384,6 +384,73 @@ function social_fb_insta_request(array $article, string $channel, bool $is_story
 }
 
 /**
+ * The Buffer channel id and API key for a channel ('fb', 'insta' or 'linkedin'), from
+ * Плащания → Buffer (or the config constants). '' when not set.
+ *
+ * @return array{0:string,1:string} [channel id, API key]
+ */
+function social_buffer_credentials(string $channel): array {
+    require_once __DIR__ . '/settings.php';
+    [$setting, $const] = match ($channel) {
+        'fb'       => ['buffer_facebook_channel_id', 'BUFFER_FACEBOOK_CHANNEL_ID'],
+        'insta'    => ['buffer_instagram_channel_id', 'BUFFER_INSTAGRAM_CHANNEL_ID'],
+        'linkedin' => ['buffer_linkedin_channel_id', 'BUFFER_LINKEDIN_CHANNEL_ID'],
+        default    => ['', ''],
+    };
+    return [$setting === '' ? '' : setting_resolve($setting, $const), setting_resolve('buffer_api_key', 'BUFFER_API_KEY')];
+}
+
+/**
+ * Every check a post must pass before it goes to Buffer, in one place. The `schedule`
+ * action runs it on the saved article before calling Buffer; the `check` action runs
+ * it alone on the editor's unsaved fields, so the Socials panel learns of a refusal
+ * BEFORE it saves and publishes a draft. Calls nothing and writes nothing.
+ *
+ * @param string $channel      'fb', 'insta' or 'linkedin' ('' when the request named no valid one).
+ * @param bool   $is_story     An Instagram Story: it has no caption, so it needs no text.
+ * @param string $scheduled_at datetime-local in Sofia time, or 'now'.
+ * @param string $channel_id   From social_buffer_credentials().
+ * @param string $api_key      From social_buffer_credentials().
+ * @param array  $bg           The Bulgarian article (title, content, photos/image).
+ * @param array  $en           The English article (title, content); [] when there is none.
+ * @return array{ok:bool,error:string,ts:int} ts: when the post goes out (unix time).
+ */
+function social_schedule_check(string $channel, bool $is_story, string $scheduled_at, string $channel_id,
+                               string $api_key, array $bg, array $en, ?int $now = null): array {
+    $now  = $now ?? time();
+    $fail = static fn(string $e): array => ['ok' => false, 'error' => $e, 'ts' => 0];
+
+    if ($scheduled_at === '') return $fail('Изберете дата и час.');
+    if (!in_array($channel, ['fb', 'insta', 'linkedin'], true)) return $fail('Невалиден канал.');
+
+    if ($scheduled_at === 'now') {
+        $ts = $now + 120;   // 2 minutes from now
+    } else {
+        try {
+            $ts = (new DateTimeImmutable($scheduled_at, new DateTimeZone('Europe/Sofia')))->getTimestamp();
+        } catch (Exception) {
+            $ts = 0;
+        }
+        if (!$ts || $ts <= $now) return $fail('Датата трябва да е в бъдещето.');
+    }
+
+    $label = ['fb' => 'Facebook', 'insta' => 'Instagram', 'linkedin' => 'LinkedIn'][$channel];
+    if ($channel_id === '') return $fail("Buffer {$label} Channel ID не е конфигуриран (Плащания → Buffer).");
+    if ($api_key === '')    return $fail('Buffer API ключ не е конфигуриран (Плащания → Buffer).');
+
+    if ($channel === 'linkedin') {
+        if (social_schedule_text($bg, $en, 'linkedin') === '') return $fail('Няма английски текст — преведете статията.');
+    } elseif (!$is_story && social_schedule_text($bg, [], $channel) === '') {
+        return $fail('Статията няма текст за публикуване. Напишете текста ѝ и опитайте отново.');
+    }
+
+    if ($channel === 'insta' && !social_photo_paths($bg)) {
+        return $fail('Instagram изисква снимка. Добавете снимка към статията преди да планирате.');
+    }
+    return ['ok' => true, 'error' => '', 'ts' => $ts];
+}
+
+/**
  * LinkedIn: several photos go as one PDF "document" — LinkedIn shows it as a swipeable
  * carousel; one photo stays an ordinary image post.
  */

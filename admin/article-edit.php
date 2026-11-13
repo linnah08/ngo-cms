@@ -1156,9 +1156,30 @@ if (translateBtn) {
     if (id === 'content_en' && typeof window._expandEnSection === 'function') window._expandEnSection();
   }
 
+  // Has the author been in this editor? TinyMCE then remembers where the caret was;
+  // an editor never visited would take the emoji at its very start.
+  function _trackFocus(ed) {
+    if (ed && !ed._emojiTracked) { ed._emojiTracked = true; ed.on('focus', function () { ed._emojiHadFocus = true; }); }
+  }
+  if (window.tinymce) {
+    tinymce.on('AddEditor', function (e) { _trackFocus(e.editor); });
+    (tinymce.get() || []).forEach(_trackFocus);
+  }
+
   function _insertEmoji(emoji) {
     _withEditor(_emojiTarget, function (ed) {
-      ed.insertContent(emoji);
+      if (!ed._emojiHadFocus) {
+        // Never visited: the emoji goes at the end of the text, not before its first word.
+        var body = ed.getBody(), last = body.lastElementChild;
+        if (last && ed.dom.isBlock(last)) {
+          var n = last.childNodes.length;
+          if (n && last.lastChild.nodeName === 'BR') n--;   // before the line break that keeps a paragraph open
+          ed.selection.setCursorLocation(last, n);
+        }
+        else ed.selection.setCursorLocation(body, body.childNodes.length);
+      }
+      // skip_focus: the picker keeps the focus, so the author can add several in a row.
+      ed.execCommand('mceInsertContent', false, emoji, { skip_focus: true });
       if (window.SocialPanel) window.SocialPanel.refresh();
     });
   }

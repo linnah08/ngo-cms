@@ -50,12 +50,13 @@ function html_to_social_text(string $html): string {
 }
 
 /**
- * Public address of an article. $lang is 'bg' or 'en'.
+ * Public address of an article. $lang is 'bg' or 'en'. The slug is percent-encoded, so a
+ * Cyrillic address is still a plain link wherever it is posted.
  */
 function article_public_url(string $slug, string $lang): string {
     return $lang === 'en'
-        ? SITE_URL . '/en/news/' . $slug . '/'
-        : SITE_URL . '/novini/' . $slug . '/';
+        ? SITE_URL . '/en/news/' . rawurlencode($slug) . '/'
+        : SITE_URL . '/novini/' . rawurlencode($slug) . '/';
 }
 
 /**
@@ -121,6 +122,9 @@ function social_post_text(string $title, string $html, string $url, string $plat
     $cut_at = null;
     if (preg_match_all('/[.!?…]["»”]?(?=\s+[\p{Lu}\d"«„]|\s*$)/u', $prefix, $m, PREG_OFFSET_CAPTURE)) {
         foreach (array_reverse($m[0]) as [$hit, $off]) {
+            // A stop at the very end of what fits ends a sentence only if the text
+            // really goes on with a space (or ends there): not "www." or "3." cut off.
+            if ($off + strlen($hit) === strlen($prefix) && !($next === '' || preg_match('/^\s$/u', $next))) continue;
             $before = substr($prefix, 0, $off);
             $token  = preg_match('/[\p{L}.\-]+$/u', $before, $t) ? mb_strtolower($t[0]) : '';
             if (mb_strlen($token) === 1 && preg_match('/^\p{L}$/u', $token)) continue;
@@ -145,13 +149,15 @@ function social_post_text(string $title, string $html, string $url, string $plat
 /**
  * The post text for one channel, built from the SAVED article — never from the browser.
  * Facebook and Instagram use the Bulgarian article, LinkedIn the English one.
- * Returns '' when that language has no text to post.
+ * Returns '' when that language's article has no body text: a title alone is not posted.
  *
  * @param array  $bg      The saved Bulgarian article (title, content, slug, slug_en).
  * @param array  $en      The saved English article (title, content); [] when there is none.
  * @param string $channel 'fb', 'insta' or 'linkedin'.
  */
 function social_schedule_text(array $bg, array $en, string $channel): string {
+    $src = $channel === 'linkedin' ? $en : $bg;
+    if (html_to_social_text((string) ($src['content'] ?? '')) === '') return '';
     if ($channel === 'linkedin') {
         $slug = (string) (($bg['slug_en'] ?? '') ?: ($bg['slug'] ?? ''));
         return social_post_text((string) ($en['title'] ?? ''), (string) ($en['content'] ?? ''),

@@ -6,8 +6,10 @@
 // typing stops. Only the newest reply is shown, so a slow old reply can't overwrite
 // a newer preview.
 //
-// Scheduling a post first saves the article in the background and publishes it
-// (author's decision), then schedules it under the address the save returned.
+// Scheduling a post first asks the endpoint whether the post would be accepted (a dry
+// run: date, Buffer set-up, text, photo), then saves the article in the background and
+// publishes it (author's decision), then schedules it under the address the save
+// returned. A refusal from the dry run leaves the article as it is — still a draft.
 //
 // Exposes window.SocialPanel = { refresh(): Promise, isOpen(): boolean,
 //   saveThenSchedule(channel: 'fb'|'insta'|'linkedin', body): Promise }.
@@ -31,6 +33,7 @@
   var MSG_FAILED   = 'Прегледът не е обновен — опитайте отново';
   var MSG_SESSION  = 'Сесията е изтекла — презаредете страницата.';
   var MSG_START    = 'Започнете да пишете — тук ще видите публикациите.';
+  var MSG_NO_BODY  = 'Статията още няма текст. Напишете го — тогава ще видите публикацията тук и ще можете да я планирате.';
   var MSG_NETWORK  = 'Грешка при свързване.';
   var MSG_BAD_REPLY = 'Нещо се обърка — опитайте отново.';
   var MSG_NOT_SAVED = 'Статията не е запазена, затова публикацията не е планирана: ';
@@ -96,6 +99,7 @@
     try { localStorage.setItem(STORAGE_KEY, open ? '1' : '0'); } catch (e) {}
     applyLayout();
     if (open) {
+      announceNext = true;
       refresh();
       if (opts.focus) {
         var title = document.getElementById('socialPanelTitle');
@@ -242,6 +246,10 @@
     });
   }
 
+  // "Прегледът е обновен" is said only when it is news: the first preview after the
+  // panel opens, and the first one that works after a failed one — never after every
+  // pause in typing.
+  var announceNext = false;
   var announceTimer = null;
   function announce(msg) {
     statusEl.textContent = '';
@@ -269,27 +277,33 @@
     var titleEn = fieldValue('title_en'), htmlEn = editorHtml('content_en');
     var bgEmpty = title.trim() === '' && !hasText(html);
     var enEmpty = titleEn.trim() === '' && !hasText(htmlEn);
+    // A title with no text is not a post: scheduling waits for the article's text.
+    var bgNoBody = !hasText(html);
     if (bgEmpty && enEmpty) {
       renderEmpty();
       hideError();
+      announceNext = false;
       return Promise.resolve();
     }
     return postJson('/admin/social-preview-ajax.php', {
       title: title, content: html, title_en: titleEn, content_en: htmlEn,
-      slug: fieldValue('slug'), slug_en: fieldValue('slug_en')
+      slug: fieldValue('slug'), slug_en: fieldValue('slug_en'),
+      current_slug: slug   // the saved address, which the save keeps: the link matches
     }).then(function (d) {
       if (mySeq !== seq) return;
       if (!d || !d.ok) {
         var e = new Error((d && d.error) || ''); e.fromServer = true; throw e;
       }
-      renderPlatform('fb', bgEmpty ? null : d.fb, MSG_START);
-      renderPlatform('insta', bgEmpty ? null : d.insta, MSG_START);
+      var bgMsg = bgEmpty ? MSG_START : MSG_NO_BODY;
+      renderPlatform('fb', bgNoBody ? null : d.fb, bgMsg);
+      renderPlatform('insta', bgNoBody ? null : d.insta, bgMsg);
       renderLinkedIn(d.linkedin);
       hideError();
-      announce(MSG_UPDATED);
+      if (announceNext) { announceNext = false; announce(MSG_UPDATED); }
     }).catch(function (e) {
       if (mySeq !== seq) return;
       clearStatus();
+      announceNext = true;   // the next preview that works is news
       // The old preview stays; the error says so and offers another try.
       if (e && e.userMessage) showError(e.userMessage);
       else if (e && e.fromServer && e.message) showError(MSG_FAILED + '. ' + e.message);
@@ -575,6 +589,52 @@
   if (statusSel) statusSel.addEventListener('change', updateDraftNotices);
 
   // ── Saving the article in the background ────────────────────────────────────
+  // While a background save and schedule runs, „Запази“ is locked: a normal save then
+  // would still post status=draft (and, for a new article, no address) and could undo
+  // the publish or drop the Buffer post ids the schedule step is writing.
+  function formSubmitButtons() {
+    var inside = Array.prototype.slice.call(form.querySelectorAll('button[type="submit"], input[type="submit"]'));
+    var outside = Array.prototype.slice.call(document.querySelectorAll(
+      'button[type="submit"][form="articleForm"], input[type="submit"][form="articleForm"]'));
+    return inside.concat(outside.filter(function (b) { return inside.indexOf(b) === -1; }));
+  }
+  function lockForm(on) {
+    formSubmitButtons().forEach(function (b) {
+      if (on) {
+        if (!b.disabled) { b.disabled = true; b.dataset.socLocked = '1'; }
+      } else if (b.dataset.socLocked === '1') {
+        b.disabled = false;
+        delete b.dataset.socLocked;
+      }
+    });
+  }
+  // Capture phase: runs before the page's own submit handlers (autosave, confirm).
+  form.addEventListener('submit', function (e) {
+    if (!sending) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, true);
+
+  // The editor's photo paths, as the save will post them (photo_src[]).
+  function photoPaths() {
+    return Array.prototype.slice.call(form.querySelectorAll('input[name="photo_src[]"]'))
+      .map(function (i) { return i.value; }).filter(Boolean);
+  }
+
+  // The dry run: would this post be accepted? Sent with the editor's unsaved fields,
+  // so it works for a new article too. Nothing is saved or sent to Buffer.
+  function checkSchedule(channel, body) {
+    var url = channel === 'linkedin' ? '/admin/linkedin-ajax.php' : '/admin/social-ajax.php';
+    var req = Object.assign({}, body, {
+      action: 'check',
+      title: fieldValue('title'), content: editorHtml('content'),
+      title_en: fieldValue('title_en'), content_en: editorHtml('content_en'),
+      photos: photoPaths()
+    });
+    if (channel !== 'linkedin') req.channel = channel;
+    return postJson(url, req);
+  }
+
   // The same form, to the same handler; _ajax=1 asks for JSON instead of a redirect,
   // publish_now=1 publishes it (and drops any auto-publish date).
   function saveArticle() {
@@ -624,13 +684,23 @@
     return wasDraft && saved.status === 'published';
   }
 
-  // Save (and publish) the article, then schedule the post under the address the
-  // save returned — saving can change it (a new title). Nothing but the time and
-  // the channel is sent: the server builds the post from the saved article.
+  // Check that the post would be accepted, then save (and publish) the article, then
+  // schedule the post under the address the save returned — saving can change it (a
+  // new title). A refused check answers {ok:false, error} and nothing is saved.
+  // Nothing but the time and the channel is sent to schedule: the server builds the
+  // post from the saved article.
   function saveThenSchedule(channel, body) {
     var startedAt = Date.now();
     var published = false;
-    return saveArticle().then(function (saved) {
+    var refused = null;
+    return checkSchedule(channel, body).then(function (check) {
+      if (!check || !check.ok) {
+        refused = check && check.error ? check : { ok: false, error: MSG_BAD_REPLY };
+        return null;
+      }
+      return saveArticle();
+    }).then(function (saved) {
+      if (refused) return refused;   // the article is left as it was
       if (!saved || !saved.ok) {
         var e = new Error(''); e.userMessage = MSG_NOT_SAVED + ((saved && saved.error) || MSG_BAD_REPLY); throw e;
       }
@@ -658,12 +728,14 @@
     if (sending) return false;
     sending = true;
     allButtons().forEach(function (b) { if (b) b.disabled = true; });
+    lockForm(true);
     spinner.style.display = '';
     errEl.style.display = 'none';
     return true;
   }
   function endSend(spinner) {
     sending = false;
+    lockForm(false);
     PLATFORMS.forEach(function (p) { setBlocked(p, blocked[p]); });
     spinner.style.display = 'none';
     updateDraftNotices();

@@ -2,7 +2,8 @@
 /**
  * Social post previews from the editor's unsaved text. Writes nothing.
  *
- * POST body (JSON): csrf_token, title, content, title_en, content_en, slug, slug_en
+ * POST body (JSON): csrf_token, title, content, title_en, content_en, slug, slug_en,
+ *   current_slug (the saved article's address, '' for a new one — as the save is given it)
  * Answers {ok:true, fb:{text,length,limit,cut}, insta:{…}, linkedin:{…}} or {ok:false, error}.
  * Facebook and Instagram use the Bulgarian text, LinkedIn the English one.
  */
@@ -41,11 +42,16 @@ $content  = $str('content');
 $title_en = $str('title_en');
 $content_en = $str('content_en');
 
-$slugs = article_compute_slugs($str('slug'), $str('slug_en'), $title, $title_en, '', article_slugs_latin());
+// The same address the save will give the article: an existing address is kept as it is.
+$current_slug = basename(str_replace(['..', "\0"], '', $str('current_slug')));
+$slugs = article_compute_slugs($str('slug'), $str('slug_en'), $title, $title_en, '', article_slugs_latin(), $current_slug);
 $url_bg = article_public_url($slugs['bg'], 'bg');
 $url_en = article_public_url($slugs['en'], 'en');
 
-$en_empty = trim(strip_tags($content_en)) === '';
+// No English body, no LinkedIn post — the same rule as social_schedule_text().
+$en_empty = html_to_social_text($content_en) === '';
+// An empty English title is saved as the Bulgarian one, so LinkedIn gets that title.
+$title_li = trim($title_en) !== '' ? $title_en : $title;
 
 echo json_encode([
     'ok'       => true,
@@ -53,5 +59,5 @@ echo json_encode([
     'insta'    => social_post_text($title, $content, $url_bg, 'insta'),
     'linkedin' => $en_empty
         ? ['text' => '', 'length' => 0, 'limit' => social_post_limit('linkedin'), 'cut' => false]
-        : social_post_text($title_en, $content_en, $url_en, 'linkedin'),
+        : social_post_text($title_li, $content_en, $url_en, 'linkedin'),
 ], JSON_UNESCAPED_UNICODE);

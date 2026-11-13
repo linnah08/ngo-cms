@@ -204,6 +204,20 @@ final class ModulesOffHttpTest extends TestCase
         return preg_match('#<a href="/admin/' . preg_quote($page, '#') . '"\s+class="admin-nav__link[^"]*"#', $html, $m) ? $m[0] : '';
     }
 
+    // ── social ───────────────────────────────────────────────────────────────
+
+    public function test_social_off_refuses_the_preview_endpoint(): void
+    {
+        $this->switchOff('social');
+        [$code, $body] = $this->http('/admin/social-preview-ajax.php', true,
+            ['csrf_token' => 'x', 'title' => 'Заглавие', 'content' => '<p>Текст.</p>']);
+        $this->assertSame(404, $code);
+        $res = json_decode($body, true);
+        $this->assertIsArray($res, 'a JSON answer, not a page');
+        $this->assertFalse($res['ok']);
+        $this->assertStringContainsString('„' . modules_registry()['social']['label'] . '“ е изключен', $res['error']);
+    }
+
     // ── shop ─────────────────────────────────────────────────────────────────
 
     /** Insert a pending order straight into the database; returns its number. */

@@ -198,12 +198,12 @@ function modules_registry(?array $replace = null): array
         ],
         'social' => [
             'label'       => 'Социални мрежи',
-            'description' => 'Раздел „Социални мрежи“ в редактора на статии: публикации за Facebook, Instagram и LinkedIn, написани с помощта на изкуствен интелект и планирани през Buffer.',
-            'off_warning' => 'Изключвате социалните мрежи. Разделът „Социални мрежи“ ще изчезне от редактора на статии, а настройките за Buffer — от „Плащания“. Публикации, които вече са планирани в Buffer, ще излязат по график, освен ако не ги изтриете в Buffer. Написаните текстове остават запазени.',
+            'description' => 'Панел „Социални мрежи“ до текста на статията: показва как ще изглежда статията във Facebook, Instagram и LinkedIn и я планира там през Buffer. Публикацията е самата статия — ако е по-дълга, се съкращава до последното цяло изречение.',
+            'off_warning' => 'Изключвате социалните мрежи. Панелът „Социални мрежи“ ще изчезне от редактора на статии, а настройките за Buffer — от „Плащания“. Публикации, които вече са планирани в Buffer, ще излязат по график, освен ако не ги изтриете в Buffer. Статиите не се променят.',
             'needs'        => [],
-            // No page of its own: the Social tab lives in article-edit.php, Buffer
+            // No page of its own: the Socials panel lives in article-edit.php, Buffer
             // settings in payment.php. Its JSON endpoints (social-ajax.php,
-            // linkedin-ajax.php, buffer-setup-ajax.php) call module_ajax_guard('social').
+            // linkedin-ajax.php, social-preview-ajax.php, buffer-setup-ajax.php) call module_ajax_guard('social').
             'admin_pages'  => [],
             'public_paths' => [],
             'pending'      => static function (PDO $pdo): ?string {

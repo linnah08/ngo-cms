@@ -89,12 +89,12 @@ final class SocialAjaxTest extends TestCase
         // Instagram's Content Publishing API has no caption parameter for
         // Stories — text is never displayed, so it must not be required, and
         // it must not be persisted as if it meant something.
+        // The rule lives in social_schedule_check() (SocialScheduleCheckTest::testTextIsNeededExceptForAStory).
         $src = file_get_contents($this->socialAjax);
-        $this->assertStringContainsString(
-            "!\$is_story && \$post_text === ''",
-            $src,
-            "schedule action must not require a post text when posting an Instagram story"
-        );
+        $this->assertStringContainsString('social_schedule_check($channel, $is_story,', $src,
+            "schedule action must tell the shared check that a story needs no text");
+        $this->assertStringContainsString("!\$is_story && social_schedule_text(",
+            (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/includes/social_images.php'));
         $this->assertStringNotContainsString(
             "'insta_story_text'",
             $src,
