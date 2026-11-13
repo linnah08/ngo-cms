@@ -21,6 +21,28 @@ final class ArticleSaveLogicTest extends TestCase
         require_once dirname(__DIR__, 2) . '/includes/ai_excerpt.php';
     }
 
+    // ── article_fb_summary_text ─────────────────────────────────────────────
+
+    public function testFbSummaryGetsTheArticleLinkAtTheEnd(): void
+    {
+        $out = article_fb_summary_text("Първи абзац.\n\nВтори абзац.", 'https://example.org/novini/x/');
+        $this->assertSame("Първи абзац.\n\nВтори абзац.\n\n👉 https://example.org/novini/x/", $out);
+    }
+
+    public function testFbSummaryDropsHashtagsAndAnyLinkTheAiWrote(): void
+    {
+        $out = article_fb_summary_text(
+            "Текст с #дума в изречението.\n\nПрочетете още: https://wrong.example/\n\n#НПО #Дарение",
+            'https://example.org/novini/x/'
+        );
+        $this->assertSame("Текст с #дума в изречението.\n\n👉 https://example.org/novini/x/", $out);
+    }
+
+    public function testFbSummaryWithNoTextIsJustTheLink(): void
+    {
+        $this->assertSame('👉 https://example.org/novini/x/', article_fb_summary_text("  \n ", 'https://example.org/novini/x/'));
+    }
+
     // ── article_compute_slugs ────────────────────────────────────────────────
 
     public function testBgSlugKeepsSourceLanguage(): void

@@ -16,34 +16,16 @@ final class SocialAjaxTest extends TestCase
         $this->articleEdit = $_SERVER['DOCUMENT_ROOT'] . '/admin/article-edit.php';
     }
 
-    public function testGenerateActionHandlesGenerateType(): void
+    public function testGenerateActionWritesOneSummaryWithTheLinkAdded(): void
     {
         $src = file_get_contents($this->socialAjax);
+        // The old "FB пост" variant is gone: one summary, no generate_type switch.
+        $this->assertStringNotContainsString("generate_type", $src);
+        $this->assertStringContainsString('Без хаштагове', $src, 'The summary must ask for no hashtags');
         $this->assertStringContainsString(
-            "generate_type",
+            'article_fb_summary_text($text, $article_url)',
             $src,
-            "social-ajax.php generate action must read a 'generate_type' param"
-        );
-    }
-
-    public function testGenerateActionHasBrandedPrompt(): void
-    {
-        $src = file_get_contents($this->socialAjax);
-        // Key phrases from the branded FB post skill
-        $this->assertStringContainsString(
-            'Warm, honest',
-            $src,
-            "Branded prompt must include voice instructions"
-        );
-        $this->assertStringContainsString(
-            'Hook',
-            $src,
-            "Branded prompt must include structural instructions"
-        );
-        $this->assertStringContainsString(
-            'устойчивост',
-            $src,
-            "Branded prompt must include DO NOT jargon list"
+            'The article link must be added by the server, not left to the AI'
         );
     }
 
@@ -82,19 +64,12 @@ final class SocialAjaxTest extends TestCase
         );
     }
 
-    public function testArticleEditHasTwoGenerateButtons(): void
+    public function testArticleEditHasOnlyTheSummaryButton(): void
     {
         $src = file_get_contents($this->articleEdit);
-        $this->assertStringContainsString(
-            'socGenerateNewsBtn',
-            $src,
-            "article-edit.php must have a Генерирай FB новина button"
-        );
-        $this->assertStringContainsString(
-            'socGeneratePostBtn',
-            $src,
-            "article-edit.php must have a Генерирай FB пост button"
-        );
+        $this->assertStringContainsString('socGenerateNewsBtn', $src);
+        $this->assertStringContainsString('✦ Обобщение с линк към статията', $src);
+        $this->assertStringNotContainsString('socGeneratePostBtn', $src, 'The FB пост button is removed');
     }
 
     public function testArticleEditHasSplitTextareas(): void

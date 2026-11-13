@@ -50,6 +50,28 @@ function html_to_social_text(string $html): string {
 }
 
 /**
+ * The Facebook summary as it is posted: the AI's text, then the article's link on
+ * its own line. The link is added here, not asked of the AI, so it is always there
+ * and always right. Hashtag-only lines and any link the AI wrote anyway are dropped.
+ */
+function article_fb_summary_text(string $summary, string $article_url): string {
+    $keep = [];
+    foreach (preg_split('/\R/u', trim($summary)) as $line) {
+        $t = trim($line);
+        if ($t !== '' && preg_match('/^(#\S+\s*)+$/u', $t)) continue;
+        if (preg_match('#https?://#i', $t)) {
+            // Its own link goes; a lead-in left with nothing to point at goes too.
+            $line = rtrim(preg_replace('#\s*https?://\S+#iu', '', $line));
+            $rest = trim($line);
+            if ($rest === '' || !preg_match('/\p{L}/u', $rest) || str_ends_with($rest, ':')) continue;
+        }
+        $keep[] = rtrim($line);
+    }
+    $text = trim(preg_replace("/\n{3,}/", "\n\n", implode("\n", $keep)));
+    return ($text !== '' ? $text . "\n\n" : '') . '👉 ' . $article_url;
+}
+
+/**
  * Derive the BG and EN slugs from the submitted slug/title fields.
  *
  * BG keeps the source language by default (slug() allows Cyrillic; only path-unsafe

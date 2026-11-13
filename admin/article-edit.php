@@ -525,10 +525,7 @@ window._showSiteNotice = function (msg, afterEl) {
 
   <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;">
     <button type="button" id="socGenerateNewsBtn" class="btn btn--outline" style="font-size:.82rem;">
-      ✦ Генерирай FB новина
-    </button>
-    <button type="button" id="socGeneratePostBtn" class="btn btn--outline" style="font-size:.82rem;">
-      ✦ Генерирай FB пост
+      ✦ Обобщение с линк към статията
     </button>
     <span id="socSpinner" style="display:none;font-size:.82rem;color:var(--text-muted);">Генерира се…</span>
     <span id="socError"   style="display:none;font-size:.82rem;color:#c0392b;"></span>
@@ -1572,15 +1569,14 @@ if (translateBtn) {
     return igMode === 'story' ? '' : instaText.value.trim();
   }
 
-  // Generate — shared handler for both buttons
-  function _generate(generateType) {
+  // Generate the summary; the server adds the article's link after it.
+  function _generate() {
     var spinner = document.getElementById('socSpinner');
     var errEl   = document.getElementById('socError');
     generateNewsBtn.disabled = true;
-    document.getElementById('socGeneratePostBtn').disabled = true;
     spinner.style.display = '';
     errEl.style.display   = 'none';
-    socPost({ action: 'generate', generate_type: generateType })
+    socPost({ action: 'generate' })
       .then(function(data) {
         if (!data.ok) {
           errEl.textContent   = data.error;
@@ -1596,13 +1592,11 @@ if (translateBtn) {
       })
       .finally(function() {
         generateNewsBtn.disabled = false;
-        document.getElementById('socGeneratePostBtn').disabled = false;
         spinner.style.display = 'none';
       });
   }
 
-  generateNewsBtn.addEventListener('click', function() { _generate('news'); });
-  document.getElementById('socGeneratePostBtn').addEventListener('click', function() { _generate('post'); });
+  generateNewsBtn.addEventListener('click', function() { _generate(); });
 
   // Copy FB text
   var copyBtn = document.getElementById('socCopyBtn');

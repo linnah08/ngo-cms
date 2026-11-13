@@ -150,46 +150,17 @@ if ($action === 'generate') {
         exit;
     }
 
-    $generate_type = $body['generate_type'] ?? 'news';
+    // One kind of text: a short summary. The link to the article is added after,
+    // by article_fb_summary_text(), so the AI is never asked to write it.
     $article = load_json($file);
     $title   = $article['title']   ?? '';
     $content = mb_substr(strip_tags($article['content'] ?? ''), 0, 3000);
+    $article_url = rtrim(SITE_URL, '/') . '/novini/' . rawurlencode($slug) . '/';
     // Who the organisation is (Организация → name and Кратко описание); nothing when not set.
     $org_about = org_ai_context('bg');
     $org_about = $org_about !== '' ? "\n\n" . $org_about : '';
 
-    if ($generate_type === 'post') {
-        $article_url = rtrim(SITE_URL, '/') . '/novini/' . rawurlencode($slug) . '/';
-        $prompt = "You write Facebook posts for a Bulgarian non-profit organisation.{$org_about}
-
-VOICE: Warm, honest, occasionally dry/funny. Team voice (\"ние\"), never corporate. Story-first. Emotion through specific detail, not adjectives.
-
-STRUCTURE: Hook → context/story → what the article covers → link. CTA at the end only.
-
-FORMATTING RULES:
-- Bulgarian only
-- 100–200 words
-- Short paragraphs, generous white space
-- 1–2 emojis max, never mid-sentence
-- No dashes or em-dashes. Use full stops instead
-- No hashtags. Never.
-- No exclamation marks more than once per post
-- End with: 👉 {$article_url}
-
-DO NOT:
-- Start with \"С радост съобщаваме\", \"Какво става когато\" or \"С удоволствие споделяме\"
-- Use NGO jargon: устойчивост, въздействие, екосистема, уязвими групи
-- Use dashes to connect clauses (reads as AI-generated)
-- Over-explain the organisation's mission
-- Invent overly specific illustrative examples
-
-Write a Facebook post for this article.
-Title: {$title}
-Content: {$content}
-
-Return only the post text. No explanations, no alternatives.";
-    } else {
-        $prompt = "Напиши публикация за Facebook и Instagram за българска НПО.{$org_about}
+    $prompt = "Напиши кратко обобщение на статия за Facebook и Instagram за българска НПО.{$org_about}
 
 Тон: топъл, честен, близък. Не корпоративен. Истински истории, реален ефект. Подходящ за широката аудитория.
 
@@ -197,16 +168,16 @@ Return only the post text. No explanations, no alternatives.";
 Заглавие: {$title}
 Съдържание: {$content}
 
-Напиши публикацията на БЪЛГАРСКИ. Насоки:
+Напиши обобщението на БЪЛГАРСКИ. Насоки:
 - 2–4 кратки абзаца
 - Започни с нещо, което привлича внимание — въпрос, факт или момент
 - Топло и автентично, подходящо за родители, доброволци, дарители
-- Завърши с призив за действие или размисъл
-- 3–5 хаштага на Bulgarian (напр. #НПО #Дарение)
+- Завърши с призив да се прочете цялата статия
+- Без хаштагове
+- Без линк — линкът към статията се добавя автоматично след текста
 - Обикновен текст, без markdown форматиране
 
-Върни само текста на публикацията, нищо друго.";
-    }
+Върни само текста на обобщението, нищо друго.";
 
     $payload = json_encode([
         'model'      => 'claude-sonnet-4-6',
@@ -252,6 +223,7 @@ Return only the post text. No explanations, no alternatives.";
         echo json_encode(['ok' => false, 'error' => 'Empty response from Claude.']);
         exit;
     }
+    $text = article_fb_summary_text($text, $article_url);
 
     $data = load_json($file);
     $data['fb_text']     = $text;
