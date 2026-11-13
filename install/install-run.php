@@ -82,8 +82,10 @@ if (!$migration_result['success']) {
 $account = $done['account'];
 try {
     if ((int) $pdo->query('SELECT COUNT(*) FROM admin_users')->fetchColumn() === 0) {
-        $pdo->prepare('INSERT INTO admin_users (name, email, password_hash, role) VALUES (?,?,?,\'admin\')')
-            ->execute([$account['admin_name'] ?: 'Администратор', $account['admin_email'], $account['password_hash']]);
+        $first = ($account['admin_first_name'] ?? '') ?: 'Администратор';
+        $last  = (string) ($account['admin_last_name'] ?? '');
+        $pdo->prepare('INSERT INTO admin_users (name, first_name, last_name, email, password_hash, role) VALUES (?,?,?,?,?,\'admin\')')
+            ->execute([trim($first . ' ' . $last), $first, $last, $account['admin_email'], $account['password_hash']]);
     }
     // One-time "log me in" link for the finish screen (admin/install-login.php): 15 minutes, single use.
     $login_token = bin2hex(random_bytes(32));

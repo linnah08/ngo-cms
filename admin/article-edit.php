@@ -46,6 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title_en   = trim($_POST['title_en']   ?? '');
     $content_en = $_POST['content_en']       ?? '';
     $excerpt_en = trim($article_en['excerpt'] ?? '');
+    // The English byline; left empty, the English page shows the Bulgarian one.
+    $author_en  = trim(is_string($_POST['author_en'] ?? null) ? $_POST['author_en'] : '') ?: $author;
     $has_en     = $title_en !== '' || $content_en !== '';
 
     // Derive both slugs (BG keeps its language unless „латиница“ is on in
@@ -164,7 +166,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($has_en) {
             $data_en = article_build_en_data([
                 'title'   => $title_en ?: $title, 'slug'    => $new_slug_en,
-                'date'    => $date,    'author'  => $author,   'status'  => $status,
+                'date'    => $date,    'author'  => $author_en, 'status' => $status,
                 'excerpt' => $excerpt_en, 'image' => $image,   'tags'    => $tags,
                 'photos'  => $photos_en,
                 'content' => $content_en, 'scheduled' => $scheduled,
@@ -415,6 +417,14 @@ $badge_style       = 'font-size:.75rem;font-weight:600;border-radius:3px;padding
     </div>
 
     <div class="form-group">
+      <label for="author_en">Author (EN)</label>
+      <input type="text" id="author_en" name="author_en" lang="en" data-translate-from="author"
+             value="<?= h($article_en['author'] ?? admin_byline($current, 'en')) ?>"
+             aria-describedby="author_en_hint">
+      <small id="author_en_hint" style="color:var(--text-muted);">The name under the English article, in Latin letters. Left empty, the Bulgarian author is shown.</small>
+    </div>
+
+    <div class="form-group">
       <label for="slug_en">Slug (EN URL)</label>
       <input type="text" id="slug_en" name="slug_en"
              value="<?= h($edit_slug_en) ?>"
@@ -443,7 +453,7 @@ $badge_style       = 'font-size:.75rem;font-weight:600;border-radius:3px;padding
 
     <p style="margin:.5rem 0 0;font-size:.8rem;color:var(--text-muted);">
       Leave all EN fields empty to skip creating/updating the English version.
-      Date, author, image and status are shared between BG and EN.
+      Date, image and status are shared between BG and EN.
     </p>
     </div><!-- /#enFieldsWrap -->
   </div>

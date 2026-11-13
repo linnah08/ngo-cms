@@ -135,7 +135,7 @@ final class PasswordPagesTest extends TestCase
 
     public function testNewUserGetsAWeekLongSetPasswordLinkAndNoKnownPassword(): void
     {
-        $r = run_admin_page('admin/users.php', ['action' => 'add', 'name' => 'New Person', 'email' => self::NEW_EMAIL, 'role' => 'author']);
+        $r = run_admin_page('admin/users.php', ['action' => 'add', 'first_name' => 'New', 'last_name' => 'Person', 'email' => self::NEW_EMAIL, 'role' => 'author']);
         $row = $this->row(self::NEW_EMAIL);
         $this->assertNotFalse($row, 'user created without a password field');
         $this->assertNotEmpty($row['reset_token']);

@@ -19,10 +19,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
     if ($action === 'add') {
-        $name  = trim($_POST['name']     ?? '');
-        $email = trim($_POST['email']    ?? '');
+        $in    = admin_names_from_input($_POST);
+        $names = $in['names'];
+        $email = trim(is_string($_POST['email'] ?? null) ? $_POST['email'] : '');
         $role  = isset(admin_roles()[$_POST['role'] ?? '']) ? $_POST['role'] : 'author';
-        if (!$name || !$email) {
+        if ($in['error'] || !$email) {
             $error = 'Моля попълнете име и имейл.';
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $error = 'Невалиден имейл.';
@@ -30,8 +31,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 // Nobody knows this password: the new user picks their own from the welcome email's link.
                 $hash = password_hash(bin2hex(random_bytes(32)), PASSWORD_BCRYPT);
-                $pdo->prepare('INSERT INTO admin_users (name, email, password_hash, role) VALUES (?,?,?,?)')
-                    ->execute([$name, $email, $hash, $role]);
+                $pdo->prepare('INSERT INTO admin_users (name, first_name, last_name, first_name_en, last_name_en, email, password_hash, role) VALUES (?,?,?,?,?,?,?,?)')
+                    ->execute([admin_full_name($names['first_name'], $names['last_name']),
+                               $names['first_name'], $names['last_name'], $names['first_name_en'], $names['last_name_en'],
+                               $email, $hash, $role]);
 
                 if (admin_send_password_link($email, 'welcome')) {
                     $success = 'Потребителят е добавен. Изпратихме му имейл с линк, от който да избере парола (валиден 7 дни).';
@@ -47,6 +50,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = 'Потребителят не беше създаден поради техническа грешка. Опитайте отново.';
                 }
             }
+        }
+
+    } elseif ($action === 'rename') {
+        $id = (int) ($_POST['id'] ?? 0);
+        $in = admin_names_from_input($_POST);
+        if ($in['error']) {
+            $error = 'Имената не бяха запазени: ' . $in['error'];
+        } else {
+            admin_save_names($pdo, $id, $in['names']);
+            flash_set('success', 'Имената са запазени.');
+            header('Location: /admin/users.php');
+            exit;
         }
 
     } elseif ($action === 'change_role') {
@@ -114,7 +129,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
-$users = $pdo->query('SELECT id, name, email, role, created_at FROM admin_users ORDER BY created_at')->fetchAll();
+$users = $pdo->query('SELECT id, name, first_name, last_name, first_name_en, last_name_en, email, role, created_at FROM admin_users ORDER BY created_at')->fetchAll();
+
+/** The four name inputs, for the add form ($p = 'new-user') and each user's rename form. */
+$name_inputs = static function (string $p, array $u): string {
+    $row = static fn(string $f, string $label, bool $req, string $ac, string $extra = '') =>
+        '<div class="form-group"><label for="' . h($p . '-' . $f) . '">' . h($label) . ($req ? '' : ' <span style="font-weight:400;color:#4b5563;">(по желание)</span>') . '</label>'
+        . '<input type="text" id="' . h($p . '-' . $f) . '" name="' . $f . '" maxlength="100" value="' . h((string) ($u[$f] ?? '')) . '"'
+        . ($req ? ' required' : '') . ' autocomplete="' . $ac . '"' . $extra . '></div>';
+    return $row('first_name', 'Име', true, 'off')
+         . $row('last_name', 'Фамилия', false, 'off')
+         . $row('first_name_en', 'Име на латиница (за английския сайт)', false, 'off', ' lang="en" data-translate-from="' . h($p . '-first_name') . '"')
+         . $row('last_name_en', 'Фамилия на латиница', false, 'off', ' lang="en" data-translate-from="' . h($p . '-last_name') . '"');
+};
 ?>
 
 <div class="admin-page-header">
@@ -138,11 +165,11 @@ if ($error)   $_msgs[] = ['type' => 'error',   'message' => $error];
 <div class="admin-table-wrap" style="margin-bottom:2.5rem;overflow-x:hidden;">
   <table class="admin-table" style="table-layout:fixed;width:100%;">
     <colgroup>
-      <col style="width:19%;">
       <col style="width:27%;">
+      <col style="width:23%;">
       <col style="width:12%;">
-      <col style="width:16%;">
-      <col style="width:26%;">
+      <col style="width:13%;">
+      <col style="width:25%;">
     </colgroup>
     <thead>
       <tr>
@@ -156,7 +183,19 @@ if ($error)   $_msgs[] = ['type' => 'error',   'message' => $error];
     <tbody>
       <?php foreach ($users as $user): ?>
         <tr>
-          <td><?= h($user['name']) ?></td>
+          <td>
+            <?= h($user['name']) ?>
+            <details style="margin-top:.25rem;">
+              <summary class="btn-link" style="cursor:pointer;">Промени имената</summary>
+              <form method="POST" action="/admin/users.php" class="admin-form" style="margin-top:.5rem;">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="rename">
+                <input type="hidden" name="id" value="<?= (int)$user['id'] ?>">
+                <?= $name_inputs('user-' . (int)$user['id'], $user) ?>
+                <button type="submit" class="btn btn--primary btn--sm">Запази имената</button>
+              </form>
+            </details>
+          </td>
           <td><?= h($user['email']) ?></td>
           <td>
             <?php
@@ -223,13 +262,11 @@ if ($error)   $_msgs[] = ['type' => 'error',   'message' => $error];
 <form method="POST" action="/admin/users.php" class="admin-form" style="max-width:480px;">
   <?= csrf_field() ?>
   <input type="hidden" name="action" value="add">
-  <div class="form-group">
-    <label for="new-user-name">Имена</label>
-    <input type="text" id="new-user-name" name="name" required autocomplete="off">
-  </div>
+  <?= $name_inputs('new-user', []) ?>
   <div class="form-group">
     <label for="new-user-email">Имейл</label>
-    <input type="email" id="new-user-email" name="email" required autocomplete="off">
+    <input type="email" id="new-user-email" name="email" required autocomplete="off" aria-describedby="new-user-email-hint">
+    <p id="new-user-email-hint" style="margin:.3rem 0 0;font-size:.85rem;color:#4b5563;">С този имейл ще влиза в панела. Имената се показват в панела и под статиите.</p>
   </div>
   <div class="form-group">
     <label for="new-user-role">Роля</label>

@@ -74,8 +74,10 @@ if (strlen($pass) < 8) {
     exit(1);
 }
 
-$pdo->prepare("INSERT INTO admin_users (name, email, password_hash, role) VALUES (?, ?, ?, 'admin')")
-    ->execute([$name, $email, password_hash($pass, PASSWORD_DEFAULT)]);
+$name = trim((string) preg_replace('/\s+/u', ' ', $name));
+[$first, $last] = array_pad(explode(' ', $name, 2), 2, '');   // first word, then the rest, as admin_split_name()
+$pdo->prepare("INSERT INTO admin_users (name, first_name, last_name, email, password_hash, role) VALUES (?, ?, ?, ?, ?, 'admin')")
+    ->execute([$name, $first, $last, $email, password_hash($pass, PASSWORD_DEFAULT)]);
 
 echo "\nCreated admin: $email\n";
 echo "Done. Log in at /admin/\n";

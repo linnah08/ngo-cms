@@ -420,12 +420,13 @@ $prev    = $step_no > 1 ? $keys[$step_no - 2] : null;
 <?php elseif ($step === 'account'): ?>
 <?php   $has_pass = !empty($done['account']['password_hash']); ?>
       <p class="intro">С тези данни ще влизате в администраторския панел, откъдето управлявате сайта.</p>
-      <?= $field('admin_email', 'Имейл', true, 'email', '', 'autocomplete="email"') ?>
+      <?= $field('admin_first_name', 'Име', true, 'text', '', 'autocomplete="given-name"') ?>
+      <?= $field('admin_last_name', 'Фамилия', false, 'text', 'Името и фамилията се показват в панела и под статиите ви. За вход не се ползват — влизате с имейла.', 'autocomplete="family-name"') ?>
+      <?= $field('admin_email', 'Имейл', true, 'email', 'С него влизате в панела.', 'autocomplete="email"') ?>
       <?= $field('admin_password', 'Парола', !$has_pass, 'password',
             $has_pass ? 'Вече сте избрали парола. Оставете полето празно, за да я запазите.' : 'Поне 8 знака. Запишете я на сигурно място.',
             'autocomplete="new-password"') ?>
       <label class="choice" id="show-pass-row" hidden style="margin-top:-.6rem;"><input type="checkbox" id="show-pass"> <span>Покажи паролата</span></label>
-      <?= $field('admin_name', 'Вашето име', false, 'text', 'Показва се в администраторския панел.', 'autocomplete="name"') ?>
       <div class="actions"><button type="submit">Напред</button></div>
 
 <?php elseif ($step === 'org'): ?>
@@ -495,7 +496,7 @@ $prev    = $step_no > 1 ? $keys[$step_no - 2] : null;
             'db' => ($d['db']['db_mode'] ?? '') === 'create'
                 ? ['База данни' => 'ще бъде създадена автоматично']
                 : ['База данни' => $d['db']['db_name'] ?? '', 'Потребител' => $d['db']['db_user'] ?? '', 'Сървър' => $d['db']['db_host'] ?? ''],
-            'account' => ['Имейл' => $d['account']['admin_email'] ?? '', 'Парола' => 'избрана', 'Име' => ($d['account']['admin_name'] ?? '') ?: '—'],
+            'account' => ['Имейл' => $d['account']['admin_email'] ?? '', 'Парола' => 'избрана', 'Име' => trim(($d['account']['admin_first_name'] ?? '') . ' ' . ($d['account']['admin_last_name'] ?? '')) ?: '—'],
             'org' => ['Име' => $d['org']['site_name_bg'] ?? '',
                       'На английски' => ($d['org']['site_name_en'] ?? '') ?: (($d['org']['site_name_bg'] ?? '') . ' (същото)'),
                       'Имейл за връзка' => $d['org']['site_email'] ?? '', 'Адрес' => $d['org']['site_url'] ?? ''],
