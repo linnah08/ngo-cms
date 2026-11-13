@@ -340,7 +340,7 @@ final class ModulesGatingTest extends TestCase
 
     public function test_social_endpoints_refuse_when_off_and_the_editor_drops_the_tab(): void
     {
-        foreach (['social-ajax.php', 'linkedin-ajax.php', 'buffer-setup-ajax.php'] as $f) {
+        foreach (['social-ajax.php', 'social-preview-ajax.php', 'linkedin-ajax.php', 'buffer-setup-ajax.php'] as $f) {
             $src = self::src('admin/' . $f);
             $auth = preg_match('/admin_require_\w+\(\);/', $src, $m, PREG_OFFSET_CAPTURE) ? $m[0][1] : PHP_INT_MAX;
             $guard = strpos($src, "module_ajax_guard('social');");

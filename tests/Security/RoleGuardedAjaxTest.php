@@ -21,6 +21,7 @@ final class RoleGuardedAjaxTest extends TestCase
             'shop manager reorders partners'    => ['admin/partners-reorder.php', 'shop_admin'],
             'shop manager edits social posts'   => ['admin/social-ajax.php', 'shop_admin'],
             'shop manager edits LinkedIn posts' => ['admin/linkedin-ajax.php', 'shop_admin'],
+            'shop manager previews social posts' => ['admin/social-preview-ajax.php', 'shop_admin'],
         ];
     }
 
@@ -39,6 +40,7 @@ final class RoleGuardedAjaxTest extends TestCase
             'admin reorders partners'  => ['admin/partners-reorder.php', 'admin'],
             'author edits social posts' => ['admin/social-ajax.php', 'author'],
             'author edits LinkedIn posts' => ['admin/linkedin-ajax.php', 'author'],
+            'author previews social posts' => ['admin/social-preview-ajax.php', 'author'],
         ];
     }
 
