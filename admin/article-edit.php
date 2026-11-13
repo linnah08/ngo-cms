@@ -732,19 +732,7 @@ window._showSiteNotice = function (msg, afterEl) {
     </span>
   </div>
 
-  <!-- Generate + actions row -->
-  <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;">
-    <button type="button" id="liGenerateNewsBtn" class="btn btn--outline" style="font-size:.82rem;">
-      ✦ Генерирай LinkedIn новина
-    </button>
-    <button type="button" id="liGeneratePostBtn" class="btn btn--outline" style="font-size:.82rem;">
-      ✦ Генерирай LinkedIn пост
-    </button>
-    <span id="liSpinner" style="display:none;font-size:.82rem;color:var(--text-muted);">Генерира се…</span>
-    <span id="liError" style="display:none;font-size:.82rem;color:#c0392b;"></span>
-  </div>
-
-  <!-- Text + scheduling (hidden until text is generated or already exists) -->
+  <!-- Text + scheduling: starts as the English article, as it is -->
   <div id="liTextWrap">
     <div class="form-group" style="margin-bottom:1rem;">
       <label style="display:flex;justify-content:space-between;align-items:center;">
@@ -1207,10 +1195,9 @@ if (translateBtn) {
 <?php if ($tab === 'social'): ?>
 // ── LinkedIn panel ─────────────────────────────────────────────────────────────
 (function () {
-  var generateNewsBtn = document.getElementById('liGenerateNewsBtn');
-  if (!generateNewsBtn) return;  // not shown for new articles
-
   var liTextArea   = document.getElementById('liText');
+  if (!liTextArea) return;  // not shown for new articles
+
   var copyBtn      = document.getElementById('liCopyBtn');
   var scheduleBtn  = document.getElementById('liScheduleBtn');
   var slug         = '<?= h($edit_slug) ?>';
@@ -1275,38 +1262,6 @@ if (translateBtn) {
     });
     return r.json();
   }
-
-  // Generate — shared handler for both buttons
-  function _liGenerate(generateType) {
-    var spinner = document.getElementById('liSpinner');
-    var errEl   = document.getElementById('liError');
-    generateNewsBtn.disabled = true;
-    document.getElementById('liGeneratePostBtn').disabled = true;
-    spinner.style.display = '';
-    errEl.style.display   = 'none';
-    liPost({ action: 'generate', generate_type: generateType })
-      .then(function(data) {
-        if (!data.ok) {
-          errEl.textContent   = data.error;
-          errEl.style.display = '';
-        } else {
-          liTextArea.value = data.text;
-          document.getElementById('liTextWrap').style.display = '';
-        }
-      })
-      .catch(function() {
-        errEl.textContent   = 'Грешка при свързване.';
-        errEl.style.display = '';
-      })
-      .finally(function() {
-        generateNewsBtn.disabled = false;
-        document.getElementById('liGeneratePostBtn').disabled = false;
-        spinner.style.display = 'none';
-      });
-  }
-
-  generateNewsBtn.addEventListener('click', function() { _liGenerate('news'); });
-  document.getElementById('liGeneratePostBtn').addEventListener('click', function() { _liGenerate('post'); });
 
   // Copy
   if (copyBtn) {

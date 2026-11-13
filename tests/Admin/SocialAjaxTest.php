@@ -208,48 +208,14 @@ final class SocialAjaxTest extends TestCase
 
     // ── LinkedIn tests ────────────────────────────────────────────────────────
 
-    public function testLinkedInAjaxHandlesGenerateType(): void
+    public function testLinkedInHasNoAiText(): void
     {
-        $src = file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/admin/linkedin-ajax.php');
-        $this->assertStringContainsString(
-            "generate_type",
-            $src,
-            "linkedin-ajax.php generate action must read a 'generate_type' param"
-        );
-    }
-
-    public function testLinkedInAjaxHasBrandedPrompt(): void
-    {
-        $src = file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/admin/linkedin-ajax.php');
-        $this->assertStringContainsString(
-            'Radically honest',
-            $src,
-            "LinkedIn branded prompt must include voice instructions"
-        );
-        $this->assertStringContainsString(
-            'em dash',
-            $src,
-            "LinkedIn branded prompt must include DO NOT em-dash rule"
-        );
-        $this->assertStringContainsString(
-            '/en/news/',
-            $src,
-            "LinkedIn branded prompt must include the EN article URL"
-        );
-    }
-
-    public function testArticleEditHasTwoLinkedInGenerateButtons(): void
-    {
-        $src = file_get_contents($this->articleEdit);
-        $this->assertStringContainsString(
-            'liGenerateNewsBtn',
-            $src,
-            "article-edit.php must have a Генерирай LinkedIn новина button"
-        );
-        $this->assertStringContainsString(
-            'liGeneratePostBtn',
-            $src,
-            "article-edit.php must have a Генерирай LinkedIn пост button"
-        );
+        // LinkedIn posts the English article as it is: no generate buttons, no AI call.
+        $ajax = file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/admin/linkedin-ajax.php');
+        $this->assertStringNotContainsString("'generate'", $ajax);
+        $this->assertStringNotContainsString('api.anthropic.com', $ajax);
+        $edit = file_get_contents($this->articleEdit);
+        $this->assertStringNotContainsString('liGenerate', $edit);
+        $this->assertStringContainsString('id="liText"', $edit);
     }
 }

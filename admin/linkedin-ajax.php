@@ -3,11 +3,12 @@
  * LinkedIn panel AJAX handler.
  *
  * POST body (JSON):
- *   action      'generate' | 'schedule'
+ *   action      'schedule'
  *   csrf_token  string
+ *   slug        string  — article slug (BG)
  *
- * For 'generate':
- *   slug  string  — article slug (BG)
+ * The LinkedIn text is the English article as it is, or what the editor typed;
+ * nothing here writes it with AI.
  */
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
@@ -47,139 +48,6 @@ if (!$slug) {
 $file = ARTICLES_PATH . '/bg/' . $slug . '.json';
 if (!file_exists($file)) {
     echo json_encode(['ok' => false, 'error' => 'Article not found']);
-    exit;
-}
-
-// ── Generate ──────────────────────────────────────────────────────────────────
-if ($action === 'generate') {
-    $api_key = setting_get('claude_api_key');
-    if ($api_key === '') {
-        echo json_encode(['ok' => false, 'error' => 'Claude API key not configured (Плащания → Claude).']);
-        exit;
-    }
-
-    $generate_type = $body['generate_type'] ?? 'news';
-    $article = load_json($file);
-
-    // Prefer the EN version of the article if it exists (LinkedIn audience is international)
-    $slug_en = $article['slug_en'] ?? $slug;
-    $en_file = ARTICLES_PATH . '/en/' . $slug_en . '.json';
-    $source  = file_exists($en_file) ? load_json($en_file) : $article;
-    $title   = $source['title'] ?? ($article['title'] ?? '');
-    $content = mb_substr(strip_tags($source['content'] ?? ($article['content'] ?? '')), 0, 3000);
-    // Who the organisation is (Организация → name and Кратко описание); nothing when not set.
-    $org_about = org_ai_context('en');
-    $org_about = $org_about !== '' ? "\n\n" . $org_about : '';
-
-    if ($generate_type === 'post') {
-        $article_url = rtrim(SITE_URL, '/') . '/en/news/' . rawurlencode($slug_en) . '/';
-        $prompt = "You write LinkedIn posts for a Bulgarian non-profit organisation.{$org_about}
-
-VOICE:
-- Warm, human, first-person plural — use \"we\", \"us\", \"our team\"
-- Radically honest — share setbacks and uncertainties openly, never spin bad news
-- Grounded and practical — celebrate small, concrete milestones with real numbers and names
-- Emotionally intelligent, not sentimental — let specific details carry the emotion
-- Playful and self-aware — light authentic humour is welcome
-- Transparent about process — share behind-the-scenes decisions
-
-STRUCTURE:
-- Open with a hook: striking contrast, surprising fact, or short declarative statement
-- Short punchy paragraphs (2–4 sentences each), generous white space
-- Use bold headings for named sub-sections where appropriate (e.g. **Section Title 🏆**)
-- Close with a soft, authentic CTA — not salesy
-- No hashtags. Never.
-
-FORMATTING:
-- English only
-- Plain text with bold for emphasis/headings only
-- 1–3 emojis max, aligned to emotional beat (celebrations: 🏆 🎉, warmth: ❤️ 🙏, neutral: 👉)
-- No em dashes — use full stops or new sentences instead
-- Link to the article at the end of the body, before hashtags: {$article_url}
-
-DO NOT:
-- Write in third person (\"The organisation does...\")
-- Use charity clichés: \"changing lives\", \"making a difference\", \"at-risk youth\", \"vulnerable populations\"
-- Use hyperbolic language: \"incredible\", \"amazing\", \"life-changing\"
-- Use heavy passive voice
-- Write long unbroken walls of text
-- Use formal press release language
-
-Write a LinkedIn post for this article.
-Title: {$title}
-Content: {$content}
-
-Return only the post text. No explanations, no alternatives.";
-    } else {
-        $prompt = "Write a LinkedIn post for a Bulgarian non-profit organisation.{$org_about}
-
-Voice: warm, honest, professional but not corporate. Real stories, real impact.
-
-Based on this article:
-Title: {$title}
-Content: {$content}
-
-Write the LinkedIn post in English. Guidelines:
-- 3–5 short paragraphs
-- Lead with impact or insight, not just \"we did X\"
-- Warm and authentic, suitable for donors, partners, institutional audiences
-- End with a brief call to action or reflection
-- Maximum 3 hashtags, professional only
-- Plain text, no markdown formatting
-
-Return only the post text, nothing else.";
-    }
-
-    $payload = json_encode([
-        'model'      => 'claude-sonnet-4-6',
-        'max_tokens' => 600,
-        'messages'   => [['role' => 'user', 'content' => $prompt]],
-    ]);
-
-    $ch = curl_init('https://api.anthropic.com/v1/messages');
-    curl_setopt_array($ch, [
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => $payload,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 30,
-        CURLOPT_HTTPHEADER     => [
-            'x-api-key: ' . $api_key,
-            'anthropic-version: 2023-06-01',
-            'content-type: application/json',
-        ],
-    ]);
-
-    $response  = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curl_err  = curl_error($ch);
-    curl_close($ch);
-
-    if ($curl_err) {
-        _om_log('linkedin-ajax generate', 'cURL: ' . $curl_err);
-        echo json_encode(['ok' => false, 'error' => 'API connection failed.']);
-        exit;
-    }
-    if ($http_code !== 200) {
-        $d = json_decode((string)$response, true);
-        _om_log('linkedin-ajax generate', "HTTP {$http_code}: " . ($d['error']['message'] ?? ''));
-        echo json_encode(['ok' => false, 'error' => 'Claude API error (HTTP ' . $http_code . ').']);
-        exit;
-    }
-
-    $d    = json_decode((string)$response, true);
-    $text = trim($d['content'][0]['text'] ?? '');
-
-    if ($text === '') {
-        echo json_encode(['ok' => false, 'error' => 'Empty response from Claude.']);
-        exit;
-    }
-
-    // Persist the generated text immediately so it survives page reloads
-    $data = load_json($file);
-    $data['linkedin_text'] = $text;
-    save_json($file, $data);
-
-    echo json_encode(['ok' => true, 'text' => $text]);
     exit;
 }
 

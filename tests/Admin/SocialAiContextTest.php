@@ -61,10 +61,7 @@ final class SocialAiContextTest extends TestCase
     public function test_every_social_prompt_includes_it(): void
     {
         $fb = (string) file_get_contents(self::root() . '/admin/social-ajax.php');
-        $li = (string) file_get_contents(self::root() . '/admin/linkedin-ajax.php');
         $this->assertStringContainsString("org_ai_context('bg')", $fb, 'Facebook/Instagram posts are written in Bulgarian');
-        $this->assertStringContainsString("org_ai_context('en')", $li, 'LinkedIn posts are written in English');
         $this->assertSame(1, substr_count($fb, 'НПО.{$org_about}'), 'Facebook/Instagram has one prompt: the summary');
-        $this->assertSame(2, substr_count($li, 'organisation.{$org_about}'));
     }
 }
