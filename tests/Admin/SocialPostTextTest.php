@@ -88,4 +88,23 @@ final class SocialPostTextTest extends TestCase
         $this->assertStringEndsWith('/novini/x/', article_public_url('x', 'bg'));
         $this->assertStringEndsWith('/en/news/y/', article_public_url('y', 'en'));
     }
+
+    public function testScheduleTextFromSavedArticle(): void
+    {
+        $bg = ['title' => 'Заглавие', 'content' => '<p>Едно.</p>', 'slug' => 'a'];
+        $this->assertSame(
+            social_post_text('Заглавие', '<p>Едно.</p>', SITE_URL . '/novini/a/', 'fb')['text'],
+            social_schedule_text($bg, [], 'fb')
+        );
+        $en = ['title' => 'Title', 'content' => '<p>One.</p>'];
+        $this->assertStringEndsWith('Read more: ' . SITE_URL . '/en/news/a-en/',
+            social_schedule_text($bg + ['slug_en' => 'a-en'], $en, 'linkedin'));
+    }
+
+    public function testLinkedInScheduleRefusesWithoutEnBody(): void
+    {
+        $bg = ['title' => 'Заглавие', 'content' => '<p>Едно.</p>', 'slug' => 'a'];
+        $this->assertSame('', social_schedule_text($bg, [], 'linkedin'));
+        $this->assertSame('', social_schedule_text([], [], 'fb'));
+    }
 }

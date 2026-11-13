@@ -3,15 +3,12 @@
  * Facebook / Instagram post AJAX handler.
  *
  * POST body (JSON):
- *   action      'generate' | 'schedule' | 'save_crop' | 'save_shape' | 'save_fit'
+ *   action      'schedule' | 'save_crop' | 'save_shape' | 'save_fit'
  *   csrf_token  string
  *   slug        string   — BG article slug
  *
- * For 'generate':
- *   (no extra fields)
- *
  * For 'schedule':
- *   social_text   string   — text to post
+ *   (no text is accepted: the post is built on the server from the saved article)
  *   scheduled_at  string   — datetime-local (Europe/Sofia)
  *   channel       string   — 'fb' or 'insta'
  *
@@ -142,133 +139,8 @@ if ($action === 'save_shape') {
     exit;
 }
 
-// ── Generate ──────────────────────────────────────────────────────────────────
-if ($action === 'generate') {
-    $api_key = setting_get('claude_api_key');
-    if ($api_key === '') {
-        echo json_encode(['ok' => false, 'error' => 'Claude API key not configured (Плащания → Claude).']);
-        exit;
-    }
-
-    $generate_type = $body['generate_type'] ?? 'news';
-    $article = load_json($file);
-    $title   = $article['title']   ?? '';
-    $content = mb_substr(strip_tags($article['content'] ?? ''), 0, 3000);
-    // Who the organisation is (Организация → name and Кратко описание); nothing when not set.
-    $org_about = org_ai_context('bg');
-    $org_about = $org_about !== '' ? "\n\n" . $org_about : '';
-
-    if ($generate_type === 'post') {
-        $article_url = rtrim(SITE_URL, '/') . '/novini/' . rawurlencode($slug) . '/';
-        $prompt = "You write Facebook posts for a Bulgarian non-profit organisation.{$org_about}
-
-VOICE: Warm, honest, occasionally dry/funny. Team voice (\"ние\"), never corporate. Story-first. Emotion through specific detail, not adjectives.
-
-STRUCTURE: Hook → context/story → what the article covers → link. CTA at the end only.
-
-FORMATTING RULES:
-- Bulgarian only
-- 100–200 words
-- Short paragraphs, generous white space
-- 1–2 emojis max, never mid-sentence
-- No dashes or em-dashes. Use full stops instead
-- No hashtags. Never.
-- No exclamation marks more than once per post
-- End with: 👉 {$article_url}
-
-DO NOT:
-- Start with \"С радост съобщаваме\", \"Какво става когато\" or \"С удоволствие споделяме\"
-- Use NGO jargon: устойчивост, въздействие, екосистема, уязвими групи
-- Use dashes to connect clauses (reads as AI-generated)
-- Over-explain the organisation's mission
-- Invent overly specific illustrative examples
-
-Write a Facebook post for this article.
-Title: {$title}
-Content: {$content}
-
-Return only the post text. No explanations, no alternatives.";
-    } else {
-        $prompt = "Напиши публикация за Facebook и Instagram за българска НПО.{$org_about}
-
-Тон: топъл, честен, близък. Не корпоративен. Истински истории, реален ефект. Подходящ за широката аудитория.
-
-На базата на тази статия:
-Заглавие: {$title}
-Съдържание: {$content}
-
-Напиши публикацията на БЪЛГАРСКИ. Насоки:
-- 2–4 кратки абзаца
-- Започни с нещо, което привлича внимание — въпрос, факт или момент
-- Топло и автентично, подходящо за родители, доброволци, дарители
-- Завърши с призив за действие или размисъл
-- 3–5 хаштага на Bulgarian (напр. #НПО #Дарение)
-- Обикновен текст, без markdown форматиране
-
-Върни само текста на публикацията, нищо друго.";
-    }
-
-    $payload = json_encode([
-        'model'      => 'claude-sonnet-4-6',
-        'max_tokens' => 500,
-        'messages'   => [['role' => 'user', 'content' => $prompt]],
-    ]);
-
-    $ch = curl_init('https://api.anthropic.com/v1/messages');
-    curl_setopt_array($ch, [
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => $payload,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 30,
-        CURLOPT_HTTPHEADER     => [
-            'x-api-key: ' . $api_key,
-            'anthropic-version: 2023-06-01',
-            'content-type: application/json',
-        ],
-    ]);
-
-    $response  = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curl_err  = curl_error($ch);
-    curl_close($ch);
-
-    if ($curl_err) {
-        _om_log('ERROR', 'social-ajax generate: cURL: ' . $curl_err);
-        echo json_encode(['ok' => false, 'error' => 'API connection failed.']);
-        exit;
-    }
-    if ($http_code !== 200) {
-        $d = json_decode((string)$response, true);
-        _om_log('ERROR', "social-ajax generate: HTTP {$http_code}: " . ($d['error']['message'] ?? ''));
-        echo json_encode(['ok' => false, 'error' => 'Claude API error (HTTP ' . $http_code . ').']);
-        exit;
-    }
-
-    $d    = json_decode((string)$response, true);
-    $text = trim($d['content'][0]['text'] ?? '');
-
-    if ($text === '') {
-        _om_log('ERROR', 'social-ajax generate: empty response from Claude');
-        echo json_encode(['ok' => false, 'error' => 'Empty response from Claude.']);
-        exit;
-    }
-
-    $data = load_json($file);
-    $data['fb_text']     = $text;
-    $data['social_text'] = $text; // backward compat
-    if (!save_json($file, $data)) {
-        _om_log('ERROR', "social-ajax generate: failed to save {$file}");
-        echo json_encode(['ok' => false, 'error' => 'Текстът е генериран, но грешка при запис на файла.']);
-        exit;
-    }
-
-    echo json_encode(['ok' => true, 'text' => $text]);
-    exit;
-}
-
 // ── Schedule via Buffer ───────────────────────────────────────────────────────
 if ($action === 'schedule') {
-    $social_text = trim($body['social_text']  ?? '');
     $scheduled_at = trim($body['scheduled_at'] ?? '');
     $channel      = $body['channel'] ?? '';
     $post_type    = in_array($body['post_type'] ?? 'post', ['post', 'story'], true) ? $body['post_type'] : 'post';
@@ -276,10 +148,6 @@ if ($action === 'schedule') {
 
     // Instagram Stories have no caption — the API doesn't support one — so
     // there's nothing for the admin to type and nothing to require here.
-    if (!$is_story && $social_text === '') {
-        echo json_encode(['ok' => false, 'error' => 'Няма текст за публикуване.']);
-        exit;
-    }
     if ($scheduled_at === '') {
         echo json_encode(['ok' => false, 'error' => 'Изберете дата и час.']);
         exit;
@@ -325,9 +193,15 @@ if ($action === 'schedule') {
     $post_id_key  = $channel === 'fb' ? 'fb_buffer_post_id' : ($is_story ? 'insta_story_buffer_post_id' : 'insta_buffer_post_id');
     $sched_key    = $channel === 'fb' ? 'fb_scheduled_at'   : ($is_story ? 'insta_story_scheduled_at'   : 'insta_scheduled_at');
     $due_key      = $channel === 'fb' ? 'fb_due_at'         : ($is_story ? 'insta_story_due_at'         : 'insta_due_at');
-    $text_key     = $channel === 'fb' ? 'fb_text'           : 'insta_text';
 
     $data               = load_json($file);
+
+    // The post IS the saved article, cut to the platform's limit. Nothing comes from the browser.
+    $post_text = social_schedule_text($data, [], $channel);
+    if (!$is_story && $post_text === '') {
+        echo json_encode(['ok' => false, 'error' => 'Статията няма текст за публикуване.']);
+        exit;
+    }
     $old_buffer_post_id = $data[$post_id_key] ?? '';
 
     $req = social_fb_insta_request($data, $channel, $is_story);
@@ -343,7 +217,7 @@ if ($action === 'schedule') {
     // Only a post deleted in Buffer gets a fresh one — anything else is reported, so a
     // failed edit never leaves two posts queued.
     if ($old_buffer_post_id !== '') {
-        $update_query = buffer_edit_post_query($old_buffer_post_id, $social_text, $due_at,
+        $update_query = buffer_edit_post_query($old_buffer_post_id, $post_text, $due_at,
             social_buffer_assets_gql($req['urls']), $req['metadata']);
 
         $uch = curl_init('https://api.buffer.com');
@@ -367,11 +241,6 @@ if ($action === 'schedule') {
         $edit = buffer_edit_outcome(json_decode((string)$uraw, true));
 
         if ($edit['status'] === 'ok') {
-            // A story has no text — keep the feed post's caption as it is.
-            if (!$is_story) {
-                $data['social_text'] = $social_text;
-                $data[$text_key]     = $social_text;
-            }
             $data[$sched_key]    = $scheduled_at;
             $data[$due_key]      = $due_at;
             if (!save_json($file, $data)) {
@@ -403,7 +272,7 @@ if ($action === 'schedule') {
     $query = 'mutation {
   createPost(input: {
     ' . $assets_gql . '
-    text: ' . json_encode($social_text) . ',
+    text: ' . json_encode($post_text) . ',
     channelId: ' . json_encode($channel_id) . ',
     schedulingType: automatic,
     mode: customScheduled,
@@ -438,10 +307,6 @@ if ($action === 'schedule') {
     if (isset($resp['data']['createPost']['post']['id'])) {
         $buffer_post_id = $resp['data']['createPost']['post']['id'];
 
-        if (!$is_story) {
-            $data['social_text'] = $social_text;
-            $data[$text_key]     = $social_text;
-        }
         $data[$post_id_key]   = $buffer_post_id;
         $data[$sched_key]     = $scheduled_at;
         $data[$due_key]       = $due_at;

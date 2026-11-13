@@ -143,6 +143,25 @@ function social_post_text(string $title, string $html, string $url, string $plat
 }
 
 /**
+ * The post text for one channel, built from the SAVED article — never from the browser.
+ * Facebook and Instagram use the Bulgarian article, LinkedIn the English one.
+ * Returns '' when that language has no text to post.
+ *
+ * @param array  $bg      The saved Bulgarian article (title, content, slug, slug_en).
+ * @param array  $en      The saved English article (title, content); [] when there is none.
+ * @param string $channel 'fb', 'insta' or 'linkedin'.
+ */
+function social_schedule_text(array $bg, array $en, string $channel): string {
+    if ($channel === 'linkedin') {
+        $slug = (string) (($bg['slug_en'] ?? '') ?: ($bg['slug'] ?? ''));
+        return social_post_text((string) ($en['title'] ?? ''), (string) ($en['content'] ?? ''),
+            article_public_url($slug, 'en'), 'linkedin')['text'];
+    }
+    return social_post_text((string) ($bg['title'] ?? ''), (string) ($bg['content'] ?? ''),
+        article_public_url((string) ($bg['slug'] ?? ''), 'bg'), $channel)['text'];
+}
+
+/**
  * Derive the BG and EN slugs from the submitted slug/title fields.
  *
  * BG keeps the source language by default (slug() allows Cyrillic; only path-unsafe

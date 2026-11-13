@@ -16,97 +16,41 @@ final class SocialAjaxTest extends TestCase
         $this->articleEdit = $_SERVER['DOCUMENT_ROOT'] . '/admin/article-edit.php';
     }
 
-    public function testGenerateActionHandlesGenerateType(): void
+    // ── The post is built on the server ──────────────────────────────────────
+
+    /** @return array<string,string> */
+    private function ajaxSources(): array
     {
-        $src = file_get_contents($this->socialAjax);
-        $this->assertStringContainsString(
-            "generate_type",
-            $src,
-            "social-ajax.php generate action must read a 'generate_type' param"
-        );
+        $root = $_SERVER['DOCUMENT_ROOT'];
+        return ['social-ajax' => (string) file_get_contents($root . '/admin/social-ajax.php'),
+                'linkedin-ajax' => (string) file_get_contents($root . '/admin/linkedin-ajax.php')];
     }
 
-    public function testGenerateActionHasBrandedPrompt(): void
+    public function testScheduleIgnoresClientText(): void
     {
-        $src = file_get_contents($this->socialAjax);
-        // Key phrases from the branded FB post skill
-        $this->assertStringContainsString(
-            'Warm, honest',
-            $src,
-            "Branded prompt must include voice instructions"
-        );
-        $this->assertStringContainsString(
-            'Hook',
-            $src,
-            "Branded prompt must include structural instructions"
-        );
-        $this->assertStringContainsString(
-            'устойчивост',
-            $src,
-            "Branded prompt must include DO NOT jargon list"
-        );
+        foreach ($this->ajaxSources() as $name => $src) {
+            $this->assertStringNotContainsString('$body[\'social_text\']', $src, $name);
+            $this->assertStringNotContainsString('$body[\'linkedin_text\']', $src, $name);
+            $this->assertStringContainsString('social_schedule_text(', $src, $name);
+        }
     }
 
-    public function testGenerateActionSavesToFbText(): void
+    public function testNoGenerateAction(): void
     {
-        $src = file_get_contents($this->socialAjax);
-        $this->assertStringContainsString(
-            "'fb_text'",
-            $src,
-            "generate action must save to fb_text field"
-        );
+        foreach ($this->ajaxSources() as $name => $src) {
+            $this->assertStringNotContainsString("=== 'generate'", $src, $name);
+            $this->assertStringNotContainsString('api.anthropic.com', $src, $name);
+            $this->assertStringNotContainsString('org_ai_context', $src, $name);
+        }
     }
 
-    public function testScheduleActionSavesChannelSpecificField(): void
+    public function testScheduleStopsWritingTextFields(): void
     {
-        $src = file_get_contents($this->socialAjax);
-        $this->assertStringContainsString(
-            "'insta_text'",
-            $src,
-            "schedule action must save to insta_text for Instagram channel"
-        );
-    }
-
-    public function testArticleEditPreservesFbText(): void
-    {
-        $src = file_get_contents($this->articleEdit);
-        $this->assertStringContainsString(
-            "'fb_text'",
-            $src,
-            "article-edit.php POST handler must preserve fb_text"
-        );
-        $this->assertStringContainsString(
-            "'insta_text'",
-            $src,
-            "article-edit.php POST handler must preserve insta_text"
-        );
-    }
-
-    public function testArticleEditHasTwoGenerateButtons(): void
-    {
-        $src = file_get_contents($this->articleEdit);
-        $this->assertStringContainsString(
-            'socGenerateNewsBtn',
-            $src,
-            "article-edit.php must have a Генерирай FB новина button"
-        );
-        $this->assertStringContainsString(
-            'socGeneratePostBtn',
-            $src,
-            "article-edit.php must have a Генерирай FB пост button"
-        );
-    }
-
-    public function testArticleEditHasSplitTextareas(): void
-    {
-        $src = file_get_contents($this->articleEdit);
-        $this->assertStringContainsString('id="fbText"',    $src, "FB textarea must have id=fbText");
-        $this->assertStringContainsString('id="instaText"', $src, "Instagram textarea must have id=instaText");
-        $this->assertStringNotContainsString(
-            'id="socText"',
-            $src,
-            "Old shared id=socText must be removed"
-        );
+        foreach ($this->ajaxSources() as $name => $src) {
+            $this->assertDoesNotMatchRegularExpression(
+                '/\[\s*\'(fb_text|insta_text|social_text|linkedin_text)\'\s*\]\s*=[^=]/', $src, $name);
+            $this->assertDoesNotMatchRegularExpression('/\$text_key\b/', $src, $name);
+        }
     }
 
     // ── Instagram Story tests ────────────────────────────────────────────────
@@ -147,9 +91,9 @@ final class SocialAjaxTest extends TestCase
         // it must not be persisted as if it meant something.
         $src = file_get_contents($this->socialAjax);
         $this->assertStringContainsString(
-            "!\$is_story && \$social_text === ''",
+            "!\$is_story && \$post_text === ''",
             $src,
-            "schedule action must not require social_text when posting an Instagram story"
+            "schedule action must not require a post text when posting an Instagram story"
         );
         $this->assertStringNotContainsString(
             "'insta_story_text'",
@@ -202,15 +146,6 @@ final class SocialAjaxTest extends TestCase
         }
     }
 
-    public function testStoryNeverOverwritesTheFeedPostCaption(): void
-    {
-        // A story is sent with no text; saving that must not blank the feed caption —
-        // neither on a fresh post nor on the Buffer edit (reschedule) path.
-        $src = file_get_contents($this->socialAjax);
-        $this->assertSame(2, substr_count($src, "if (!\$is_story) {"),
-            "both the edit and the create path must skip the caption write for a story");
-    }
-
     public function testDashboardCalendarShowsScheduledStories(): void
     {
         // The rules live in article_social_calendar_entries() (SocialCalendarEntriesTest).
@@ -232,49 +167,4 @@ final class SocialAjaxTest extends TestCase
     }
 
     // ── LinkedIn tests ────────────────────────────────────────────────────────
-
-    public function testLinkedInAjaxHandlesGenerateType(): void
-    {
-        $src = file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/admin/linkedin-ajax.php');
-        $this->assertStringContainsString(
-            "generate_type",
-            $src,
-            "linkedin-ajax.php generate action must read a 'generate_type' param"
-        );
-    }
-
-    public function testLinkedInAjaxHasBrandedPrompt(): void
-    {
-        $src = file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/admin/linkedin-ajax.php');
-        $this->assertStringContainsString(
-            'Radically honest',
-            $src,
-            "LinkedIn branded prompt must include voice instructions"
-        );
-        $this->assertStringContainsString(
-            'em dash',
-            $src,
-            "LinkedIn branded prompt must include DO NOT em-dash rule"
-        );
-        $this->assertStringContainsString(
-            '/en/news/',
-            $src,
-            "LinkedIn branded prompt must include the EN article URL"
-        );
-    }
-
-    public function testArticleEditHasTwoLinkedInGenerateButtons(): void
-    {
-        $src = file_get_contents($this->articleEdit);
-        $this->assertStringContainsString(
-            'liGenerateNewsBtn',
-            $src,
-            "article-edit.php must have a Генерирай LinkedIn новина button"
-        );
-        $this->assertStringContainsString(
-            'liGeneratePostBtn',
-            $src,
-            "article-edit.php must have a Генерирай LinkedIn пост button"
-        );
-    }
 }
