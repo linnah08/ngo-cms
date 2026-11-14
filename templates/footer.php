@@ -227,7 +227,7 @@ if (!$_is_admin_page) {
   </div>
 </footer>
 
-<script src="/assets/js/main.js"></script>
+<script src="<?= h(versioned_asset('/assets/js/main.js')) ?>"></script>
 
 <?php if (!str_starts_with($_SERVER['REQUEST_URI'], '/admin')): ?>
 <?php require_once ROOT_PATH . '/includes/ga4.php'; $__choice = (string) ($_COOKIE['om_cookie_consent'] ?? ''); ?>

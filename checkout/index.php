@@ -1206,7 +1206,7 @@ $boxnow_partner_id = function_exists('setting_resolve')
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/footer.php';
 ?>
 
-<script src="/assets/js/boxnow-widget.js"></script>
+<script src="<?= h(versioned_asset('/assets/js/boxnow-widget.js')) ?>"></script>
 <script>
 const rates    = <?= json_encode($rates) ?>;
 const subtotal = <?= json_encode($subtotal) ?>;
