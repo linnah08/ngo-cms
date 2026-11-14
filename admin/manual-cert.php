@@ -14,6 +14,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DonationCertGenera
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/site_extensions.php';   // donation recipients
 
 admin_require_shop();
+
+$certified_here = donation_recipients_certified_here();
 module_admin_guard('donations');
 
 $pdo    = get_pdo();
@@ -38,8 +40,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $payment_method = in_array($_POST['payment_method'] ?? '', ['card', 'bank_transfer', 'cod'], true)
                          ? $_POST['payment_method'] : 'bank_transfer';
     $donation_date = trim($_POST['donation_date'] ?? date('Y-m-d'));
-    // Asked only when the site lists more than one donation recipient (includes/site_extensions.php).
+    // Asked only when more than one recipient gets its certificates here (includes/site_extensions.php);
+    // a recipient that issues its own (certificates_url) is never one of them.
     $recipient     = donation_recipient_clean($_POST['recipient'] ?? null);
+    if (!isset($certified_here[$recipient])) $recipient = donation_recipient_default();
 
     if ($donor_type === 'individual' && $donor_name === '') {
         $errors[] = 'Моля, въведете пълно име на дарителя.';
@@ -200,6 +204,13 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 <?php endif; ?>
 
 <div style="max-width:640px;">
+  <?php foreach (donation_recipients_certified_elsewhere() as $ek => $eurl): ?>
+  <div role="note" style="margin-bottom:1.25rem;padding:.9rem 1.1rem;border-radius:8px;background:#fff8e1;border:1px solid #b07d00;color:#4a3500;line-height:1.5;">
+    Дарения, получени от <strong><?= h(donation_recipient_order_label($ek, 'bg')) ?></strong>, получават сертификат
+    с данните и номерацията на <?= h(donation_recipient_order_label($ek, 'bg')) ?>, не от тази страница:
+    <a href="<?= h($eurl) ?>" style="color:inherit;font-weight:600;">издай го оттук</a>.
+  </div>
+  <?php endforeach; ?>
   <div class="admin-card" style="padding:1.75rem;">
     <form method="POST">
       <?= csrf_field() ?>
@@ -313,12 +324,12 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         </select>
       </div>
 
-      <?php if (donation_recipients_choosable()): ?>
+      <?php if (count($certified_here) > 1): ?>
       <div class="form-group" style="margin-bottom:1.5rem;">
         <label class="form-label" for="mcRecipient">За кого е дарението</label>
         <select name="recipient" id="mcRecipient" class="form-input">
           <?php $rec = donation_recipient_clean($_POST['recipient'] ?? null); ?>
-          <?php foreach (donation_recipients() as $rk => $rv): ?>
+          <?php foreach ($certified_here as $rk => $rv): ?>
             <option value="<?= h($rk) ?>" <?= $rec === $rk ? 'selected' : '' ?>><?= h($rv['order_label_bg']) ?> — <?= h($rv['purpose_bg']) ?></option>
           <?php endforeach; ?>
         </select>

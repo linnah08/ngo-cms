@@ -37,6 +37,10 @@ return [
             // Name on order lines, emails, admin and reports. One text for both
             // languages also works: 'order_label' => 'Център Пример'.
             'order_label' => ['bg' => 'Център Пример', 'en' => 'Example Centre'],
+            // Optional: the centre issues its own donation certificates (its own
+            // details and numbering) on a page of the site's own. Админ →
+            // Сертификат за дарение then leaves it out and links there instead.
+            // 'certificates_url' => '/partner/cert.php',
         ],
     ],
 

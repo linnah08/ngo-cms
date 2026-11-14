@@ -210,4 +210,56 @@ final class DonationRecipientsTest extends TestCase
         }
         $this->assertSame([], $bad, 'use donation_recipient_order_label() / order_label_bg');
     }
+    public function test_a_recipient_with_its_own_certificate_page_is_left_out_of_the_organisations(): void
+    {
+        $this->site('<?php return ["recipients" => [
+            "foundation" => ["label_bg" => "Фондацията", "purpose_bg" => "П", "default" => true],
+            "centre"     => ["label_bg" => "Центърът", "purpose_bg" => "П", "order_label" => "Център Пример",
+                             "certificates_url" => "/centre/cert.php"],
+            "other"      => ["label_bg" => "Друг", "purpose_bg" => "П"],
+            "bad_url"    => ["label_bg" => "Лош адрес", "purpose_bg" => "П", "certificates_url" => "javascript:alert(1)"],
+        ]];');
+        $this->assertTrue(donation_recipients_choosable(), 'donors still choose among all four');
+        $this->assertSame(['foundation', 'other', 'bad_url'], array_keys(donation_recipients_certified_here()));
+        $this->assertSame(['centre' => '/centre/cert.php'], donation_recipients_certified_elsewhere());
+    }
+
+    public function test_the_default_recipient_is_always_certified_here(): void
+    {
+        $this->site('<?php return ["recipients" => [
+            "foundation" => ["label_bg" => "Фондацията", "purpose_bg" => "П", "default" => true, "certificates_url" => "/x/"],
+        ]];');
+        $this->assertSame(['foundation'], array_keys(donation_recipients_certified_here()));
+        $this->assertSame([], donation_recipients_certified_elsewhere());
+    }
+
+    public function test_the_certificate_page_points_to_a_recipients_own_page_instead_of_offering_it(): void
+    {
+        if (!test_db_available()) $this->markTestSkipped('No DB configured.');
+        $page = function (string $php): string {
+            $this->site($php);
+            return run_admin_page('admin/manual-cert.php', [], ['method' => 'GET',
+                'globals' => ['_om_site_extensions_file' => $GLOBALS['_om_site_extensions_file']]])['body'];
+        };
+
+        // Only the organisation is left: no picker, a note with the link.
+        $html = $page('<?php return ["recipients" => [
+            "foundation" => ["label_bg" => "Фондацията", "purpose_bg" => "П", "default" => true],
+            "centre"     => ["label_bg" => "Центърът", "purpose_bg" => "П", "order_label" => "Център Пример",
+                             "certificates_url" => "/centre/cert.php"],
+        ]];');
+        $this->assertStringNotContainsString('name="recipient"', $html);
+        $this->assertStringContainsString('href="/centre/cert.php"', $html);
+        $this->assertStringContainsString('<strong>Център Пример</strong>', $html);
+
+        // With a third recipient the picker is back, still without the centre.
+        $html = $page('<?php return ["recipients" => [
+            "foundation" => ["label_bg" => "Фондацията", "purpose_bg" => "П", "default" => true],
+            "centre"     => ["label_bg" => "Центърът", "purpose_bg" => "П", "certificates_url" => "/centre/cert.php"],
+            "other"      => ["label_bg" => "Друг", "purpose_bg" => "П"],
+        ]];');
+        $this->assertStringContainsString('name="recipient"', $html);
+        $this->assertStringContainsString('value="other"', $html);
+        $this->assertStringNotContainsString('value="centre"', $html);
+    }
 }

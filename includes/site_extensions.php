@@ -334,6 +334,10 @@ const DONATION_RECIPIENT_DEFAULT = 'foundation';
  * default. order_label — ['bg' => …, 'en' => …], or one text for both — is the
  * recipient's name on order lines, emails, admin lists and reports („Дарение за
  * <order_label>“); without it the label is used.
+ * certificates_url — a page on the site — marks a recipient that issues its own
+ * donation certificates there (its own details and numbering): the
+ * organisation's own certificate page (admin/manual-cert.php) leaves it out and
+ * links there instead.
  */
 function donation_recipients(): array
 {
@@ -351,6 +355,7 @@ function donation_recipients(): array
         'purpose_en' => defined('DONATION_PURPOSE_EN') ? (string) DONATION_PURPOSE_EN : 'For the activities and programmes of ' . $site_en,
         'order_label_bg' => $site_bg,
         'order_label_en' => $site_en,
+        'certificates_url' => '',
         'default'    => true,
     ]];
 
@@ -378,6 +383,7 @@ function donation_recipients(): array
             // A Bulgarian order name alone serves both languages, like label_bg.
             'order_label_bg' => $order_bg ?: $label_bg,
             'order_label_en' => $order_en ?: ($order_bg ?: $label_en),
+            'certificates_url' => site_extension_local_path($r['certificates_url'] ?? null) ?? '',
             'default'    => !empty($r['default']),
         ];
     }
@@ -405,6 +411,26 @@ function donation_recipient_hint_url(?string $key, string $lang = 'bg'): string
 {
     $r = donation_recipients()[donation_recipient_clean($key)];
     return $lang === 'en' ? $r['hint_url_en'] : $r['hint_url_bg'];
+}
+
+/**
+ * The recipients whose donation certificates the organisation issues itself
+ * (admin/manual-cert.php): every one without its own certificates_url. The
+ * default recipient always stays, so the list is never empty.
+ */
+function donation_recipients_certified_here(): array
+{
+    return array_filter(donation_recipients(), static fn($r) => $r['certificates_url'] === '' || $r['default']);
+}
+
+/** The recipients that issue their own certificates: key => certificates_url. */
+function donation_recipients_certified_elsewhere(): array
+{
+    $out = [];
+    foreach (donation_recipients() as $k => $r) {
+        if ($r['certificates_url'] !== '' && !$r['default']) $out[$k] = $r['certificates_url'];
+    }
+    return $out;
 }
 
 /** Do donors choose a recipient? Only when the site lists more than one. */
