@@ -164,13 +164,14 @@ final class SocialPanelTest extends TestCase
 
         $flow = $this->jsFunction('saveThenSchedule');
         $applied = strpos($flow, 'applySave(saved');
-        $slugAt  = strpos($flow, 'slug: saved.slug');
+        $sched   = strpos($flow, 'postSchedule(channel, saved.slug, body)');
         $this->assertNotFalse($applied, 'the save reply is applied to the page');
-        $this->assertNotFalse($slugAt, 'the schedule request uses the slug the save returned');
+        $this->assertNotFalse($sched, 'the schedule request uses the slug the save returned');
+        $this->assertGreaterThan($applied, $sched, 'scheduling starts only after the save reply');
+        $post = $this->jsFunction('postSchedule');
+        $this->assertStringContainsString('slug: articleSlug', $post);
         foreach (['/admin/social-ajax.php', '/admin/linkedin-ajax.php'] as $url) {
-            $at = strpos($flow, "'" . $url . "'");
-            $this->assertNotFalse($at, $url);
-            $this->assertGreaterThan($applied, $at, $url . ' is called only after the save reply');
+            $this->assertStringContainsString("'" . $url . "'", $post, $url);
         }
         $this->assertStringContainsString('if (!saved || !saved.ok)', $flow, 'a failed save stops before scheduling');
         $this->assertStringContainsString('saveThenSchedule: saveThenSchedule', $this->js, 'exposed on window.SocialPanel');
@@ -368,5 +369,44 @@ final class SocialPanelTest extends TestCase
         $this->assertStringContainsString('window._translateArticleToEn()', $js);
         $this->assertMatchesRegularExpression('/if \(r\.ok\) \{.*refresh\(\);/s', $js, 'the LinkedIn preview updates after translating');
         $this->assertStringNotContainsString("getElementById('translateToEnBtn')", $js, 'no longer depends on the hidden-when-unconfigured button');
+    }
+
+    // ── „Планирай навсякъде“ ──────────────────────────────────────────────────
+
+    public function testScheduleEverywhereHasLabelledControlsAboveTheTabs(): void
+    {
+        $this->assertStringContainsString('<fieldset id="socAllPanel"', $this->edit);
+        $this->assertStringContainsString('<label for="socAllAt"', $this->edit);
+        $this->assertStringContainsString('id="socAllAt" value="<?= h($default_social_at) ?>"', $this->edit,
+            'the shared time starts at the same default as each network');
+        $this->assertStringContainsString('<label for="socAll_<?= $_net ?>"', $this->edit);
+        $this->assertStringContainsString('<input type="checkbox" id="socAll_<?= $_net ?>" class="soc-all-net"', $this->edit);
+        $this->assertLessThan(strpos($this->edit, 'role="tablist" aria-label="Социална мрежа"'), strpos($this->edit, 'id="socAllPanel"'));
+        $this->assertMatchesRegularExpression('/id="socAllSummary" role="status"/', $this->edit);
+        $this->assertMatchesRegularExpression('/id="socAllError" role="alert"/', $this->edit);
+    }
+
+    public function testScheduleEverywhereChecksAllBeforeSavingOnce(): void
+    {
+        $start = strpos($this->js, "allBtn.addEventListener('click'");
+        $this->assertNotFalse($start);
+        $block = substr($this->js, $start, 4000);
+        $check = strpos($block, 'checkSchedule(');
+        $save  = strpos($block, 'saveArticle()');
+        $sched = strpos($block, 'postSchedule(');
+        $this->assertNotFalse($check);
+        $this->assertGreaterThan($check, $save, 'every post is checked before the article is saved');
+        $this->assertGreaterThan($save, $sched, 'posts are scheduled after the one save');
+        $this->assertSame(1, substr_count($block, 'saveArticle()'), 'the article is saved once, not per network');
+        $this->assertStringContainsString('if (refused.length)', $block, 'a refused post stops everything before saving');
+        $this->assertStringContainsString('nets.reduce(', $block, 'posts go one after another: each rewrites the article file');
+    }
+
+    public function testScheduleEverywhereSaysWhatHappenedOnEachNetwork(): void
+    {
+        $this->assertStringContainsString("(ok ? '✓ ' : '✗ ')", $this->js, 'an icon, not colour alone');
+        $this->assertStringContainsString("'Изберете поне една мрежа.'", $this->js);
+        $this->assertStringContainsString('if (allBtn) allBtn.disabled = true;', $this->js, 'locked while any post is sending');
+        $this->assertStringContainsString('_igConfig()', $this->js, 'Instagram follows the Post/Story choice');
     }
 }

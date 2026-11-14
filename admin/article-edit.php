@@ -501,6 +501,27 @@ endif;
   <p id="siteNotice" role="status" hidden
      style="border:2px solid #1d4ed8;background:#eff6ff;color:#1e3a8a;border-radius:8px;padding:.6rem .85rem;margin:0 0 1rem;font-weight:600;font-size:.85rem;"></p>
 
+  <!-- ── Schedule on every ticked network at once (social-panel.js) ─────────── -->
+  <fieldset id="socAllPanel" style="border:1px solid var(--border);border-radius:8px;padding:.75rem .85rem;margin:0 0 1rem;background:#fafafa;min-width:0;">
+    <legend style="font-size:.85rem;font-weight:700;padding:0 .3rem;">Планирай навсякъде</legend>
+    <div style="display:flex;gap:.25rem 1rem;flex-wrap:wrap;margin-bottom:.5rem;">
+      <?php foreach (['fb' => 'Facebook', 'insta' => 'Instagram', 'linkedin' => 'LinkedIn'] as $_net => $_name): ?>
+      <label for="socAll_<?= $_net ?>" style="display:inline-flex;align-items:center;gap:.4rem;min-height:44px;font-size:.88rem;cursor:pointer;">
+        <input type="checkbox" id="socAll_<?= $_net ?>" class="soc-all-net" value="<?= $_net ?>" checked style="width:20px;height:20px;"> <?= h($_name) ?>
+      </label>
+      <?php endforeach; ?>
+    </div>
+    <label for="socAllAt" style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.3rem;">Планирай за</label>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
+      <input type="datetime-local" id="socAllAt" value="<?= h($default_social_at) ?>" style="min-height:44px;font-size:.9rem;">
+      <button type="button" id="socAllBtn" class="btn btn--primary" style="min-height:44px;font-size:.85rem;">Планирай навсякъде</button>
+      <span id="socAllSpinner" style="display:none;font-size:.85rem;color:var(--text-muted);">Изпраща се…</span>
+    </div>
+    <p style="margin:.4rem 0 0;font-size:.78rem;color:var(--text-muted);">Instagram се планира като пост или история — според избраното в раздела Instagram.</p>
+    <p id="socAllError" role="alert" style="display:none;margin:.5rem 0 0;font-size:.85rem;font-weight:600;color:#b91c1c;"></p>
+    <ul id="socAllSummary" role="status" aria-live="polite" style="list-style:none;margin:.5rem 0 0;padding:0;font-size:.85rem;"></ul>
+  </fieldset>
+
   <div role="tablist" aria-label="Социална мрежа" style="display:flex;gap:.25rem;border-bottom:1px solid var(--border);margin-bottom:1rem;flex-wrap:wrap;">
     <?php foreach (['fb' => 'Facebook', 'insta' => 'Instagram', 'linkedin' => 'LinkedIn'] as $_p => $_name): $_sel = $_p === 'fb'; ?>
     <button type="button" role="tab" id="socTab-<?= $_p ?>" class="soc-tab" data-platform="<?= $_p ?>"

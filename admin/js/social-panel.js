@@ -702,6 +702,15 @@
     return wasDraft && saved.status === 'published';
   }
 
+  // Schedule one post of the saved article. Only the time (and Instagram's post type) is
+  // sent: the server builds the text itself.
+  function postSchedule(channel, articleSlug, body) {
+    var url = channel === 'linkedin' ? '/admin/linkedin-ajax.php' : '/admin/social-ajax.php';
+    var req = Object.assign({}, body, { action: 'schedule', slug: articleSlug });
+    if (channel !== 'linkedin') req.channel = channel;
+    return postJson(url, req);
+  }
+
   // Check that the post would be accepted, then save (and publish) the article, then
   // schedule the post under the address the save returned — saving can change it (a
   // new title). A refused check answers {ok:false, error} and nothing is saved.
@@ -723,10 +732,7 @@
         var e = new Error(''); e.userMessage = MSG_NOT_SAVED + ((saved && saved.error) || MSG_BAD_REPLY); throw e;
       }
       published = applySave(saved, startedAt);
-      var url = channel === 'linkedin' ? '/admin/linkedin-ajax.php' : '/admin/social-ajax.php';
-      var req = Object.assign({}, body, { action: 'schedule', slug: saved.slug });
-      if (channel !== 'linkedin') req.channel = channel;
-      return postJson(url, req);
+      return postSchedule(channel, saved.slug, body);
     }).then(function (data) {
       if (published && data && !data.site_notice) data.site_notice = MSG_PUBLISHED;
       if (data && data.ok) panel.dataset.hasScheduled = '1';
@@ -739,12 +745,14 @@
   }
 
   // ── Scheduling ──────────────────────────────────────────────────────────────
+  var allBtn = document.getElementById('socAllBtn');
   function allButtons() {
     return PLATFORMS.reduce(function (all, p) { return all.concat(scheduleButtons(p)); }, []);
   }
   function startSend(btn, spinner, errEl) {
     if (sending) return false;
     sending = true;
+    if (allBtn) allBtn.disabled = true;
     allButtons().forEach(function (b) { if (b) b.disabled = true; });
     lockForm(true);
     spinner.style.display = '';
@@ -753,6 +761,7 @@
   }
   function endSend(spinner) {
     sending = false;
+    if (allBtn) allBtn.disabled = false;
     lockForm(false);
     PLATFORMS.forEach(function (p) { setBlocked(p, blocked[p]); });
     spinner.style.display = 'none';
@@ -765,6 +774,25 @@
     errEl.style.display = '';
   }
 
+  // A post Buffer accepted: its badge (and Instagram's "the crop is sent" note) follows.
+  function markScheduled(channel, data, extra, badgeId, label) {
+    if (channel === 'linkedin') {
+      document.getElementById('liStatusBadge').innerHTML = data.due_at
+        ? '<span style="color:#b45309;">⏱ Планирано за ' + fmtSofia(data.due_at) + ' (Sofia)</span>'
+        : '<span style="color:#2e7d32;">✓ Публикувано сега</span>';
+      return;
+    }
+    if (channel === 'insta') {
+      var noteBox = document.getElementById(extra && extra.post_type === 'story' ? 'igCropStory' : 'igCropPost');
+      var note = noteBox && noteBox.querySelector('.ig-crop-sched-note');
+      if (note && data.due_at) note.style.display = '';
+    }
+    label = label || (channel === 'fb' ? 'FB' : 'IG');
+    document.getElementById(badgeId).innerHTML = data.due_at
+      ? '<span style="color:#b45309;">⏱ ' + label + ': ' + fmtSofia(data.due_at) + '</span>'
+      : '<span style="color:#2e7d32;">✓ ' + label + ': Публикувано сега</span>';
+  }
+
   function scheduleChannel(channel, scheduled_at, btn, spinner, errEl, badgeId, extra, label) {
     if (!startSend(btn, spinner, errEl)) return;
     var body = Object.assign({ scheduled_at: scheduled_at }, extra || {});
@@ -775,15 +803,7 @@
         window._showSiteNotice(data.site_notice, errEl);
         return;
       }
-      if (channel === 'insta') {
-        var noteBox = document.getElementById(extra && extra.post_type === 'story' ? 'igCropStory' : 'igCropPost');
-        var note = noteBox && noteBox.querySelector('.ig-crop-sched-note');
-        if (note && data.due_at) note.style.display = '';
-      }
-      label = label || (channel === 'fb' ? 'FB' : 'IG');
-      document.getElementById(badgeId).innerHTML = data.due_at
-        ? '<span style="color:#b45309;">⏱ ' + label + ': ' + fmtSofia(data.due_at) + '</span>'
-        : '<span style="color:#2e7d32;">✓ ' + label + ': Публикувано сега</span>';
+      markScheduled(channel, data, extra, badgeId, label);
       window._showSiteNotice(data.site_notice, errEl);
     }).catch(function (e) { sendFailed(errEl, e); })
       .then(function () { endSend(spinner); });
@@ -833,9 +853,7 @@
         window._showSiteNotice(data.site_notice, errEl);
         return;
       }
-      document.getElementById('liStatusBadge').innerHTML = data.due_at
-        ? '<span style="color:#b45309;">⏱ Планирано за ' + fmtSofia(data.due_at) + ' (Sofia)</span>'
-        : '<span style="color:#2e7d32;">✓ Публикувано сега</span>';
+      markScheduled('linkedin', data);
       window._showSiteNotice(data.site_notice, errEl);
     }).catch(function (e) { sendFailed(errEl, e); })
       .then(function () { endSend(spinner); });
@@ -846,6 +864,97 @@
     if (at) liSend(at, liBtn);
   });
   liNowBtn.addEventListener('click', function () { liSend('now', liNowBtn); });
+
+  // ── „Планирай навсякъде“: one time, every ticked network ─────────────────────
+  // 1. Every ticked post is checked first (a dry run, nothing saved). If any is refused,
+  //    nothing is saved or scheduled, and the list says which and why.
+  // 2. The article is saved and published once.
+  // 3. The posts are scheduled one after another — each rewrites the same article file —
+  //    and the list says what happened on each network (✓/✗ and the reason).
+  var NET_NAMES = { fb: 'Facebook', insta: 'Instagram', linkedin: 'LinkedIn' };
+  var allSpin = document.getElementById('socAllSpinner');
+  var allErr  = document.getElementById('socAllError');
+  var allList = document.getElementById('socAllSummary');
+
+  function allConfig(net, at) {
+    if (net === 'insta') {
+      var cfg = _igConfig();
+      return { body: Object.assign({ scheduled_at: at }, cfg.extra), extra: cfg.extra, badgeId: cfg.badgeId, label: cfg.label,
+               timeField: igMode === 'story' ? 'instaStoryScheduleAt' : 'instaScheduleAt' };
+    }
+    if (net === 'fb') return { body: { scheduled_at: at }, badgeId: 'fbStatusBadge', label: 'FB', timeField: 'fbScheduleAt' };
+    return { body: { scheduled_at: at }, timeField: 'liScheduleAt' };
+  }
+  function allLine(net, ok, msg) {
+    var li = document.createElement('li');
+    li.style.cssText = 'margin:.2rem 0;font-weight:600;color:' + (ok ? '#14532d' : '#7f1d1d') + ';';
+    li.textContent = (ok ? '✓ ' : '✗ ') + NET_NAMES[net] + ': ' + msg;
+    allList.appendChild(li);
+  }
+  function allDoneText(data) {
+    return data.due_at ? 'планирано за ' + fmtSofia(data.due_at) : 'публикувано сега';
+  }
+
+  allBtn.addEventListener('click', function () {
+    allList.innerHTML = '';
+    allErr.style.display = 'none';
+    var nets = Array.prototype.slice.call(panel.querySelectorAll('.soc-all-net:checked'))
+      .map(function (c) { return c.value; });
+    if (!nets.length) {
+      allErr.textContent = 'Изберете поне една мрежа.';
+      allErr.style.display = '';
+      return;
+    }
+    var at = needTime('socAllAt', allErr);
+    if (!at || !startSend(allBtn, allSpin, allErr)) return;
+    allSpin.textContent = 'Изпраща се…';
+    var cfgs = {};
+    nets.forEach(function (n) {
+      cfgs[n] = allConfig(n, at);
+      var tf = document.getElementById(cfgs[n].timeField);
+      if (tf) tf.value = at;   // each network's own field shows the same time
+    });
+    var startedAt = Date.now();
+    var published = false, notice = '', anyOk = false;
+
+    Promise.all(nets.map(function (n) {
+      return checkSchedule(n, cfgs[n].body).then(function (c) {
+        return c && c.ok ? null : { net: n, error: (c && c.error) || MSG_BAD_REPLY };
+      });
+    })).then(function (results) {
+      var refused = results.filter(Boolean);
+      if (refused.length) {
+        refused.forEach(function (r) { allLine(r.net, false, r.error); });
+        allErr.textContent = 'Нищо не е планирано и статията не е запазена. Оправете проблема или махнете отметката на тази мрежа.';
+        allErr.style.display = '';
+        return;
+      }
+      return saveArticle().then(function (saved) {
+        if (!saved || !saved.ok) {
+          var e = new Error(''); e.userMessage = MSG_NOT_SAVED + ((saved && saved.error) || MSG_BAD_REPLY); throw e;
+        }
+        published = applySave(saved, startedAt);
+        return nets.reduce(function (chain, n) {
+          return chain.then(function () {
+            return postSchedule(n, saved.slug, cfgs[n].body).then(function (data) {
+              if (data && data.site_notice && !notice) notice = data.site_notice;
+              if (!data || !data.ok) { allLine(n, false, (data && data.error) || MSG_BAD_REPLY); return; }
+              anyOk = true;
+              markScheduled(n, data, cfgs[n].extra, cfgs[n].badgeId, cfgs[n].label);
+              allLine(n, true, allDoneText(data));
+            }, function (e) {
+              allLine(n, false, (e && e.userMessage) || (e && e.badReply ? MSG_BAD_REPLY : MSG_NETWORK));
+            });
+          });
+        }, Promise.resolve());
+      }).then(function () {
+        if (anyOk) panel.dataset.hasScheduled = '1';
+        if (!notice && published) notice = MSG_PUBLISHED;
+        if (notice) window._showSiteNotice(notice, allList);
+      });
+    }).catch(function (e) { sendFailed(allErr, e); })
+      .then(function () { endSend(allSpin); });
+  });
 
   // ── Start ───────────────────────────────────────────────────────────────────
   window.SocialPanel = { refresh: refresh, isOpen: isOpen, saveThenSchedule: saveThenSchedule };
