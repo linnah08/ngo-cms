@@ -418,7 +418,7 @@ $badge_style       = 'font-size:.75rem;font-weight:600;border-radius:3px;padding
 
     <div class="form-group">
       <label for="author_en">Author (EN)</label>
-      <input type="text" id="author_en" name="author_en" lang="en" data-translate-from="author"
+      <input type="text" id="author_en" name="author_en" lang="en" data-translate-from="author" data-translate-mode="transliterate"
              value="<?= h($article_en['author'] ?? admin_byline($current, 'en')) ?>"
              aria-describedby="author_en_hint">
       <small id="author_en_hint" style="color:var(--text-muted);">The name under the English article, in Latin letters. Left empty, the Bulgarian author is shown.</small>

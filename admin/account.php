@@ -114,12 +114,12 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
     </div>
     <div class="form-group">
       <label for="first_name_en">Име на латиница <span style="font-weight:400;color:#4b5563;">(по желание)</span></label>
-      <input type="text" id="first_name_en" name="first_name_en" maxlength="100" lang="en" data-translate-from="first_name"
+      <input type="text" id="first_name_en" name="first_name_en" maxlength="100" lang="en" data-translate-from="first_name" data-translate-mode="transliterate"
              value="<?= h((string) $names['first_name_en']) ?>">
     </div>
     <div class="form-group">
       <label for="last_name_en">Фамилия на латиница <span style="font-weight:400;color:#4b5563;">(по желание)</span></label>
-      <input type="text" id="last_name_en" name="last_name_en" maxlength="100" lang="en" data-translate-from="last_name"
+      <input type="text" id="last_name_en" name="last_name_en" maxlength="100" lang="en" data-translate-from="last_name" data-translate-mode="transliterate"
              value="<?= h((string) $names['last_name_en']) ?>">
     </div>
     <button type="submit" class="btn btn--primary">Запази имената</button>

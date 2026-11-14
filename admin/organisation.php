@@ -185,7 +185,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <?= $ferr('site_mol') ?>
       </label>
       <label id="f-site_mol_en">Представляващ на английски
-        <input type="text" name="site_mol_en" data-translate-from="site_mol" value="<?= h($val('site_mol_en')) ?>" maxlength="150" placeholder="Ivan Ivanov"<?= $fattr('site_mol_en') ?>>
+        <input type="text" name="site_mol_en" data-translate-from="site_mol" data-translate-mode="transliterate" value="<?= h($val('site_mol_en')) ?>" maxlength="150" placeholder="Ivan Ivanov"<?= $fattr('site_mol_en') ?>>
         <?= $ferr('site_mol_en') ?>
         <small style="<?= $hint ?>">За английските страници и документи. Ако е празно, се показва българското.</small>
       </label>

@@ -433,8 +433,10 @@ final class ModulesOffHttpTest extends TestCase
         $this->switchOff('ai_helpers');
         [$code, $body] = $this->http('/admin/pages.php?page=about', true);
         $this->assertSame(200, $code);
-        $this->assertStringNotContainsString('✦ Translate', $body);
-        $this->assertStringNotContainsString("querySelectorAll('[data-translate-from]')", $body);
+        // The button script still runs, for names' „✦ На латиница“ (no service), but attaches no ✦ Translate.
+        $this->assertStringContainsString('var aiOn = false;', $body);
+        $this->assertStringNotContainsString("fetch('/admin/translate-ajax.php'", $body);
+        $this->assertStringNotContainsString("var translateUrl = '/admin/translate-ajax.php'", $body);
         $this->assertStringContainsString('window._aiHelpersOn = false;', $body);
 
         [$code, $json] = $this->http('/admin/translate-ajax.php', true, ['csrf_token' => 'x', 'text' => 'Здравей']);

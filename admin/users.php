@@ -139,8 +139,8 @@ $name_inputs = static function (string $p, array $u): string {
         . ($req ? ' required' : '') . ' autocomplete="' . $ac . '"' . $extra . '></div>';
     return $row('first_name', 'Име', true, 'off')
          . $row('last_name', 'Фамилия', false, 'off')
-         . $row('first_name_en', 'Име на латиница (за английския сайт)', false, 'off', ' lang="en" data-translate-from="' . h($p . '-first_name') . '"')
-         . $row('last_name_en', 'Фамилия на латиница', false, 'off', ' lang="en" data-translate-from="' . h($p . '-last_name') . '"');
+         . $row('first_name_en', 'Име на латиница (за английския сайт)', false, 'off', ' lang="en" data-translate-from="' . h($p . '-first_name') . '" data-translate-mode="transliterate"')
+         . $row('last_name_en', 'Фамилия на латиница', false, 'off', ' lang="en" data-translate-from="' . h($p . '-last_name') . '" data-translate-mode="transliterate"');
 };
 ?>
 
