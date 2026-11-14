@@ -686,8 +686,12 @@ endif;
     </div>
     <div id="socEnEmpty" hidden style="margin:.5rem 0;">
       <p style="margin:0 0 .5rem;font-size:.85rem;font-weight:600;"><span aria-hidden="true">ℹ</span> Няма английски текст — преведете статията</p>
-      <button type="button" id="socTranslateBtn" class="btn btn--outline" style="font-size:.82rem;min-height:44px;"><?= $deepl_ready ? '✦ Преведи на английски' : 'Към английската версия' ?></button>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
+        <button type="button" id="socTranslateBtn" class="btn btn--primary" style="font-size:.82rem;min-height:44px;">✦ Преведи на английски</button>
+        <button type="button" id="socWriteEnBtn" class="btn btn--outline" style="font-size:.82rem;min-height:44px;">Ще го напиша сам(а)</button>
+      </div>
     </div>
+    <p id="socTranslateMsg" role="status" aria-live="polite" style="margin:.5rem 0;font-size:.85rem;"></p>
     <p id="socCount-linkedin" style="margin:0;font-size:.8rem;color:var(--text-muted);font-variant-numeric:tabular-nums;"></p>
     <p id="socCut-linkedin" hidden style="margin:.25rem 0 0;font-size:.8rem;font-weight:600;color:#92400e;"><span aria-hidden="true">✂</span> Текстът е съкратен до последното цяло изречение</p>
     <div data-emoji-anchor style="display:flex;gap:.4rem;flex-wrap:wrap;margin:.6rem 0 1rem;">
@@ -1065,6 +1069,50 @@ if (suggestBtn) {
   });
 }
 
+// Translate the Bulgarian title and text into the English fields. Shared by the
+// "Auto-translate" button and the Socials panel. Resolves to {ok:true} or
+// {ok:false, error:'<plain Bulgarian>'}; never throws.
+window._translateArticleToEn = async function () {
+  _expandEnSection();
+  var bgTitle   = document.getElementById('title').value;
+  var bgContent = _tinyGet('content');
+  if (!bgTitle.trim() && !bgContent.trim()) {
+    return { ok: false, error: 'Няма какво да се преведе — първо напишете статията на български.' };
+  }
+
+  async function tx(text, isHtml) {
+    if (!text.trim()) return { ok: true, translated: '' };
+    var r;
+    try {
+      r = await fetch('/admin/translate-ajax.php', {
+        method: 'POST', credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text: text, is_html: isHtml, csrf_token: window._csrfToken})
+      });
+    } catch (e) {
+      return { ok: false, error: 'Няма връзка със сървъра. Опитайте отново.' };
+    }
+    if (r.redirected || r.status === 401 || r.status === 403) {
+      return { ok: false, error: 'Автоматичният превод е само за администратори. Помолете администратор или напишете английския текст сами.' };
+    }
+    var d = null;
+    try { d = await r.json(); } catch (e) {}
+    if (!d) return { ok: false, error: 'Преводът не успя. Опитайте отново.' };
+    if (d.ok) return { ok: true, translated: d.translated };
+    if (r.status === 404 || /not configured|DeepL/i.test(d.error || '')) {
+      return { ok: false, error: 'Автоматичният превод не е настроен. Администраторът може да го включи от „Преводи“.' };
+    }
+    return { ok: false, error: 'Преводът не успя. Опитайте отново.' };
+  }
+
+  var res = await Promise.all([tx(bgTitle, false), tx(bgContent, true)]);
+  var failed = res.filter(function (x) { return !x.ok; })[0];
+  if (failed) return failed;
+  if (res[0].translated) document.getElementById('title_en').value = res[0].translated;
+  if (res[1].translated) _tinySet('content_en', res[1].translated);
+  return { ok: true };
+};
+
 // Auto-translate button
 var translateBtn = document.getElementById('translateToEnBtn');
 if (translateBtn) {
@@ -1072,34 +1120,8 @@ if (translateBtn) {
     var btn = this;
     btn.disabled = true;
     btn.textContent = 'Translating…';
-    _expandEnSection();
-
-    var bgTitle   = document.getElementById('title').value;
-    var bgContent = _tinyGet('content');
-
-    async function tx(text, isHtml) {
-      if (!text.trim()) return '';
-      var r = await fetch('/admin/translate-ajax.php', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({text: text, is_html: isHtml, csrf_token: window._csrfToken})
-      });
-      var d = await r.json();
-      return d.ok ? d.translated : '';
-    }
-
-    try {
-      var [enTitle, enContent] = await Promise.all([
-        tx(bgTitle,   false),
-        tx(bgContent, true),
-      ]);
-      if (enTitle)   document.getElementById('title_en').value = enTitle;
-      if (enContent) _tinySet('content_en', enContent);
-      btn.textContent = '✓ Translated';
-    } catch(e) {
-      btn.textContent = '✗ Error — check console';
-      console.error(e);
-    }
+    var r = await window._translateArticleToEn();
+    btn.textContent = r.ok ? '✓ Translated' : '✗ ' + r.error;
     btn.disabled = false;
   });
 }

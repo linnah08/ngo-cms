@@ -350,4 +350,23 @@ final class SocialPanelTest extends TestCase
             '/setKey: function \(key\) \{.*localStorage\.setItem\(next, raw\);\s*localStorage\.removeItem\(storageKey\);.*storageKey = next;/s', $autosave,
             'a kept draft moves to the new address');
     }
+
+    public function testLinkedInOffersTranslationRightInThePanel(): void
+    {
+        $edit = $this->edit;
+        // Gate functionality, not visibility: always the translate button, never a
+        // different control depending on whether DeepL happens to be set up here.
+        $this->assertStringContainsString('id="socTranslateBtn"', $edit);
+        $this->assertStringContainsString('✦ Преведи на английски</button>', $edit);
+        $this->assertStringNotContainsString("\$deepl_ready ? '✦ Преведи на английски'", $edit);
+        $this->assertStringContainsString('id="socWriteEnBtn"', $edit);
+        $this->assertMatchesRegularExpression('/id="socTranslateMsg" role="status"/', $edit);
+        $this->assertStringContainsString('window._translateArticleToEn = async function', $edit);
+        $this->assertStringContainsString('Автоматичният превод не е настроен', $edit);
+
+        $js = $this->js;
+        $this->assertStringContainsString('window._translateArticleToEn()', $js);
+        $this->assertMatchesRegularExpression('/if \(r\.ok\) \{.*refresh\(\);/s', $js, 'the LinkedIn preview updates after translating');
+        $this->assertStringNotContainsString("getElementById('translateToEnBtn')", $js, 'no longer depends on the hidden-when-unconfigured button');
+    }
 }

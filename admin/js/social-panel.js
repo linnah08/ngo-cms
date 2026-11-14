@@ -378,12 +378,30 @@
   });
 
   // ── No English text yet: translate, or open the English section ─────────────
-  document.getElementById('socTranslateBtn').addEventListener('click', function () {
-    var tx = document.getElementById('translateToEnBtn');
-    if (tx) { tx.click(); return; }
+  // Translation happens right here; the server says when it isn't set up, and that
+  // shows as a plain message — the button itself is always offered.
+  var trBtn = document.getElementById('socTranslateBtn');
+  var trMsg = document.getElementById('socTranslateMsg');
+  trBtn.addEventListener('click', async function () {
+    if (typeof window._translateArticleToEn !== 'function') return;
+    trBtn.disabled = true;
+    trMsg.style.color = '';
+    trMsg.textContent = 'Превежда се…';
+    var r = await window._translateArticleToEn();
+    trBtn.disabled = false;
+    if (r.ok) {
+      trMsg.style.color = '#14532d';
+      trMsg.textContent = '✓ Преведено. Прегледайте английския текст в статията, преди да публикувате.';
+      refresh();
+    } else {
+      trMsg.style.color = '#7f1d1d';
+      trMsg.textContent = '⚠ ' + r.error;
+    }
+  });
+  document.getElementById('socWriteEnBtn').addEventListener('click', function () {
     if (typeof window._expandEnSection === 'function') window._expandEnSection();
     var t = document.getElementById('title_en');
-    if (t) t.focus();
+    if (t) { t.scrollIntoView({ block: 'center' }); t.focus(); }
   });
 
   // ── What happened to the site post, shown at the top and under the button ──
