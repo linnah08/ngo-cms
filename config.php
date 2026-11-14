@@ -709,7 +709,8 @@ function admin_logged_in(): bool {
 function admin_session_recheck(PDO $pdo): bool
 {
     $sess = $_SESSION[ADMIN_SESSION_NAME] ?? [];
-    $stmt = $pdo->prepare('SELECT name, email, role FROM admin_users WHERE id = ? LIMIT 1');
+    // SELECT *: the Latin name columns (migration 051) may not exist yet right after an update.
+    $stmt = $pdo->prepare('SELECT * FROM admin_users WHERE id = ? LIMIT 1');
     $stmt->execute([(int) ($sess['id'] ?? 0)]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$user) {
@@ -719,9 +720,10 @@ function admin_session_recheck(PDO $pdo): bool
     }
     $role_changed = (string) ($sess['role'] ?? '') !== (string) $user['role'];
     $_SESSION[ADMIN_SESSION_NAME] = array_merge($sess, [
-        'name'  => $user['name'],
-        'email' => $user['email'],
-        'role'  => $user['role'],
+        'name'    => $user['name'],
+        'name_en' => trim(trim((string) ($user['first_name_en'] ?? '')) . ' ' . trim((string) ($user['last_name_en'] ?? ''))),
+        'email'   => $user['email'],
+        'role'    => $user['role'],
     ]);
     if ($role_changed && !headers_sent()) {
         // The public site's edit bar was granted for the old role; it is set again at the next login.
@@ -747,6 +749,16 @@ function admin_require_login(): void {
 function admin_user(): array {
     if (session_status() === PHP_SESSION_NONE) session_start();
     return $_SESSION[ADMIN_SESSION_NAME] ?? [];
+}
+
+/**
+ * The article byline a signed-in user's name gives: the full name for 'bg';
+ * for 'en' the Latin full name, or the Bulgarian one when none is set.
+ */
+function admin_byline(array $user, string $lang): string
+{
+    $en = trim((string) ($user['name_en'] ?? ''));
+    return $lang === 'en' && $en !== '' ? $en : (string) ($user['name'] ?? '');
 }
 
 function admin_session_refresh(): void {

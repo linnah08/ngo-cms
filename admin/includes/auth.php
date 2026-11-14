@@ -76,6 +76,7 @@ function admin_start_session(array $user): void
     $_SESSION[ADMIN_SESSION_NAME] = [
         'id'   => $user['id'],
         'name' => $user['name'],
+        'name_en' => admin_full_name((string) ($user['first_name_en'] ?? ''), (string) ($user['last_name_en'] ?? '')),
         'email'=> $user['email'],
         'role' => $user['role'],
         'time' => time(),
@@ -84,6 +85,51 @@ function admin_start_session(array $user): void
     // A site's own role never gets the public site's edit bar (the token authorises inline edits).
     require_once dirname(__DIR__, 2) . '/includes/site_extensions.php';
     if (!admin_role_is_site_role((string) $user['role'])) admin_bar_token_set((string) $user['role']);
+}
+
+/** The admin_users name fields a form can set, each up to 100 characters. */
+const ADMIN_NAME_FIELDS = ['first_name', 'last_name', 'first_name_en', 'last_name_en'];
+
+/** "Име Фамилия", or just the first name when there is no last name. */
+function admin_full_name(string $first, string $last): string
+{
+    return trim(trim($first) . ' ' . trim($last));
+}
+
+/**
+ * One free-text name split the way migration 051 split existing users:
+ * the first word is the first name, the rest the last name. Returns [first, last].
+ */
+function admin_split_name(string $full): array
+{
+    $full  = trim((string) preg_replace('/\s+/u', ' ', $full));
+    $parts = explode(' ', $full, 2);
+    return [$parts[0], $parts[1] ?? ''];
+}
+
+/**
+ * The four name fields from a form, trimmed and cut to the column size, and
+ * what is wrong with them: ['names' => [...], 'error' => string|null]. Only the
+ * first name is required.
+ */
+function admin_names_from_input(array $in): array
+{
+    $names = [];
+    foreach (ADMIN_NAME_FIELDS as $f) {
+        $v = is_string($in[$f] ?? null) ? $in[$f] : '';
+        $names[$f] = mb_substr(trim((string) preg_replace('/\s+/u', ' ', $v)), 0, 100);
+    }
+    return ['names' => $names, 'error' => $names['first_name'] === '' ? 'Попълнете собственото име.' : null];
+}
+
+/** Saves a user's names; `name` follows as "first last". */
+function admin_save_names(PDO $pdo, int $id, array $names): void
+{
+    $pdo->prepare('UPDATE admin_users SET first_name = ?, last_name = ?, first_name_en = ?, last_name_en = ?, name = ? WHERE id = ?')
+        ->execute([
+            $names['first_name'], $names['last_name'], $names['first_name_en'], $names['last_name_en'],
+            admin_full_name($names['first_name'], $names['last_name']), $id,
+        ]);
 }
 
 /**

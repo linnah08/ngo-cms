@@ -325,12 +325,6 @@
 <?php // Only while „Помощ от изкуствен интелект“ is on (Admin → Модули): switched
       // off, no page gets a ✦ Translate button and nothing calls DeepL. The two
       // helpers stay defined so a page's own inline handler never throws. ?>
-<?php if (!module_enabled_with_needs('ai_helpers')): ?>
-<script>
-function txEl() {}
-function txField() {}
-</script>
-<?php else: ?>
 <script>
 function _tmGet(el) {
   var ed = el && el.id && window.tinymce ? tinymce.get(el.id) : null;
@@ -340,6 +334,14 @@ function _tmSet(el, html) {
   var ed = el && el.id && window.tinymce ? tinymce.get(el.id) : null;
   if (ed) ed.setContent(html); else if (el) el.value = html;
 }
+</script>
+<?php if (!module_enabled_with_needs('ai_helpers')): ?>
+<script>
+function txEl() {}
+function txField() {}
+</script>
+<?php else: ?>
+<script>
 async function txEl(bgEl, enEl, btn, isHtml) {
   if (!bgEl || !enEl) return;
   var bgVal = _tmGet(bgEl);
@@ -367,10 +369,20 @@ document.querySelectorAll('.translate-legal-btn').forEach(function(btn) {
   });
 });
 
+</script>
+<?php endif; ?>
+<script src="<?= h(versioned_asset('/admin/js/bg-translit.js')) ?>"></script>
+<script>
 /* Every EN field that names its BG source — data-translate-from="<name or id>"
    — gets a "✦ Translate" button under it. Fields added to the page later
-   (repeating rows) get one too. Rich-text fields are sent as HTML. */
+   (repeating rows) get one too. Rich-text fields are sent as HTML.
+   A person's name (data-translate-mode="transliterate") gets „✦ На латиница“
+   instead: written in Latin letters right here, never translated (DeepL made
+   „Детелина“ "Clover"). That one works with the AI helpers off too. */
 (function () {
+  var aiOn = <?= module_enabled_with_needs('ai_helpers') ? 'true' : 'false' ?>;
+  var translateUrl = <?= module_enabled_with_needs('ai_helpers') ? "'/admin/translate-ajax.php'" : 'null' ?>;   // off: nothing calls DeepL
+
   function sourceOf(enEl) {
     var key   = enEl.getAttribute('data-translate-from');
     var scope = enEl.form || document;
@@ -379,7 +391,10 @@ document.querySelectorAll('.translate-legal-btn').forEach(function(btn) {
 
   function attach(enEl) {
     if (enEl._txAttached) return;
+    var translit = enEl.getAttribute('data-translate-mode') === 'transliterate';
+    if (!translit && !aiOn) return;   // AI helpers off: no ✦ Translate, nothing calls DeepL
     enEl._txAttached = true;
+    var label = translit ? '✦ На латиница' : '✦ Translate';
 
     var wrap = document.createElement('span');
     wrap.style.cssText = 'display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.35rem;';
@@ -387,7 +402,7 @@ document.querySelectorAll('.translate-legal-btn').forEach(function(btn) {
     btn.type = 'button';
     btn.className = 'btn btn--outline';
     btn.style.cssText = 'font-size:.75rem;padding:.2rem .5rem;';
-    btn.textContent = '✦ Translate';
+    btn.textContent = label;
     var msg = document.createElement('span');
     msg.setAttribute('role', 'alert');
     msg.style.cssText = 'font-size:.8rem;color:#b91c1c;';
@@ -404,15 +419,25 @@ document.querySelectorAll('.translate-legal-btn').forEach(function(btn) {
         return;
       }
       // Nothing to lose when the English field only holds the Bulgarian text (not translated yet).
-      if (_tmGet(enEl).trim() && _tmGet(enEl).trim() !== text.trim() && window._adminConfirm &&
-          !(await window._adminConfirm('Английският текст ще бъде заменен с превода. Продължаване?', 'Замени'))) {
+      var replaced = translit ? window.bgTransliterate(text) : null;
+      if (_tmGet(enEl).trim() && _tmGet(enEl).trim() !== text.trim() && _tmGet(enEl).trim() !== replaced &&
+          window._adminConfirm &&
+          !(await window._adminConfirm(translit
+              ? 'Полето ще бъде заменено с „' + replaced + '“. Продължаване?'
+              : 'Английският текст ще бъде заменен с превода. Продължаване?', 'Замени'))) {
+        return;
+      }
+      if (translit) {
+        _tmSet(enEl, replaced);
+        enEl.dispatchEvent(new Event('input', {bubbles: true}));
+        btn.textContent = '✓';
         return;
       }
       var isHtml = !!(window.tinymce && enEl.id && tinymce.get(enEl.id));
       btn.disabled = true;
       btn.textContent = '…';
       try {
-        var res  = await fetch('/admin/translate-ajax.php', {
+        var res  = await fetch(translateUrl, {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({text: text, is_html: isHtml, csrf_token: window._csrfToken})
@@ -429,7 +454,7 @@ document.querySelectorAll('.translate-legal-btn').forEach(function(btn) {
       } catch (e) {
         msg.textContent = 'Преводът не успя. Проверете връзката и опитайте отново (ако сте стояли дълго на страницата — презаредете я).';
       }
-      btn.textContent = '✦ Translate';
+      btn.textContent = label;
       btn.disabled = false;
     });
   }
@@ -446,7 +471,6 @@ document.querySelectorAll('.translate-legal-btn').forEach(function(btn) {
   }).observe(document.body, {childList: true, subtree: true});
 })();
 </script>
-<?php endif; ?>
 <script src="<?= h(versioned_asset('/admin/js/session-guard.js')) ?>"></script>
 <?php // Jobs the server's schedule isn't running are started after the page is sent (includes/scheduled_jobs.php).
 try { require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/scheduled_jobs.php'; scheduled_jobs_run_on_visit(); }

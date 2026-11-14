@@ -50,7 +50,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <label for="email">Имейл</label>
         <input type="email" id="email" name="email"
                value="<?= h($_POST['email'] ?? '') ?>"
-               required autofocus autocomplete="email">
+               required autofocus autocomplete="username" aria-describedby="email-hint">
+        <small id="email-hint" style="display:block;margin-top:.3rem;font-size:.85rem;color:#4b5563;">Влизате с имейла си, не с името.</small>
       </div>
       <div class="form-group">
         <label for="password">Парола</label>

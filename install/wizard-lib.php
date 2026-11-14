@@ -86,6 +86,8 @@ function wizard_validate_account(array $in, ?string $existing_hash = null): arra
     // Trimmed to match the login form, which trims the password before verifying.
     $pass  = trim((string) ($in['admin_password'] ?? ''));
     $errors = [];
+    $first = mb_substr(wizard_trim($in, 'admin_first_name'), 0, 100);
+    if ($first === '')                                    $errors['admin_first_name'] = 'Въведете собственото си име.';
     if ($email === '')                                    $errors['admin_email'] = 'Въведете имейла, с който ще влизате.';
     elseif (!filter_var($email, FILTER_VALIDATE_EMAIL))   $errors['admin_email'] = 'Този имейл не изглежда правилен. Проверете за правописна грешка, например липсващо @.';
     $hash = $existing_hash;
@@ -93,7 +95,8 @@ function wizard_validate_account(array $in, ?string $existing_hash = null): arra
     elseif ($pass !== '' && mb_strlen($pass) < 8)         $errors['admin_password'] = 'Паролата трябва да е поне 8 знака.';
     elseif ($pass !== '')                                 $hash = password_hash($pass, PASSWORD_DEFAULT);
     return [
-        'data'   => ['admin_name' => mb_substr(wizard_trim($in, 'admin_name'), 0, 100), 'admin_email' => $email, 'password_hash' => $hash],
+        'data'   => ['admin_first_name' => $first, 'admin_last_name' => mb_substr(wizard_trim($in, 'admin_last_name'), 0, 100),
+                     'admin_email' => $email, 'password_hash' => $hash],
         'errors' => $errors,
     ];
 }

@@ -19,7 +19,7 @@ final class InstallWizardTest extends TestCase
     {
         return [
             'db'      => ['db_mode' => 'create'],
-            'account' => ['admin_name' => '', 'admin_email' => 'me@example.org', 'password_hash' => password_hash('secret123', PASSWORD_DEFAULT)],
+            'account' => ['admin_first_name' => 'Мария', 'admin_last_name' => '', 'admin_email' => 'me@example.org', 'password_hash' => password_hash('secret123', PASSWORD_DEFAULT)],
             'org'     => ['site_name_bg' => 'Фондация Пример', 'site_name_en' => '', 'site_url' => 'https://example.org', 'site_email' => 'info@example.org'],
             'look'    => ['brand_theme' => 'classic', 'brand_primary' => '#123456', 'brand_accent' => '#654321'],
             'modules' => ['modules' => []],
@@ -66,20 +66,21 @@ final class InstallWizardTest extends TestCase
     public function test_account_needs_an_email_and_a_password_of_eight(): void
     {
         $r = wizard_validate_account([]);
-        $this->assertSame(['admin_email', 'admin_password'], array_keys($r['errors']));
-        $this->assertArrayHasKey('admin_email', wizard_validate_account(['admin_email' => 'nope', 'admin_password' => 'longenough'])['errors']);
-        $this->assertArrayHasKey('admin_password', wizard_validate_account(['admin_email' => 'a@b.bg', 'admin_password' => 'short'])['errors']);
+        $this->assertSame(['admin_first_name', 'admin_email', 'admin_password'], array_keys($r['errors']), 'in the order of the form');
+        $this->assertArrayHasKey('admin_email', wizard_validate_account(['admin_first_name' => 'Мария', 'admin_email' => 'nope', 'admin_password' => 'longenough'])['errors']);
+        $this->assertArrayHasKey('admin_password', wizard_validate_account(['admin_first_name' => 'Мария', 'admin_email' => 'a@b.bg', 'admin_password' => 'short'])['errors']);
 
-        $r = wizard_validate_account(['admin_email' => 'a@b.bg', 'admin_password' => '  longenough  ']);
+        $r = wizard_validate_account(['admin_first_name' => ' Мария ', 'admin_email' => 'a@b.bg', 'admin_password' => '  longenough  ']);
         $this->assertSame([], $r['errors']);
         $this->assertTrue(password_verify('longenough', $r['data']['password_hash']), 'trimmed like the login form');
         $this->assertArrayNotHasKey('admin_password', $r['data'], 'the password is never kept in plain text');
-        $this->assertSame('', $r['data']['admin_name'], 'the name is optional');
+        $this->assertSame('Мария', $r['data']['admin_first_name']);
+        $this->assertSame('', $r['data']['admin_last_name'], 'the last name is optional');
     }
 
     public function test_coming_back_to_the_account_step_keeps_the_password(): void
     {
-        $r = wizard_validate_account(['admin_email' => 'a@b.bg', 'admin_password' => ''], 'earlier-hash');
+        $r = wizard_validate_account(['admin_first_name' => 'Мария', 'admin_email' => 'a@b.bg', 'admin_password' => ''], 'earlier-hash');
         $this->assertSame([], $r['errors']);
         $this->assertSame('earlier-hash', $r['data']['password_hash']);
     }

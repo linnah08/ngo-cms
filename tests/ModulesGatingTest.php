@@ -114,7 +114,8 @@ final class ModulesGatingTest extends TestCase
     {
         $code = 'require ROOT_PATH . "/admin/includes/admin-footer.php";';
         $off = $this->child($code, ['ai_helpers']);
-        $this->assertStringNotContainsString('data-translate-from', $off, 'no button is attached to EN fields');
+        $this->assertStringContainsString('var aiOn = false;', $off, 'no ✦ Translate button is attached to EN fields');
+        $this->assertStringContainsString('/admin/js/bg-translit.js', $off, 'names still get „✦ На латиница“, which needs no service');
         $this->assertStringNotContainsString('/admin/translate-ajax.php', $off);
         $this->assertStringContainsString('function txField() {}', $off, 'inline handlers on a page never throw');
         $on = $this->child($code);

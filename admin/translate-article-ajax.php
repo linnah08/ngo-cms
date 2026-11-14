@@ -51,6 +51,15 @@ $article = load_json($bg_file);
 // for it there. Older articles without slug_en share the Bulgarian address.
 $slug_en = basename(str_replace(['..', "\0"], '', is_string($article['slug_en'] ?? null) ? $article['slug_en'] : '')) ?: $slug;
 
+// The English byline: one already set on the English version stays; otherwise the
+// signed-in user's Latin name when the article is theirs; otherwise the Bulgarian one.
+$author_bg  = (string) ($article['author'] ?? '');
+$en_before  = is_file(ARTICLES_PATH . '/en/' . $slug_en . '.json') ? (array) load_json(ARTICLES_PATH . '/en/' . $slug_en . '.json') : [];
+$author_en  = trim((string) ($en_before['author'] ?? ''));
+if ($author_en === '' || $author_en === $author_bg) {
+    $author_en = $author_bg === (string) (admin_user()['name'] ?? '') ? admin_byline(admin_user(), 'en') : $author_bg;
+}
+
 // Translate fields — content may contain HTML, the rest is plain text
 $err     = null;
 $title   = deepl_translate($article['title']   ?? '', 'EN-GB', false, $err);
@@ -70,7 +79,7 @@ $en_data = [
     'title'   => $title   ?: $article['title'],
     'slug'    => $slug_en,
     'date'    => $article['date']   ?? date('Y-m-d'),
-    'author'  => $article['author'] ?? '',
+    'author'  => $author_en,
     'status'  => $article['status'] ?? 'draft',
     'excerpt' => $excerpt ?: '',
     'image'   => $article['image']  ?? '',
