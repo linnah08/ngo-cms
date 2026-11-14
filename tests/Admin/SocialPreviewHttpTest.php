@@ -154,7 +154,7 @@ final class SocialPreviewHttpTest extends TestCase
     {
         [$jar, $csrf] = $this->login();
         [$code, $res] = $this->preview($jar, [
-            'csrf_token' => $csrf, 'title' => 'Нова статия', 'content' => '<p>Текст.</p>',
+            'csrf_token' => $csrf, 'title' => 'Нова статия', 'content' => '<p>Текст. ' . str_repeat('Още едно изречение тук. ', 120) . '</p>',
             'title_en' => '', 'content_en' => '', 'slug' => '', 'slug_en' => '',
         ]);
         @unlink($jar);
@@ -164,8 +164,10 @@ final class SocialPreviewHttpTest extends TestCase
         $this->assertTrue($res['ok']);
         $this->assertStringContainsString('Нова статия', $res['fb']['text']);
         $this->assertStringContainsString('Текст.', $res['fb']['text']);
-        $this->assertStringContainsString(article_public_url($slugs['bg'], 'bg'), $res['fb']['text']);
-        $this->assertStringContainsString(article_public_url($slugs['bg'], 'bg'), $res['insta']['text']);
+        // Facebook takes the whole text, so no link; Instagram is cut, so it links to the article.
+        $this->assertStringNotContainsString(article_public_url($slugs['bg'], 'bg'), $res['fb']['text']);
+        $this->assertTrue($res['insta']['cut']);
+        $this->assertStringEndsWith(article_public_url($slugs['bg'], 'bg'), $res['insta']['text']);
         $this->assertSame(['text' => '', 'length' => 0, 'limit' => 3000, 'cut' => false], $res['linkedin'], 'no English body, no LinkedIn post');
         $this->assertFalse($res['fb']['cut']);
         $this->assertSame(social_text_length($res['fb']['text']), $res['fb']['length']);
@@ -176,7 +178,7 @@ final class SocialPreviewHttpTest extends TestCase
         [$jar, $csrf] = $this->login();
         [, $res] = $this->preview($jar, [
             'csrf_token' => $csrf, 'title' => 'Заглавие', 'content' => '<p>Текст.</p>',
-            'title_en' => 'Headline', 'content_en' => '<p>Body.</p>', 'slug' => '', 'slug_en' => 'my-en-slug',
+            'title_en' => 'Headline', 'content_en' => '<p>Body. ' . str_repeat('One more sentence here. ', 200) . '</p>', 'slug' => '', 'slug_en' => 'my-en-slug',
         ]);
         @unlink($jar);
         $this->assertTrue($res['ok']);

@@ -50,13 +50,14 @@ function html_to_social_text(string $html): string {
 }
 
 /**
- * Public address of an article. $lang is 'bg' or 'en'. The slug is percent-encoded, so a
- * Cyrillic address is still a plain link wherever it is posted.
+ * Public address of an article. $lang is 'bg' or 'en'. A Cyrillic slug stays readable
+ * (Facebook and LinkedIn link it as it is); slug() has already removed every character
+ * that could break an address.
  */
 function article_public_url(string $slug, string $lang): string {
     return $lang === 'en'
-        ? SITE_URL . '/en/news/' . rawurlencode($slug) . '/'
-        : SITE_URL . '/novini/' . rawurlencode($slug) . '/';
+        ? SITE_URL . '/en/news/' . $slug . '/'
+        : SITE_URL . '/novini/' . $slug . '/';
 }
 
 /**
@@ -77,9 +78,10 @@ function social_post_limit(string $platform): int {
 }
 
 /**
- * The post for one platform: title, blank line, article text, blank line, link line.
- * A text over the platform's limit is cut at the last full sentence that fits
- * (else at a whole word) and ends with " …" before the link — posting is never refused.
+ * The post for one platform: title, blank line, article text. Only a text over the
+ * platform's limit gets the link: it is cut at the last full sentence that fits
+ * (else at a whole word) and ends with " …", a blank line and "Прочетете повече: <url>"
+ * — posting is never refused.
  * Facebook and Instagram take the Bulgarian wording, LinkedIn the English.
  *
  * @return array{text:string,length:int,limit:int,cut:bool}
@@ -92,13 +94,12 @@ function social_post_text(string $title, string $html, string $url, string $plat
     if ($title === '' && $body === '') {
         return ['text' => '', 'length' => 0, 'limit' => $limit, 'cut' => false];
     }
-    $link = t_or('social.read_more', 'Прочетете повече', 'Read more', $lang) . ': ' . $url;
     $main = implode("\n\n", array_filter([$title, $body], static fn($p) => $p !== ''));
-    $full = $main . "\n\n" . $link;
-
-    if (social_text_length($full) <= $limit) {
-        return ['text' => $full, 'length' => social_text_length($full), 'limit' => $limit, 'cut' => false];
+    if (social_text_length($main) <= $limit) {
+        return ['text' => $main, 'length' => social_text_length($main), 'limit' => $limit, 'cut' => false];
     }
+
+    $link = t_or('social.read_more', 'Прочетете повече', 'Read more', $lang) . ': ' . $url;
 
     $tail   = " …\n\n" . $link;
     $budget = max(0, $limit - social_text_length($tail));

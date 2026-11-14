@@ -14,18 +14,22 @@ final class SocialPostTextTest extends TestCase
         require_once dirname(__DIR__, 2) . '/includes/articles.php';
     }
 
-    public function testShortArticleIsTitleBodyAndLink(): void
+    public function testArticleThatFitsIsTitleAndBodyWithoutLink(): void
     {
         $r = social_post_text('Заглавие', '<p>Едно.</p><p>Две.</p>', self::URL, 'fb');
-        $this->assertSame("Заглавие\n\nЕдно.\n\nДве.\n\nПрочетете повече: https://x/novini/a/", $r['text']);
+        $this->assertSame("Заглавие\n\nЕдно.\n\nДве.", $r['text']);
         $this->assertFalse($r['cut']);
+        $this->assertSame(social_text_length($r['text']), $r['length']);
     }
 
-    public function testLinkedInUsesEnglishReadMore(): void
+    public function testLinkedInUsesEnglishReadMoreWhenCut(): void
     {
-        $r = social_post_text('Title', '<p>One.</p>', 'https://x/en/news/a/', 'linkedin');
-        $this->assertStringEndsWith('Read more: https://x/en/news/a/', $r['text']);
+        $r = social_post_text('Title', '<p>' . str_repeat('One more sentence here. ', 200) . '</p>', 'https://x/en/news/a/', 'linkedin');
+        $this->assertTrue($r['cut']);
+        $this->assertStringEndsWith("here. …\n\nRead more: https://x/en/news/a/", $r['text']);
         $this->assertSame(3000, $r['limit']);
+        $short = social_post_text('Title', '<p>One.</p>', 'https://x/en/news/a/', 'linkedin');
+        $this->assertStringNotContainsString('Read more', $short['text']);
     }
 
     public function testLongTextCutAtLastFullSentence(): void
@@ -89,11 +93,11 @@ final class SocialPostTextTest extends TestCase
         $this->assertStringEndsWith('/en/news/y/', article_public_url('y', 'en'));
     }
 
-    public function testCyrillicAddressIsPercentEncoded(): void
+    public function testCyrillicAddressStaysReadable(): void
     {
-        $this->assertSame(SITE_URL . '/novini/' . rawurlencode('новина-1') . '/', article_public_url('новина-1', 'bg'));
-        $this->assertStringEndsWith('/novini/%D0%BD%D0%BE%D0%B2%D0%B8%D0%BD%D0%B0/', article_public_url('новина', 'bg'));
-        $this->assertSame(SITE_URL . '/en/news/news-1/', article_public_url('news-1', 'en'), 'a plain address stays as it is');
+        $this->assertSame(SITE_URL . '/novini/новина-1/', article_public_url('новина-1', 'bg'));
+        $this->assertStringNotContainsString('%', article_public_url('новина', 'bg'));
+        $this->assertSame(SITE_URL . '/en/news/news-1/', article_public_url('news-1', 'en'));
     }
 
     /** A body whose longest fitting start ends exactly at $end, followed by $after. */
@@ -103,7 +107,7 @@ final class SocialPostTextTest extends TestCase
         $budget = 2200 - social_text_length($tail);
         $head   = "Заглавие\n\nПърво изречение. ";
         $filler = 'Д' . str_repeat('д', $budget - mb_strlen($head) - mb_strlen(' ' . $end) - 1);
-        $r = social_post_text('Заглавие', '<p>Първо изречение. ' . $filler . ' ' . $end . $after . '</p>', self::URL, 'insta');
+        $r = social_post_text('Заглавие', '<p>Първо изречение. ' . $filler . ' ' . $end . $after . str_repeat(' още', 100) . '</p>', self::URL, 'insta');
         $this->assertTrue($r['cut']);
         return $r;
     }
@@ -130,7 +134,7 @@ final class SocialPostTextTest extends TestCase
             social_post_text('Заглавие', '<p>Едно.</p>', SITE_URL . '/novini/a/', 'fb')['text'],
             social_schedule_text($bg, [], 'fb')
         );
-        $en = ['title' => 'Title', 'content' => '<p>One.</p>'];
+        $en = ['title' => 'Title', 'content' => '<p>' . str_repeat('One more sentence here. ', 200) . '</p>'];
         $this->assertStringEndsWith('Read more: ' . SITE_URL . '/en/news/a-en/',
             social_schedule_text($bg + ['slug_en' => 'a-en'], $en, 'linkedin'));
     }

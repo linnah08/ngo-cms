@@ -14,7 +14,9 @@ isn't good enough to post unchecked. The author wants to see what each platform 
 
 - **The post is the article.** Facebook and Instagram post the BG article text, and
   LinkedIn posts the EN article text. There is no separate post text and no AI-written post.
-- **Long text is cut at the last full sentence that fits**, followed by a "read more" link
+- **Long text is cut at the last full sentence that fits**, followed by a "read more" link.
+  A post that fits gets no link (author's decision, 2026-11-14), and the link stays
+  readable — a Cyrillic slug is not percent-encoded. Original wording:
   to the article. This replaces the excerpt approach.
 - **A "Socials" button opens a panel beside the article.** The panel is built from what is
   in the editor right now, saved or not. Clicking the button again closes it.
@@ -69,8 +71,7 @@ A new function, `social_post_text(string $title, string $html, string $url, stri
 2. Platform limits: Instagram 2,200 characters, LinkedIn 3,000, Facebook none in
    practice. Characters are counted the way the platforms count them. The bold-letter
    symbols count as more than one, so use a conservative count.
-3. If the text plus the link line fits, the result is the full text, a blank line, then
-   the link line.
+3. If the text fits, the result is the full text — no link line.
 4. Otherwise the text is cut at the last full sentence end (`.`, `!`, `?`, `…`, closing
    quote) so that the text, `…`, and the link line all fit. If no sentence end fits, the
    cut falls on a word boundary.
