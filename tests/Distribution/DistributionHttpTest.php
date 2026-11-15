@@ -265,6 +265,27 @@ final class DistributionHttpTest extends TestCase
         $this->assertSame(0, (int) $pdo->query("SELECT active FROM distribution_distributors WHERE id = $did")->fetchColumn());
     }
 
+    public function testAllProductsTableHasTotalRow(): void
+    {
+        require_once self::$root . '/includes/distribution.php';
+        $pdo   = get_pdo();
+        $token = $this->login();
+        $pid   = self::$productId;
+        $this->req('/admin/distribution.php', ['csrf_token' => $token, 'product_id' => $pid,
+            'action' => 'add_batch', 'quantity' => 7, 'produced_on' => '2026-06-01']);
+
+        $overview = distribution_overview($pdo);
+        [, $body] = $this->req('/admin/distribution.php?product=' . $pid);
+        if (count($overview) < 2) {
+            $this->assertStringNotContainsString('<tfoot>', $body, 'One product: a total would just repeat its row');
+            return;
+        }
+        $this->assertMatchesRegularExpression('~<tfoot>.*Общо~s', $body);
+        $produced = array_sum(array_map(fn($o) => (int) $o['total']['produced'], $overview));
+        preg_match('~<tfoot>.*?Общо</th>\s*<td[^>]*>([^<]+)</td>~s', $body, $m);
+        $this->assertSame(number_format($produced, 0, ',', ' '), trim($m[1] ?? ''), 'Total produced is the sum of the product rows');
+    }
+
     public function testSamplesForSeveralProductsRoundTrip(): void
     {
         $pdo   = get_pdo();

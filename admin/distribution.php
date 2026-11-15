@@ -456,7 +456,8 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
           </th>
           <?= $ov_numbers($o['total'] + ['produced' => 0, 'sold' => 0, 'to_samples' => 0, 'remaining' => 0, 'with_distributors' => 0], $is_var) ?>
         </tr>
-        <?php if ($is_var): foreach ($o['items'] as $it): ?>
+        <?php if ($is_var && count($o['items']) > 1): // one variant would just repeat the product's row
+          foreach ($o['items'] as $it): ?>
         <tr>
           <th scope="row" style="<?= $ov_rowhead ?>font-weight:400;padding-left:2rem;">
             <?= h($it['label']) ?><?= $it['active'] ? '' : ' <span class="dist-hint">(скрит)</span>' ?>
@@ -466,6 +467,18 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
         <?php endforeach; endif; ?>
       <?php endforeach; ?>
       </tbody>
+      <?php if (count($overview) > 1):
+        // Sum of the product rows only — variant rows are already inside their product's row.
+        $ov_sum = ['produced' => 0, 'sold' => 0, 'to_samples' => 0, 'to_writeoff' => 0, 'remaining' => 0, 'with_distributors' => 0];
+        foreach ($overview as $o) foreach ($ov_sum as $k => $_) $ov_sum[$k] += (int) ($o['total'][$k] ?? 0);
+      ?>
+      <tfoot>
+        <tr style="border-top:2px solid var(--text);">
+          <th scope="row" style="<?= $ov_rowhead ?>font-weight:700;">Общо</th>
+          <?= $ov_numbers($ov_sum, true) ?>
+        </tr>
+      </tfoot>
+      <?php endif; ?>
     </table>
   </div>
 
