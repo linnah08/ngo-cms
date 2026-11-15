@@ -244,6 +244,24 @@ if ($slug) {
                data-cms-id="<?= $p['id'] ?>"><?= $desc ?></div>
         <?php endif; ?>
 
+        <?php
+          // A variant's own description (written in the admin under the variant),
+          // shown under the shared one while that variant is chosen.
+          $pv_descs = [];
+          foreach ($prod_variants as $pv) {
+              $d = $lang === 'bg' ? ($pv['description_bg'] ?? '') : (($pv['description_en'] ?? '') ?: ($pv['description_bg'] ?? ''));
+              if (trim(strip_tags((string)$d)) !== '') $pv_descs[(int)$pv['id']] = $d;
+          }
+          $pv_start_id = $default_pv ? (int)$default_pv['id'] : 0;
+        ?>
+        <?php if ($pv_descs): ?>
+          <div id="pvDescs" aria-live="polite" style="line-height:1.8;color:var(--text-muted);">
+            <?php foreach ($pv_descs as $pv_id => $d): ?>
+              <div class="pv-desc" id="pvd-<?= $pv_id ?>"<?= $pv_start_id === $pv_id ? '' : ' hidden' ?>><?= $d ?></div>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+
         <?php if ($is_variant && !empty($prod_variants) && !$pv_multi): ?>
           <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/product-variant-chooser.php'; ?>
         <?php endif; ?>
@@ -543,6 +561,7 @@ var _pvData = <?= json_encode(
     'image'  => $pv['image'] ? '/assets/images/products/' . $pv['image'] : '',
     'images' => array_map(fn($f) => '/assets/images/products/' . $f, variant_gallery($pv)),
     'stock'  => (int)$pv['stock'],
+    'slug'   => variant_link_slug($pv),
     // In stock, or sold out on a product that takes pre-orders.
     'buyable'  => (int)$pv['stock'] > 0 || $p_preorder_on,
     'preorder' => (int)$pv['stock'] <= 0 && $p_preorder_on,
@@ -608,6 +627,20 @@ function selectVariant(vid) {
   if (opt) opt.classList.add('active');
   var radio = document.getElementById('pvr-' + vid);
   if (radio && !radio.checked) radio.checked = true;
+
+  // The chosen variant's own description (if it has one)
+  document.querySelectorAll('#pvDescs .pv-desc').forEach(function(el){
+    el.hidden = el.id !== 'pvd-' + vid;
+  });
+
+  // The address becomes this variant's link, so it can be copied or shared
+  if (pv.slug && window.history && history.replaceState) {
+    try {
+      var u = new URL(window.location.href);
+      u.searchParams.set('v', pv.slug);
+      history.replaceState(history.state, '', u.toString());
+    } catch (e) {}
+  }
 
   renderGallery(vid);
 }

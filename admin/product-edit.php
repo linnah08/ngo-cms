@@ -156,12 +156,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $images_json = json_encode($sv['images'] ?? [], JSON_UNESCAPED_UNICODE);
                 if ($sv['id'] > 0 && in_array($sv['id'], $existing_ids, true)) {
                     $pdo->prepare(
-                        'UPDATE product_variants SET label_bg=?,label_en=?,attributes=?,image=?,images=?,stock=?,sort_order=?,active=1 WHERE id=? AND product_id=?'
-                    )->execute([$sv['label_bg'], $sv['label_en'], $attrs_json, $sv['image'], $images_json, $sv['stock'], $sort, $sv['id'], $saved_id]);
+                        'UPDATE product_variants SET label_bg=?,label_en=?,description_bg=?,description_en=?,attributes=?,image=?,images=?,stock=?,sort_order=?,active=1 WHERE id=? AND product_id=?'
+                    )->execute([$sv['label_bg'], $sv['label_en'], $sv['description_bg'], $sv['description_en'], $attrs_json, $sv['image'], $images_json, $sv['stock'], $sort, $sv['id'], $saved_id]);
                 } else {
                     $pdo->prepare(
-                        'INSERT INTO product_variants (product_id,label_bg,label_en,attributes,image,images,stock,sort_order) VALUES (?,?,?,?,?,?,?,?)'
-                    )->execute([$saved_id, $sv['label_bg'], $sv['label_en'], $attrs_json, $sv['image'], $images_json, $sv['stock'], $sort]);
+                        'INSERT INTO product_variants (product_id,label_bg,label_en,description_bg,description_en,attributes,image,images,stock,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?)'
+                    )->execute([$saved_id, $sv['label_bg'], $sv['label_en'], $sv['description_bg'], $sv['description_en'], $attrs_json, $sv['image'], $images_json, $sv['stock'], $sort]);
                 }
             }
         }
@@ -615,6 +615,18 @@ if (($product['type'] ?? '') === 'variant' && !$is_new) {
                       style="min-width:44px;min-height:44px;background:none;border:none;color:#e53935;cursor:pointer;font-size:1.1rem;padding:.2rem;"><span aria-hidden="true">✕</span></button>
             </td>
           </tr>
+          <tr class="pv-desc-row">
+            <td colspan="99" style="padding:.25rem .5rem 1rem;border-bottom:1px solid var(--border);">
+              <div style="font-size:.78rem;font-weight:600;margin-bottom:.35rem;">Описание само за „<?= h($pvr['label_bg']) ?>“ <span style="font-weight:400;color:var(--text-muted);">(по избор — показва се под общото описание, когато този вариант е избран)</span></div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:.75rem;">
+                <textarea class="pv-desc" id="pvDescBg-<?= (int)$pvr['id'] ?>" name="pv_desc_bg[]" rows="3" aria-label="Описание на варианта (BG)"><?= h($pvr['description_bg'] ?? '') ?></textarea>
+                <div>
+                  <textarea class="pv-desc" id="pvDescEn-<?= (int)$pvr['id'] ?>" name="pv_desc_en[]" rows="3" aria-label="Variant description (EN)"
+                            data-translate-from="pvDescBg-<?= (int)$pvr['id'] ?>"><?= h($pvr['description_en'] ?? '') ?></textarea>
+                </div>
+              </div>
+            </td>
+          </tr>
           <?php endforeach; ?>
         </tbody>
       </table>
@@ -782,10 +794,40 @@ function addPvRow() {
   tbody.appendChild(tr);
   syncAttrJson(tr);
   renderPvPhotos(tr);
+
+  // Its own description (BG + EN rich text), like the saved rows have
+  var key  = 'n' + (++_pvNewRows);
+  var dtr  = document.createElement('tr');
+  dtr.className = 'pv-desc-row';
+  dtr.innerHTML = '<td colspan="99" style="padding:.25rem .5rem 1rem;border-bottom:1px solid var(--border);">'
+    + '<div style="font-size:.78rem;font-weight:600;margin-bottom:.35rem;">Описание само за този вариант '
+    + '<span style="font-weight:400;color:var(--text-muted);">(по избор — показва се под общото описание, когато този вариант е избран)</span></div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:.75rem;">'
+    + '<textarea class="pv-desc" id="pvDescBg-' + key + '" name="pv_desc_bg[]" rows="3" aria-label="Описание на варианта (BG)"></textarea>'
+    + '<div><textarea class="pv-desc" id="pvDescEn-' + key + '" name="pv_desc_en[]" rows="3" aria-label="Variant description (EN)"'
+    + ' data-translate-from="pvDescBg-' + key + '"></textarea></div>'
+    + '</div></td>';
+  tbody.appendChild(dtr);
+  initPvDescEditors('#pvDescBg-' + key + ', #pvDescEn-' + key);
+}
+
+var _pvNewRows = 0;
+function initPvDescEditors(selector) {
+  if (typeof tinymce === 'undefined') return;
+  tinymce.init(Object.assign({}, window._tinyBase, { selector: selector, min_height: 140 }));
 }
 
 function removePvRow(btn) {
-  btn.closest('tr').remove();
+  var tr   = btn.closest('tr');
+  var desc = tr.nextElementSibling;
+  if (desc && desc.classList.contains('pv-desc-row')) {
+    desc.querySelectorAll('textarea.pv-desc').forEach(function (t) {
+      var ed = typeof tinymce !== 'undefined' ? tinymce.get(t.id) : null;
+      if (ed) ed.remove();
+    });
+    desc.remove();
+  }
+  tr.remove();
 }
 
 // ── Variant photo strip (multiple photos per variant) ─────────────────────────
@@ -1264,6 +1306,7 @@ function txField(bgId, enId, btn, isHtml) {
 
 <script>
 tinymce.init(Object.assign({}, window._tinyBase, { selector: '#descBg, #descEn', min_height: 200 }));
+initPvDescEditors('textarea.pv-desc');
 initAutosave({
   key:     <?= json_encode('product:' . ($id ?: 'new')) ?>,
   formId:  'productForm',

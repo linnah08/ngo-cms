@@ -306,6 +306,8 @@ function product_parse_variant_rows(array $post, callable $image_ok, bool $allow
     $vr_images    = $post['pv_images']   ?? []; // JSON per row: {"images":[...],"primary":"..."}
     $vr_stocks    = $post['pv_stock']    ?? [];
     $vr_attrs     = $post['pv_attrs']    ?? []; // JSON strings per row
+    $vr_desc_bg   = $post['pv_desc_bg']  ?? []; // rich text per row (admin-written HTML)
+    $vr_desc_en   = $post['pv_desc_en']  ?? [];
 
     $rows = [];
     foreach (array_keys($vr_labels) as $i) {
@@ -338,6 +340,8 @@ function product_parse_variant_rows(array $post, callable $image_ok, bool $allow
             'id'       => (int)($vr_ids[$i] ?? 0),
             'label_bg' => $lbl,
             'label_en' => trim((string)($vr_labels_en[$i] ?? '')),
+            'description_bg' => trim((string)($vr_desc_bg[$i] ?? '')),
+            'description_en' => trim((string)($vr_desc_en[$i] ?? '')),
             'image'    => $primary,
             'images'   => $images,
             // Below zero only for a pre-order product, where it counts items still owed.

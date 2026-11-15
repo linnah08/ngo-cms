@@ -98,6 +98,22 @@ final class ProductSaveLogicTest extends TestCase
 
     // ── product_parse_variant_rows ───────────────────────────────────────────
 
+    public function testVariantRowsCarryTheirOwnDescriptions(): void
+    {
+        $post = [
+            'pv_id'       => ['7', '0', '0'],
+            'pv_label_bg' => ['Ледоразбивачи', '', 'Очи в Очи'],
+            'pv_desc_bg'  => ['  <p>Въпроси за запознаване</p> ', '<p>пропуснат</p>', ''],
+            'pv_desc_en'  => ['<p>Icebreakers</p>', '', ''],
+        ];
+        $rows = product_parse_variant_rows($post, fn() => true);
+        $this->assertCount(2, $rows);
+        $this->assertSame('<p>Въпроси за запознаване</p>', $rows[0]['description_bg']);
+        $this->assertSame('<p>Icebreakers</p>', $rows[0]['description_en']);
+        $this->assertSame('', $rows[1]['description_bg']);
+        $this->assertSame('', $rows[1]['description_en']);
+    }
+
     public function testVariantRowsSkipEmptyLabelAndSanitiseGallery(): void
     {
         $post = [

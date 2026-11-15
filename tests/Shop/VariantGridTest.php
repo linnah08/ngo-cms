@@ -92,4 +92,28 @@ final class VariantGridTest extends TestCase
         $src = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/admin/product-edit.php');
         $this->assertStringContainsString("'/?v=' . variant_link_slug(\$pvr)", $src);
     }
+
+    public function testProductPageShowsChosenVariantsDescription(): void
+    {
+        $src = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/magazin/index.php');
+        $this->assertStringContainsString('id="pvDescs"', $src);
+        $this->assertStringContainsString("el.hidden = el.id !== 'pvd-' + vid;", $src);
+    }
+
+    public function testChoosingAVariantPutsItsLinkInTheAddressBar(): void
+    {
+        $src = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/magazin/index.php');
+        $this->assertStringContainsString("'slug'   => variant_link_slug(\$pv)", $src);
+        $this->assertStringContainsString("u.searchParams.set('v', pv.slug);", $src);
+        $this->assertStringContainsString('history.replaceState(', $src);
+    }
+
+    public function testAdminHasRichTextDescriptionPerVariant(): void
+    {
+        $src = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/admin/product-edit.php');
+        $this->assertStringContainsString('name="pv_desc_bg[]"', $src);
+        $this->assertStringContainsString('name="pv_desc_en[]"', $src);
+        $this->assertStringContainsString("initPvDescEditors('textarea.pv-desc');", $src);
+        $this->assertStringContainsString('description_bg=?,description_en=?', $src);
+    }
 }
