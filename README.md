@@ -66,6 +66,10 @@ Each config below is gitignored. Copy the matching `*.example` file and fill it 
 | `graph.config.php.example` | `graph.config.php` | No | Outgoing email via Microsoft Graph (email is disabled until set) |
 | `courier.config.php.example` | `courier.config.php` | No | Courier API credentials (Bulgaria) |
 
+A copy whose `SITE_URL` is on your computer (`localhost`, `127.0.0.1`, `*.test`, `*.local`) never
+sends email, even with real mail settings — test orders there can't email your team or anyone
+else. Add `define('MAIL_ALLOW_LOCAL', true);` to its `site.config.php` to send anyway.
+
 `site.config.php` is the one file you edit to rebrand the site — name, base URL,
 contact details, bank account, social links, Google Analytics/Ads IDs, and
 initial feature toggles (`FEATURE_DONATIONS`, `FEATURE_CAMPAIGN`). Leave any

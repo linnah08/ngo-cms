@@ -424,6 +424,8 @@ function mail_explain_error(string $raw): string
 {
     $r = strtolower($raw);
     return match (true) {
+        str_contains($r, MAIL_LOCAL_COPY_ERROR_MARK)
+            => 'Това е копие на сайта на компютър, а не истинският сайт, затова имейли не се изпращат.',
         str_contains($r, 'could not authenticate'), str_contains($r, 'authentication'),
         str_contains($r, '535'), str_contains($r, 'username and password')
             => 'Сървърът не прие потребителското име или паролата. Проверете ги (обикновено потребителското име е целият имейл адрес) и опитайте отново.',
@@ -449,6 +451,46 @@ function mail_explain_error(string $raw): string
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Local copies of the site never send mail
+// ══════════════════════════════════════════════════════════════════════════════
+
+/** Start of the last-error text when a local copy refuses to send (matched by mail_explain_error). */
+const MAIL_LOCAL_COPY_ERROR_MARK = 'local copy of the site';
+
+/**
+ * Is $site_url the address of a copy running on someone's computer (a dev
+ * server, a test run, a rehearsal) rather than a real site? Pure.
+ *
+ * Such copies often hold a real database and real mail settings, so without
+ * this every test order there emailed the organisation and the "customer".
+ */
+function mail_site_is_local(string $site_url): bool
+{
+    $host = strtolower((string) parse_url($site_url, PHP_URL_HOST));
+    $host = trim($host, '[].');
+    if ($host === '') return false;
+    if ($host === 'localhost' || $host === '::1' || $host === '0.0.0.0') return true;
+    if (preg_match('/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/', $host)) return true;
+    foreach (['.localhost', '.test', '.local', '.example', '.invalid'] as $suffix) {
+        if (str_ends_with($host, $suffix)) return true;
+    }
+    return false;
+}
+
+/**
+ * Should send_mail() refuse because this is a local copy? A copy that really
+ * needs to send (e.g. to try a mail server) defines MAIL_ALLOW_LOCAL as true in
+ * its config (site.config.php or local.config.php). A test with a fake SMTP sender
+ * (mail_set_smtp_sender) never reaches a real server, so it is let through.
+ */
+function mail_blocked_as_local_copy(string $site_url): bool
+{
+    if (defined('MAIL_ALLOW_LOCAL') && MAIL_ALLOW_LOCAL) return false;
+    if (is_callable($GLOBALS['_mail_smtp_sender'] ?? null)) return false;
+    return mail_site_is_local($site_url);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // send_mail — public API used across the site
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -463,6 +505,15 @@ function send_mail(string $to, string $subject, string $body_html, string $reply
     // a real address, whatever transport this machine has configured.
     if (defined('MAIL_DISABLED') && MAIL_DISABLED) {
         _mail_set_last_error('Mail disabled (MAIL_DISABLED)');
+        return false;
+    }
+
+    // A copy of the site on a computer (SITE_URL is localhost, 127.0.0.1, *.test…)
+    // never mails anyone: its test orders used to email the real team.
+    if (mail_blocked_as_local_copy(defined('SITE_URL') ? (string) SITE_URL : '')) {
+        _mail_set_last_error('Not sent: ' . MAIL_LOCAL_COPY_ERROR_MARK . ' (' . SITE_URL . ')');
+        error_log('send_mail: not sent from a ' . MAIL_LOCAL_COPY_ERROR_MARK . ' — "' . $subject . '"'
+            . ' (define MAIL_ALLOW_LOCAL as true in the site config to send anyway)');
         return false;
     }
 

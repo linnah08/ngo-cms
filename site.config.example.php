@@ -26,6 +26,9 @@ define('SITE_LEGAL_NAME_EN', '');
 
 // Public base URL — NO trailing slash. Every absolute URL (emails, payment
 // callbacks, lang_url()) derives from this.
+// A copy on your computer (localhost, 127.0.0.1, *.test, *.local) never sends
+// email, so its test orders can't reach real people. To send from one anyway:
+// define('MAIL_ALLOW_LOCAL', true);
 define('SITE_URL',   'https://example.org');
 
 define('SITE_EMAIL', 'info@example.org');         // public contact / from address
