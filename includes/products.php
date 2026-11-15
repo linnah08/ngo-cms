@@ -116,14 +116,32 @@ function product_single_variant(array $active_variants): ?array {
 }
 
 /**
+ * The ?v= value that opens a product page with this variant selected —
+ * e.g. /magazin/napkins/?v=semeyni-hroniki for an ad about one variant.
+ * Derived from the BG name (Latin letters), so it is the same on BG and EN pages.
+ */
+function variant_link_slug(array $variant): string {
+    return ascii_slug((string)($variant['label_bg'] ?? ''));
+}
+
+/**
  * The variant the product page starts on: the first (in sort order) that is in
  * stock, or null when every variant is sold out. Starting on a sold-out variant
  * would make "Add to cart" fail for a buyer who didn't change the choice.
  *
  * With $preorder (the product takes pre-orders) a sold-out product still starts
  * on its first variant, which can then be pre-ordered.
+ *
+ * $wanted is the page's ?v= value; an unknown or unbuyable one is ignored.
  */
-function product_default_variant(array $active_variants, bool $preorder = false): ?array {
+function product_default_variant(array $active_variants, bool $preorder = false, ?string $wanted = null): ?array {
+    // ?v=<link slug> (an ad for one variant) starts on that variant if it can be bought.
+    $wanted = $wanted !== null ? strtolower(trim($wanted)) : '';
+    if ($wanted !== '') {
+        foreach ($active_variants as $pv) {
+            if (variant_link_slug($pv) === $wanted && ((int)($pv['stock'] ?? 0) > 0 || $preorder)) return $pv;
+        }
+    }
     foreach ($active_variants as $pv) {
         if ((int)($pv['stock'] ?? 0) > 0) return $pv;
     }

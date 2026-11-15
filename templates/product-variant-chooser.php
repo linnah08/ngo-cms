@@ -6,14 +6,17 @@
  *   $lang           string  'bg' | 'en'
  *   $p_preorder_on  bool    optional — the product takes pre-orders, so sold-out
  *                           variants stay choosable and say "Pre-order"
+ *   $pv_wanted      ?string optional — the page's ?v= value (see variant_link_slug())
  *
- * Several variants → a "Choose variant" group of native radio buttons (a
+ * Several variants → a photo grid of all of them, so a visitor (e.g. from an
+ * ad) sees every variant at once; the product page puts it where the big photo
+ * would be. It is a "Choose variant" group of native radio buttons (a
  * fieldset + legend, so keyboards use Tab / arrow keys and screen readers
  * announce "radio, 2 of 3, checked"). The first IN-STOCK variant starts
  * checked; sold-out ones are disabled radios that still say "Out of stock".
  * The hidden variant_id in the add-to-cart form follows the pick via
  * selectVariant() in magazin/index.php. The tile look lives in that page's
- * <style> (.pv-option / .pv-radio).
+ * <style> (.pv-grid / .pv-option / .pv-radio).
  *
  * Exactly one variant → nothing to choose, so no "Choose variant" prompt: the
  * variant is shown as plain text (name, attributes, stock) so the buyer — and a
@@ -67,10 +70,11 @@ $_pv_admin    = cms_admin(['Продукти', '/admin/product-edit.php?id=' . (
     </div>
   </div>
 <?php else: ?>
-  <?php $_default_pv = product_default_variant($prod_variants, $_preorder_on); ?>
+  <?php $_default_pv = product_default_variant($prod_variants, $_preorder_on, $pv_wanted ?? null); ?>
+  <?php $_pv_cols = count($prod_variants) === 4 ? 2 : min(count($prod_variants), 3); ?>
   <fieldset class="pv-choices">
     <legend><?= te('shop.choose_variant', 'Избери вариант', 'Choose variant', $lang) ?></legend>
-    <div style="display:flex;flex-direction:column;gap:.5rem;">
+    <div class="pv-grid" style="display:grid;grid-template-columns:repeat(<?= (int)$_pv_cols ?>,minmax(0,1fr));gap:.6rem;">
       <?php foreach ($prod_variants as $pv): ?>
         <?php
           $d       = $_pv_describe($pv);
@@ -83,24 +87,22 @@ $_pv_admin    = cms_admin(['Продукти', '/admin/product-edit.php?id=' . (
           <input type="radio" class="pv-radio" name="pv_choice" id="pvr-<?= $pv_id ?>" value="<?= $pv_id ?>"
                  <?= $checked ? 'checked' : '' ?>
                  <?= $pv_buy ? 'onchange="selectVariant(' . $pv_id . ')"' : 'disabled' ?>>
-          <?php if ($d['img']): ?>
-            <img class="pv-thumb" src="<?= h($d['img']) ?>" alt="">
-          <?php else: ?>
-            <span class="pv-thumb" style="display:block;background:var(--off-white);border-radius:4px;"></span>
-          <?php endif; ?>
-          <span style="display:block;flex:1;min-width:0;">
-            <span style="display:block;font-weight:600;font-size:.95rem;">
-              <span<?= $_pv_admin ?>><?= h($d['label']) ?></span>
-              <?php /* Visible, non-colour "selected" marker; the radio's own checked state is what a screen reader announces. */ ?>
-              <span class="pv-selected" aria-hidden="true">✓ <?= te('shop.variant_selected', 'Избран', 'Selected', $lang) ?></span>
-            </span>
-            <?php if ($d['attrs']): ?>
-              <span style="display:block;font-size:.78rem;color:var(--text-muted);"<?= $_pv_admin ?>><?= $d['attrs'] ?></span>
+          <span class="pv-tile__img" style="display:block;position:relative;width:100%;aspect-ratio:1;border-radius:var(--radius);overflow:hidden;background:var(--off-white);">
+            <?php if ($d['img']): ?>
+              <img src="<?= h($d['img']) ?>" alt="" style="width:100%;height:100%;object-fit:cover;display:block;">
             <?php endif; ?>
           </span>
-          <span style="font-size:.8rem;flex-shrink:0;<?= $d['in_stock'] ? 'color:var(--teal);' : ($_preorder_on ? 'color:#92400e;font-weight:600;' : 'color:#b03a2e;font-weight:600;') ?>">
+          <span style="display:block;min-width:0;">
+            <span style="display:block;font-weight:600;font-size:clamp(.78rem,3.4vw,.95rem);line-height:1.25;overflow-wrap:break-word;hyphens:auto;"<?= $_pv_admin ?>><?= h($d['label']) ?></span>
+            <?php /* Visible, non-colour "selected" marker; the radio's own checked state is what a screen reader announces. */ ?>
+            <span class="pv-selected" aria-hidden="true">✓ <?= te('shop.variant_selected', 'Избран', 'Selected', $lang) ?></span>
+            <?php if ($d['attrs']): ?>
+              <span style="display:block;font-size:.75rem;color:var(--text-muted);"<?= $_pv_admin ?>><?= $d['attrs'] ?></span>
+            <?php endif; ?>
+          </span>
+          <span style="display:block;font-size:.75rem;line-height:1.2;<?= $d['in_stock'] ? 'color:#1b5e63;' : ($_preorder_on ? 'color:#92400e;font-weight:600;' : 'color:#b03a2e;font-weight:600;') ?>">
             <?= $d['in_stock']
-                ? te('shop.stock_left', 'Налични: {n} бр.', '{n} left', $lang, ['n' => (int) $pv['stock']])
+                ? te('shop.in_stock', 'В наличност', 'In stock', $lang)
                 : ($_preorder_on ? '⏳ ' . te('shop.preorder.label', 'Предварителна поръчка', 'Pre-order', $lang) : te('shop.out_of_stock', 'Изчерпан', 'Out of stock', $lang)) ?>
           </span>
         </label>

@@ -585,6 +585,20 @@ if (($product['type'] ?? '') === 'variant' && !$is_new) {
             <td style="padding:.4rem .5rem;vertical-align:middle;">
               <input type="text" name="pv_label_bg[]" value="<?= h($pvr['label_bg']) ?>" required
                      style="width:100%;padding:.35rem .5rem;border:1px solid var(--border);border-radius:4px;font-size:.85rem;">
+              <?php if (!empty($product['slug']) && count($prod_variants_rows) > 1 && variant_link_slug($pvr) !== ''): ?>
+                <?php $pv_ad_link = rtrim(SITE_URL, '/') . '/magazin/' . rawurlencode($product['slug']) . '/?v=' . variant_link_slug($pvr); ?>
+                <div style="margin-top:.35rem;font-size:.75rem;color:var(--text-muted);">
+                  <label style="display:block;">Линк, който отваря страницата с този вариант избран (за реклами):
+                    <span style="display:flex;gap:.3rem;margin-top:.2rem;">
+                      <input type="text" readonly value="<?= h($pv_ad_link) ?>" onfocus="this.select()"
+                             style="flex:1;min-width:0;padding:.25rem .4rem;border:1px solid var(--border);border-radius:4px;font-size:.75rem;background:var(--off-white);">
+                      <button type="button" class="btn btn--outline" style="font-size:.72rem;padding:.2rem .5rem;"
+                              onclick="var b=this,i=b.previousElementSibling;navigator.clipboard.writeText(i.value).then(function(){b.textContent='Копирано ✓';setTimeout(function(){b.textContent='Копирай';},2000);},function(){i.select();});">Копирай</button>
+                    </span>
+                  </label>
+                  Ако смениш името на варианта, линкът също се сменя.
+                </div>
+              <?php endif; ?>
             </td>
             <td style="padding:.4rem .5rem;vertical-align:middle;">
               <input type="text" name="pv_label_en[]" value="<?= h($pvr['label_en'] ?? '') ?>"

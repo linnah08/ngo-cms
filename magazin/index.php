@@ -54,7 +54,12 @@ if ($slug) {
     // The variant the page starts on: the first in-stock one (null if all sold
     // out — unless the product takes pre-orders, then its first variant).
     $p_preorder_on = $p && !empty($p['preorder_enabled']);
-    $default_pv = product_default_variant($prod_variants, $p_preorder_on);
+    // ?v=<link slug> (see variant_link_slug()) starts on that variant — for ads about one variant.
+    $pv_wanted  = is_string($_GET['v'] ?? null) ? $_GET['v'] : null;
+    $default_pv = product_default_variant($prod_variants, $p_preorder_on, $pv_wanted);
+    // Several variants → the top of the page is a photo grid of all of them
+    // instead of one big photo, so visitors see every variant at once.
+    $pv_multi   = $is_variant && count($prod_variants) > 1;
 
     if (!$p) {
         http_response_code(404);
@@ -133,7 +138,16 @@ if ($slug) {
 .pv-thumbstrip{display:flex;gap:.5rem;margin-top:.6rem;flex-wrap:wrap;}
 .pv-thumbstrip img{width:52px;height:52px;object-fit:cover;border-radius:4px;cursor:pointer;border:2px solid transparent;transition:border-color .15s;}
 .pv-thumbstrip img.active{border-color:var(--teal);}
-@media(max-width:640px){#pvGallery{display:none!important;}}
+@media(max-width:640px){.product-detail-grid:not(.has-pv-grid) #pvGallery{display:none!important;}}
+.pv-grid .pv-option{position:relative;flex-direction:column;align-items:stretch;gap:.35rem;min-height:0;padding:0;border:0;background:none;text-align:left;}
+.pv-grid .pv-option.active,.pv-grid .pv-option:has(.pv-radio:checked){background:none;}
+.pv-grid .pv-radio{position:absolute;opacity:0;width:1px;height:1px;}
+.pv-grid .pv-tile__img{box-shadow:0 0 0 2px var(--border);transition:box-shadow .15s;}
+.pv-grid .pv-option:hover .pv-tile__img{box-shadow:0 0 0 2px var(--teal);}
+.pv-grid .pv-option.active .pv-tile__img,.pv-grid .pv-option:has(.pv-radio:checked) .pv-tile__img{box-shadow:0 0 0 3px var(--teal);}
+.pv-grid .pv-option.disabled .pv-tile__img{opacity:.5;box-shadow:0 0 0 2px var(--border);}
+.pv-grid .pv-option:has(.pv-radio:focus-visible){outline:3px solid var(--teal);outline-offset:3px;border-radius:var(--radius);}
+.pv-grid .pv-option.active .pv-selected,.pv-grid .pv-option:has(.pv-radio:checked) .pv-selected{display:block;}
 </style>';
     require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
@@ -149,8 +163,16 @@ if ($slug) {
 
     <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/product-flash.php'; ?>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:start;" class="product-detail-grid">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:start;" class="product-detail-grid<?= $pv_multi ? ' has-pv-grid' : '' ?>">
 
+      <?php if ($pv_multi): ?>
+      <!-- All variants at a glance: pick one by its photo -->
+      <div>
+        <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/product-variant-chooser.php'; ?>
+        <!-- More photos of the chosen variant (filled by JS; hidden when it has only one) -->
+        <div class="pv-thumbstrip" id="pvGallery" style="margin-top:.75rem;"></div>
+      </div>
+      <?php else: ?>
       <!-- Image / Mockup -->
       <?php $initial_src = $p['image'] ? '/assets/images/products/' . $p['image'] : ''; ?>
       <?php
@@ -198,6 +220,7 @@ if ($slug) {
       <?php endif; ?>
       <?php if ($_show_admin_bar): ?><span class="om-img-overlay">📷 Replace</span><?php endif; ?>
       </span>
+      <?php endif; ?>
 
       <!-- Details -->
       <div style="display:flex;flex-direction:column;gap:1.5rem;">
@@ -221,7 +244,7 @@ if ($slug) {
                data-cms-id="<?= $p['id'] ?>"><?= $desc ?></div>
         <?php endif; ?>
 
-        <?php if ($is_variant && !empty($prod_variants)): ?>
+        <?php if ($is_variant && !empty($prod_variants) && !$pv_multi): ?>
           <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/product-variant-chooser.php'; ?>
         <?php endif; ?>
 
@@ -533,7 +556,8 @@ var _galleryIdx  = 0;
 function galleryShow(i) {
   if (!_galleryImgs.length) return;
   _galleryIdx = (i + _galleryImgs.length) % _galleryImgs.length;
-  var img = document.getElementById('mockupImg');
+  var img = document.getElementById('mockupImg')
+         || document.querySelector('.pv-grid .pv-option.active .pv-tile__img img');
   if (img) img.src = _galleryImgs[_galleryIdx];
   document.querySelectorAll('#pvGallery img').forEach(function(t, idx){
     t.classList.toggle('active', idx === _galleryIdx);
@@ -572,9 +596,13 @@ function selectVariant(vid) {
   var img = document.getElementById('mockupImg');
   if (img && pv.image) img.src = pv.image;
 
-  // .active mirrors the checked radio, for browsers without CSS :has()
+  // .active mirrors the checked radio, for browsers without CSS :has().
+  // Grid tiles go back to their main photo (the gallery may have swapped one).
   document.querySelectorAll('.pv-option').forEach(function(el){
     el.classList.remove('active');
+    var tv = _pvData.find(function(v){ return 'pvo-' + v.id === el.id; });
+    var tImg = el.querySelector('.pv-tile__img img');
+    if (tv && tImg && tv.image) tImg.src = tv.image;
   });
   var opt = document.getElementById('pvo-' + vid);
   if (opt) opt.classList.add('active');
