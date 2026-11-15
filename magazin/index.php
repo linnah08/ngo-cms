@@ -234,34 +234,6 @@ if ($slug) {
 
         <div><?= price_html((float)$p['price_eur']) ?></div>
 
-        <?php if ($desc): ?>
-          <div style="line-height:1.8;color:var(--text-muted);"
-               data-cms-field="description"
-               data-cms-section="product"
-               data-cms-type="richtext"
-               data-cms-bg="<?= h($p['description_bg'] ?? '') ?>"
-               data-cms-en="<?= h($p['description_en'] ?? '') ?>"
-               data-cms-id="<?= $p['id'] ?>"><?= $desc ?></div>
-        <?php endif; ?>
-
-        <?php
-          // A variant's own description (written in the admin under the variant),
-          // shown under the shared one while that variant is chosen.
-          $pv_descs = [];
-          foreach ($prod_variants as $pv) {
-              $d = $lang === 'bg' ? ($pv['description_bg'] ?? '') : (($pv['description_en'] ?? '') ?: ($pv['description_bg'] ?? ''));
-              if (trim(strip_tags((string)$d)) !== '') $pv_descs[(int)$pv['id']] = $d;
-          }
-          $pv_start_id = $default_pv ? (int)$default_pv['id'] : 0;
-        ?>
-        <?php if ($pv_descs): ?>
-          <div id="pvDescs" aria-live="polite" style="line-height:1.8;color:var(--text-muted);">
-            <?php foreach ($pv_descs as $pv_id => $d): ?>
-              <div class="pv-desc" id="pvd-<?= $pv_id ?>"<?= $pv_start_id === $pv_id ? '' : ' hidden' ?>><?= $d ?></div>
-            <?php endforeach; ?>
-          </div>
-        <?php endif; ?>
-
         <?php if ($is_variant && !empty($prod_variants) && !$pv_multi): ?>
           <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/product-variant-chooser.php'; ?>
         <?php endif; ?>
@@ -530,6 +502,46 @@ if ($slug) {
 
         <?php else: ?>
           <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/product-out-of-stock.php'; ?>
+        <?php endif; ?>
+
+        <?php
+          // A variant's own description (written in the admin under the variant),
+          // shown under the cart while that variant is chosen — its own box,
+          // headed with the variant's name, so it doesn't read as the shared text.
+          $pv_descs = [];
+          foreach ($prod_variants as $pv) {
+              $d = $lang === 'bg' ? ($pv['description_bg'] ?? '') : (($pv['description_en'] ?? '') ?: ($pv['description_bg'] ?? ''));
+              if (trim(strip_tags((string)$d)) !== '') {
+                  $pv_descs[(int)$pv['id']] = [
+                      'label' => $lang === 'bg' ? $pv['label_bg'] : (($pv['label_en'] ?? '') ?: $pv['label_bg']),
+                      'html'  => $d,
+                  ];
+              }
+          }
+          $pv_start_id = $default_pv ? (int)$default_pv['id'] : 0;
+        ?>
+        <?php if ($pv_descs): ?>
+          <div id="pvDescs" aria-live="polite">
+            <?php foreach ($pv_descs as $pv_id => $pd): ?>
+              <section class="pv-desc" id="pvd-<?= $pv_id ?>" aria-labelledby="pvdh-<?= $pv_id ?>"<?= $pv_start_id === $pv_id ? '' : ' hidden' ?>
+                       style="border-left:4px solid var(--teal);background:#eef8fa;padding:.9rem 1.1rem;border-radius:0;line-height:1.8;">
+                <h2 id="pvdh-<?= $pv_id ?>" style="font-size:1rem;margin:0 0 .35rem;line-height:1.35;color:#025e70;">
+                  <?= te('shop.variant_about', 'За „{name}“', 'About “{name}”', $lang, ['name' => $pd['label']]) ?>
+                </h2>
+                <div><?= $pd['html'] ?></div>
+              </section>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+
+        <?php if ($desc): ?>
+          <div style="line-height:1.8;color:var(--text-muted);"
+               data-cms-field="description"
+               data-cms-section="product"
+               data-cms-type="richtext"
+               data-cms-bg="<?= h($p['description_bg'] ?? '') ?>"
+               data-cms-en="<?= h($p['description_en'] ?? '') ?>"
+               data-cms-id="<?= $p['id'] ?>"><?= $desc ?></div>
         <?php endif; ?>
       </div>
 

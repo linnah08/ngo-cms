@@ -378,6 +378,7 @@
   "shop.choose_variant": "Избери вариант",
   "shop.out_of_stock": "Изчерпан",
   "shop.in_stock": "В наличност",
+  "shop.variant_about": "За „{name}“",
   "shop.view_details": "Виж детайли",
   "home.campaign.label": "Кампания",
   "reports.heading": "Годишни отчети",

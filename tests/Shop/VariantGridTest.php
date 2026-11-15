@@ -116,4 +116,15 @@ final class VariantGridTest extends TestCase
         $this->assertStringContainsString("initPvDescEditors('textarea.pv-desc');", $src);
         $this->assertStringContainsString('description_bg=?,description_en=?', $src);
     }
+
+    public function testCartComesBeforeVariantTextThenSharedDescription(): void
+    {
+        $src  = (string) file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/magazin/index.php');
+        $cart = strpos($src, 'id="addToCartForm"');
+        $vd   = strpos($src, 'id="pvDescs"');
+        $gen  = strpos($src, 'data-cms-field="description"');
+        $this->assertNotFalse($cart);
+        $this->assertTrue($cart < $vd && $vd < $gen, 'order must be: add to cart, variant text, shared description');
+        $this->assertStringContainsString("te('shop.variant_about'", $src);
+    }
 }
