@@ -4,7 +4,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/couriers/SpeedyCourier.php';
 
-admin_require_login();
+admin_require_shop();   // shipping label with the customer's address: admin or shop manager, like Поръчки
 
 $pdo      = get_pdo();
 $order_id = (int)($_GET['order_id'] ?? 0);

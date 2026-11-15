@@ -16,7 +16,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/ai_keywords.php';
-admin_require_login();
+admin_require_editorial();   // only the article editor calls it
 module_ajax_guard('ai_helpers');
 
 header('Content-Type: application/json; charset=UTF-8');

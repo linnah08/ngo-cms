@@ -7,7 +7,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/site_extensions.php';   // t
 $page_title_admin = 'Месечен отчет';
 $active_nav       = 'monthly-report';
 
-admin_require_login();
+admin_require_shop();   // order and donor data: admin or shop manager, like the menu
 
 // Default to previous month
 $default_year  = (int) date('Y', strtotime('first day of last month'));
