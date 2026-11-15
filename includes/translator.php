@@ -57,7 +57,9 @@ function deepl_translate(string $text, string $target_lang = 'EN-GB', bool $is_h
 
     // Wrap HTML in <div> to avoid DeepL "text without parent" 400 error.
     // DeepL's HTML tag handling requires all text to be inside HTML elements.
+    $brs = [];
     if ($is_html) {
+        [$text, $brs] = deepl_protect_line_breaks($text);
         $text = '<div>' . $text . '</div>';
     }
 
@@ -118,6 +120,7 @@ function deepl_translate(string $text, string $target_lang = 'EN-GB', bool $is_h
     // Strip the wrapping <div> we added before sending
     if ($is_html) {
         $translated = preg_replace('/^\s*<div>(.*)<\/div>\s*$/s', '$1', $translated);
+        $translated = deepl_restore_line_breaks($translated, $brs);
     }
 
     // Restore glossary targets
@@ -126,6 +129,42 @@ function deepl_translate(string $text, string $target_lang = 'EN-GB', bool $is_h
     }
 
     return $translated;
+}
+
+/**
+ * Swap every <br> for a numbered block-level stand-in before the text goes to
+ * DeepL. DeepL treats a <br> as part of the sentence, so a bold heading on the
+ * line above ("<strong>Трябва лична карта</strong><br>Без лична карта…") is
+ * read as one sentence with the body: it comes back with a stray "." at the
+ * start of the next line, and words from the end of the heading moved after
+ * the break. An <hr> is a block element, which DeepL never joins sentences
+ * across. Splitting tags and outline detection do not change this (tested).
+ *
+ * @return array{0: string, 1: list<string>} the text, and the original <br> tags in order
+ */
+function deepl_protect_line_breaks(string $html): array
+{
+    $brs = [];
+    $out = preg_replace_callback('/<br\b[^>]*>/i', static function (array $m) use (&$brs): string {
+        $brs[] = $m[0];
+        return '<hr data-deepl-br="' . (count($brs) - 1) . '">';
+    }, $html);
+    return [$out ?? $html, $brs];
+}
+
+/**
+ * Put back the <br> tags deepl_protect_line_breaks() took out. Accepts the
+ * stand-in however DeepL wrote it back (with or without a closing slash).
+ *
+ * @param list<string> $brs
+ */
+function deepl_restore_line_breaks(string $html, array $brs): string
+{
+    if ($brs === []) return $html;
+    $out = preg_replace_callback('/<hr data-deepl-br="(\d+)"\s*\/?>/', static function (array $m) use ($brs): string {
+        return $brs[(int) $m[1]] ?? '<br>';
+    }, $html);
+    return $out ?? $html;
 }
 
 /**

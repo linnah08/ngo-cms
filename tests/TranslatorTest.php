@@ -43,6 +43,42 @@ final class TranslatorTest extends TestCase
         $this->assertStringContainsString('key', strtolower($error));
     }
 
+    // ── line breaks: each <br> line reaches DeepL as its own sentence ─────────
+    // DeepL reads "<strong>Heading</strong><br>Body" as one sentence: it adds a
+    // stray "." after the <br> and moves the heading's last words past it.
+    // A block-level stand-in for <br> keeps the lines apart.
+
+    public function test_line_breaks_become_block_markers_before_sending(): void
+    {
+        [$out, $brs] = deepl_protect_line_breaks('<p><strong>Трябва лична карта</strong><br>Без лична карта<br />няма договор.</p>');
+        $this->assertStringNotContainsString('<br', $out);
+        $this->assertSame(2, substr_count($out, '<hr data-deepl-br='));
+        $this->assertSame(['<br>', '<br />'], $brs);
+    }
+
+    public function test_line_breaks_are_restored_exactly_after_translation(): void
+    {
+        $src = '<p><strong>Трябва лична карта</strong><br>Без лична карта<BR class="x">няма договор.</p>';
+        [$out, $brs] = deepl_protect_line_breaks($src);
+        $this->assertSame($src, deepl_restore_line_breaks($out, $brs));
+    }
+
+    public function test_restore_accepts_markers_deepl_reserialised(): void
+    {
+        $this->assertSame(
+            '<p><strong>You need an ID card</strong><br>Without one…</p>',
+            deepl_restore_line_breaks('<p><strong>You need an ID card</strong><hr data-deepl-br="0"/>Without one…</p>', ['<br>'])
+        );
+    }
+
+    public function test_text_without_line_breaks_is_untouched(): void
+    {
+        [$out, $brs] = deepl_protect_line_breaks('<p>Без <hr> нови редове.</p>');
+        $this->assertSame('<p>Без <hr> нови редове.</p>', $out);
+        $this->assertSame([], $brs);
+        $this->assertSame('<p>A <hr> line.</p>', deepl_restore_line_breaks('<p>A <hr> line.</p>', []));
+    }
+
     // ── deepl_is_configured ───────────────────────────────────────────────────
 
     public function test_is_configured_returns_bool(): void
