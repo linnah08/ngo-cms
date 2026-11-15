@@ -276,6 +276,16 @@ final class ArticleSaveLogicTest extends TestCase
         $this->assertSame('Tom & Jerry', html_to_social_text('Tom &amp; Jerry'));
     }
 
+    public function testHtmlToSocialTextDecodesEntitiesInsideBold(): void
+    {
+        // The bold letters were swapped in before the entities were decoded, so
+        // "&rsquo;" turned into bold "rsquo" and showed up literally in the post.
+        $bold = static fn(string $s): string => strtr($s, ['d' => "\u{1D5F1}", 'o' => "\u{1D5FC}", 'n' => "\u{1D5FB}", 't' => "\u{1D601}", 'T' => "\u{1D5E7}", 'm' => "\u{1D5FA}", 'J' => "\u{1D5DD}", 'e' => "\u{1D5F2}", 'r' => "\u{1D5FF}", 'y' => "\u{1D606}", 'a' => "\u{1D5EE}", 'b' => "\u{1D5EF}"]);
+        $this->assertSame($bold('don’t'), html_to_social_text('<strong>don&rsquo;t</strong>'));
+        $this->assertSame($bold('Tom & Jerry'), html_to_social_text('<b>Tom &amp; Jerry</b>'));
+        $this->assertSame($bold('a < b'), html_to_social_text('<strong>a &lt; b</strong>'));
+    }
+
     public function testHtmlToSocialTextKeepsAnEmptyLineBetweenParagraphs(): void
     {
         // TinyMCE puts a single newline (or none) between paragraphs; the post

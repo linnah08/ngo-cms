@@ -30,8 +30,11 @@ function html_to_social_text(string $html): string {
     $html = preg_replace_callback(
         '/<(?:strong|b)(?:\s[^>]*)?>(.+?)<\/(?:strong|b)>/is',
         function ($m) use ($bold_map) {
-            $inner = strip_tags($m[1]);
-            return strtr($inner, $bold_map);
+            // Decode entities before swapping in bold letters — otherwise
+            // "&rsquo;" becomes bold "rsquo" and is never decoded. Re-escape
+            // after, so "a &lt; b" survives the strip_tags() further down.
+            $inner = html_entity_decode(strip_tags($m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            return htmlspecialchars(strtr($inner, $bold_map), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         },
         $html
     );
