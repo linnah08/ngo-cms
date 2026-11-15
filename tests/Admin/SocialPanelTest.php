@@ -388,7 +388,7 @@ final class SocialPanelTest extends TestCase
 
     public function testScheduleEverywhereChecksAllBeforeSavingOnce(): void
     {
-        $start = strpos($this->js, "allBtn.addEventListener('click'");
+        $start = strpos($this->js, 'function runAll(');
         $this->assertNotFalse($start);
         $block = substr($this->js, $start, 4000);
         $check = strpos($block, 'checkSchedule(');
@@ -408,5 +408,43 @@ final class SocialPanelTest extends TestCase
         $this->assertStringContainsString("'Изберете поне една мрежа.'", $this->js);
         $this->assertStringContainsString('if (allBtn) allBtn.disabled = true;', $this->js, 'locked while any post is sending');
         $this->assertStringContainsString('_igConfig()', $this->js, 'Instagram follows the Post/Story choice');
+    }
+
+    // ── „Публикувай сега навсякъде“ ────────────────────────────────────────────
+
+    public function testPublishNowEverywhereButtonSitsBesideScheduleEverywhere(): void
+    {
+        $sched = strpos($this->edit, 'id="socAllBtn"');
+        $now   = strpos($this->edit, '<button type="button" id="socAllNowBtn"');
+        $this->assertNotFalse($now);
+        $this->assertGreaterThan($sched, $now);
+        $this->assertLessThan(strpos($this->edit, '</fieldset>', $sched), $now, 'inside the same all-networks box');
+        $this->assertStringContainsString('Публикувай сега навсякъде</button>', $this->edit);
+        $this->assertStringContainsString('изпраща в Instagram винаги пост', $this->edit, 'the page says what Instagram gets');
+    }
+
+    public function testPublishNowEverywhereAsksFirstThenSendsNowThroughTheSameFlow(): void
+    {
+        $start = strpos($this->js, "allNowBtn.addEventListener('click'");
+        $this->assertNotFalse($start);
+        $block = substr($this->js, $start, 900);
+        $confirm = strpos($block, 'window._adminConfirm(');
+        $run     = strpos($block, "runAll(nets, 'now', allNowBtn)");
+        $this->assertNotFalse($confirm, 'asks with the site\'s own dialog, not window.confirm');
+        $this->assertNotFalse($run);
+        $this->assertGreaterThan($confirm, $run, 'nothing is sent before the answer');
+        $this->assertStringContainsString('if (ok) runAll(', $block, 'a „no“ sends nothing');
+        $this->assertStringNotContainsString('window.confirm(', $this->js);
+    }
+
+    public function testPublishNowEverywhereSendsInstagramAFeedPostAndIsLockedWhileSending(): void
+    {
+        $this->assertMatchesRegularExpression(
+            "/var cfg = at === 'now'\s*\? \{ extra: \{ post_type: 'post' \}/", $this->js,
+            'publish-now sends Instagram a post even when the Story tab is open');
+        $this->assertStringContainsString('if (allNowBtn) allNowBtn.disabled = true;', $this->js);
+        $this->assertStringContainsString('if (allNowBtn) allNowBtn.disabled = false;', $this->js);
+        $this->assertStringContainsString("at !== 'now' && document.getElementById(cfgs[n].timeField)", $this->js,
+            'publishing now leaves each network\'s own planned time alone');
     }
 }

@@ -745,7 +745,8 @@
   }
 
   // ── Scheduling ──────────────────────────────────────────────────────────────
-  var allBtn = document.getElementById('socAllBtn');
+  var allBtn    = document.getElementById('socAllBtn');
+  var allNowBtn = document.getElementById('socAllNowBtn');
   function allButtons() {
     return PLATFORMS.reduce(function (all, p) { return all.concat(scheduleButtons(p)); }, []);
   }
@@ -753,6 +754,7 @@
     if (sending) return false;
     sending = true;
     if (allBtn) allBtn.disabled = true;
+    if (allNowBtn) allNowBtn.disabled = true;
     allButtons().forEach(function (b) { if (b) b.disabled = true; });
     lockForm(true);
     spinner.style.display = '';
@@ -762,6 +764,7 @@
   function endSend(spinner) {
     sending = false;
     if (allBtn) allBtn.disabled = false;
+    if (allNowBtn) allNowBtn.disabled = false;
     lockForm(false);
     PLATFORMS.forEach(function (p) { setBlocked(p, blocked[p]); });
     spinner.style.display = 'none';
@@ -865,12 +868,13 @@
   });
   liNowBtn.addEventListener('click', function () { liSend('now', liNowBtn); });
 
-  // ── „Планирай навсякъде“: one time, every ticked network ─────────────────────
+  // ── „Планирай навсякъде“ / „Публикувай сега навсякъде“: every ticked network ─
   // 1. Every ticked post is checked first (a dry run, nothing saved). If any is refused,
-  //    nothing is saved or scheduled, and the list says which and why.
+  //    nothing is saved or sent, and the list says which and why.
   // 2. The article is saved and published once.
-  // 3. The posts are scheduled one after another — each rewrites the same article file —
+  // 3. The posts are sent one after another — each rewrites the same article file —
   //    and the list says what happened on each network (✓/✗ and the reason).
+  // „Сега“ asks first (a post can't be taken back) and always sends Instagram a feed post.
   var NET_NAMES = { fb: 'Facebook', insta: 'Instagram', linkedin: 'LinkedIn' };
   var allSpin = document.getElementById('socAllSpinner');
   var allErr  = document.getElementById('socAllError');
@@ -878,9 +882,11 @@
 
   function allConfig(net, at) {
     if (net === 'insta') {
-      var cfg = _igConfig();
+      var cfg = at === 'now'
+        ? { extra: { post_type: 'post' }, badgeId: 'instaStatusBadge', label: 'IG' }
+        : _igConfig();
       return { body: Object.assign({ scheduled_at: at }, cfg.extra), extra: cfg.extra, badgeId: cfg.badgeId, label: cfg.label,
-               timeField: igMode === 'story' ? 'instaStoryScheduleAt' : 'instaScheduleAt' };
+               timeField: cfg.extra.post_type === 'story' ? 'instaStoryScheduleAt' : 'instaScheduleAt' };
     }
     if (net === 'fb') return { body: { scheduled_at: at }, badgeId: 'fbStatusBadge', label: 'FB', timeField: 'fbScheduleAt' };
     return { body: { scheduled_at: at }, timeField: 'liScheduleAt' };
@@ -894,24 +900,29 @@
   function allDoneText(data) {
     return data.due_at ? 'планирано за ' + fmtSofia(data.due_at) : 'публикувано сега';
   }
-
-  allBtn.addEventListener('click', function () {
+  function allNets() {
+    return Array.prototype.slice.call(panel.querySelectorAll('.soc-all-net:checked'))
+      .map(function (c) { return c.value; });
+  }
+  function allStart() {
     allList.innerHTML = '';
     allErr.style.display = 'none';
-    var nets = Array.prototype.slice.call(panel.querySelectorAll('.soc-all-net:checked'))
-      .map(function (c) { return c.value; });
+    var nets = allNets();
     if (!nets.length) {
       allErr.textContent = 'Изберете поне една мрежа.';
       allErr.style.display = '';
-      return;
     }
-    var at = needTime('socAllAt', allErr);
-    if (!at || !startSend(allBtn, allSpin, allErr)) return;
+    return nets;
+  }
+
+  // at: a datetime-local value, or 'now'. Starts with the buttons already checked.
+  function runAll(nets, at, btn) {
+    if (!startSend(btn, allSpin, allErr)) return;
     allSpin.textContent = 'Изпраща се…';
     var cfgs = {};
     nets.forEach(function (n) {
       cfgs[n] = allConfig(n, at);
-      var tf = document.getElementById(cfgs[n].timeField);
+      var tf = at !== 'now' && document.getElementById(cfgs[n].timeField);
       if (tf) tf.value = at;   // each network's own field shows the same time
     });
     var startedAt = Date.now();
@@ -925,7 +936,8 @@
       var refused = results.filter(Boolean);
       if (refused.length) {
         refused.forEach(function (r) { allLine(r.net, false, r.error); });
-        allErr.textContent = 'Нищо не е планирано и статията не е запазена. Оправете проблема или махнете отметката на тази мрежа.';
+        allErr.textContent = (at === 'now' ? 'Нищо не е публикувано' : 'Нищо не е планирано')
+          + ' и статията не е запазена. Оправете проблема или махнете отметката на тази мрежа.';
         allErr.style.display = '';
         return;
       }
@@ -954,6 +966,23 @@
       });
     }).catch(function (e) { sendFailed(allErr, e); })
       .then(function () { endSend(allSpin); });
+  }
+
+  allBtn.addEventListener('click', function () {
+    var nets = allStart();
+    if (!nets.length) return;
+    var at = needTime('socAllAt', allErr);
+    if (at) runAll(nets, at, allBtn);
+  });
+
+  allNowBtn.addEventListener('click', async function () {
+    var nets = allStart();
+    if (!nets.length || sending) return;
+    var names = nets.map(function (n) { return NET_NAMES[n]; }).join(', ');
+    var msg = 'Публикацията ще излезе веднага в: ' + names + '. След това не може да бъде отменена оттук.'
+      + (nets.indexOf('insta') !== -1 ? ' В Instagram се изпраща пост (не история).' : '');
+    var ok = window._adminConfirm ? await window._adminConfirm(msg, 'Публикувай сега') : false;
+    if (ok) runAll(nets, 'now', allNowBtn);
   });
 
   // ── Start ───────────────────────────────────────────────────────────────────

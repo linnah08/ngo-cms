@@ -503,7 +503,7 @@ endif;
 
   <!-- ── Schedule on every ticked network at once (social-panel.js) ─────────── -->
   <fieldset id="socAllPanel" style="border:1px solid var(--border);border-radius:8px;padding:.75rem .85rem;margin:0 0 1rem;background:#fafafa;min-width:0;">
-    <legend style="font-size:.85rem;font-weight:700;padding:0 .3rem;">Планирай навсякъде</legend>
+    <legend style="font-size:.85rem;font-weight:700;padding:0 .3rem;">Във всички мрежи наведнъж</legend>
     <div style="display:flex;gap:.25rem 1rem;flex-wrap:wrap;margin-bottom:.5rem;">
       <?php foreach (['fb' => 'Facebook', 'insta' => 'Instagram', 'linkedin' => 'LinkedIn'] as $_net => $_name): ?>
       <label for="socAll_<?= $_net ?>" style="display:inline-flex;align-items:center;gap:.4rem;min-height:44px;font-size:.88rem;cursor:pointer;">
@@ -515,9 +515,10 @@ endif;
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
       <input type="datetime-local" id="socAllAt" value="<?= h($default_social_at) ?>" style="min-height:44px;font-size:.9rem;">
       <button type="button" id="socAllBtn" class="btn btn--primary" style="min-height:44px;font-size:.85rem;">Планирай навсякъде</button>
+      <button type="button" id="socAllNowBtn" class="btn btn--outline" style="min-height:44px;font-size:.85rem;">Публикувай сега навсякъде</button>
       <span id="socAllSpinner" style="display:none;font-size:.85rem;color:var(--text-muted);">Изпраща се…</span>
     </div>
-    <p style="margin:.4rem 0 0;font-size:.78rem;color:var(--text-muted);">Instagram се планира като пост или история — според избраното в раздела Instagram.</p>
+    <p style="margin:.4rem 0 0;font-size:.78rem;color:var(--text-muted);">При планиране Instagram получава пост или история — според избраното в раздела Instagram. „Публикувай сега навсякъде“ изпраща в Instagram винаги пост.</p>
     <p id="socAllError" role="alert" style="display:none;margin:.5rem 0 0;font-size:.85rem;font-weight:600;color:#b91c1c;"></p>
     <ul id="socAllSummary" role="status" aria-live="polite" style="list-style:none;margin:.5rem 0 0;padding:0;font-size:.85rem;"></ul>
   </fieldset>
