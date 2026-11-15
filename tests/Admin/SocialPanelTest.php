@@ -407,7 +407,6 @@ final class SocialPanelTest extends TestCase
         $this->assertStringContainsString("(ok ? '✓ ' : '✗ ')", $this->js, 'an icon, not colour alone');
         $this->assertStringContainsString("'Изберете поне една мрежа.'", $this->js);
         $this->assertStringContainsString('if (allBtn) allBtn.disabled = true;', $this->js, 'locked while any post is sending');
-        $this->assertStringContainsString('_igConfig()', $this->js, 'Instagram follows the Post/Story choice');
     }
 
     // ── „Публикувай сега навсякъде“ ────────────────────────────────────────────
@@ -420,7 +419,7 @@ final class SocialPanelTest extends TestCase
         $this->assertGreaterThan($sched, $now);
         $this->assertLessThan(strpos($this->edit, '</fieldset>', $sched), $now, 'inside the same all-networks box');
         $this->assertStringContainsString('Публикувай сега навсякъде</button>', $this->edit);
-        $this->assertStringContainsString('изпраща в Instagram винаги пост', $this->edit, 'the page says what Instagram gets');
+        $this->assertStringContainsString('В Instagram оттук винаги отива пост.', $this->edit, 'the page says what Instagram gets');
     }
 
     public function testPublishNowEverywhereAsksFirstThenSendsNowThroughTheSameFlow(): void
@@ -437,11 +436,14 @@ final class SocialPanelTest extends TestCase
         $this->assertStringNotContainsString('window.confirm(', $this->js);
     }
 
-    public function testPublishNowEverywhereSendsInstagramAFeedPostAndIsLockedWhileSending(): void
+    public function testEverywhereSendsInstagramAFeedPostAndPublishNowIsLockedWhileSending(): void
     {
         $this->assertMatchesRegularExpression(
-            "/var cfg = at === 'now'\s*\? \{ extra: \{ post_type: 'post' \}/", $this->js,
-            'publish-now sends Instagram a post even when the Story tab is open');
+            "/function allConfig\(net, at\) \{\s*if \(net === 'insta'\) \{\s*var extra = \{ post_type: 'post' \};/", $this->js,
+            'planning and publishing everywhere send Instagram a post even when the Story tab is open');
+        $allCfg = substr($this->js, strpos($this->js, 'function allConfig('), 600);
+        $this->assertStringNotContainsString('_igConfig()', $allCfg, 'the Post/Story tab no longer decides');
+        $this->assertStringNotContainsString('instaStoryScheduleAt', $allCfg, 'the Story time field is left alone');
         $this->assertStringContainsString('if (allNowBtn) allNowBtn.disabled = true;', $this->js);
         $this->assertStringContainsString('if (allNowBtn) allNowBtn.disabled = false;', $this->js);
         $this->assertStringContainsString("at !== 'now' && document.getElementById(cfgs[n].timeField)", $this->js,

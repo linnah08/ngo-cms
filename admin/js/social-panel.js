@@ -874,19 +874,19 @@
   // 2. The article is saved and published once.
   // 3. The posts are sent one after another — each rewrites the same article file —
   //    and the list says what happened on each network (✓/✗ and the reason).
-  // „Сега“ asks first (a post can't be taken back) and always sends Instagram a feed post.
+  // „Сега“ asks first (a post can't be taken back).
   var NET_NAMES = { fb: 'Facebook', insta: 'Instagram', linkedin: 'LinkedIn' };
   var allSpin = document.getElementById('socAllSpinner');
   var allErr  = document.getElementById('socAllError');
   var allList = document.getElementById('socAllSummary');
 
+  // Instagram always gets a feed post from here, whichever Post/Story tab is open;
+  // a Story is sent from the Instagram tab's own buttons.
   function allConfig(net, at) {
     if (net === 'insta') {
-      var cfg = at === 'now'
-        ? { extra: { post_type: 'post' }, badgeId: 'instaStatusBadge', label: 'IG' }
-        : _igConfig();
-      return { body: Object.assign({ scheduled_at: at }, cfg.extra), extra: cfg.extra, badgeId: cfg.badgeId, label: cfg.label,
-               timeField: cfg.extra.post_type === 'story' ? 'instaStoryScheduleAt' : 'instaScheduleAt' };
+      var extra = { post_type: 'post' };
+      return { body: Object.assign({ scheduled_at: at }, extra), extra: extra, badgeId: 'instaStatusBadge', label: 'IG',
+               timeField: 'instaScheduleAt' };
     }
     if (net === 'fb') return { body: { scheduled_at: at }, badgeId: 'fbStatusBadge', label: 'FB', timeField: 'fbScheduleAt' };
     return { body: { scheduled_at: at }, timeField: 'liScheduleAt' };

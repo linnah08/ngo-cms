@@ -518,7 +518,7 @@ endif;
       <button type="button" id="socAllNowBtn" class="btn btn--outline" style="min-height:44px;font-size:.85rem;">Публикувай сега навсякъде</button>
       <span id="socAllSpinner" style="display:none;font-size:.85rem;color:var(--text-muted);">Изпраща се…</span>
     </div>
-    <p style="margin:.4rem 0 0;font-size:.78rem;color:var(--text-muted);">При планиране Instagram получава пост или история — според избраното в раздела Instagram. „Публикувай сега навсякъде“ изпраща в Instagram винаги пост.</p>
+    <p style="margin:.4rem 0 0;font-size:.78rem;color:var(--text-muted);">В Instagram оттук винаги отива пост. История се изпраща от бутоните в раздела Instagram.</p>
     <p id="socAllError" role="alert" style="display:none;margin:.5rem 0 0;font-size:.85rem;font-weight:600;color:#b91c1c;"></p>
     <ul id="socAllSummary" role="status" aria-live="polite" style="list-style:none;margin:.5rem 0 0;padding:0;font-size:.85rem;"></ul>
   </fieldset>
