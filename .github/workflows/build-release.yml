@@ -86,6 +86,13 @@ jobs:
             --title "${GITHUB_REF_NAME}" \
             --notes "Пакет за първоначална инсталация: разархивирайте го в папката на домейна си и отворете сайта, за да стартирате инсталатора. Сайт, който вече работи, се обновява сам от Администрация → Обновления." \
           || gh release upload "${GITHUB_REF_NAME}" "${ZIP}" --clobber
+          # The same zip under a name that never changes, so one link always
+          # downloads the newest release:
+          #   https://github.com/<owner>/<repo>/releases/latest/download/ngo-platform.zip
+          # Uploaded after the versioned zip, which the updater (first .zip
+          # asset) keeps using; the bytes are identical either way.
+          cp "${ZIP}" ngo-platform.zip
+          gh release upload "${GITHUB_REF_NAME}" ngo-platform.zip --clobber
 
       - name: Upload as build artifact (manual runs)
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
