@@ -37,6 +37,24 @@ final class InstallWizardTest extends TestCase
         $this->assertFalse(wizard_step_reachable('nope', []));
     }
 
+    public function test_a_first_visit_opens_on_the_welcome_screen(): void
+    {
+        $this->assertTrue(wizard_show_welcome('', []), 'the very first visit');
+        $this->assertFalse(wizard_show_welcome('', ['db' => []]), 'someone halfway through goes back to their step');
+        $this->assertTrue(wizard_show_welcome('welcome', ['db' => [], 'account' => []]), 'it can always be opened on purpose');
+        $this->assertFalse(wizard_show_welcome('db', []), 'asking for a step opens that step');
+        $this->assertFalse(wizard_show_welcome('nope', []), 'an unknown step falls through to the first open one, as before');
+        $this->assertArrayNotHasKey('welcome', wizard_steps(), 'it is a cover page, not a numbered step');
+    }
+
+    public function test_the_welcome_screen_starts_the_wizard_and_step_1_leads_back_to_it(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__) . '/install/index.php');
+        $this->assertStringContainsString('Добре дошли', $src);
+        $this->assertMatchesRegularExpression('/<a class="btn-link[^"]*" href="\?step=db">Започнете<\/a>/', $src, 'a real link, reachable by keyboard');
+        $this->assertStringContainsString('href="?step=welcome"', $src, 'Назад on the database step goes back to the welcome screen');
+    }
+
     public function test_on_cpanel_the_database_step_needs_nothing_typed(): void
     {
         $r = wizard_validate_db([], true, fn() => $this->fail('nothing to connect to yet'));

@@ -131,6 +131,7 @@ $token  = $_SESSION['install']['token'] ?? '';
 $cpanel = !$already && cpanel_available();
 
 $step = (string) ($_GET['step'] ?? '');
+$welcome = !$already && $_SERVER['REQUEST_METHOD'] !== 'POST' && wizard_show_welcome($step, $done);
 if (!isset($steps[$step])) $step = wizard_first_open_step($done);
 $return_review = ($_GET['return'] ?? $_POST['return'] ?? '') === 'review' && isset($done['modules']);
 
@@ -252,7 +253,7 @@ $prev    = $step_no > 1 ? $keys[$step_no - 2] : null;
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title><?= ($already || $success) ? 'Инсталиране на сайта' : e('Стъпка ' . $step_no . ' от ' . count($steps) . ': ' . $steps[$step] . ' — Инсталиране на сайта') ?></title>
+<title><?= ($already || $success) ? 'Инсталиране на сайта' : ($welcome ? 'Добре дошли — Инсталиране на сайта' : e('Стъпка ' . $step_no . ' от ' . count($steps) . ': ' . $steps[$step] . ' — Инсталиране на сайта')) ?></title>
 <style>
   :root { --teal:#03758f; --border:#d9d6d0; --bg:#f8f6f2; --text:#1a1916; --muted:#5c5752; --bad:#b3261e; }
   * { box-sizing: border-box; }
@@ -322,6 +323,9 @@ $prev    = $step_no > 1 ? $keys[$step_no - 2] : null;
   .next-list { padding-left: 1.2rem; }
   .next-list li { margin-bottom: .5rem; }
   .next-list a, .alert a { color: var(--teal); font-weight: 600; }
+  .welcome { padding: 1.5rem 0 .5rem; }
+  .welcome h1 { font-size: 2rem; margin-bottom: .75rem; }
+  .welcome p.intro { font-size: 1.15rem; margin-bottom: 1.75rem; }
   .btn-link { display: inline-flex; align-items: center; min-height: 48px; padding: .75rem 1.5rem; border-radius: 8px; background: var(--teal); color: #fff; font-weight: 600; text-decoration: none; }
 </style>
 </head>
@@ -351,6 +355,13 @@ $prev    = $step_no > 1 ? $keys[$step_no - 2] : null;
        Когато са готови, натиснете „Пусни сайта“.</p>
     <p>Допълнителните части на сайта включвате и изключвате по всяко време от <a href="/admin/modules.php">„Модули“</a>. Нищо не се губи, когато изключите модул.</p>
 
+<?php elseif ($welcome): ?>
+    <div class="welcome">
+      <h1 tabindex="-1" id="focus-target">Добре дошли!</h1>
+      <p class="intro">За около 5 минути ще имате сайт за вашата организация.</p>
+      <p><a class="btn-link" href="?step=db">Започнете</a></p>
+    </div>
+
 <?php else: ?>
     <nav class="progress" aria-label="Напредък">
       <ol>
@@ -363,6 +374,8 @@ $prev    = $step_no > 1 ? $keys[$step_no - 2] : null;
     <a class="back" href="?step=review" data-review="1">← Обратно към проверката</a>
 <?php elseif ($prev): ?>
     <a class="back" href="?step=<?= e($prev) ?>">← Назад</a>
+<?php elseif ($step === 'db'): ?>
+    <a class="back" href="?step=welcome">← Назад</a>
 <?php endif; ?>
 
 <?php if ($errors || $install_error): ?>

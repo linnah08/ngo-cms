@@ -24,6 +24,16 @@ function wizard_steps(): array
     ];
 }
 
+/**
+ * Show the welcome screen? It is a cover page before step 1, not a numbered step:
+ * shown on the very first visit, or when asked for by name (step 1's „Назад“).
+ * Someone halfway through goes straight back to their step.
+ */
+function wizard_show_welcome(string $requested, array $done): bool
+{
+    return $requested === 'welcome' || ($requested === '' && $done === []);
+}
+
 /** The first step not yet completed ($done = step key => data); 'review' once all are. */
 function wizard_first_open_step(array $done): string
 {
