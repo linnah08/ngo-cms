@@ -63,9 +63,11 @@ function article_public_url(string $slug, string $lang): string {
 /**
  * Length of a text the way the social platforms count it: UTF-16 code units, so a
  * bold letter from html_to_social_text() (outside the basic plane) counts as two.
+ * A line break counts as two as well: Instagram counts it as "\r\n" (it refused a
+ * 2192-unit caption with 37 line breaks as over 2200).
  */
 function social_text_length(string $text): int {
-    return intdiv(strlen(mb_convert_encoding($text, 'UTF-16LE', 'UTF-8')), 2);
+    return intdiv(strlen(mb_convert_encoding($text, 'UTF-16LE', 'UTF-8')), 2) + substr_count($text, "\n");
 }
 
 /** Character limit of a post. $platform is 'fb', 'insta' or 'linkedin'. */
@@ -104,12 +106,12 @@ function social_post_text(string $title, string $html, string $url, string $plat
     $tail   = " …\n\n" . $link;
     $budget = max(0, $limit - social_text_length($tail));
 
-    // The longest start of $main that fits the budget, counted in UTF-16 units.
+    // The longest start of $main that fits the budget, counted as social_text_length() does.
     $chars = mb_str_split($main);
     $used = 0;
     $n = 0;
     foreach ($chars as $c) {
-        $w = mb_ord($c) > 0xFFFF ? 2 : 1;
+        $w = ($c === "\n" || mb_ord($c) > 0xFFFF) ? 2 : 1;
         if ($used + $w > $budget) break;
         $used += $w;
         $n++;
@@ -133,6 +135,12 @@ function social_post_text(string $title, string $html, string $url, string $plat
             $cut_at = $off + strlen($hit);
             break;
         }
+    }
+    // A list item rarely ends in a full stop, so the end of a whole bullet line counts
+    // as a sentence end too — else a long list sends the cut back to before the list.
+    if (preg_match_all('/^• [^\n]*\S(?=\n)/mu', $prefix, $m, PREG_OFFSET_CAPTURE)) {
+        [$hit, $off] = end($m[0]);
+        $cut_at = max($cut_at ?? 0, $off + strlen($hit));
     }
     if ($cut_at !== null) {
         $cut = substr($prefix, 0, $cut_at);

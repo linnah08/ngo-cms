@@ -69,6 +69,37 @@ final class SocialPostTextTest extends TestCase
         $this->assertSame(2, social_text_length('𝗔'));
     }
 
+    public function testLineBreakCountedAsTwo(): void
+    {
+        // Instagram counts a line break as two characters (it refused a 2192-char
+        // caption with 37 line breaks as "over 2200").
+        $this->assertSame(4, social_text_length("а\nб"));
+    }
+
+    public function testManyParagraphsStayUnderInstagramLimit(): void
+    {
+        // Short paragraphs: lots of line breaks, as in the refused 21 Nov 2026 post.
+        $body = str_repeat('<p>' . str_repeat('дума ', 10) . 'край.</p>', 60);
+        $r = social_post_text('Заглавие', $body, self::URL, 'insta');
+        $this->assertTrue($r['cut']);
+        $as_instagram_counts = mb_strlen($r['text']) + substr_count($r['text'], "\n");
+        $this->assertLessThanOrEqual(2200, $as_instagram_counts);
+        $this->assertSame($as_instagram_counts, $r['length']);
+    }
+
+    public function testLongListIsCutAfterTheLastWholeBullet(): void
+    {
+        // Bullets have no full stops: the cut falls after the last whole item,
+        // not back before the list.
+        $items = '';
+        for ($i = 1; $i <= 80; $i++) $items .= '<li>точка номер ' . $i . ' от списъка с неща</li>';
+        $r = social_post_text('Заглавие', '<p>Увод.</p><ul>' . $items . '</ul>', self::URL, 'insta');
+        $this->assertTrue($r['cut']);
+        $this->assertLessThanOrEqual(2200, $r['length']);
+        $this->assertGreaterThan(2000, $r['length']);
+        $this->assertMatchesRegularExpression("/• точка номер \\d+ от списъка с неща …\n\nПрочетете повече: /u", $r['text']);
+    }
+
     public function testFacebookNeverCuts(): void
     {
         $r = social_post_text('Заглавие', '<p>' . str_repeat('а', 20000) . '</p>', self::URL, 'fb');
@@ -106,7 +137,7 @@ final class SocialPostTextTest extends TestCase
         $tail   = " …\n\nПрочетете повече: " . self::URL;
         $budget = 2200 - social_text_length($tail);
         $head   = "Заглавие\n\nПърво изречение. ";
-        $filler = 'Д' . str_repeat('д', $budget - mb_strlen($head) - mb_strlen(' ' . $end) - 1);
+        $filler = 'Д' . str_repeat('д', $budget - social_text_length($head) - mb_strlen(' ' . $end) - 1);
         $r = social_post_text('Заглавие', '<p>Първо изречение. ' . $filler . ' ' . $end . $after . str_repeat(' още', 100) . '</p>', self::URL, 'insta');
         $this->assertTrue($r['cut']);
         return $r;
