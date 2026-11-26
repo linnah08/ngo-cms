@@ -27,7 +27,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') upload_json(['ok' => false, 'error' =
 if (empty($_POST) && empty($_FILES) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
     upload_fail('too large', 'size');
 }
-csrf_verify(); // exits with 403 on failure — wrap in try for tests
+if (!csrf_verify()) {
+    http_response_code(403);
+    upload_json(['ok' => false, 'error' => 'csrf', 'reason' => 'server',
+        'message' => 'Страницата е отворена твърде дълго. Презаредете я и опитайте отново.']);
+}
 
 $upload_err = $_FILES['image']['error'] ?? UPLOAD_ERR_NO_FILE;
 if (in_array($upload_err, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
@@ -55,6 +59,7 @@ $dir_map = [
 $dir = $dir_map[$section] ?? 'assets/images/pages';
 $dest_dir = $_SERVER['DOCUMENT_ROOT'] . '/' . $dir;
 
+// nosemgrep: tainted-filename — section mapped through the $dir_map whitelist
 if (!is_dir($dest_dir)) {
     mkdir($dest_dir, 0755, true);
 }

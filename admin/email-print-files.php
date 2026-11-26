@@ -16,7 +16,6 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
 
 admin_require_shop();
-csrf_verify();
 
 header('Content-Type: application/json; charset=UTF-8');
 
@@ -25,9 +24,17 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$raw  = file_get_contents('php://input');
+$raw  = $GLOBALS['_om_raw_input'] ?? file_get_contents('php://input');
 $body = json_decode($raw, true);
 if (!is_array($body)) $body = $_POST;
+
+// The token comes in the JSON body (order-view.php), so csrf_verify(), which
+// reads $_POST, can't see it — check the decoded body instead.
+if (!csrf_matches($body['csrf_token'] ?? '')) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Страницата е отворена твърде дълго. Презаредете я и опитайте отново.']);
+    exit;
+}
 
 $order_id    = (int)($body['order_id'] ?? 0);
 $item_indices = array_map('intval', (array)($body['items'] ?? []));
@@ -85,6 +92,7 @@ $pids = array_unique(array_filter(array_map(fn($i) => (int)($all_items[$i]['prod
 $product_map = [];
 if ($pids) {
     $in = implode(',', array_fill(0, count($pids), '?'));
+    // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
     $ps = $pdo->prepare("SELECT id, name_bg, image, variants FROM products WHERE id IN ($in)");
     $ps->execute(array_values($pids));
     foreach ($ps->fetchAll() as $pr) {
@@ -104,6 +112,7 @@ foreach ($item_indices as $item_index) {
     $shirt_path  = $_SERVER['DOCUMENT_ROOT'] . '/assets/images/products/' . $product['image'];
     $design_path = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($item['design_file'], '/');
 
+    // nosemgrep: tainted-filename — design_file from the order's stored JSON (server-generated); product image from DB
     if (!file_exists($shirt_path) || !file_exists($design_path)) continue;
 
     $label = ($item_index + 1); // "Позиция N"

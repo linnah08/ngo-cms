@@ -59,20 +59,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($section === 'photos') {
         $photos  = json_decode(setting_get('campaign_photos', '[]'), true) ?: [];
         $img_dir = $_SERVER['DOCUMENT_ROOT'] . '/assets/images/campaign/';
+        // nosemgrep: tainted-filename — fixed campaign folder; unlink only for listed photos under /assets/images/campaign/ without ..
         if (!is_dir($img_dir)) mkdir($img_dir, 0755, true);
 
         $del = trim($_POST['delete_photo'] ?? '');
         if ($del !== '') {
+            // Delete the file only when it is one of the campaign's photos AND was
+            // uploaded into its own folder. A photo picked from the media library
+            // lives elsewhere and may be used on other pages — just drop it from
+            // the list. Anything else is never touched on disk.
+            $owned = in_array($del, $photos, true)
+                && str_starts_with($del, '/assets/images/campaign/')
+                && !str_contains($del, '..');
             $photos = array_values(array_filter($photos, fn($p) => $p !== $del));
             $full   = $_SERVER['DOCUMENT_ROOT'] . $del;
-            if (is_file($full)) @unlink($full);
+            // nosemgrep: tainted-filename — fixed campaign folder; unlink only for listed photos under /assets/images/campaign/ without ..
+            if ($owned && is_file($full)) @unlink($full);
             setting_set('campaign_photos', json_encode($photos));
             $saved = true;
         }
 
         if (!empty($_POST['image_from_library'])) {
             $lib = $_POST['image_from_library'];
-            if (preg_match('#^/assets/images/[a-zA-Z0-9/_.\-]+$#', $lib)) {
+            if (preg_match('#^/assets/images/[a-zA-Z0-9/_.\-]+$#', $lib) && !str_contains($lib, '..')) {
                 if (!in_array($lib, $photos)) $photos[] = $lib;
                 setting_set('campaign_photos', json_encode($photos));
                 $saved = true;

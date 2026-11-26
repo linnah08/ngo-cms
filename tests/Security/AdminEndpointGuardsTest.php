@@ -106,6 +106,26 @@ final class AdminEndpointGuardsTest extends TestCase
         $this->assertStringNotContainsString('hash_equals(csrf_token()', $src, "$rel must use the shared csrf_matches(), not its own comparison");
     }
 
+    /**
+     * csrf_verify() only returns true/false — it does not stop the request.
+     * Calling it as a bare statement looks like protection and is none
+     * (email-print-files.php and inline-upload.php both did this).
+     */
+    public function testCsrfResultIsNeverIgnored(): void
+    {
+        $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(ROOT_PATH, FilesystemIterator::SKIP_DOTS));
+        $ignored = [];
+        foreach ($it as $f) {
+            $rel = substr($f->getPathname(), strlen(ROOT_PATH) + 1);
+            if ($f->getExtension() !== 'php' || preg_match('#^(vendor|node_modules|tests|\.semgrep|\.superpowers)/#', $rel)) continue;
+            if (preg_match('/^\s*csrf_verify\(\)\s*;/m', (string) file_get_contents($f->getPathname()))) {
+                $ignored[] = $rel;
+            }
+        }
+        sort($ignored);
+        $this->assertSame([], $ignored, 'These call csrf_verify() but ignore its result, so a forged request still goes through');
+    }
+
     #[DataProvider('adminFileProvider')]
     public function testPaidApiCallsComeAfterCsrf(string $rel): void
     {
