@@ -238,8 +238,10 @@ final class DonationRecipientsTest extends TestCase
         if (!test_db_available()) $this->markTestSkipped('No DB configured.');
         $page = function (string $php): string {
             $this->site($php);
-            return run_admin_page('admin/manual-cert.php', [], ['method' => 'GET',
-                'globals' => ['_om_site_extensions_file' => $GLOBALS['_om_site_extensions_file']]])['body'];
+            $res = run_admin_page('admin/manual-cert.php', [], ['method' => 'GET',
+                'globals' => ['_om_site_extensions_file' => $GLOBALS['_om_site_extensions_file']]]);
+            if ($res['status'] === 404) $this->markTestSkipped('admin/manual-cert.php is off on this site (Дарения is switched off).');
+            return $res['body'];
         };
 
         // Only the organisation is left: no picker, a note with the link.

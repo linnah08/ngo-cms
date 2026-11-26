@@ -52,7 +52,6 @@ final class AdminNavTest extends TestCase
     public function test_every_admin_page_lights_up_its_menu_item(): void
     {
         $this->as('admin');
-        $items = admin_nav_items();
         $navs  = ['home'];   // admin/home-sections.php: 'pages' for a created page, 'home' for the front page
         foreach (glob(dirname(__DIR__, 2) . '/admin/*.php') as $file) {
             if (!module_admin_page_visible(basename($file))) continue;   // a switched-off module's pages are gone anyway
@@ -63,7 +62,9 @@ final class AdminNavTest extends TestCase
         $navs = array_diff(array_unique($navs), ['support', 'account', 'signature']);
         $this->assertGreaterThan(20, count($navs));
         foreach ($navs as $nav) {
-            $this->assertNotNull(admin_nav_current($items, $nav), "a page with \$active_nav = '$nav' has no menu item to light up");
+            // Built as that page builds it: some items show only on their own
+            // page (Партньори while the front page hides its partners section).
+            $this->assertNotNull(admin_nav_current(admin_nav_items($nav), $nav), "a page with \$active_nav = '$nav' has no menu item to light up");
         }
     }
 
