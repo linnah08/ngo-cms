@@ -3,13 +3,18 @@ name: Security scan
 # Looks for security holes automatically — on every push to main, every Monday
 # morning, and on demand (Actions → Security scan → Run workflow).
 #
-# 1. audit:   known holes in the libraries we use (composer / npm). Any hole
+# 1. audit:   known holes in the PHP libraries we use (composer). Any hole
 #             turns the run red and GitHub emails the pusher. The fix usually
 #             arrives as a Dependabot pull request (.github/dependabot.yml).
 # 2. semgrep: mistakes in our own PHP — user input reaching HTML, SQL, shell,
 #             files or redirects. Findings go to the repo's Security → Code
 #             scanning tab, which emails admins and tracks each one until it is
 #             fixed or dismissed with a reason. Our own rules: .semgrep/.
+#
+# Runs only in ngo-cms itself. Sites built on it (lafetki, other NGOs) receive
+# this file with each release, but their code is this code, already scanned
+# here — and uploading results needs code scanning, which private repos lack.
+# (npm isn't audited: package.json has only test tools, nothing ships.)
 
 on:
   push:
@@ -23,9 +28,10 @@ permissions:
 
 jobs:
   audit:
+    if: github.repository == 'linnah08/ngo-cms'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -38,18 +44,16 @@ jobs:
       - name: Known holes in PHP libraries
         run: composer audit
 
-      - name: Known holes in JavaScript libraries (shipped ones only)
-        run: npm audit --omit=dev
-
   semgrep:
+    if: github.repository == 'linnah08/ngo-cms'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -74,7 +78,7 @@ jobs:
 
       - name: Send findings to the Security tab
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: semgrep.sarif
           category: semgrep

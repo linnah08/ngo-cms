@@ -9,7 +9,7 @@ function upload_json(array $data): never {
     exit;
 }
 
-// Every failure says why in `reason` (size | type | server) and in plain words in
+// Every failure says why in `reason` (size | type | server | session) and in plain words in
 // `message`, so the editor can tell people what to do instead of guessing.
 function upload_fail(string $error, string $reason): never {
     $messages = [
@@ -29,7 +29,7 @@ if (empty($_POST) && empty($_FILES) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 
 }
 if (!csrf_verify()) {
     http_response_code(403);
-    upload_json(['ok' => false, 'error' => 'csrf', 'reason' => 'server',
+    upload_json(['ok' => false, 'error' => 'csrf', 'reason' => 'session',
         'message' => 'Страницата е отворена твърде дълго. Презаредете я и опитайте отново.']);
 }
 

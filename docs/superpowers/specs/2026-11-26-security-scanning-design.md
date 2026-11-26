@@ -47,8 +47,11 @@ common code mistakes in our own PHP caught automatically, without someone rememb
   and tag a release. This is the one exception to "no PRs": it's GitHub's only mechanism.
 
 **3. `security.yml` workflow** — runs on push to `main`, weekly (Monday morning), and manually:
-- **`composer audit`** (and `npm audit --omit=dev`, which is empty today) — fails the run if any
-  advisory is open, so a red ✗ shows on `main` and GitHub emails the pusher.
+- **`composer audit`** — fails the run if any advisory is open, so a red ✗ shows on `main` and
+  GitHub emails the pusher. (No `npm audit`: `package-lock.json` isn't committed and npm holds only
+  test tools; Dependabot still watches `package.json`.)
+- Both jobs run only in `linnah08/ngo-cms` — forks get the file with each release but scan nothing
+  of their own, and private repos can't take the SARIF upload.
 - **Semgrep** (open-source CLI, PHP rulesets for injection/XSS/SSRF/unsafe functions) with
   output uploaded as SARIF to GitHub's **Security → Code scanning** tab (free for public repos),
   which emails repo admins on new alerts and tracks each one until fixed or dismissed.
@@ -78,4 +81,4 @@ in PHPUnit; Semgrep complements it, doesn't replace it.
 
 - Exact Semgrep rulesets/versions (pin the Semgrep version), weekly cron time.
 - Which custom rules are worth writing after seeing the first-run results.
-- Whether to also add the same workflow to lafetki (probably not needed — same code).
+- lafetki: the release adds a file under `.github/workflows/`, so its sync-release asks for a hand merge once.

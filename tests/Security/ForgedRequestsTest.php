@@ -44,6 +44,14 @@ final class ForgedRequestsTest extends TestCase
         $r = run_admin_page('admin/inline-upload.php', ['section' => 'home'], ['role' => 'admin', 'csrf' => false]);
         $this->assertSame(403, $r['status'], $r['body']);
         $this->assertStringContainsString('Презаредете', $this->text($r));
+        // "Try again" would fail forever — the editor must be told to reload.
+        $this->assertSame('session', json_decode($r['body'], true)['reason'] ?? null);
+    }
+
+    public function test_article_photo_upload_tells_people_to_reload_on_an_expired_page(): void
+    {
+        $src = (string) file_get_contents(ROOT_PATH . '/admin/article-edit.php');
+        $this->assertMatchesRegularExpression('/if \(why\.session\)[^\n]*презаредете/iu', $src);
     }
 
     public function test_inline_upload_accepts_its_own_page_token(): void

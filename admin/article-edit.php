@@ -853,7 +853,7 @@ document.getElementById('tagsInput').addEventListener('input', function () {
     return true;
   }
 
-  // Rejects with the reason (size | type | server) so the summary can say what went wrong.
+  // Rejects with the reason (size | type | server | session) so the summary can say what went wrong.
   // label: „Снимка 2 от 5“ when several go up, shown on the progress bar.
   function upload(file, label) {
     if (MAX_BYTES && file.size > MAX_BYTES) return Promise.reject('size');
@@ -875,6 +875,7 @@ document.getElementById('tagsInput').addEventListener('input', function () {
     if (why.server) parts.push(why.server === 1
       ? '1 снимка не можа да се качи. Опитайте отново.'
       : why.server + ' снимки не можаха да се качат. Опитайте отново.');
+    if (why.session) parts.push('Страницата е отворена твърде дълго — снимките не се качиха. Запазете текста си, презаредете страницата и ги добавете отново.');
     return parts.join(' ');
   }
 
@@ -893,7 +894,7 @@ document.getElementById('tagsInput').addEventListener('input', function () {
     files = files.slice(0, Math.max(0, room));
     if (!files.length) return;
     showError('');
-    var failed = 0, done = 0, why = { size: 0, type: 0, server: 0 };
+    var failed = 0, done = 0, why = { size: 0, type: 0, server: 0, session: 0 };
     uploading += files.length;
     say('Качване на ' + files.length + (files.length === 1 ? ' снимка…' : ' снимки…'));
     files.reduce(function (p, f) {

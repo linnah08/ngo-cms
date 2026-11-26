@@ -34,6 +34,37 @@ final class SecurityScanningWorkflowTest extends TestCase
         $this->assertStringNotContainsString('continue-on-error', $yml, 'A known vulnerability must turn the run red');
     }
 
+    /** package-lock.json is gitignored, and npm audit without one fails every run — a red that means nothing. */
+    public function test_npm_audit_only_runs_with_a_committed_lockfile(): void
+    {
+        $yml     = $this->read('.github/workflows/security.yml');
+        $tracked = trim((string) shell_exec('git -C ' . escapeshellarg(dirname(__DIR__, 2)) . ' ls-files package-lock.json'));
+        if ($tracked === '') {
+            $this->assertStringNotContainsString('npm audit', $yml);
+        } else {
+            $this->addToAssertionCount(1);
+        }
+    }
+
+    /**
+     * Forks (lafetki, other NGOs) get this file with each release, but scan
+     * results upload only on repos with code scanning — and the code is
+     * scanned here, upstream, anyway.
+     */
+    public function test_scans_run_only_in_the_upstream_repo(): void
+    {
+        $yml = $this->read('.github/workflows/security.yml');
+        $this->assertSame(2, substr_count($yml, "if: github.repository == 'linnah08/ngo-cms'"), 'Both jobs (audit, semgrep) must be guarded');
+    }
+
+    public function test_uses_supported_action_versions(): void
+    {
+        $yml = $this->read('.github/workflows/security.yml');
+        foreach (['actions/checkout@v4', 'actions/setup-python@v5', 'codeql-action/upload-sarif@v3'] as $old) {
+            $this->assertStringNotContainsString($old, $yml, "$old is deprecated");
+        }
+    }
+
     public function test_semgrep_is_pinned(): void
     {
         $this->assertMatchesRegularExpression('/semgrep==\d+\.\d+\.\d+/', $this->read('.github/workflows/security.yml'));
