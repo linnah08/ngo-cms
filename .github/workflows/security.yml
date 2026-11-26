@@ -76,6 +76,15 @@ jobs:
           --exclude-rule php.lang.security.injection.tainted-callable.tainted-callable
           --sarif --output semgrep.sarif
 
+      # Findings marked "// nosemgrep: <rule> — <why>" were checked and are
+      # safe, but Semgrep still lists them (as suppressed) and GitHub would
+      # open an alert for each. Keep only the unreviewed ones.
+      - name: Leave out reviewed false alarms
+        if: always()
+        run: |
+          jq '.runs[].results |= map(select((.suppressions // []) | length == 0))' semgrep.sarif > semgrep.filtered.sarif
+          mv semgrep.filtered.sarif semgrep.sarif
+
       - name: Send findings to the Security tab
         if: always()
         uses: github/codeql-action/upload-sarif@v4

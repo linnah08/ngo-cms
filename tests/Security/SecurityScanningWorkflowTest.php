@@ -79,6 +79,19 @@ final class SecurityScanningWorkflowTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/semgrep scan[^\n]*--error/', $yml, 'Findings must reach the Security tab, not stop the job first');
     }
 
+    /**
+     * Semgrep's SARIF still lists findings marked "// nosemgrep" (as suppressed),
+     * and GitHub opened an alert for each of them — 126 on the first run. They
+     * must be stripped between the scan and the upload.
+     */
+    public function test_reviewed_false_positives_are_not_uploaded(): void
+    {
+        $yml    = $this->read('.github/workflows/security.yml');
+        $filter = strpos($yml, 'select((.suppressions // []) | length == 0)');
+        $this->assertNotFalse($filter, 'Suppressed results must be filtered out of semgrep.sarif');
+        $this->assertLessThan(strpos($yml, 'upload-sarif'), $filter, 'Filter before the upload');
+    }
+
     public function test_third_party_code_is_not_scanned(): void
     {
         $lines = array_map('trim', explode("\n", $this->read('.semgrepignore')));
