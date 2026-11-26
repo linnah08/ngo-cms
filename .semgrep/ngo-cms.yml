@@ -27,6 +27,11 @@ rules:
           - pattern: intval(...)
           - pattern: urlencode(...)
           - pattern: rawurlencode(...)
+          # JSON replies: json_encode escapes "/" by default, so "</script>"
+          # can't break out — unless that escaping is switched off.
+          - patterns:
+              - pattern: json_encode(...)
+              - pattern-not: json_encode($V, <... JSON_UNESCAPED_SLASHES ...>, ...)
     pattern-sinks:
       - pattern-either:
           - pattern: echo ...;

@@ -56,6 +56,24 @@ final class SecurityScanningWorkflowTest extends TestCase
         }
     }
 
+    /** A "// nosemgrep" line written in a template's HTML part would show up on the page as text. */
+    public function test_scanner_notes_are_php_comments_not_page_text(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $it   = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS));
+        $bad  = [];
+        foreach ($it as $f) {
+            $rel = substr($f->getPathname(), strlen($root) + 1);
+            if ($f->getExtension() !== 'php' || preg_match('#^(vendor|node_modules|tests|\.semgrep|\.superpowers)/#', $rel)) continue;
+            $code = (string) file_get_contents($f->getPathname());
+            if (!str_contains($code, 'nosemgrep')) continue;
+            foreach (token_get_all($code) as $t) {
+                if (is_array($t) && $t[0] === T_INLINE_HTML && str_contains($t[1], 'nosemgrep')) $bad[] = $rel;
+            }
+        }
+        $this->assertSame([], $bad);
+    }
+
     public function test_dependabot_only_opens_security_updates(): void
     {
         $yml = $this->read('.github/dependabot.yml');

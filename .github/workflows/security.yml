@@ -59,10 +59,17 @@ jobs:
       - name: Our own rules still catch what they should
         run: semgrep --test --config .semgrep/ngo-cms.yml .semgrep/ngo-cms.php
 
+      # Two stock rules are switched off because they can't be taught our
+      # conventions and only produced false alarms:
+      # - echoed-request doesn't know our h() escaper; our own
+      #   ngo-cms-unescaped-request-output rule covers the same hole and does.
+      # - tainted-callable flags every $pdo->prepare("... IN ($placeholders)").
       - name: Scan our code
         run: >-
           semgrep scan --metrics=off
           --config p/php --config p/security-audit --config .semgrep/ngo-cms.yml
+          --exclude-rule php.lang.security.injection.echoed-request.echoed-request
+          --exclude-rule php.lang.security.injection.tainted-callable.tainted-callable
           --sarif --output semgrep.sarif
 
       - name: Send findings to the Security tab

@@ -23,6 +23,16 @@ $safe = h($_POST['name']);
 // ok: ngo-cms-unescaped-request-output
 echo '<p>' . $safe . '</p>';
 
+// ok: ngo-cms-unescaped-request-output
+echo json_encode(['q' => $_GET['q']]);
+
+// json_encode only keeps "</script>" out while slashes stay escaped.
+// ruleid: ngo-cms-unescaped-request-output
+echo json_encode(['q' => $_GET['q']], JSON_UNESCAPED_SLASHES);
+
+// ruleid: ngo-cms-unescaped-request-output
+echo json_encode(['q' => $_GET['q']], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
 $pdo = get_pdo();
 
 // ruleid: ngo-cms-request-in-raw-sql
