@@ -795,10 +795,10 @@ $_shop_header_done = $_shop_header_file !== null && site_extension_render($_shop
   <script>if (location.hash === '#donation') location.replace(<?= json_encode($_donation_url) ?>);</script>
   <div class="container">
     <div style="max-width:640px;margin:0 auto;text-align:center;">
-      <span class="section-label" style="color:rgba(255,255,255,.7);">
+      <span class="section-label">
         <?= te('donation.label', 'Дарение', 'Donation', $lang) ?>
       </span>
-      <h2 style="color:#fff;margin-bottom:1rem;"
+      <h2 style="margin-bottom:1rem;"
           data-cms-field="title"
           data-cms-section="donation"
           data-cms-type="text"

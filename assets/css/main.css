@@ -563,6 +563,14 @@ body.nav-open {
   padding-bottom: 2px;
 }
 
+/* On a dark band the label goes light. :where() keeps this at the weight of
+   a plain .section-label, so a theme that draws labels its own way (a filled
+   box, say) still wins without restating the dark-band case. */
+:where(.section--teal) .section-label {
+  color: rgba(255, 255, 255, 0.8);
+  border-bottom-color: currentColor;
+}
+
 .section-header h2 {
   margin-bottom: var(--space-md);
 }
