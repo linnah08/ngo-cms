@@ -1,0 +1,26 @@
+# Dependabot: when a library we use has a published security hole, GitHub opens
+# a pull request with the fixed version. Merge it, then tag a release so the
+# fix reaches the sites.
+#
+# open-pull-requests-limit: 0 turns OFF routine "new version available" PRs
+# (noise). Security update PRs are not affected by this limit — they need
+# "Dependabot security updates" switched on in the repo's Security settings.
+version: 2
+updates:
+  - package-ecosystem: "composer"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0

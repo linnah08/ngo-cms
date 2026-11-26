@@ -1,0 +1,12 @@
+# Files the Semgrep security scan skips: third-party code (its holes are found
+# by composer audit / Dependabot instead) and our tests, which feed attack
+# strings into the code on purpose. .semgrep/ holds our rules and their test
+# fixture, which is deliberately full of unsafe code.
+vendor/
+node_modules/
+tests/
+test-results/
+uploads/
+documents/
+logs/
+.semgrep/

@@ -1,0 +1,60 @@
+# Our own security rules for the Semgrep scan (.github/workflows/security.yml),
+# on top of Semgrep's standard PHP rules. They follow CLAUDE.md's "Security —
+# job 0": escape all output with h(), and never put user input into SQL.
+#
+# A finding that has been checked and is safe gets a comment on that line:
+#   // nosemgrep: <rule id> — <why it is safe>
+rules:
+  - id: ngo-cms-unescaped-request-output
+    mode: taint
+    languages: [php]
+    severity: ERROR
+    message: >-
+      Text from the request reaches the page without h(). Anyone could put
+      HTML or a script into the link or form and run it in a visitor's or an
+      admin's browser (XSS). Wrap the value in h() — or (int) for numbers.
+    pattern-sources:
+      - pattern-either:
+          - pattern: $_GET
+          - pattern: $_POST
+          - pattern: $_REQUEST
+          - pattern: $_COOKIE
+    pattern-sanitizers:
+      - pattern-either:
+          - pattern: h(...)
+          - pattern: htmlspecialchars(...)
+          - pattern: (int) $X
+          - pattern: intval(...)
+          - pattern: urlencode(...)
+          - pattern: rawurlencode(...)
+    pattern-sinks:
+      - pattern-either:
+          - pattern: echo ...;
+          - pattern: print(...)
+          - pattern: printf(...)
+
+  - id: ngo-cms-request-in-raw-sql
+    mode: taint
+    languages: [php]
+    severity: ERROR
+    message: >-
+      Text from the request goes into SQL that is run directly. That allows
+      SQL injection. Use $pdo->prepare() with ? placeholders and pass the
+      value to execute().
+    pattern-sources:
+      - pattern-either:
+          - pattern: $_GET
+          - pattern: $_POST
+          - pattern: $_REQUEST
+          - pattern: $_COOKIE
+    pattern-sanitizers:
+      - pattern-either:
+          - pattern: (int) $X
+          - pattern: intval(...)
+          - pattern: $DB->quote(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $DB->query($SQL, ...)
+              - pattern: $DB->exec($SQL)
+          - focus-metavariable: $SQL

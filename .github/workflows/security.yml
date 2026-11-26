@@ -1,0 +1,73 @@
+name: Security scan
+
+# Looks for security holes automatically — on every push to main, every Monday
+# morning, and on demand (Actions → Security scan → Run workflow).
+#
+# 1. audit:   known holes in the libraries we use (composer / npm). Any hole
+#             turns the run red and GitHub emails the pusher. The fix usually
+#             arrives as a Dependabot pull request (.github/dependabot.yml).
+# 2. semgrep: mistakes in our own PHP — user input reaching HTML, SQL, shell,
+#             files or redirects. Findings go to the repo's Security → Code
+#             scanning tab, which emails admins and tracks each one until it is
+#             fixed or dismissed with a reason. Our own rules: .semgrep/.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: zip, pdo_mysql, mbstring, intl, gd, curl
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: Known holes in PHP libraries
+        run: composer audit
+
+      - name: Known holes in JavaScript libraries (shipped ones only)
+        run: npm audit --omit=dev
+
+  semgrep:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Semgrep
+        run: pip install semgrep==1.187.0
+
+      - name: Our own rules still catch what they should
+        run: semgrep --test --config .semgrep/ngo-cms.yml .semgrep/ngo-cms.php
+
+      - name: Scan our code
+        run: >-
+          semgrep scan --metrics=off
+          --config p/php --config p/security-audit --config .semgrep/ngo-cms.yml
+          --sarif --output semgrep.sarif
+
+      - name: Send findings to the Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
