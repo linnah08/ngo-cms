@@ -166,6 +166,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $cert_path_rel = $pledge['cert_path'] ?? '';
             $cert_path_abs = $cert_path_rel !== '' ? $_SERVER['DOCUMENT_ROOT'] . $cert_path_rel : '';
 
+            // nosemgrep: tainted-filename — cert_path from the pledge row; new path from date(), padded sequence and cleaned pledge_number
             if ($cert_number > 0 && $cert_path_abs !== '' && file_exists($cert_path_abs)) {
                 // Existing file — just register it in documents
                 $formatted = str_pad((string)$cert_number, 5, '0', STR_PAD_LEFT);
@@ -182,6 +183,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $formatted = str_pad((string)$num, 5, '0', STR_PAD_LEFT);
                 $year      = date('Y', strtotime($pledge['created_at']));
                 $dir       = $_SERVER['DOCUMENT_ROOT'] . "/documents/donation_certs/{$year}/";
+                // nosemgrep: tainted-filename — cert_path from the pledge row; new path from date(), padded sequence and cleaned pledge_number
                 if (!is_dir($dir)) mkdir($dir, 0755, true);
                 $filename = $formatted . '_' . preg_replace('/[^a-z0-9_-]/i', '', $pledge['pledge_number']) . '.pdf';
                 $filepath = $dir . $filename;
@@ -201,6 +203,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $fake_doc   = ['formatted_number' => $formatted];
 
                 $pdf     = (new DonationCertGenerator())->generate($fake_order, $fake_items, $fake_doc);
+                // nosemgrep: tainted-filename — cert_path from the pledge row; new path from date(), padded sequence and cleaned pledge_number
                 $written = file_put_contents($filepath, $pdf);
                 if ($written === false) {
                     throw new RuntimeException('Failed to write cert PDF to ' . $filepath);

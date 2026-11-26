@@ -81,5 +81,6 @@ function _donation_cert_unlink(string $rel): void
     $rel = ltrim($rel, '/');
     if (!str_starts_with($rel, 'documents/donation_certs/') || str_contains($rel, '..')) return;
     $abs = rtrim($_SERVER['DOCUMENT_ROOT'], '/') . '/' . $rel;
+    // nosemgrep: tainted-filename — cert_path from DB, checked for documents/donation_certs/ prefix and no ..
     if (is_file($abs)) @unlink($abs);
 }

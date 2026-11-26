@@ -42,6 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $share_err = org_save_share_image($_FILES['share_image'], $images);
             if ($share_err !== null) $errors['share_image'] = $share_err;
         } elseif (!$errors && ($_POST['share_image_remove'] ?? '') === '1') {
+            // nosemgrep: tainted-filename — fixed file under assets/images
             @unlink($images . '/share-upload.jpg');
         }
 

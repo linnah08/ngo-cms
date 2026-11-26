@@ -33,9 +33,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!empty($ids)) {
             $in = implode(',', array_fill(0, count($ids), '?'));
             if ($action === 'bulk_delete') {
+                // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
                 $pdo->prepare("DELETE FROM product_reviews WHERE id IN ($in)")->execute($ids);
             } else {
                 $status = $action === 'bulk_approve' ? 'approved' : 'rejected';
+                // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
                 $pdo->prepare("UPDATE product_reviews SET status = ? WHERE id IN ($in)")
                     ->execute(array_merge([$status], $ids));
             }

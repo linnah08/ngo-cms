@@ -22,6 +22,7 @@ if (!$doc) {
 }
 
 $filepath = $_SERVER['DOCUMENT_ROOT'] . '/' . $doc['file_path'];
+// nosemgrep: tainted-filename — file_path from the documents row by (int) id, written by the server
 if (!file_exists($filepath)) {
     http_response_code(404);
     exit('Файлът не е намерен на сървъра. Генерирайте документа отново.');
@@ -32,7 +33,9 @@ $filename = $label . '_' . $doc['formatted_number'] . '.pdf';
 
 header('Content-Type: application/pdf');
 header('Content-Disposition: inline; filename="' . $filename . '"');
+// nosemgrep: tainted-filename — file_path from the documents row by (int) id, written by the server
 header('Content-Length: ' . filesize($filepath));
 header('Cache-Control: private, max-age=0');
+// nosemgrep: tainted-filename — file_path from the documents row by (int) id, written by the server
 readfile($filepath);
 exit;

@@ -666,20 +666,24 @@ function org_brand_image(string $name, ?string $root = null): string
     $root  = rtrim($root, '/');
     $own   = ORG_BRAND_DIR . '/' . $name;
     $old   = 'assets/images/' . $name;
+    // nosemgrep: tainted-filename — name is the literal logo.png/favicon.png; tmp from random_bytes
     if (is_file("$root/$own")) return $own;
     $key = "$root|$name";
     if (isset($cache[$key]) && $cache[$key] === $old) return $old;
 
     $cache[$key] = $old;
+    // nosemgrep: tainted-filename — name is the literal logo.png/favicon.png; tmp from random_bytes
     $hash = is_file("$root/$old") ? hash_file('sha256', "$root/$old") : false;
     if ($hash === false || in_array($hash, ORG_BRAND_DEFAULT_HASHES[$name] ?? [], true)) {
         return $old;   // the shipped default, or nothing at all
     }
     $dir = "$root/" . ORG_BRAND_DIR;
     $tmp = "$dir/.$name.tmp-" . bin2hex(random_bytes(4));
+    // nosemgrep: tainted-filename — name is the literal logo.png/favicon.png; tmp from random_bytes
     if ((is_dir($dir) || @mkdir($dir, 0755, true)) && @copy("$root/$old", $tmp) && @rename($tmp, "$root/$own")) {
         return $own;
     }
+    // nosemgrep: tainted-filename — name is the literal logo.png/favicon.png; tmp from random_bytes
     @unlink($tmp);
     return $old;
 }

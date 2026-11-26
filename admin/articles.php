@@ -34,9 +34,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'bulk_d
         // Same per-slug delete logic as the single-row delete above (BG file
         // + slug_en-aware EN file removal).
         $bg      = ARTICLES_PATH . '/bg/' . $slug . '.json';
+        // nosemgrep: tainted-filename — slug cleaned with basename(str_replace(['..',"\0"])); slug_en comes from stored JSON written via slug()
         $bg_data = file_exists($bg) ? load_json($bg) : [];
         $en      = ARTICLES_PATH . '/en/' . ($bg_data['slug_en'] ?? $slug) . '.json';
+        // nosemgrep: tainted-filename — slug cleaned with basename(str_replace(['..',"\0"])); slug_en comes from stored JSON written via slug()
         if (file_exists($bg)) unlink($bg);
+        // nosemgrep: tainted-filename — slug cleaned with basename(str_replace(['..',"\0"])); slug_en comes from stored JSON written via slug()
         if (file_exists($en)) unlink($en);
     }
     flash_set('success', 'Избраните статии са изтрити.');
@@ -58,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'bulk_p
         $allPublished = true;
         foreach ($ids as $slug) {
             $bg   = ARTICLES_PATH . '/bg/' . $slug . '.json';
+            // nosemgrep: tainted-filename — slug cleaned with basename(str_replace(['..',"\0"])); slug_en comes from stored JSON written via slug()
             $data = file_exists($bg) ? load_json($bg) : [];
             if (($data['status'] ?? '') !== 'published') { $allPublished = false; break; }
         }
@@ -65,6 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'bulk_p
 
         foreach ($ids as $slug) {
             $bg = ARTICLES_PATH . '/bg/' . $slug . '.json';
+            // nosemgrep: tainted-filename — slug cleaned with basename(str_replace(['..',"\0"])); slug_en comes from stored JSON written via slug()
             if (!file_exists($bg)) continue;
             $data              = load_json($bg);
             $data['status']    = $newStatus;
@@ -74,6 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'bulk_p
             // Date, author, image and status are shared between BG and EN —
             // keep that in sync here too.
             $en = ARTICLES_PATH . '/en/' . ($data['slug_en'] ?? $slug) . '.json';
+            // nosemgrep: tainted-filename — slug cleaned with basename(str_replace(['..',"\0"])); slug_en comes from stored JSON written via slug()
             if (file_exists($en)) {
                 $en_data              = load_json($en);
                 $en_data['status']    = $newStatus;

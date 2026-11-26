@@ -53,10 +53,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ));
         if (!empty($ids)) {
             $in = implode(',', array_fill(0, count($ids), '?'));
+            // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM products WHERE id IN ($in) AND active = 1");
             $stmt->execute($ids);
             $activeCount = (int)$stmt->fetchColumn();
             $newActive   = ($activeCount === count($ids)) ? 0 : 1;
+            // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
             $pdo->prepare("UPDATE products SET active = ? WHERE id IN ($in)")
                 ->execute(array_merge([$newActive], $ids));
         }
@@ -72,10 +74,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ));
         if (!empty($ids)) {
             $in = implode(',', array_fill(0, count($ids), '?'));
+            // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM products WHERE id IN ($in) AND featured = 1");
             $stmt->execute($ids);
             $featuredCount = (int)$stmt->fetchColumn();
             $newFeatured   = ($featuredCount === count($ids)) ? 0 : 1;
+            // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
             $pdo->prepare("UPDATE products SET featured = ? WHERE id IN ($in)")
                 ->execute(array_merge([$newFeatured], $ids));
         }
@@ -91,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ));
         if (!empty($ids)) {
             $in = implode(',', array_fill(0, count($ids), '?'));
+            // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
             $pdo->prepare("UPDATE products SET active = 0 WHERE id IN ($in)")->execute($ids);
         }
         flash_set('success', 'Избраните продукти са деактивирани.');
@@ -129,7 +134,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!empty($safe)) {
             $in = implode(',', array_fill(0, count($safe), '?'));
+            // nosemgrep: tainted-sql-string — only ? placeholders; ids int-cast and bound in execute()
             $pdo->prepare("DELETE FROM product_variants WHERE product_id IN ($in)")->execute($safe);
+            // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
             $pdo->prepare("DELETE FROM products WHERE id IN ($in)")->execute($safe);
         }
 

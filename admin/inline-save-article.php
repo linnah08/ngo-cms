@@ -28,6 +28,7 @@ foreach (['bg' => $slug_bg, 'en' => $slug_en] as $lang => $slug) {
     $slug = basename(str_replace(['..', "\0"], '', $slug));
     $path = "/content/articles/{$lang}/{$slug}.json";
     $full = $_SERVER['DOCUMENT_ROOT'] . $path;
+    // nosemgrep: tainted-filename — slug cleaned with basename(str_replace(['..',"\0"])); lang is a literal
     if (!file_exists($full)) continue;
 
     // $full, not $path: load_json/save_json take a filesystem path (the old code read and

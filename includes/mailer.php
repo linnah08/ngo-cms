@@ -3,6 +3,7 @@ $_mailer_root = $_SERVER['DOCUMENT_ROOT'] ?: dirname(__DIR__);
 if (!defined('SITE_NAME_BG')) require_once $_mailer_root . '/config.php';
 // Microsoft Graph mail credentials (gitignored). Optional: when absent the site
 // still runs, but send_mail() no-ops with a logged warning until configured.
+// nosemgrep: tainted-filename — fixed config file under DOCUMENT_ROOT
 if (is_file($_mailer_root . '/graph.config.php')) require_once $_mailer_root . '/graph.config.php';
 if (!function_exists('setting_get')) require_once $_mailer_root . '/includes/settings.php';
 require_once $_mailer_root . '/includes/email-templates.php';

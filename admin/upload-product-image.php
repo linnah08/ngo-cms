@@ -49,6 +49,7 @@ if ($_FILES['image']['size'] > 8 * 1024 * 1024) {
 $filename = 'upload-' . bin2hex(random_bytes(8)) . '.' . $ext;
 $dir      = $_SERVER['DOCUMENT_ROOT'] . '/assets/images/products/';
 
+// nosemgrep: tainted-filename — fixed folder; file name from random_bytes
 if (!is_dir($dir)) mkdir($dir, 0755, true);
 
 if (!move_uploaded_file($_FILES['image']['tmp_name'], $dir . $filename)) {

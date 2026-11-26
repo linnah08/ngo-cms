@@ -145,6 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $qs  = array_filter($_GET);
         if ($ids) {
             $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
             $pdo->prepare("UPDATE comments SET status = 'approved' WHERE id IN ($placeholders)")->execute($ids);
         }
         header('Location: /admin/comments.php?' . http_build_query($qs));
@@ -157,6 +158,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $qs  = array_filter($_GET);
         if ($ids) {
             $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
             $pdo->prepare("UPDATE comments SET status = 'rejected' WHERE id IN ($placeholders)")->execute($ids);
         }
         header('Location: /admin/comments.php?' . http_build_query($qs));
@@ -169,6 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $qs  = array_filter($_GET);
         if ($ids) {
             $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
             $pdo->prepare("DELETE FROM comments WHERE id IN ($placeholders)")->execute($ids);
         }
         header('Location: /admin/comments.php?' . http_build_query($qs));
@@ -198,6 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $qs  = array_filter($_GET);
         if ($ids) {
             $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
             $pdo->prepare("UPDATE contact_submissions SET status = 'read' WHERE id IN ($placeholders)")->execute($ids);
         }
         header('Location: /admin/comments.php?' . http_build_query($qs));
@@ -210,6 +214,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $qs  = array_filter($_GET);
         if ($ids) {
             $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
             $pdo->prepare("UPDATE contact_submissions SET status = 'archived' WHERE id IN ($placeholders)")->execute($ids);
         }
         header('Location: /admin/comments.php?' . http_build_query($qs));
@@ -222,6 +227,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $qs  = array_filter($_GET);
         if ($ids) {
             $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
             $pdo->prepare("DELETE FROM contact_submissions WHERE id IN ($placeholders)")->execute($ids);
         }
         header('Location: /admin/comments.php?' . http_build_query($qs));

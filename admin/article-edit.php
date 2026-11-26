@@ -92,6 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (isset($allowed_mime[$ftype])) {
                 $ext     = $allowed_mime[$ftype];
                 $img_dir = $_SERVER['DOCUMENT_ROOT'] . '/assets/images/articles/';
+                // nosemgrep: tainted-filename — fixed article image folder / path already checked by article_photo_path_ok()
                 if (!is_dir($img_dir)) mkdir($img_dir, 0755, true);
                 $filename = ascii_slug($new_slug) . '-' . time() . '.' . $ext;
                 if (move_uploaded_file($_FILES['image']['tmp_name'], $img_dir . $filename)) {
@@ -360,7 +361,7 @@ $draft_note = '<p class="soc-draft-note"' . $draft_note_hidden . ' style="margin
       <input type="hidden" name="photo_main" id="apMain" value="<?= (int) $grid_main ?>">
       <ul id="apGrid" aria-labelledby="apTitle"
           style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.75rem;padding:0;margin:0 0 .75rem;">
-        <?php foreach ($grid_bg as $i => $photo): $total = count($grid_bg); $main = $i === $grid_main; $missing = !is_file($_SERVER['DOCUMENT_ROOT'] . $photo['src']); ?>
+        <?php /* nosemgrep: tainted-filename — photo src already checked by article_photo_path_ok() */ foreach ($grid_bg as $i => $photo): $total = count($grid_bg); $main = $i === $grid_main; $missing = !is_file($_SERVER['DOCUMENT_ROOT'] . $photo['src']); ?>
           <?php require $_SERVER['DOCUMENT_ROOT'] . '/templates/admin/article-photo-row.php'; ?>
         <?php endforeach; ?>
       </ul>

@@ -284,6 +284,7 @@ if ($action === 'schedule') {
     curl_close($ch);
 
     if ($curl_err) {
+        // nosemgrep: tainted-sql-string — log line, not SQL; channel whitelisted
         _om_log('ERROR', "social-ajax schedule/{$channel}: cURL create: " . $curl_err);
         echo json_encode(['ok' => false, 'error' => 'Грешка при свързване с Buffer.']);
         exit;
@@ -299,6 +300,7 @@ if ($action === 'schedule') {
         $data[$due_key]       = $due_at;
 
         if (!save_json($file, $data)) {
+            // nosemgrep: tainted-sql-string — log line, not SQL; channel whitelisted
             _om_log('ERROR', "social-ajax schedule/{$channel}: failed to save after create");
             echo json_encode(['ok' => false, 'error' => 'Публикувано в Buffer, но грешка при запис на файла.']);
             exit;

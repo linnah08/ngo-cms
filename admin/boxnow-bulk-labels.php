@@ -50,8 +50,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($ready) {
             $sheets = boxnow_a4_sheets(array_column($ready, 'pdf'));
             $dir = $_SERVER['DOCUMENT_ROOT'] . '/documents/boxnow_batches';
+            // nosemgrep: tainted-filename — fixed folder; file name built from date() and random_bytes
             if (!is_dir($dir)) mkdir($dir, 0775, true);
             $pdf_file = 'boxnow-' . date('Ymd-His') . '-' . bin2hex(random_bytes(3)) . '.pdf';
+            // nosemgrep: tainted-filename — fixed folder; file name built from date() and random_bytes
             if (file_put_contents($dir . '/' . $pdf_file, $sheets) === false) {
                 throw new RuntimeException('Файлът с етикетите не можа да бъде записан.');
             }

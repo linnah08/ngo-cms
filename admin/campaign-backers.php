@@ -45,10 +45,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ));
         if (!empty($ids)) {
             $in = implode(',', array_fill(0, count($ids), '?'));
+            // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM campaign_pledges WHERE id IN ($in) AND reward_id IS NOT NULL AND reward_shipped = 1");
             $stmt->execute($ids);
             $shippedCount = (int)$stmt->fetchColumn();
             $newShipped   = ($shippedCount === count($ids)) ? 0 : 1;
+            // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
             $pdo->prepare("UPDATE campaign_pledges SET reward_shipped = ? WHERE id IN ($in) AND reward_id IS NOT NULL")
                 ->execute(array_merge([$newShipped], $ids));
         }
@@ -133,6 +135,7 @@ $status_clause = $filter !== 'all'
     ? "AND p.payment_status = " . $pdo->quote($filter)
     : '';
 
+// nosemgrep: tainted-sql-string — pledge-type clause is a constant; status whitelisted and passed through $pdo->quote()
 $backers = $pdo->query("
     SELECT p.*, r.title AS reward_title
     FROM campaign_pledges p

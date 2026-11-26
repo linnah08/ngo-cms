@@ -83,6 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $products_dir = $_SERVER['DOCUMENT_ROOT'] . '/assets/images/products/';
         $submitted_variants = product_parse_variant_rows(
             $_POST,
+            // nosemgrep: tainted-filename — basename() + /^[A-Za-z0-9._-]+$/ in product_parse_variant_rows()
             static fn(string $f): bool => is_file($products_dir . $f),
             (bool)$preorder_enabled
         );

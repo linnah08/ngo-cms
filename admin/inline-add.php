@@ -24,6 +24,7 @@ function _inline_add_upload(string $field, string $dir): string {
     $ext = image_upload_ext($_FILES[$field]['tmp_name']);
     if ($ext === null) return '';
     $dest_dir = $_SERVER['DOCUMENT_ROOT'] . $dir;
+    // nosemgrep: tainted-filename — fixed folder; file name from random_bytes
     if (!is_dir($dest_dir)) mkdir($dest_dir, 0755, true);
     $name = bin2hex(random_bytes(8)) . '.' . $ext;
     if (!move_uploaded_file($_FILES[$field]['tmp_name'], $dest_dir . '/' . $name)) return '';

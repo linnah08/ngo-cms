@@ -71,7 +71,7 @@ $preview_html = render_newsletter_email($greeting, $body_raw, '', $lang);
 // ── GET ?raw=1: return bare email HTML for iframe src ─────────────────────────
 if (($_GET['raw'] ?? '') === '1') {
     header('Content-Type: text/html; charset=UTF-8');
-    echo $preview_html;
+    echo $preview_html; // nosemgrep: ngo-cms-unescaped-request-output — the admin's own newsletter HTML; request input is only the whitelisted bg/en
     exit;
 }
 
@@ -129,7 +129,7 @@ $admin_email  = $current_user['email'] ?? '';
     Тема: <strong><?= h($subject ?: '(без тема)') ?></strong>
   </div>
   <div id="nlPreviewFrameWrap" style="padding:0;">
-    <iframe id="nlPreviewFrame" src="?id=<?= $id ?>&lang=<?= $lang ?>&raw=1"
+    <iframe id="nlPreviewFrame" src="?id=<?= $id ?>&lang=<?= h($lang) ?>&raw=1"
             style="width:100%;max-width:100%;height:700px;border:none;display:block;margin:0;background:#fff;"
             title="Email preview"></iframe>
   </div>

@@ -49,6 +49,7 @@ $pos         = is_array($item['design_position'] ?? null) ? $item['design_positi
 // (shirt physical dimensions vary per size — spec is expressed as % of shirt image)
 
 foreach ([$shirt_path, $design_path] as $f) {
+    // nosemgrep: tainted-filename — design_file from the order's stored JSON (server-generated), order by (int) id
     if (!file_exists($f)) { http_response_code(404); exit('Image file not found.'); }
 }
 

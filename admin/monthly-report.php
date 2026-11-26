@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: text/csv; charset=UTF-8');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
     header('Cache-Control: no-store');
-    echo $csv;
+    echo $csv; // nosemgrep: ngo-cms-unescaped-request-output — CSV download (attachment); request input is only the (int) year/month
     exit;
 }
 

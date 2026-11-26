@@ -49,6 +49,7 @@ set_exception_handler(function(Throwable $e): void {
     http_response_code(500);
     // Show a branded error page; never expose the stack trace to the browser
     $err_page = $_SERVER['DOCUMENT_ROOT'] . '/errors/500.php';
+    // nosemgrep: tainted-filename — fixed path under DOCUMENT_ROOT / code-literal asset paths
     if (file_exists($err_page)) {
         require $err_page;
     } else {
@@ -76,6 +77,7 @@ register_shutdown_function(function(): void {
         if (!headers_sent()) {
             http_response_code(500);
             $err_page = ($_SERVER['DOCUMENT_ROOT'] ?? __DIR__) . '/errors/500.php';
+            // nosemgrep: tainted-filename — fixed path under DOCUMENT_ROOT / code-literal asset paths
             if (file_exists($err_page)) { require $err_page; }
         }
     }
@@ -597,6 +599,7 @@ function get_settings(): array {
 function versioned_asset(string $rel): string {
     $rel  = '/' . ltrim($rel, '/');
     $root = $_SERVER['DOCUMENT_ROOT'] ?: dirname(__DIR__);
+    // nosemgrep: tainted-filename — fixed path under DOCUMENT_ROOT / code-literal asset paths
     $v    = @filemtime($root . $rel);
     return $rel . ($v ? '?v=' . $v : '');
 }

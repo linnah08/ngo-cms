@@ -25,6 +25,7 @@ if (!$row || !preg_match('#^documents/distribution_protocols/\d{4}/[0-9]+\.pdf$#
 }
 
 $path = $_SERVER['DOCUMENT_ROOT'] . '/' . $rel;
+// nosemgrep: tainted-filename — path from DB row by (int) id, whitelisted by regex
 if (!is_file($path)) {
     http_response_code(404);
     exit('Файлът на протокола липсва. Отворете „Разпространение“ и го създайте отново.');
@@ -32,7 +33,9 @@ if (!is_file($path)) {
 
 header('Content-Type: application/pdf');
 header('Content-Disposition: inline; filename="Protokol_' . preg_replace('/\D/', '', (string) $row['protocol_formatted_number']) . '.pdf"');
+// nosemgrep: tainted-filename — path from DB row by (int) id, whitelisted by regex
 header('Content-Length: ' . filesize($path));
 header('Cache-Control: private, max-age=0');
+// nosemgrep: tainted-filename — path from DB row by (int) id, whitelisted by regex
 readfile($path);
 exit;

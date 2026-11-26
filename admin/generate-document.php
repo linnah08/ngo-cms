@@ -111,7 +111,9 @@ $filename = $doc_formatted . '_' . preg_replace('/[^a-z0-9_-]/i', '', $order['or
 $filepath = $dir . '/' . $filename;
 $rel_path = 'documents/' . $type_dirs[$doc_type] . '/' . $year . '/' . $filename;
 
+// nosemgrep: tainted-filename — doc_type whitelisted; year from date(); number is a padded sequence; order_number cleaned to [a-z0-9_-]
 if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
+    // nosemgrep: tainted-sql-string — log line, not SQL
     _om_log('ERROR', "generate-document: cannot create directory {$dir}");
     header('Location: /admin/order-view.php?id=' . $order_id . '&doc_error=' . urlencode('Грешка: не може да се създаде директория за документи. Проверете правата на файловата система.'));
     exit;
@@ -149,6 +151,7 @@ if ($doc_type === 'credit_note') {
 }
 
 try {
+    // nosemgrep: tainted-object-instantiation — class from the fixed $generators map, doc_type whitelisted
     $generator = new $gen_class();
     $pdf_bytes = $generator->generate($order, $items, $document);
 } catch (Throwable $e) {
@@ -157,6 +160,7 @@ try {
     exit;
 }
 
+// nosemgrep: tainted-filename — doc_type whitelisted; year from date(); number is a padded sequence; order_number cleaned to [a-z0-9_-]
 $written = file_put_contents($filepath, $pdf_bytes);
 if ($written === false || $written === 0) {
     _om_log('ERROR', "generate-document: file_put_contents failed for {$filepath}");

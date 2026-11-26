@@ -127,6 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $filepath = $dir . '/' . $filename;
         $rel_path = 'documents/invoices/' . $year . '/' . $filename;
 
+        // nosemgrep: tainted-filename — year from date(); number is a padded sequence; order_number cleaned to [a-z0-9_-]
         if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
             $errors[] = 'Грешка: не може да се създаде директория за документи.';
         }
@@ -150,6 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $generator = new InvoiceGenerator();
             $pdf_bytes = $generator->generate($order_row, $items, $document);
 
+            // nosemgrep: tainted-filename — year from date(); number is a padded sequence; order_number cleaned to [a-z0-9_-]
             if (file_put_contents($filepath, $pdf_bytes) === false) {
                 throw new RuntimeException("file_put_contents failed for {$filepath}");
             }

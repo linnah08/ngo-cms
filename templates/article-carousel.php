@@ -25,6 +25,7 @@ $_ac_img = 'width:100%;height:auto;border-radius:var(--radius-lg);display:block;
 /** [width, height] of a photo on disk, or null. */
 $_ac_size = $photo_size ?? static function (string $src): ?array {
     if (!str_starts_with($src, '/') || str_contains($src, '..')) return null;
+    // nosemgrep: tainted-filename — starts-with-/ and no-.. guard runs first
     $s = @getimagesize(rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/') . $src);
     return $s ? [(int) $s[0], (int) $s[1]] : null;
 };

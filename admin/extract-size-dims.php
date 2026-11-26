@@ -48,6 +48,7 @@ if (!$filename || !preg_match('/\.(jpg|jpeg|png|webp|gif)$/i', $filename)) {
 }
 
 $path = $_SERVER['DOCUMENT_ROOT'] . '/assets/images/products/' . $filename;
+// nosemgrep: tainted-filename — basename() + image-extension regex inside the fixed products folder
 if (!file_exists($path)) {
     echo json_encode(['ok' => false, 'error' => 'File not found.']);
     exit;
@@ -60,6 +61,7 @@ if ($api_key === '') {
 }
 
 // Encode image as base64
+// nosemgrep: tainted-filename — basename() + image-extension regex inside the fixed products folder
 $image_data  = base64_encode(file_get_contents($path));
 $ext         = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
 $media_types = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'gif' => 'image/gif'];

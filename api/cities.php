@@ -48,6 +48,7 @@ if ($courier === 'speedy') {
         error_log('api/cities.php speedy: ' . $e->getMessage());
         // Fall back to static list if Speedy API is unreachable
         $fallback = $_SERVER['DOCUMENT_ROOT'] . '/data/bg-cities.json';
+        // nosemgrep: tainted-filename — fixed data file; courier whitelisted
         echo file_exists($fallback) ? file_get_contents($fallback) : '[]';
     }
     exit;
@@ -55,5 +56,6 @@ if ($courier === 'speedy') {
 
 // Static city list for other couriers (BoxNow uses same Bulgarian cities)
 $file   = $_SERVER['DOCUMENT_ROOT'] . '/data/bg-cities.json';
+// nosemgrep: tainted-filename — fixed data file; courier whitelisted
 $cities = json_decode(file_get_contents($file), true) ?: [];
 echo json_encode($cities);

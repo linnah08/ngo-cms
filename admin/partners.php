@@ -34,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             if ($has_logo_file) {
                 $dir = $_SERVER['DOCUMENT_ROOT'] . '/assets/images/partners/';
+                // nosemgrep: tainted-filename — fixed folder; file name is slug($name)
                 if (!is_dir($dir)) mkdir($dir, 0755, true);
                 $filename = $id . '.' . $ext;
                 if (move_uploaded_file($_FILES['logo']['tmp_name'], $dir . $filename)) {

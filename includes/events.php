@@ -466,6 +466,7 @@ function event_generate_ticket_pdfs(PDO $pdo, array $pledge, array $event, ?call
     $year  = date('Y');
     $root  = rtrim($_SERVER['DOCUMENT_ROOT'] ?: dirname(__DIR__), '/');
     $dir   = "$root/documents/tickets/$year/";
+    // nosemgrep: tainted-filename — folder from date('Y'); file name from random_bytes + server-generated pledge_number / DB row
     if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
         throw new RuntimeException("event_generate_ticket_pdfs: cannot create $dir");
     }
@@ -487,6 +488,7 @@ function event_generate_ticket_pdfs(PDO $pdo, array $pledge, array $event, ?call
             'amount_eur'    => $each,
             'created_at'    => $pledge['created_at'] ?? date('Y-m-d H:i:s'),
         ], event_ticket_document($event, $code));
+        // nosemgrep: tainted-filename — folder from date('Y'); file name from random_bytes + server-generated pledge_number / DB row
         if (file_put_contents($dir . $file, $bytes) === false) {
             throw new RuntimeException("event_generate_ticket_pdfs: cannot write $file");
         }
@@ -539,6 +541,7 @@ function event_ticket_attachments(array $pledge, array $paths): array
     $out  = [];
     $n    = count($paths);
     foreach (array_values($paths) as $i => $rel) {
+        // nosemgrep: tainted-filename — folder from date('Y'); file name from random_bytes + server-generated pledge_number / DB row
         if (is_file($root . $rel)) {
             $out[] = ['path' => $root . $rel, 'name' => 'ticket-' . $pledge['pledge_number'] . ($n > 1 ? '-' . ($i + 1) : '') . '.pdf'];
         }

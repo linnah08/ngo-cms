@@ -17,6 +17,7 @@ $images = [];
 
 foreach ($dirs as $cat => $url_path) {
     $dir = $_SERVER['DOCUMENT_ROOT'] . $url_path;
+    // nosemgrep: tainted-filename — hard-coded folders; file names from scandir()
     if (!is_dir($dir)) continue;
     foreach (scandir($dir) as $f) {
         if ($f[0] === '.') continue;
@@ -25,6 +26,7 @@ foreach ($dirs as $cat => $url_path) {
         $images[] = [
             'path'  => $url_path . $f,
             'cat'   => $cat,
+            // nosemgrep: tainted-filename — hard-coded folders; file names from scandir()
             'mtime' => @filemtime($dir . $f) ?: 0,
         ];
     }

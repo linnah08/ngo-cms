@@ -358,6 +358,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $qty = max(1, (int) $ticket_pledge['ticket_qty']);
             // Make the PDFs again if any is missing (or the count is off).
             $all_exist = count($ticket_paths) === $qty
+                // nosemgrep: tainted-filename — paths from DB rows written by the server; existence check only
                 && count(array_filter($ticket_paths, fn($p) => file_exists($_SERVER['DOCUMENT_ROOT'] . $p))) === $qty;
             try {
                 if (!$all_exist) {
@@ -401,6 +402,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'Сертификатът не е генериран. Генерирайте го първо.';
             } else {
                 $cert_file = $_SERVER['DOCUMENT_ROOT'] . '/' . $existing_cert['file_path'];
+                // nosemgrep: tainted-filename — paths from DB rows written by the server; existence check only
                 if (!file_exists($cert_file)) {
                     $errors[] = 'Файлът на сертификата липсва. Генерирайте го отново.';
                 } else {
@@ -1082,6 +1084,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
             $n       = $i + 1;
             $total   = count($ticket_paths);
             $label   = $total > 1 ? "Билет {$n}/{$total}" : 'Билет';
+            // nosemgrep: tainted-filename — paths from DB rows written by the server; existence check only
             $fexists = file_exists($_SERVER['DOCUMENT_ROOT'] . $rel_path);
             $dl_url  = '/admin/download-ticket.php?pledge=' . urlencode($order['order_number']) . '&n=' . $n;
           ?>

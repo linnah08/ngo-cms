@@ -537,6 +537,7 @@ const ARTICLE_PHOTOS_MAX = 10;
 function article_photo_path_ok(string $src, ?callable $exists = null): bool {
     if (!preg_match('#^/assets/images/[a-zA-Z0-9_\-][a-zA-Z0-9/_.\-]*$#', $src)) return false;
     if (str_contains($src, '..')) return false;
+    // nosemgrep: tainted-filename — regex ^/assets/images/ and no-.. check run first
     $exists ??= static fn(string $p): bool => is_file($_SERVER['DOCUMENT_ROOT'] . $p);
     return $exists($src);
 }

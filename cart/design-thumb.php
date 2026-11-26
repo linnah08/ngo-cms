@@ -28,6 +28,7 @@ if (!in_array($file, $allowed, true)) {
 
 $path = $_SERVER['DOCUMENT_ROOT'] . '/uploads/print-designs/' . $file;
 
+// nosemgrep: tainted-filename — basename() + print_filename_safe() regex; file must be in this session's cart
 if (!file_exists($path)) {
     http_response_code(404);
     exit;
@@ -37,7 +38,9 @@ $ext   = strtolower(pathinfo($file, PATHINFO_EXTENSION));
 $types = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'];
 
 header('Content-Type: ' . ($types[$ext] ?? 'application/octet-stream'));
+// nosemgrep: tainted-filename — basename() + print_filename_safe() regex; file must be in this session's cart
 header('Content-Length: ' . filesize($path));
 header('Cache-Control: private, no-store');
+// nosemgrep: tainted-filename — basename() + print_filename_safe() regex; file must be in this session's cart
 readfile($path);
 exit;

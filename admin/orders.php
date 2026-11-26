@@ -29,6 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $sel->execute([$oid]);
                 if (($o = $sel->fetch()) && order_stock_on_delete($pdo, $o)) $restocked[] = $o['order_number'];
             }
+            // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
             $pdo->prepare("DELETE FROM orders WHERE id IN ($placeholders)")->execute($ids);
             if ($restocked) {
                 flash_set('success', 'Продуктите от изтритите поръчки ' . implode(', ', $restocked) . ' са върнати в наличност.');
@@ -69,6 +70,7 @@ $filter_type   = $filter['type'];
 $filter_status = $filter['status'];
 $search        = $filter['q'];
 
+// nosemgrep: tainted-sql-string — orders_list_filter() whitelists every fragment; search values are bound
 $sql    = 'SELECT *, TIMESTAMPDIFF(MINUTE, created_at, NOW()) AS age_minutes FROM orders WHERE ' . $filter['where'] . ' ORDER BY created_at DESC LIMIT 200';
 $stmt   = $pdo->prepare($sql);
 $stmt->execute($filter['params']);

@@ -177,6 +177,7 @@ function generate_campaign_cert(PDO $pdo, array $pledge): void
         $formatted = str_pad((string)$num, 5, '0', STR_PAD_LEFT);
         $year      = date('Y');
         $dir       = $_SERVER['DOCUMENT_ROOT'] . "/documents/donation_certs/{$year}/";
+        // nosemgrep: tainted-filename — folder from date('Y'); file name from padded sequence + server-generated pledge_number
         if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
             error_log("generate_campaign_cert: cannot create dir {$dir}");
             return;
@@ -207,6 +208,7 @@ function generate_campaign_cert(PDO $pdo, array $pledge): void
         $generator = new DonationCertGenerator();
         $pdf_bytes = $generator->generate($fake_order, $fake_items, $fake_doc);
 
+        // nosemgrep: tainted-filename — folder from date('Y'); file name from padded sequence + server-generated pledge_number
         if (file_put_contents($filepath, $pdf_bytes) === false) {
             error_log("generate_campaign_cert: file_put_contents failed for {$filepath}");
             return;

@@ -26,6 +26,7 @@ try {
     [$file, $class] = $class_map[$courier];
     require_once $_SERVER['DOCUMENT_ROOT'] . '/' . $file;
 
+    // nosemgrep: tainted-object-instantiation — class from the fixed $class_map; courier whitelisted
     $obj    = new $class();
     $raw    = $obj->getOffices($city);
 

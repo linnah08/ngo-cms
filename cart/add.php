@@ -123,6 +123,7 @@ if ($product['type'] === 'print') {
 
         $safe_name  = print_generate_filename(image_upload_ext($_FILES['design']['tmp_name']) ?? 'jpg');
         $upload_dir = $_SERVER['DOCUMENT_ROOT'] . '/uploads/print-designs/';
+        // nosemgrep: tainted-filename — fixed folder; file name from print_generate_filename()
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         if (!move_uploaded_file($_FILES['design']['tmp_name'], $upload_dir . $safe_name)) {
             flash_set('error', t_or('cart.err.upload_failed', 'Файлът не можа да се качи. Моля, опитай отново.', 'The file could not be uploaded. Please try again.', $lang));

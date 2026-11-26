@@ -13,6 +13,7 @@ if (!print_filename_safe($file)) {
 
 $path = $_SERVER['DOCUMENT_ROOT'] . '/uploads/print-designs/' . $file;
 
+// nosemgrep: tainted-filename — basename() + print_filename_safe() regex
 if (!file_exists($path)) {
     http_response_code(404);
     exit('File not found.');
@@ -29,6 +30,8 @@ $ct = $types[$ext] ?? 'application/octet-stream';
 
 header('Content-Type: '        . $ct);
 header('Content-Disposition: attachment; filename="' . $file . '"');
+// nosemgrep: tainted-filename — basename() + print_filename_safe() regex
 header('Content-Length: '      . filesize($path));
+// nosemgrep: tainted-filename — basename() + print_filename_safe() regex
 readfile($path);
 exit;

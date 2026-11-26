@@ -46,6 +46,7 @@ try {
         if ($w > 0) $totalWeight = $w;
     }
 
+    // nosemgrep: tainted-object-instantiation — class from the fixed $class_map; courier must be speedy
     $obj = new $class();
     $apiError = null;
     try {

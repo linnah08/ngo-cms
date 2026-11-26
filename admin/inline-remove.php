@@ -63,6 +63,7 @@ switch ($type) {
         $slug = basename(str_replace(['..', "\0"], '', (string)$id));
         foreach (['bg', 'en'] as $lang) {
             $path = $_SERVER['DOCUMENT_ROOT'] . "/content/articles/{$lang}/{$slug}.json";
+            // nosemgrep: tainted-filename — slug cleaned with basename(str_replace(['..',"\0"]))
             if (file_exists($path)) unlink($path);
         }
         break;

@@ -58,10 +58,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ));
         if (!empty($ids)) {
             $in = implode(',', array_fill(0, count($ids), '?'));
+            // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM newsletter_subscribers WHERE id IN ($in) AND status = 'active'");
             $stmt->execute($ids);
             $activeCount = (int)$stmt->fetchColumn();
             $newStatus   = ($activeCount === count($ids)) ? 'unsubscribed' : 'active';
+            // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
             $pdo->prepare("UPDATE newsletter_subscribers SET status = ? WHERE id IN ($in)")
                 ->execute(array_merge([$newStatus], $ids));
         }
@@ -77,6 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ));
         if (!empty($ids)) {
             $in = implode(',', array_fill(0, count($ids), '?'));
+            // nosemgrep: tainted-sql-string — IN list is only ? placeholders; ids are int-cast and bound in execute()
             $pdo->prepare("DELETE FROM newsletter_subscribers WHERE id IN ($in)")->execute($ids);
         }
         flash_set('success', 'Избраните абонати са изтрити.');
@@ -113,6 +116,7 @@ $cnt_stmt->execute($params);
 $total = (int)$cnt_stmt->fetchColumn();
 $pages = max(1, (int)ceil($total / $per_page));
 
+// nosemgrep: tainted-sql-string — where_sql is constant fragments with bound values; LIMIT/OFFSET are ints
 $stmt = $pdo->prepare("SELECT * FROM newsletter_subscribers WHERE $where_sql ORDER BY subscribed_at DESC LIMIT $per_page OFFSET $offset");
 $stmt->execute($params);
 $subscribers = $stmt->fetchAll();
@@ -122,6 +126,7 @@ $topic_by_id = array_column(newsletter_topic_list(true), null, 'id');
 $sub_topics  = [];
 if ($subscribers) {
     $in = implode(',', array_map(fn($r) => (int) $r['id'], $subscribers));
+    // nosemgrep: tainted-sql-string — IN list is (int)-cast ids of rows just read from the DB
     foreach ($pdo->query("SELECT subscriber_id, topic_id FROM newsletter_subscriber_topics WHERE subscriber_id IN ($in) ORDER BY topic_id") as $r) {
         $sub_topics[(int) $r['subscriber_id']][] = (int) $r['topic_id'];
     }
