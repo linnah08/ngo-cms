@@ -29,7 +29,8 @@ final class LegalTemplatesTest extends TestCase
     private static function scope(array $on = []): array
     {
         return array_merge(['shop' => false, 'donations' => false, 'campaign' => false, 'events' => false, 'newsletter' => false,
-            'comments' => false, 'analytics' => false, 'turnstile' => false, 'money' => false], $on);
+            'comments' => false, 'analytics' => false, 'turnstile' => false, 'money' => false,
+            'cart_reminders' => false, 'cart_cookie' => false], $on);
     }
 
     public function test_every_page_has_a_text_in_both_languages_with_the_organisations_details(): void
@@ -98,5 +99,51 @@ final class LegalTemplatesTest extends TestCase
         $this->assertStringContainsString('в жълто', $item['why']);
         $item  = array_values(array_filter(launch_checklist(['legal' => ['privacy' => '<p>Готов текст</p>']], true), fn($i) => $i['key'] === 'privacy'))[0];
         $this->assertTrue($item['done']);
+    }
+
+    public function test_privacy_has_cart_reminder_paragraph_only_when_email_switch_on(): void
+    {
+        $off = self::scope(['shop' => true, 'money' => true, 'cart_cookie' => true]);
+        $on  = self::scope(['shop' => true, 'money' => true, 'cart_cookie' => true, 'cart_reminders' => true]);
+        foreach (['bg' => ['Напомняне за поръчка', 'до 30 дни', 'Не ми напомняйте', 'с отметката при поръчката'],
+                  'en' => ['Order reminder', 'up to 30 days', 'Don\'t remind me', 'with the checkbox at checkout']] as $lang => $needles) {
+            $without = legal_template('privacy', $lang, self::facts(), $off);
+            $with    = legal_template('privacy', $lang, self::facts(), $on);
+            foreach ($needles as $n) {
+                $this->assertStringNotContainsString($n, $without, "$lang: $n absent when off");
+                $this->assertStringContainsString($n, $with, "$lang: $n present when on");
+            }
+        }
+    }
+
+    public function test_cookie_table_lists_om_cart_only_when_a_switch_is_on(): void
+    {
+        foreach (['bg' => ['Запомня количката ви, за да можете да се върнете към нея.', '30 дни'],
+                  'en' => ['Remembers your basket so you can come back to it.', '30 days']] as $lang => $texts) {
+            $off = legal_template('cookies', $lang, self::facts(), self::scope(['shop' => true]));
+            $on  = legal_template('cookies', $lang, self::facts(), self::scope(['shop' => true, 'cart_cookie' => true]));
+            $this->assertStringNotContainsString('om_cart', $off, $lang);
+            $this->assertStringContainsString('om_cart', $on, $lang);
+            foreach ($texts as $t) $this->assertStringContainsString($t, $on, $lang);
+        }
+    }
+
+    public function test_cart_switches_drive_the_live_scope(): void
+    {
+        if (!test_db_available()) $this->markTestSkipped('DB not available.');
+        require_once dirname(__DIR__) . '/includes/settings.php';
+        $old = [setting_get('cart_reminder_email', ''), setting_get('cart_reminder_notice', '')];
+        try {
+            setting_set('cart_reminder_email', '0'); setting_set('cart_reminder_notice', '1');
+            $s = legal_scope();
+            $this->assertFalse($s['cart_reminders']);
+            setting_set('cart_reminder_email', '1');
+            $s = legal_scope();
+            $shopOn = function_exists('module_enabled_with_needs') && module_enabled_with_needs('shop');
+            $this->assertSame($shopOn, $s['cart_reminders']);
+            $this->assertSame($shopOn, $s['cart_cookie']);
+        } finally {
+            setting_set('cart_reminder_email', $old[0]); setting_set('cart_reminder_notice', $old[1]);
+        }
     }
 }

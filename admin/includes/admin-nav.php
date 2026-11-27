@@ -75,6 +75,7 @@ function admin_nav_items(?string $active_nav = null): array
         'count' => $shop && module_admin_page_visible('product-reviews.php') ? admin_nav_count("SELECT COUNT(*) FROM product_reviews WHERE status='pending'") : 0,
         'count_label' => 'чакащи отзива', 'count_href' => '/admin/product-reviews.php']);
     $add($shop && module_admin_page_visible('orders.php'), ['key' => 'orders', 'label' => 'Поръчки', 'href' => '/admin/orders.php', 'icon' => 'cart', 'area' => 'side', 'group' => 'Магазин']);
+    $add($shop && module_admin_page_visible('cart-reminders.php'), ['key' => 'cart-reminders', 'label' => 'Напомняния за поръчки', 'href' => '/admin/cart-reminders.php', 'icon' => 'mail', 'area' => 'side', 'group' => 'Магазин']);
     $add($shop && module_admin_page_visible('distribution.php'), ['key' => 'distribution', 'label' => 'Разпространение', 'href' => '/admin/distribution.php', 'icon' => 'share', 'area' => 'side', 'group' => 'Магазин']);
     $add($shop && module_admin_page_visible('monthly-report.php'), ['key' => 'monthly-report', 'label' => 'Месечен отчет', 'href' => '/admin/monthly-report.php', 'icon' => 'chart', 'area' => 'side', 'group' => 'Магазин']);
 

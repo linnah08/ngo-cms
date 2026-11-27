@@ -155,6 +155,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
   </div>
   <p style="margin:0 0 .35rem;line-height:1.6;"><?= h($job['what']) ?></p>
   <p class="admin-meta" style="margin:0 0 1rem;">Изпълнява се <?= h($job['every']) ?>. <?= h($job['needed_when']) ?></p>
+  <?php if ($key === 'cart_reminders'): ?>
+  <p style="margin:0 0 1rem;font-size:.9rem;"><a href="/admin/cart-reminders.php">Настройки</a></p>
+  <?php endif; ?>
 
   <?php if ($r['manual'] !== null && $r['manual'] > (int) $r['last'] && $now - $r['manual'] < 14 * 86400): ?>
   <p role="note" style="margin:0 0 1rem;padding:.6rem .8rem;background:#fff8eb;border:1px solid #f3d9a4;border-radius:6px;color:#5c3d06;font-size:.88rem;line-height:1.5;">

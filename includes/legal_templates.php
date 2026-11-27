@@ -48,6 +48,14 @@ function legal_facts(string $lang): array
 /** Which parts of the texts apply to this site. */
 function legal_scope(): array
 {
+    // The cart-reminder switches live in the database; with no database, treat them as off.
+    $cart_email = false; $cart_any = false;
+    try {
+        require_once __DIR__ . '/settings.php';
+        require_once __DIR__ . '/saved_carts.php';
+        $cart_email = saved_cart_email_enabled();
+        $cart_any   = saved_carts_enabled();
+    } catch (Throwable) {}
     $on = static fn(string $m): bool => function_exists('module_enabled_with_needs') && module_enabled_with_needs($m);
     $c  = static fn(string $k): string => defined($k) ? trim((string) constant($k)) : '';
     $turnstile = false;
@@ -60,6 +68,8 @@ function legal_scope(): array
         'campaign'   => $on('campaign'),
         'events'     => $on('events'),
         'newsletter' => $on('newsletter'),
+        'cart_reminders' => $on('shop') && $cart_email,
+        'cart_cookie'    => $on('shop') && $cart_any,
         'comments'   => $on('comments_reviews'),
         'analytics'  => $c('GTM_ID') !== '' || $c('GA4_ID') !== '' || $c('GOOGLE_ADS_ID') !== '',
         'turnstile'  => $turnstile,
@@ -107,6 +117,7 @@ function legal_privacy_bg(array $f, array $s): string
         $s['shop'] || $s['events'] ? '<strong>Поръчки' . ($s['events'] ? ' и билети' : '') . ':</strong> име, имейл, телефон, адрес за доставка, данни за фактура (ако поискате), какво сте поръчали и дали е платено.' : '',
         $s['donations'] || $s['campaign'] ? '<strong>Дарения:</strong> име, имейл, сума, по желание адрес и данни за документ за дарение.' : '',
         $s['newsletter'] ? '<strong>Бюлетин:</strong> имейл и по желание име, темите, които сте избрали, и кога сте се абонирали.' : '',
+        !empty($s['cart_reminders']) ? '<strong>Напомняне за поръчка:</strong> ако сте отметнали, че искате напомняне — името, имейлът и какво има в количката ви (или подкрепата ви).' : '',
         $s['comments'] ? '<strong>Коментари и отзиви:</strong> име, имейл и текстът, който публикувате.' : '',
         '<strong>Съобщения до нас:</strong> това, което ни пишете, и данните ви за контакт.',
         '<strong>Посещения на сайта:</strong> IP адрес и технически данни за браузъра, които сървърът записва автоматично за сигурност' . ($s['analytics'] ? '; статистика за посещенията — само ако приемете бисквитките за статистика' : '') . '.',
@@ -115,6 +126,7 @@ function legal_privacy_bg(array $f, array $s): string
         $s['shop'] || $s['events'] ? 'да изпълним поръчката ви, да я доставим и да издадем документите, които законът изисква (договор и законово задължение);' : '',
         $s['donations'] || $s['campaign'] ? 'да приемем дарението ви и да издадем документ за него (договор и законово задължение);' : '',
         $s['newsletter'] ? 'да ви изпращаме бюлетина, за който сте се абонирали (съгласие — можете да се отпишете с връзката във всеки бюлетин);' : '',
+        !empty($s['cart_reminders']) ? 'да ви изпратим едно напомняне по имейл за незавършената поръчка, ако сте поискали това с отметката при поръчката (съгласие);' : '',
         'да отговорим на съобщенията ви (легитимен интерес);',
         'да пазим сайта от злоупотреби и спам (легитимен интерес).',
     ];
@@ -129,6 +141,7 @@ function legal_privacy_bg(array $f, array $s): string
     $keep = [
         $s['money'] ? 'Поръчки, плащания и документи за дарения: 10 години, както изисква Законът за счетоводството.' : '',
         $s['newsletter'] ? 'Бюлетин: докато не се отпишете.' : '',
+        !empty($s['cart_reminders']) ? 'Напомняне за поръчка: до 30 дни, или докато направите поръчката или натиснете „Не ми напомняйте“.' : '',
         $s['comments'] ? 'Коментари и отзиви: докато са публикувани или докато не поискате да ги изтрием.' : '',
         'Съобщения до нас: ' . legal_gap('напр. до 2 години') . '.',
     ];
@@ -142,6 +155,7 @@ function legal_privacy_bg(array $f, array $s): string
         . '<h2>5. Колко дълго ги пазим</h2>' . legal_li($keep)
         . '<h2>6. Вашите права</h2>'
         . '<p>Имате право да поискате достъп до данните си, да ги поправим или изтрием, да ограничим обработването им, да ги получите във формат, който можете да пренесете, и да възразите срещу обработването. Когато обработваме данни със съгласието ви, можете да го оттеглите по всяко време. Пишете ни на ' . $f['email'] . ' — отговаряме до един месец.</p>'
+        . (!empty($s['cart_reminders']) ? '<p>Съгласието за напомняне за поръчка можете да оттеглите с връзката „Не ми напомняйте“ в имейла или като ни пишете на ' . $f['email'] . '.</p>' : '')
         . '<p>Ако смятате, че нарушаваме правата ви, можете да подадете жалба до Комисията за защита на личните данни: гр. София 1592, бул. „Проф. Цветан Лазаров“ № 2, <a href="https://www.cpdp.bg">www.cpdp.bg</a>.</p>'
         . '<h2>7. Бисквитки</h2>'
         . '<p>Какви бисквитки ползва сайтът и как да управлявате избора си, е описано в <a href="' . $f['cookies'] . '">Политиката за бисквитки</a>.</p>'
@@ -155,6 +169,7 @@ function legal_privacy_en(array $f, array $s): string
         $s['shop'] || $s['events'] ? '<strong>Orders' . ($s['events'] ? ' and tickets' : '') . ':</strong> name, email, phone, delivery address, invoice details (if you ask for an invoice), what you ordered and whether it was paid.' : '',
         $s['donations'] || $s['campaign'] ? '<strong>Donations:</strong> name, email, amount and, if you choose, an address and details for a donation certificate.' : '',
         $s['newsletter'] ? '<strong>Newsletter:</strong> email and optionally name, the topics you chose and when you subscribed.' : '',
+        !empty($s['cart_reminders']) ? '<strong>Order reminder:</strong> if you ticked that you want a reminder — your name, email and what is in your basket (or your pledge).' : '',
         $s['comments'] ? '<strong>Comments and reviews:</strong> name, email and the text you publish.' : '',
         '<strong>Messages to us:</strong> what you write and your contact details.',
         '<strong>Visits:</strong> IP address and technical browser data that the server records automatically for security' . ($s['analytics'] ? '; visit statistics — only if you accept statistics cookies' : '') . '.',
@@ -163,6 +178,7 @@ function legal_privacy_en(array $f, array $s): string
         $s['shop'] || $s['events'] ? 'to fulfil and deliver your order and issue the documents the law requires (contract and legal obligation);' : '',
         $s['donations'] || $s['campaign'] ? 'to accept your donation and issue a document for it (contract and legal obligation);' : '',
         $s['newsletter'] ? 'to send the newsletter you subscribed to (consent — unsubscribe with the link in any issue);' : '',
+        !empty($s['cart_reminders']) ? 'to send you one email reminder about an unfinished order, if you asked for it with the checkbox at checkout (consent);' : '',
         'to answer your messages (legitimate interest);',
         'to protect the site from abuse and spam (legitimate interest).',
     ];
@@ -177,6 +193,7 @@ function legal_privacy_en(array $f, array $s): string
     $keep = [
         $s['money'] ? 'Orders, payments and donation documents: 10 years, as the Accountancy Act requires.' : '',
         $s['newsletter'] ? 'Newsletter: until you unsubscribe.' : '',
+        !empty($s['cart_reminders']) ? 'Order reminder: up to 30 days, or until you place the order or click "Don\'t remind me".' : '',
         $s['comments'] ? 'Comments and reviews: while published, or until you ask us to delete them.' : '',
         'Messages to us: ' . legal_gap('e.g. up to 2 years') . '.',
     ];
@@ -190,6 +207,7 @@ function legal_privacy_en(array $f, array $s): string
         . '<h2>5. How long we keep it</h2>' . legal_li($keep)
         . '<h2>6. Your rights</h2>'
         . '<p>You may ask for access to your data, to have it corrected or deleted, to restrict its processing, to receive it in a portable format, and to object to its processing. Where we rely on your consent, you can withdraw it at any time. Write to ' . $f['email'] . ' — we reply within one month.</p>'
+        . (!empty($s['cart_reminders']) ? '<p>You can withdraw your consent to the order reminder with the "Don\'t remind me" link in the email, or by writing to ' . $f['email'] . '.</p>' : '')
         . '<p>If you believe we have breached your rights, you can complain to the Commission for Personal Data Protection: 2 Prof. Tsvetan Lazarov Blvd, Sofia 1592, <a href="https://www.cpdp.bg">www.cpdp.bg</a>.</p>'
         . '<h2>7. Cookies</h2>'
         . '<p>Which cookies the site uses and how to manage your choice is explained in the <a href="' . $f['cookies'] . '">Cookie policy</a>.</p>'
@@ -214,6 +232,7 @@ function legal_cookies_bg(array $f, array $s): string
         ['OMSESSID', 'Сесията на сайта: количката, защитата на формите' . ($s['money'] ? ', данните при поръчка' : '') . '.', 'Докато затворите браузъра'],
         ['om_cookie_consent', 'Запомня избора ви за бисквитките.', '1 година'],
     ];
+    if (!empty($s['cart_cookie'])) $needed[] = ['om_cart', 'Запомня количката ви, за да можете да се върнете към нея.', '30 дни'];
     if ($s['newsletter']) $needed[] = ['om_nl_sub', 'Запомня, че сте се абонирали, за да не показваме отново поканата за бюлетина.', '1 година'];
     if ($s['turnstile'])  $needed[] = ['Cloudflare Turnstile', 'Проверка срещу спам във формите.', 'Кратко, според Cloudflare'];
     $html = '<h2>1. Какво са бисквитките</h2>'
@@ -243,6 +262,7 @@ function legal_cookies_en(array $f, array $s): string
         ['OMSESSID', 'The site session: your basket, form protection' . ($s['money'] ? ', order details' : '') . '.', 'Until you close the browser'],
         ['om_cookie_consent', 'Remembers your cookie choice.', '1 year'],
     ];
+    if (!empty($s['cart_cookie'])) $needed[] = ['om_cart', 'Remembers your basket so you can come back to it.', '30 days'];
     if ($s['newsletter']) $needed[] = ['om_nl_sub', 'Remembers that you subscribed, so we don\'t show the newsletter invitation again.', '1 year'];
     if ($s['turnstile'])  $needed[] = ['Cloudflare Turnstile', 'Anti-spam check on forms.', 'Short, set by Cloudflare'];
     $html = '<h2>1. What cookies are</h2>'
