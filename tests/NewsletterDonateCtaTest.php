@@ -194,6 +194,7 @@ final class NewsletterDonateCtaTest extends TestCase
 
     public function test_card_only_for_the_session_that_placed_the_order(): void
     {
+        skip_unless_modules_on('newsletter');
         if (session_status() === PHP_SESSION_NONE) @session_start();
         $saved = $_SESSION[ORDER_SESSION_KEY] ?? null;
         $cookie = $_COOKIE['om_nl_sub'] ?? null;

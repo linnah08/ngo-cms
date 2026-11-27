@@ -15,7 +15,7 @@ final class NewsletterSubscribeAjaxTest extends TestCase
     protected function setUp(): void
     {
         if (!test_db_available()) $this->markTestSkipped('No DB available.');
-        if (!module_enabled_with_needs('newsletter')) $this->markTestSkipped('Newsletter module is off on this checkout.');
+        skip_unless_modules_on('newsletter');
     }
 
     protected function tearDown(): void

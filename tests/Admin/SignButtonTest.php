@@ -123,7 +123,7 @@ final class SignButtonTest extends TestCase
 
     public function test_pledge_page_sign_dialog_opens_with_and_without_a_saved_signature(): void
     {
-        if (!feature_enabled('campaign')) $this->markTestSkipped('The campaign is off on this site, so there is no pledge page.');
+        skip_unless_modules_on('campaign');
         $num = 'PHPUNIT-SIGNP-' . strtoupper(bin2hex(random_bytes(3)));
         $this->pledges[] = $num;
         $this->pdo->prepare("INSERT INTO campaign_pledges (pledge_number, name, email, amount_eur, payment_status)

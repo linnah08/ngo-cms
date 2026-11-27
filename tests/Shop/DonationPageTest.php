@@ -129,7 +129,7 @@ final class DonationPageTest extends TestCase
     #[RunInSeparateProcess]
     public function testBulgarianPageShowsTitleIntroAndForm(): void
     {
-        if (!feature_enabled('donations')) $this->markTestSkipped('Donations are switched off on this site (FEATURE_DONATIONS).');
+        skip_unless_modules_on('donations');
         $_SERVER['REQUEST_URI']    = '/donation/';
         $_SERVER['REQUEST_METHOD'] = 'GET';
         global $_path_map_bg_to_en;
@@ -151,7 +151,7 @@ final class DonationPageTest extends TestCase
     #[RunInSeparateProcess]
     public function testErrorsComeBackOnTheDonationPageWithTheDonorsInput(): void
     {
-        if (!feature_enabled('donations')) $this->markTestSkipped('Donations are switched off on this site (FEATURE_DONATIONS).');
+        skip_unless_modules_on('donations');
         $_SERVER['REQUEST_URI']    = '/donation/';
         $_SERVER['REQUEST_METHOD'] = 'GET';
         start_session();
@@ -173,7 +173,7 @@ final class DonationPageTest extends TestCase
     public function testShopPointsToTheDonationPageAndForwardsTheOldAnchor(): void
     {
         if (!test_db_available()) $this->markTestSkipped('No DB configured.');
-        if (!feature_enabled('donations')) $this->markTestSkipped('Donations are switched off on this site (FEATURE_DONATIONS).');
+        skip_unless_modules_on('donations');
         $_SERVER['REQUEST_URI']    = '/en/shop/';
         $_SERVER['REQUEST_METHOD'] = 'GET';
         global $_path_map_bg_to_en;

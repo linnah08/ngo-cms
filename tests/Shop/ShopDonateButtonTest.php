@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -41,6 +42,7 @@ final class ShopDonateButtonTest extends TestCase
         $this->assertSame('|off', $this->child("echo shop_donate_button('bg'), '|', shop_donate_button_on() ? 'on' : 'off';"));
     }
 
+    #[Group('module-switches')]   // sets FEATURE_DONATIONS itself
     public function test_switched_on_it_links_to_the_donation_page_in_the_visitors_language(): void
     {
         $out = $this->child("echo shop_donate_button('bg'), \"\\n\", shop_donate_button('en', 'btn btn--white', 'min-width:10rem;');", ['SHOP_DONATE_BUTTON' => '1', 'FEATURE_DONATIONS' => true]);
@@ -59,6 +61,7 @@ final class ShopDonateButtonTest extends TestCase
             ['SHOP_DONATE_BUTTON' => '1', 'FEATURE_DONATIONS' => false]));
     }
 
+    #[Group('module-switches')]   // sets FEATURE_DONATIONS itself
     public function test_the_organisation_form_saves_an_explicit_on_or_off(): void
     {
         $out = $this->child("require_once ROOT_PATH . '/includes/organisation.php';"
@@ -70,6 +73,7 @@ final class ShopDonateButtonTest extends TestCase
         $this->assertSame('SHOP_DONATE_BUTTON|1|0|0', $out);
     }
 
+    #[Group('module-switches')]   // sets FEATURE_DONATIONS itself
     public function test_hidden_in_the_form_without_the_shop_or_donations(): void
     {
         $this->assertSame('hidden', $this->child("require_once ROOT_PATH . '/includes/organisation.php';"

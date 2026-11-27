@@ -258,6 +258,7 @@ final class EnglishCheckoutTest extends TestCase
     #[RunInSeparateProcess]
     public function testEnglishHeaderCartLinkIsEnglish(): void
     {
+        skip_unless_modules_on('shop');
         $_SERVER['REQUEST_URI'] = '/en/shop/';
         start_session();
         $_SESSION['cart'] = [['product_id' => 1, 'quantity' => 2]];
@@ -275,6 +276,7 @@ final class EnglishCheckoutTest extends TestCase
     #[RunInSeparateProcess]
     public function testBulgarianHeaderCartLink(): void
     {
+        skip_unless_modules_on('shop');
         $_SERVER['REQUEST_URI'] = '/magazin/';
         start_session();
         $_SESSION['cart'] = [['product_id' => 1, 'quantity' => 1]];

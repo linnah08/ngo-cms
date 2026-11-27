@@ -119,7 +119,7 @@ final class ModulesGatingTest extends TestCase
         $this->assertStringNotContainsString('/admin/translate-ajax.php', $off);
         $this->assertStringContainsString('function txField() {}', $off, 'inline handlers on a page never throw');
         $on = $this->child($code);
-        if (!module_enabled_with_needs('ai_helpers')) $this->markTestSkipped('ai_helpers is off on this site.');
+        skip_unless_modules_on('ai_helpers');
         $this->assertStringContainsString("querySelectorAll('[data-translate-from]').forEach(attach)", $on);
     }
 

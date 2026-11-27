@@ -108,6 +108,7 @@ final class HomeProductsLayoutTest extends TestCase
 
     public function test_two_products_are_centred_cards(): void
     {
+        skip_unless_modules_on('shop');
         $html = $this->render([$this->product(), $this->product()]);
         $this->assertStringNotContainsString('home-spot', $html);
         $this->assertStringContainsString(self::CENTRED, $html);

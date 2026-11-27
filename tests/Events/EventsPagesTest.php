@@ -216,6 +216,7 @@ PHP;
 
     public function test_public_list_and_event_page_in_both_languages(): void
     {
+        skip_unless_modules_on('events');
         $e = $this->event();
         $bg = $this->visit('sabitiya/index.php', '/sabitiya/');
         $this->assertSame(200, $bg['status'], $bg['body']);
@@ -238,6 +239,7 @@ PHP;
 
     public function test_hidden_or_unknown_events_are_404_and_closed_ones_have_no_form(): void
     {
+        skip_unless_modules_on('events');
         $hidden = $this->event(['published' => 0]);
         $this->assertSame(404, $this->visit('sabitiya/index.php', '/sabitiya/' . $hidden['slug'] . '/')['status']);
         $this->assertSame(404, $this->visit('sabitiya/index.php', '/sabitiya/no-such-event-xyz/')['status']);
@@ -250,6 +252,7 @@ PHP;
 
     public function test_checkout_refuses_bad_requests_back_on_the_event_page(): void
     {
+        skip_unless_modules_on('events');
         $e = $this->event();
         [$code, $loc] = $this->http('/sabitiya/checkout.php', ['event_id' => $e['id'], 'name' => 'X', 'email' => 'x@test.invalid', 'lang' => 'bg']);
         $this->assertSame(302, $code);
@@ -274,6 +277,7 @@ PHP;
 
     public function test_tickets_address_and_old_return_address_still_work(): void
     {
+        skip_unless_modules_on('events');
         [$code, $loc] = $this->http('/tickets/');
         $this->assertSame(302, $code);
         $this->assertStringStartsWith('/sabitiya/', $loc);

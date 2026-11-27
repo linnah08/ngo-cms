@@ -64,36 +64,42 @@ final class HowToHelpCtaTest extends TestCase
 
     public function testBgContactFormPreSelectsVolunteer(): void
     {
+        skip_unless_modules_on('contact_form');
         $body = $this->getBody('/kontakti/?topic=' . urlencode('Искам да стана доброволец'));
         $this->assertStringContainsString('value="Искам да стана доброволец" selected', $body);
     }
 
     public function testBgContactFormPreSelectsPartner(): void
     {
+        skip_unless_modules_on('contact_form');
         $body = $this->getBody('/kontakti/?topic=' . urlencode('Искам да стана партньор'));
         $this->assertStringContainsString('value="Искам да стана партньор" selected', $body);
     }
 
     public function testBgContactFormIgnoresInvalidTopic(): void
     {
+        skip_unless_modules_on('contact_form');
         $body = $this->getBody('/kontakti/?topic=InvalidTopic');
         $this->assertStringContainsString('selected>— Изберете тема —', $body);
     }
 
     public function testEnContactFormPreSelectsVolunteer(): void
     {
+        skip_unless_modules_on('contact_form');
         $body = $this->getBody('/en/contacts/?topic=' . urlencode('I want to volunteer'));
         $this->assertStringContainsString('value="I want to volunteer" selected', $body);
     }
 
     public function testEnContactFormPreSelectsPartner(): void
     {
+        skip_unless_modules_on('contact_form');
         $body = $this->getBody('/en/contacts/?topic=' . urlencode('I want to become a partner'));
         $this->assertStringContainsString('value="I want to become a partner" selected', $body);
     }
 
     public function testEnContactFormIgnoresInvalidTopic(): void
     {
+        skip_unless_modules_on('contact_form');
         $body = $this->getBody('/en/contacts/?topic=InvalidTopic');
         $this->assertStringContainsString('selected>— Select a topic —', $body);
     }

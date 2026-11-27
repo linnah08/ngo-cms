@@ -72,6 +72,7 @@ final class ShopHeaderHookTest extends TestCase
     #[RunInSeparateProcess]
     public function test_the_plain_header_shows_without_a_site_header(): void
     {
+        skip_unless_modules_on('shop');
         if (!test_db_available()) $this->markTestSkipped('No DB configured.');
         $GLOBALS['_om_site_extensions_file'] = '/nonexistent/site-extensions.php';
         $html = $this->renderShop('/magazin/');
@@ -82,6 +83,7 @@ final class ShopHeaderHookTest extends TestCase
     #[RunInSeparateProcess]
     public function test_a_site_header_replaces_the_plain_one(): void
     {
+        skip_unless_modules_on('shop');
         if (!test_db_available()) $this->markTestSkipped('No DB configured.');
         file_put_contents($this->dir . '/templates/site/shop-header.php',
             '<section id="site-shop-header" data-lang="<?= $lang ?>"><h1><?= h($shop_hero["title"]) ?></h1></section>');
@@ -94,6 +96,7 @@ final class ShopHeaderHookTest extends TestCase
     #[RunInSeparateProcess]
     public function test_a_failing_site_header_falls_back_to_the_plain_one(): void
     {
+        skip_unless_modules_on('shop');
         if (!test_db_available()) $this->markTestSkipped('No DB configured.');
         file_put_contents($this->dir . '/templates/site/shop-header.php', '<p>half</p><?php throw new RuntimeException("boom");');
         $this->extensions('<?php return ["shop_header" => "templates/site/shop-header.php"];');

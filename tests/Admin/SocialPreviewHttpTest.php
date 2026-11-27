@@ -152,6 +152,7 @@ final class SocialPreviewHttpTest extends TestCase
 
     public function test_unsaved_article_gets_its_posts_from_the_title(): void
     {
+        skip_unless_modules_on('social');
         [$jar, $csrf] = $this->login();
         [$code, $res] = $this->preview($jar, [
             'csrf_token' => $csrf, 'title' => 'Нова статия', 'content' => '<p>Текст. ' . str_repeat('Още едно изречение тук. ', 120) . '</p>',
@@ -175,6 +176,7 @@ final class SocialPreviewHttpTest extends TestCase
 
     public function test_linkedin_uses_the_english_text_and_url(): void
     {
+        skip_unless_modules_on('social');
         [$jar, $csrf] = $this->login();
         [, $res] = $this->preview($jar, [
             'csrf_token' => $csrf, 'title' => 'Заглавие', 'content' => '<p>Текст.</p>',
@@ -189,6 +191,7 @@ final class SocialPreviewHttpTest extends TestCase
 
     public function test_oversized_input_is_refused_in_plain_words(): void
     {
+        skip_unless_modules_on('social');
         [$jar, $csrf] = $this->login();
         [, $res] = $this->preview($jar, ['csrf_token' => $csrf, 'title' => 'T', 'content' => str_repeat('a', 600 * 1024)]);
         @unlink($jar);
@@ -198,6 +201,7 @@ final class SocialPreviewHttpTest extends TestCase
 
     public function test_linkedin_takes_the_bulgarian_title_when_the_english_one_is_empty(): void
     {
+        skip_unless_modules_on('social');
         // The save stores an empty EN title as the BG one, so the post gets it too.
         [$jar, $csrf] = $this->login();
         [, $res] = $this->preview($jar, [
@@ -236,6 +240,7 @@ final class SocialPreviewHttpTest extends TestCase
 
     public function test_check_refuses_in_plain_words_for_a_new_article_and_writes_nothing(): void
     {
+        skip_unless_modules_on('social');
         [$jar, $csrf] = $this->login();
         $before = $this->articleFiles();
         $unsaved = ['csrf_token' => $csrf, 'title' => 'Нова', 'content' => '<p>Текст.</p>', 'photos' => []];

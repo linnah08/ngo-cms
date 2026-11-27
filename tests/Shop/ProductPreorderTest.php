@@ -171,6 +171,7 @@ final class ProductPreorderTest extends TestCase
 
     public function testSoldOutPreorderProductCanBeOrderedAndSaysSo(): void
     {
+        skip_unless_modules_on('shop');
         if (!self::$pdo) $this->markTestSkipped('No DB with migration 042.');
         $this->server();
         $pid  = $this->product(0, true);

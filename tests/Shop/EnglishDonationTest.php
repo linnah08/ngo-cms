@@ -248,7 +248,7 @@ final class EnglishDonationTest extends TestCase
     public function testEnglishDonationFormShowsErrorsAccessiblyInEnglish(): void
     {
         if (!test_db_available()) $this->markTestSkipped('No DB configured.');
-        if (!feature_enabled('donations')) $this->markTestSkipped('Donations are switched off on this site (FEATURE_DONATIONS).');
+        skip_unless_modules_on('donations');
         $_SERVER['REQUEST_URI']    = '/en/donation/';
         $_SERVER['REQUEST_METHOD'] = 'GET';
         start_session();
@@ -283,7 +283,7 @@ final class EnglishDonationTest extends TestCase
     public function testEnglishDonationConfirmationIsEnglish(): void
     {
         if (!test_db_available()) $this->markTestSkipped('No DB configured.');
-        if (!feature_enabled('donations')) $this->markTestSkipped('Donations are switched off on this site (FEATURE_DONATIONS).');
+        skip_unless_modules_on('donations');
         require_once self::root() . '/admin/includes/db.php';
         $pdo = get_pdo();
         $num = generate_order_number();

@@ -108,6 +108,30 @@ function test_content_files_available(string ...$paths): bool {
     return true;
 }
 
+/**
+ * Skip the test unless every named optional module (includes/modules.php) is on
+ * on this site, counting the modules it needs. A test of a module's own pages or
+ * features calls this first: an NGO that switched the module off runs the suite
+ * too (tests/modules-off.sh switches them all off before a release), and the
+ * feature it checks simply isn't there. A test of the switching itself belongs
+ * in #[Group('module-switches')] instead.
+ */
+function skip_unless_modules_on(string ...$modules): void {
+    foreach ($modules as $m) {
+        if (!module_enabled_with_needs($m)) {
+            throw new PHPUnit\Framework\SkippedWithMessageException(
+                'The „' . module_label($m) . '“ module is switched off on this site.');
+        }
+    }
+}
+
+/** Like skip_unless_modules_on(), for a feature that is there while any one of the modules is on. */
+function skip_unless_any_module_on(string ...$modules): void {
+    if (module_any_enabled(...$modules)) return;
+    throw new PHPUnit\Framework\SkippedWithMessageException(
+        'The „' . implode('“ and „', array_map('module_label', $modules)) . '“ modules are all switched off on this site.');
+}
+
 // ── Donation flow helpers (donation_path(), donation_validate()) ──────────────
 require_once $root . '/includes/donation.php';
 

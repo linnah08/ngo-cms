@@ -53,14 +53,25 @@ final class AdminNavTest extends TestCase
     {
         $this->as('admin');
         $navs  = ['home'];   // admin/home-sections.php: 'pages' for a created page, 'home' for the front page
+        $all   = ['home'];
         foreach (glob(dirname(__DIR__, 2) . '/admin/*.php') as $file) {
-            if (!module_admin_page_visible(basename($file))) continue;   // a switched-off module's pages are gone anyway
-            if (preg_match("/\\\$active_nav\s*=\s*'([a-z0-9-]+)'/", (string) file_get_contents($file), $m)) $navs[] = $m[1];
+            $src = (string) file_get_contents($file);
+            if (!preg_match("/\\\$active_nav\s*=\s*'([a-z0-9-]+)'/", $src, $m)) continue;
+            $all[] = $m[1];
+            // A switched-off module's pages are gone anyway — including a page
+            // shared by several modules (comments.php), which no single
+            // module lists, so read the page's own guard too.
+            if (!module_admin_page_visible(basename($file))) continue;
+            if (preg_match('/module_admin_guard\(([^)]*)\)/', $src, $g) && preg_match_all("/'([a-z_]+)'/", $g[1], $mods)
+                && !module_any_enabled(...$mods[1])) continue;
+            $navs[] = $m[1];
         }
         // In the top bar, not the menus: Помощ and the account panel. Подпис is
         // only for the person who signs documents, which this test user is not.
-        $navs = array_diff(array_unique($navs), ['support', 'account', 'signature']);
-        $this->assertGreaterThan(20, count($navs));
+        $skip = ['support', 'account', 'signature'];
+        // The scan works: counted over every page, so a site with modules off checks it too.
+        $this->assertGreaterThan(20, count(array_diff(array_unique($all), $skip)));
+        $navs = array_diff(array_unique($navs), $skip);
         foreach ($navs as $nav) {
             // Built as that page builds it: some items show only on their own
             // page (Партньори while the front page hides its partners section).

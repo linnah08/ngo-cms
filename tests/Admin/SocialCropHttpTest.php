@@ -186,6 +186,7 @@ final class SocialCropHttpTest extends TestCase
 
     public function test_a_foreign_photo_or_unknown_kind_is_refused(): void
     {
+        skip_unless_modules_on('social');
         [$jar, $csrf] = $this->login();
         [, $foreign] = $this->save($jar, ['csrf_token' => $csrf, 'kind' => 'post', 'src' => '/assets/images/logo.png', 'rect' => $this->rect()]);
         [, $kind]    = $this->save($jar, ['csrf_token' => $csrf, 'kind' => 'reel', 'src' => self::$src, 'rect' => $this->rect()]);
@@ -199,6 +200,7 @@ final class SocialCropHttpTest extends TestCase
     /** The Instagram post shape: only the four known values; answered with the new preview. */
     public function test_the_post_shape_is_saved_and_checked(): void
     {
+        skip_unless_modules_on('social');
         [$jar, $csrf] = $this->login();
         $send = fn(array $b) => json_decode($this->http('/admin/social-ajax.php', $jar,
             json_encode(['action' => 'save_shape', 'slug' => self::$slug] + $b))[1], true);
@@ -222,6 +224,7 @@ final class SocialCropHttpTest extends TestCase
     /** Whole photo or fill, per photo: only the post's own photos and the two values. */
     public function test_whole_or_fill_is_saved_and_checked(): void
     {
+        skip_unless_modules_on('social');
         [$jar, $csrf] = $this->login();
         $send = fn(array $b) => json_decode($this->http('/admin/social-ajax.php', $jar,
             json_encode(['action' => 'save_fit', 'slug' => self::$slug] + $b))[1], true);
@@ -243,6 +246,7 @@ final class SocialCropHttpTest extends TestCase
 
     public function test_a_good_crop_is_stored_on_the_bg_article(): void
     {
+        skip_unless_modules_on('social');
         [$jar, $csrf] = $this->login();
         [$code, $res] = $this->save($jar, ['csrf_token' => $csrf, 'kind' => 'post', 'src' => self::$src, 'rect' => $this->rect()]);
         [, $story]    = $this->save($jar, ['csrf_token' => $csrf, 'kind' => 'story', 'src' => self::$src,

@@ -94,6 +94,7 @@ final class ConfirmationPrivacyTest extends TestCase
     #[DataProvider('viewers')]
     public function testShopConfirmationShowsItemsAndAddressOnlyToTheBuyer(bool $owned): void
     {
+        skip_unless_modules_on('shop');
         $pdo = self::pdoOrSkip($this);
         [$number, $id] = self::insertOrder($pdo, 'physical', [
             'items' => json_encode([['name_bg' => 'Тайна книга', 'quantity' => 1, 'subtotal_eur' => 25]]),
@@ -118,7 +119,7 @@ final class ConfirmationPrivacyTest extends TestCase
     public function testDonationConfirmationShowsAmountAndMessageOnlyToTheDonor(bool $owned): void
     {
         $pdo = self::pdoOrSkip($this);
-        if (!feature_enabled('donations')) $this->markTestSkipped('Donations are off on this install.');
+        skip_unless_modules_on('donations');
         [$number, $id] = self::insertOrder($pdo, 'donation', [
             'total_eur' => 77.5, 'donation_message' => 'Лично послание за детето', 'payment_status' => 'paid',
         ]);
@@ -139,7 +140,7 @@ final class ConfirmationPrivacyTest extends TestCase
     public function testCampaignConfirmationShowsEmailOnlyToTheBacker(bool $owned): void
     {
         $pdo = self::pdoOrSkip($this);
-        if (!feature_enabled('campaign')) $this->markTestSkipped('The campaign module is off on this install.');
+        skip_unless_modules_on('campaign');
         $number = sprintf('CP-20000101-%04X', random_int(0, 0xFFFF));
         $pdo->prepare("INSERT INTO campaign_pledges (pledge_number, name, email, amount_eur, payment_status) VALUES (?, ?, ?, ?, 'paid')")
             ->execute([$number, 'Тест Дарител', 'backer-secret@example.test', 30]);

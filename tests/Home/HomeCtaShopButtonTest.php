@@ -51,6 +51,7 @@ final class HomeCtaShopButtonTest extends TestCase
 
     public function test_switched_on_it_sits_between_the_two_buttons_with_the_default_wording(): void
     {
+        skip_unless_modules_on('shop', 'donations');
         $html = $this->render(['shop_button' => 'on']);
         $this->assertStringContainsString('Разгледай магазина</a>', $html);
         $donate = strpos($html, 'href="/donation/"');
@@ -65,6 +66,7 @@ final class HomeCtaShopButtonTest extends TestCase
 
     public function test_its_own_wording_wins_and_is_escaped(): void
     {
+        skip_unless_modules_on('shop');
         $html = $this->render(['shop_button' => 'on', 'shop_label' => ['bg' => 'Към <магазина>', 'en' => '']], 'en');
         // An empty English label falls back to the English default, not to the Bulgarian text.
         $this->assertStringContainsString('Visit the shop</a>', $html);
@@ -74,6 +76,7 @@ final class HomeCtaShopButtonTest extends TestCase
 
     public function test_edit_mode_can_reword_it_on_the_page(): void
     {
+        skip_unless_modules_on('shop');
         $GLOBALS['_show_admin_bar'] = true;
         $html = $this->render(['shop_button' => 'on']);
         $this->assertMatchesRegularExpression('/href="\/magazin\/"[^>]*data-cms-section="home:s_cta" data-cms-field="shop_label" data-cms-type="text" data-cms-bg="Разгледай магазина" data-cms-en="Visit the shop"/', $html);

@@ -26,7 +26,7 @@ final class DonationNewsletterOptInTest extends TestCase
 
     private function needsNewsletter(): void
     {
-        if (!module_enabled_with_needs('newsletter')) $this->markTestSkipped('Newsletter module is off on this checkout.');
+        skip_unless_modules_on('newsletter');
     }
 
     /** A form post that opts in, as the site's form would send it: a ticked topic, or the one box. */
@@ -125,7 +125,7 @@ final class DonationNewsletterOptInTest extends TestCase
     public function testDonationPageShowsTheTick(): void
     {
         $this->needsNewsletter();
-        if (!module_enabled_with_needs('donations')) $this->markTestSkipped('Donations module is off on this checkout.');
+        skip_unless_modules_on('donations');
         foreach (['donation/index.php', 'en/donation/index.php'] as $page) {
             $r = run_admin_page($page, [], ['method' => 'GET', 'role' => null]);
             $this->assertSame(200, $r['status'], $page);

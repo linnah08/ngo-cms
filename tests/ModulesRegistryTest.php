@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -170,6 +171,8 @@ final class ModulesRegistryTest extends TestCase
         $this->assertStringNotContainsString('REACHED THE PAGE', $out);
     }
 
+    // Sets the switch itself, so the modules-off run (which overrides it) leaves it out.
+    #[Group('module-switches')]
     public function test_public_guard_lets_the_page_through_when_on(): void
     {
         $out = $this->child(<<<'PHP'

@@ -43,6 +43,7 @@ final class PublicSubmitTest extends TestCase
 
     private function comment(array $post = [], array $opts = []): array
     {
+        skip_unless_modules_on('comments_reviews');
         $slug = $post['article_slug'] ?? $this->tag;
         $this->cleanup[] = fn() => self::$pdo->prepare('DELETE FROM comments WHERE article_slug = ?')->execute([$slug]);
         return run_admin_page('api/comment-submit.php', $post + [
@@ -143,6 +144,7 @@ final class PublicSubmitTest extends TestCase
 
     private function review(string $slug, array $post = [], array $opts = []): array
     {
+        skip_unless_modules_on('comments_reviews', 'shop');
         return run_admin_page('api/review-submit.php', $post + [
             'product_slug' => $slug, 'lang' => 'bg', 'author_name' => 'Иван', 'author_email' => 'ivan@test.invalid',
             'rating' => '5', 'content' => 'Чудесен продукт, препоръчвам.', 'website' => '',
@@ -215,6 +217,7 @@ final class PublicSubmitTest extends TestCase
 
     public function testContactFormsRejectAnOverlongNameWithAMessage(): void
     {
+        skip_unless_modules_on('contact_form');
         $email = $this->tag . '@test.invalid';
         $this->cleanup[] = fn() => self::$pdo->prepare('DELETE FROM contact_submissions WHERE email = ?')->execute([$email]);
 

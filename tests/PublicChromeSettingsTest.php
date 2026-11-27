@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -109,6 +110,8 @@ final class PublicChromeSettingsTest extends TestCase
 
     // ── IBAN ─────────────────────────────────────────────────────────────────
 
+    // Sets FEATURE_DONATIONS itself, so the modules-off run (which overrides it) leaves it out.
+    #[Group('module-switches')]
     public function test_iban_shown_when_donations_on_and_set(): void
     {
         $html = $this->render(['SITE_IBAN' => 'BG80BNBG96611020345678', 'FEATURE_DONATIONS' => true],

@@ -137,7 +137,8 @@ final class HomeRenderTest extends TestCase
     public function test_cta_on_teal_uses_solid_white_text_and_white_buttons(): void
     {
         $html = $this->render([$this->s('cta', ['heading' => ['bg' => 'Х', 'en' => ''], 'text' => ['bg' => 'Кратък текст', 'en' => ''],
-            'btn1_label' => ['bg' => 'Дарете', 'en' => ''], 'btn1_url' => ['bg' => '/magazin/', 'en' => ''], 'background' => 'teal'])]);
+            'btn1_label' => ['bg' => 'Помогнете', 'en' => ''], 'btn1_url' => ['bg' => '/kak-da-pomogna/', 'en' => ''], 'background' => 'teal'])]);
+        // (A page no module owns: a module's link is left out while it is off, and this checks colours, not links.)
         $this->assertStringContainsString('section--teal', $html);
         $this->assertStringContainsString('color:#fff;', $html);
         $this->assertStringNotContainsString('rgba(255,255,255,0.85)', $html);

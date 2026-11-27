@@ -12,18 +12,25 @@ use PHPUnit\Framework\TestCase;
  */
 final class ModuleOffSkipTest extends TestCase
 {
+    /** The run's own NGO_TEST_MODULES_OFF (tests/modules-off.sh sets it), put back after each test. */
+    private string|false $runOff = false;
+
     protected function setUp(): void
     {
         if (!test_db_available()) $this->markTestSkipped('needs the local DB');
+        $this->runOff = getenv('NGO_TEST_MODULES_OFF');
     }
 
     protected function tearDown(): void
     {
-        putenv('NGO_TEST_MODULES_OFF');
+        // Put back what the run had: clearing it would switch every module back
+        // on for the rest of a modules-off run.
+        putenv($this->runOff === false ? 'NGO_TEST_MODULES_OFF' : 'NGO_TEST_MODULES_OFF=' . $this->runOff);
     }
 
     public function test_the_switch_turns_only_the_named_modules_off(): void
     {
+        putenv('NGO_TEST_MODULES_OFF');
         $own = feature_enabled('campaign');
         putenv('NGO_TEST_MODULES_OFF=campaign, social');
         $this->assertFalse(feature_enabled('campaign'));
@@ -64,6 +71,7 @@ final class ModuleOffSkipTest extends TestCase
 
     public function test_with_the_module_on_the_page_opens_as_usual(): void
     {
+        putenv('NGO_TEST_MODULES_OFF');
         if (!feature_enabled('campaign')) $this->markTestSkipped('Кампания is off on this site');
         $r = run_admin_page('admin/campaign.php', [], ['method' => 'GET']);
         $this->assertSame(200, $r['status']);

@@ -18,6 +18,8 @@ final class NewsletterBandTest extends TestCase
 
     private function validate(array $over): array
     {
+        // The band fields are part of the form only while Бюлетин is on.
+        skip_unless_modules_on('newsletter');
         return org_validate(array_merge([
             'site_name_bg' => 'Фондация Тест', 'site_name_en' => 'Test Foundation', 'site_email' => 'info@example.org',
             'brand_theme'  => 'classic', 'brand_primary' => '#0387A5', 'brand_accent' => '#04ADBF',

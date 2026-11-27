@@ -180,6 +180,7 @@ final class DistributionHttpTest extends TestCase
 
     public function testPostWithoutCsrfIsRefused(): void
     {
+        skip_unless_modules_on('distribution');
         $this->login();
         [$code] = $this->req('/admin/distribution.php', ['action' => 'add_batch', 'product_id' => self::$productId, 'quantity' => 5, 'produced_on' => '2026-01-01']);
         $this->assertSame(400, $code);
@@ -190,6 +191,7 @@ final class DistributionHttpTest extends TestCase
 
     public function testPageRendersForTheChosenProduct(): void
     {
+        skip_unless_modules_on('distribution');
         $this->login();
         [$code, $body] = $this->req('/admin/distribution.php?product=' . self::$productId);
         $this->assertSame(200, $code);
@@ -203,6 +205,7 @@ final class DistributionHttpTest extends TestCase
 
     public function testBatchHandOverProtocolAndBulkPaidRoundTrip(): void
     {
+        skip_unless_modules_on('distribution');
         $pdo   = get_pdo();
         $token = $this->login();
         $pid   = self::$productId;
@@ -267,6 +270,7 @@ final class DistributionHttpTest extends TestCase
 
     public function testAllProductsTableHasTotalRow(): void
     {
+        skip_unless_modules_on('distribution');
         require_once self::$root . '/includes/distribution.php';
         $pdo   = get_pdo();
         $token = $this->login();
@@ -288,6 +292,7 @@ final class DistributionHttpTest extends TestCase
 
     public function testSamplesForSeveralProductsRoundTrip(): void
     {
+        skip_unless_modules_on('distribution');
         $pdo   = get_pdo();
         $token = $this->login();
         $pid   = self::$productId;

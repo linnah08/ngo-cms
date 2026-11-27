@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 
@@ -27,6 +28,8 @@ final class FeatureFlagsTest extends TestCase
         $this->assertTrue(feature_enabled('no_such_module'));
     }
 
+    // Compares the switch with the site's own constant, which the modules-off run overrides.
+    #[Group('module-switches')]
     public function test_name_is_case_insensitive_and_maps_to_the_constant(): void
     {
         $this->assertTrue(defined('FEATURE_CAMPAIGN'), 'site.config.example.php should define FEATURE_CAMPAIGN');

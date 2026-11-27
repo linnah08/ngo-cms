@@ -128,7 +128,7 @@ final class SocialPanelTest extends TestCase
     public function testNewArticlePageRendersThePanel(): void
     {
         require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/modules.php';
-        if (!module_enabled_with_needs('social')) $this->markTestSkipped('The social module is off in this database.');
+        skip_unless_modules_on('social');
         $r = run_admin_page('admin/article-edit.php', [], ['method' => 'GET']);
         $this->assertSame(200, $r['status'], $r['body']);
         $this->assertDoesNotMatchRegularExpression('/(Warning|Notice|Deprecated|Fatal error):/', $r['body']);

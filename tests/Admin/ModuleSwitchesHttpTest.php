@@ -16,6 +16,7 @@ use PHPUnit\Framework\Attributes\Group;
  */
 #[Group('http')]
 #[Group('admin')]
+#[Group('module-switches')]   // sets the switches itself; left out of the modules-off run
 final class ModuleSwitchesHttpTest extends TestCase
 {
     private static string $root;

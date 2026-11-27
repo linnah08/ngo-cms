@@ -124,6 +124,7 @@ final class ProductEditNullFieldsHttpTest extends TestCase
 
     public function testEditPageRendersFullFormWhenNullableFieldsAreNull(): void
     {
+        skip_unless_modules_on('shop');
         if (!self::$serverReady) {
             $this->markTestSkipped('Could not start local php -S test server.');
         }

@@ -131,6 +131,7 @@ final class OrganisationTest extends TestCase
 
     public function test_order_prefix_is_optional_uppercased_and_checked(): void
     {
+        skip_unless_any_module_on('shop', 'donations');   // the field is in the form only for order numbers
         $themes = array_keys(brand_themes());
         $this->assertSame('', org_validate($this->validInput(['order_prefix' => '']), $themes)['values']['order_prefix']);
 

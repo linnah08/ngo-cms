@@ -16,6 +16,7 @@ use PHPUnit\Framework\TestCase;
  */
 #[Group('http')]
 #[Group('admin')]
+#[Group('module-switches')]   // sets the switches itself; left out of the modules-off run
 final class ModulesOffHttpTest extends TestCase
 {
     private static string $root;
@@ -272,7 +273,7 @@ final class ModulesOffHttpTest extends TestCase
     public function test_donations_work_end_to_end_with_the_shop_off(): void
     {
         $this->switchOff('shop');
-        if (!module_enabled_with_needs('donations')) $this->markTestSkipped('Donations are off on this site.');
+        skip_unless_modules_on('donations');
 
         [$code, $form] = $this->http('/donation/');
         $this->assertSame(200, $code);

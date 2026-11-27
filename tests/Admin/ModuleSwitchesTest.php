@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 
@@ -12,6 +13,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
  * applies; with no constant either the module is on. Anything that define()s
  * constants runs in a child PHP process so this process's own are untouched.
  */
+#[Group('module-switches')]   // sets the switches itself; left out of the modules-off run
 final class ModuleSwitchesTest extends TestCase
 {
     private string $tmp;
