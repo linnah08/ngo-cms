@@ -478,5 +478,12 @@
   "cart.restore.campaign_closed": "Кампанията вече не приема подкрепа.",
   "cart.restore.reward_gone": "Наградата, която сте избрали, вече не се предлага.",
   "cart.restore.expired": "Тази количка вече не е налична.",
-  "cart.restore.merged": "Добавихме артикулите от напомнянето ви в количката."
+  "cart.restore.merged": "Добавихме артикулите от напомнянето ви в количката.",
+  "cart.notice.one": "Оставихте 1 продукт в количката.",
+  "cart.notice.many": "Оставихте {n} продукта в количката.",
+  "cart.notice.restore": "Върнете ги",
+  "cart.notice.campaign": "кампанията",
+  "cart.notice.pledge": "Започнахте да подкрепите „{campaign}“.",
+  "cart.notice.finish": "Довършете",
+  "cart.notice.dismiss": "Скрий съобщението"
 }

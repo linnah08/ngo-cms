@@ -312,3 +312,4 @@ require ROOT_PATH . '/templates/tinymce-base.php';
     </div>
   </div>
 </header>
+<?php require __DIR__ . '/partials/saved-cart-notice.php'; ?>

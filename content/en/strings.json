@@ -478,5 +478,12 @@
   "cart.restore.campaign_closed": "The campaign is no longer taking pledges.",
   "cart.restore.reward_gone": "The reward you chose is no longer offered.",
   "cart.restore.expired": "This cart is no longer available.",
-  "cart.restore.merged": "We added the items from your reminder to your cart."
+  "cart.restore.merged": "We added the items from your reminder to your cart.",
+  "cart.notice.one": "You left 1 item in your cart.",
+  "cart.notice.many": "You left {n} items in your cart.",
+  "cart.notice.restore": "Bring them back",
+  "cart.notice.campaign": "the campaign",
+  "cart.notice.pledge": "You started supporting {campaign}.",
+  "cart.notice.finish": "Finish",
+  "cart.notice.dismiss": "Dismiss this message"
 }
