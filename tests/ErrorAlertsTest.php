@@ -199,14 +199,16 @@ final class ErrorAlertsTest extends TestCase
 
     public function testListRecentReturnsRowsNewestFirst(): void
     {
-        self::$pdo->prepare(
-            "INSERT INTO error_alerts (error_class, message, file, line, created_at) VALUES ('TestCapture', 'Recent 1', '/f.php', 1, ?)"
-        )->execute([date('Y-m-d H:i:s', time() - 60)]);
+        // The database's own clock, as created_at's default uses: PHP runs in UTC
+        // and MySQL may not, so a PHP time can land hours behind every real row.
+        self::$pdo->exec(
+            "INSERT INTO error_alerts (error_class, message, file, line, created_at) VALUES ('TestCapture', 'Recent 1', '/f.php', 1, NOW() - INTERVAL 60 SECOND)"
+        );
         $olderId = (int) self::$pdo->lastInsertId();
 
-        self::$pdo->prepare(
-            "INSERT INTO error_alerts (error_class, message, file, line, created_at) VALUES ('TestCapture', 'Recent 2', '/f.php', 2, ?)"
-        )->execute([date('Y-m-d H:i:s')]);
+        self::$pdo->exec(
+            "INSERT INTO error_alerts (error_class, message, file, line, created_at) VALUES ('TestCapture', 'Recent 2', '/f.php', 2, NOW())"
+        );
         $newerId = (int) self::$pdo->lastInsertId();
 
         $recent = error_alert_list_recent(50);
