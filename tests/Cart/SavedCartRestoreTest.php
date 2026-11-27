@@ -541,6 +541,34 @@ final class SavedCartRestoreTest extends TestCase
         }
     }
 
+    /**
+     * A reward pledge has no cart lines, so step 1 used to crash half-way through
+     * the page (the order summary read rows of an empty cart). The status is
+     * already 200 by then, so check the form itself is all there.
+     */
+    public function test_pledge_checkout_step_one_shows_the_whole_form_and_the_checkbox(): void
+    {
+        $this->startServer();
+        skip_unless_modules_on('campaign');
+        setting_set('cart_reminder_email', '1');
+        $pl  = $this->pledge(['reward_id' => 'new']);
+        $t   = $this->savedRow(bin2hex(random_bytes(32)), [], $pl['pledge_id']);
+        $jar = tempnam(sys_get_temp_dir(), 'jar');
+        try {
+            $this->assertStringContainsString('/checkout/?step=1', $this->http('/cart/restore.php?t=' . $t, $jar)['location']);
+            $page = $this->http('/checkout/?step=1', $jar);
+            $this->assertSame(200, $page['code']);
+            $this->assertStringNotContainsString('Нещо се обърка', $page['body']);
+            $this->assertStringContainsString('name="customer_email"', $page['body']);
+            $this->assertStringContainsString('id="cart_reminder"', $page['body']);
+            $this->assertStringContainsString('</html>', $page['body']);
+            $device = $this->jarCookie($jar, 'om_cart');
+            if ($device !== null) self::$tokens[] = $device;
+        } finally {
+            @unlink($jar);
+        }
+    }
+
     public function test_restore_onto_empty_cart_never_adopts_the_links_browser_token(): void
     {
         $this->startServer();

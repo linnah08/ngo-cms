@@ -27,7 +27,9 @@ if (empty($cart) && !$_is_pledge_mode) {
 
 // Load cart products
 function load_cart_products(array $cart, \PDO $pdo): array {
-    if (empty($cart)) return [];
+    // A reward pledge goes through checkout with no cart lines: callers read
+    // 'rows' and 'subtotal' either way.
+    if (empty($cart)) return ['rows' => [], 'subtotal' => 0.0];
     $ids  = array_column($cart, 'product_id');
     $in   = implode(',', array_fill(0, count($ids), '?'));
     $stmt = $pdo->prepare("SELECT * FROM products WHERE id IN ($in) AND active=1");
