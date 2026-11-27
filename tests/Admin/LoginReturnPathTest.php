@@ -77,4 +77,20 @@ final class LoginReturnPathTest extends TestCase
         $_SERVER['REQUEST_URI']    = '/admin/dashboard.php';
         $this->assertSame('/admin/login.php', admin_login_url_for_request());
     }
+
+    /**
+     * admin/login.php calls these, and the updater keeps a site's own config.php:
+     * defined there, a fork on an older config.php got a 500 on its login page
+     * (the v0.64.9 release gate caught it). They live in a shipped include that
+     * admin/includes/auth.php loads.
+     */
+    public function testHelpersDontDependOnConfigPhp(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $config = (string) file_get_contents($root . '/config.php');
+        $this->assertStringNotContainsString('function admin_login_return_path', $config);
+        $this->assertStringNotContainsString('function admin_login_url_for_request', $config);
+        $this->assertStringContainsString("includes/admin_login_return.php'", (string) file_get_contents($root . '/admin/includes/auth.php'));
+        $this->assertStringContainsString("includes/admin_login_return.php'", $config);
+    }
 }

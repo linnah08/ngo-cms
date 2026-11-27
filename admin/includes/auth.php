@@ -48,6 +48,7 @@ function rate_limit_exceeded(string $action, int $max, int $window_seconds): boo
 }
 
 require_once dirname(__DIR__, 2) . '/includes/admin_session.php';   // admin_session_site(), also for a site that kept an older config.php
+require_once dirname(__DIR__, 2) . '/includes/admin_login_return.php';   // admin_login_return_path()
 
 function admin_login(string $email, string $password): bool
 {
