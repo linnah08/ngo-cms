@@ -105,6 +105,12 @@ function saved_cart_for_browser(PDO $pdo): array
     return $out;
 }
 
+/** Stops a row driving the on-site notice (used once its email link has been followed). */
+function saved_cart_dismiss_row(PDO $pdo, int $id): void
+{
+    $pdo->prepare('UPDATE saved_carts SET dismissed_at = NOW() WHERE id = ?')->execute([$id]);
+}
+
 function saved_cart_mark_ordered(PDO $pdo, ?int $pledge_id = null): void
 {
     if ($pledge_id !== null) {

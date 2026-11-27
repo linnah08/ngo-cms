@@ -388,4 +388,30 @@ final class SavedCartRestoreTest extends TestCase
             $this->assertStringContainsString('Тази подкрепа вече е обработена.', $page['body']);
         } finally { @unlink($jar); }
     }
+
+    public function test_restore_onto_empty_cart_never_adopts_the_links_browser_token(): void
+    {
+        $this->startServer();
+        $a = $this->product(['stock' => 9]);
+        $jar = tempnam(sys_get_temp_dir(), 'jar');
+        try {
+            $other = bin2hex(random_bytes(32));
+            $token = $this->savedRow($other, [['product_id' => $a, 'quantity' => 2]]);
+            $r = $this->http('/cart/restore.php?t=' . $token, $jar);
+            $this->assertSame(302, $r['code']);
+            $device = $this->jarCookie($jar, 'om_cart');
+            $this->assertMatchesRegularExpression('/^[0-9a-f]{64}$/', $device);
+            self::$tokens[] = $device;
+            $this->assertNotSame($other, $device);
+
+            $s = self::$pdo->prepare('SELECT items FROM saved_carts WHERE browser_token = ? AND pledge_id IS NULL');
+            $s->execute([$device]);
+            $items = json_decode((string)$s->fetchColumn(), true);
+            $this->assertSame([$a => 2], array_column($items, 'quantity', 'product_id'));
+
+            $d = self::$pdo->prepare('SELECT dismissed_at FROM saved_carts WHERE token = ?');
+            $d->execute([$token]);
+            $this->assertNotNull($d->fetchColumn());
+        } finally { @unlink($jar); }
+    }
 }

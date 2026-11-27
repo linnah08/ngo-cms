@@ -67,8 +67,6 @@ if (!is_array($current)) $current = [];
 
 if ($current === []) {
     $_SESSION['cart'] = $checked['items'];
-    // This device now carries the saved row, so it keeps being updated.
-    if (saved_cart_token_valid((string)$row['browser_token'])) saved_cart_set_cookie((string)$row['browser_token']);
 } else {
     $merge = saved_cart_merge($current, $checked['items']);
     $_SESSION['cart'] = $merge['items'];
@@ -79,5 +77,11 @@ if ($current === []) {
 
 try { saved_cart_sync($pdo, $_SESSION['cart'], $lang); }
 catch (Throwable $e) { error_log('Saved cart sync failed: ' . $e->getMessage()); }
+
+// The device saves under its own cookie, never the link's. The emailed row has done its job.
+if ($from_email && $row['browser_token'] !== saved_cart_browser_token(false)) {
+    try { saved_cart_dismiss_row($pdo, (int)$row['id']); }
+    catch (Throwable $e) { error_log('Saved cart dismiss failed: ' . $e->getMessage()); }
+}
 
 restore_go(shop_path('cart', $lang));
