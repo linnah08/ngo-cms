@@ -193,6 +193,17 @@ if (module_admin_page_visible('product-reviews.php')) try {
   <div class="admin-alert admin-alert--<?= h($_flash['type']) ?>" style="margin-bottom:1.5rem;"><?= h($_flash['message']) ?></div>
 <?php endforeach; ?>
 
+<?php /* Text kept only in this browser's backup (admin/js/autosave.js) — filled by JS. */ ?>
+<div id="unsavedDrafts" hidden></div>
+<p id="unsavedDraftsLive" role="status" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0;"></p>
+<script src="<?= h(versioned_asset('/admin/js/unsaved-drafts.js')) ?>"></script>
+<script>
+showUnsavedDrafts({
+  mountId: 'unsavedDrafts', prefix: 'product:', titleField: 'name_bg', newLabel: 'Нов продукт, още не е запазен',
+  editUrl: function (id) { return '/admin/product-edit.php' + (id === 'new' ? '' : '?id=' + encodeURIComponent(id)); }
+});
+</script>
+
 <?php if (empty($products)): ?>
   <p style="color:var(--text-muted);">Няма продукти. <a href="/admin/product-edit.php">Добавете първия</a>.</p>
 <?php else: ?>

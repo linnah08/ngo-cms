@@ -221,6 +221,11 @@ if (session_status() === PHP_SESSION_NONE) {
     }
     $_om_cookie_domain = PHP_SAPI === 'cli' ? '' : site_session_cookie_domain();
     if ($_om_cookie_domain !== '') ini_set('session.cookie_domain', $_om_cookie_domain);
+    // PHP's default deletes a session after 24 idle minutes, which logged people out
+    // mid-article long before the 8-hour admin limit. Match ADMIN_SESSION_HOURS (defined
+    // further down). Hosts that clean sessions by their own cron ignore this, so open
+    // admin pages also ping the server every few minutes (admin/js/session-guard.js).
+    ini_set('session.gc_maxlifetime', (string) (8 * 3600));
     session_start();
     // The setting changed since this visitor's cookie was made: move the cookie
     // over once, or a host-only and a shared cookie of the same name would
@@ -735,9 +740,45 @@ function admin_session_recheck(PDO $pdo): bool
     return true;
 }
 
+/**
+ * Where to send someone after they log in: $raw when it is an admin page on this
+ * site (a path, never another host), otherwise the dashboard.
+ */
+function admin_login_return_path(?string $raw): string {
+    $fallback = '/admin/dashboard.php';
+    $raw = (string) $raw;
+    if ($raw === '' || strlen($raw) > 2000) return $fallback;
+    if (preg_match('/[\x00-\x1f\x7f\\\\]/', $raw)) return $fallback;
+    if (!str_starts_with($raw, '/admin/')) return $fallback;
+    $path = (string) parse_url($raw, PHP_URL_PATH);
+    if ($path === '' || str_contains($path, '..')) return $fallback;
+    if (in_array(basename($path), ['login.php', 'logout.php', 'session-ping.php'], true)) return $fallback;
+    return $raw;
+}
+
+/**
+ * The login URL for a request that found no session, carrying the page to come back
+ * to. A form sent after the session ran out returns to the page the form was on
+ * (its editor still holds the text in the browser's backup).
+ */
+function admin_login_url_for_request(): string {
+    $back = (string) ($_SERVER['REQUEST_URI'] ?? '');
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
+        $ref  = (string) ($_SERVER['HTTP_REFERER'] ?? '');
+        $host = (string) ($_SERVER['HTTP_HOST'] ?? '');
+        $back = '';
+        if ($ref !== '' && $host !== '' && strcasecmp((string) parse_url($ref, PHP_URL_HOST), explode(':', $host)[0]) === 0) {
+            $q    = parse_url($ref, PHP_URL_QUERY);
+            $back = (string) parse_url($ref, PHP_URL_PATH) . ($q ? '?' . $q : '');
+        }
+    }
+    $back = admin_login_return_path($back);
+    return '/admin/login.php' . ($back === '/admin/dashboard.php' ? '' : '?next=' . rawurlencode($back));
+}
+
 function admin_require_login(): void {
     if (!admin_logged_in()) {
-        header('Location: /admin/login.php');
+        header('Location: ' . admin_login_url_for_request());
         exit;
     }
     // A site's own role (includes/site-extensions.php) works in its own pages, not the admin.

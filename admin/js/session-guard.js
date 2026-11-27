@@ -16,13 +16,17 @@
   }
 
   function showExpiredBanner() {
+    if (document.getElementById('_sessExpired')) return;
     var hasDraft = hasLocalDraft();
     var banner = document.createElement('div');
+    banner.id = '_sessExpired';
+    banner.setAttribute('role', 'alert');
     banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#dc2626;color:#fff;'
       + 'padding:.85rem 1.25rem;text-align:center;z-index:99999;font-size:.95rem;line-height:1.5;';
     banner.innerHTML = 'Сесията ви е изтекла.'
       + (hasDraft ? ' Черновата е запазена — ' : ' ')
-      + '<a href="/admin/login.php" style="color:#fff;font-weight:700;text-decoration:underline;">'
+      + '<a href="/admin/login.php?next=' + encodeURIComponent(location.pathname + location.search)
+      + '" style="color:#fff;font-weight:700;text-decoration:underline;">'
       + 'Влезте отново, за да продължите.</a>';
     document.body.prepend(banner);
   }
@@ -111,12 +115,52 @@
     });
   }
 
+  // Heartbeat: a page left open (an article being written) still talks to the server
+  // every few minutes, so the host never throws the session away as idle — that
+  // logged people out mid-article and lost what they wrote. Typing since the last
+  // beat also extends the 8-hour limit, as „Остани в системата“ does.
+  var BEAT_MS = 4 * 60 * 1000;
+  var active = false;
+  var expired = false;
+  ['input', 'keydown', 'change'].forEach(function (ev) {
+    document.addEventListener(ev, function () { active = true; }, true);
+  });
+  // TinyMCE types inside its own iframe, so its key presses don't reach this
+  // document; autosave.js reports them with this event.
+  document.addEventListener('om:activity', function () { active = true; });
+
+  function beat() {
+    if (expired) return;
+    var opts = { method: 'GET', credentials: 'same-origin' };
+    if (active) {
+      var fd = new FormData();
+      fd.append('csrf_token', csrfToken);
+      opts = { method: 'POST', credentials: 'same-origin', body: fd };
+    }
+    active = false;
+    fetch('/admin/session-ping.php', opts)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.alive === false) { expired = true; showExpiredBanner(); return; }
+        if (d.expiresAt && d.expiresAt * 1000 !== expiresAt) {
+          expiresAt = d.expiresAt * 1000;
+          if (!warned) scheduleWarning();
+        }
+      })
+      .catch(function () { /* offline for a moment — try again on the next beat */ });
+  }
+  setInterval(beat, BEAT_MS);
+  // Coming back to a tab the browser had paused: check straight away.
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') beat();
+  });
+
   // Page-load ping: detect already-expired session before user starts typing
   document.addEventListener('DOMContentLoaded', function () {
     fetch('/admin/session-ping.php', { method: 'GET', credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (!d.alive) { showExpiredBanner(); return; }
+        if (!d.alive) { expired = true; showExpiredBanner(); return; }
         if (d.expiresAt) expiresAt = d.expiresAt * 1000;
         scheduleWarning();
       })

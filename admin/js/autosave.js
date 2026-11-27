@@ -47,6 +47,8 @@
     }
 
     function schedule() {
+      // Tells session-guard.js someone is working here, so it keeps the session alive.
+      try { document.dispatchEvent(new Event('om:activity')); } catch (e) {}
       clearTimeout(timer);
       timer = setTimeout(save, 2000);
     }
@@ -81,6 +83,25 @@
       var saved;
       try { saved = JSON.parse(raw); } catch (e) { return; }
       if (!saved || !saved.data) return;
+
+      // Opened from the „Незапазени чернови“ box on a list page (?restore=1):
+      // put the text back straight away instead of asking again.
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('restore') === '1') {
+        params.delete('restore');
+        try {
+          var qs = params.toString();
+          history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+        } catch (e) {}
+        restore(saved.data);
+        var note = document.createElement('div');
+        note.setAttribute('role', 'status');
+        note.style.cssText = 'background:#fffbeb;border:1px solid #b45309;color:#78350f;border-radius:6px;'
+          + 'padding:.75rem 1rem;margin-bottom:1.25rem;font-size:.95rem;';
+        note.textContent = 'Текстът ви е върнат. Натиснете „Запази“, за да не се загуби.';
+        form.insertBefore(note, form.firstChild);
+        return;
+      }
 
       var diff = Math.floor((Date.now() - (saved.ts || 0)) / 1000);
       var ago = diff < 60  ? ('преди ' + diff + ' сек.')
@@ -160,12 +181,23 @@
         var key = '_tiny_' + id;
         if (!(key in data)) return;
         var ed = (typeof tinymce !== 'undefined') ? tinymce.get(id) : null;
-        if (ed) {
+        if (ed && ed.initialized) {
           ed.setContent(data[key]);
+          return;
+        }
+        // The editor hasn't started yet (restoring on page load, or the EN editor
+        // that starts when its section opens): it starts from the textarea, so put
+        // the text there, and set it again once the editor is up in case it already
+        // read the old value.
+        var ta = document.getElementById(id);
+        if (ta) ta.value = data[key];
+        var whenUp = function (e) { e.setContent(data[key]); };
+        if (ed) {
+          ed.once('init', function () { whenUp(ed); });
         } else if (typeof tinymce !== 'undefined') {
           var handler = function (e) {
             if (e.editor.id === id) {
-              e.editor.setContent(data[key]);
+              e.editor.once('init', function () { whenUp(e.editor); });
               tinymce.off('AddEditor', handler);
             }
           };

@@ -2,8 +2,11 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/auth.php';
 
+// The page to return to after logging in (set when the session ran out on it).
+$next = admin_login_return_path($_POST['next'] ?? $_GET['next'] ?? null);
+
 if (admin_logged_in()) {
-    header('Location: /admin/dashboard.php');
+    header('Location: ' . $next);
     exit;
 }
 
@@ -16,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email    = trim($_POST['email']    ?? '');
         $password = trim($_POST['password'] ?? '');
         if (admin_login($email, $password)) {
-            header('Location: /admin/dashboard.php');
+            header('Location: ' . $next);
             exit;
         }
         $error = 'Невалиден имейл или парола.';
@@ -45,7 +48,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <div class="admin-alert admin-alert--error"><?= h($error) ?></div>
     <?php endif; ?>
 
+    <?php if ($next !== '/admin/dashboard.php' && !$error): ?>
+      <div class="admin-alert" role="status" style="margin-bottom:1rem;background:#fffbeb;border:1px solid #b45309;color:#78350f;">
+        Излязохте от системата. Влезте отново и ще се върнете там, където бяхте.
+      </div>
+    <?php endif; ?>
+
     <form method="POST" action="/admin/login.php">
+      <input type="hidden" name="next" value="<?= h($next) ?>">
       <div class="form-group">
         <label for="email">Имейл</label>
         <input type="email" id="email" name="email"

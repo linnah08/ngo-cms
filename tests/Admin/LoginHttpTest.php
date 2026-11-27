@@ -139,4 +139,60 @@ final class LoginHttpTest extends TestCase
         $this->assertSame(200, $dashCode,
             'Dashboard must return 200 after successful login (session must persist across redirect)');
     }
+
+    public function testLoggedOutEditorSendsToLoginWithReturnPage(): void
+    {
+        $this->skip();
+
+        $ch = curl_init(self::$base . '/admin/article-edit.php?slug=some-article');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        $resp = (string) curl_exec($ch);
+        curl_close($ch);
+
+        $this->assertMatchesRegularExpression(
+            '~Location: /admin/login\.php\?next=' . preg_quote(rawurlencode('/admin/article-edit.php?slug=some-article'), '~') . '~',
+            $resp, 'A logged-out visit must send to the login page carrying the page to return to');
+    }
+
+    public function testLoginReturnsToTheGivenAdminPage(): void
+    {
+        $this->skip();
+
+        $ch = curl_init(self::$base . '/admin/login.php');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+            'email'    => self::$email,
+            'password' => self::$password,
+            'next'     => '/admin/article-edit.php?slug=x',
+        ]));
+        $resp = (string) curl_exec($ch);
+        curl_close($ch);
+
+        $this->assertStringContainsString('Location: /admin/article-edit.php?slug=x', $resp);
+    }
+
+    public function testLoginIgnoresAReturnPageOnAnotherSite(): void
+    {
+        $this->skip();
+
+        $ch = curl_init(self::$base . '/admin/login.php');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+            'email'    => self::$email,
+            'password' => self::$password,
+            'next'     => '//evil.example/admin/',
+        ]));
+        $resp = (string) curl_exec($ch);
+        curl_close($ch);
+
+        $this->assertStringContainsString('Location: /admin/dashboard.php', $resp);
+    }
 }
