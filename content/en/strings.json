@@ -124,6 +124,7 @@
   "checkout.f.name": "Full name",
   "checkout.f.email": "Email",
   "checkout.f.phone": "Phone",
+  "checkout.cart_reminder": "Email me a reminder if I don't finish my order",
   "checkout.invoice": "I need an invoice",
   "checkout.invoice.hint": "For companies registered in Bulgaria (with an EIK) — fill in the company details",
   "checkout.f.company": "Company name",

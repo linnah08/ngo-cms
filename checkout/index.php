@@ -163,18 +163,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        $cart_reminder = !empty($_POST['cart_reminder']) && saved_cart_email_enabled();
         if (!$errors) {
             $_SESSION['checkout_data'] = array_merge($data, [
                 'customer_name'  => $name,
                 'customer_email' => $email,
                 'customer_phone' => $phone,
                 'invoice_data'   => $invoice_data,
+                'cart_reminder'  => $cart_reminder,
             ]);
+            if (saved_cart_email_enabled()) {
+                try {
+                    saved_cart_record_consent(
+                        get_pdo(), $cart_reminder, $email, $name, post_lang(),
+                        saved_cart_consent_label(post_lang()),
+                        !empty($data['_pledge_number']) ? (int)($data['_pledge_id'] ?? 0) : null
+                    );
+                } catch (Throwable $e) {
+                    error_log('Saved cart consent failed: ' . $e->getMessage());
+                }
+            }
             header('Location: ' . shop_path('checkout') . '?step=2');
             exit;
         }
         // Show the form again with what they typed, not emptied
         $contact_redisplay = [
+            'cart_reminder'  => $cart_reminder,
             'customer_name'  => $name,
             'customer_email' => $email,
             'customer_phone' => $phone,
@@ -725,6 +739,7 @@ $subtotal  = $cart_info['subtotal'];
           </div>
         </label>
       </div>
+      <?= saved_cart_consent_checkbox_html($lang, !empty($d['cart_reminder'])) ?>
       <!-- Optional invoice section (B2B) -->
       <?php
         $inv_data   = $d['invoice_data'] ?? null;

@@ -105,6 +105,77 @@ function saved_cart_for_browser(PDO $pdo): array
     return $out;
 }
 
+// ── Email consent ────────────────────────────────────────────────────────────
+
+/** The checkbox wording, in the shopper's language. Recorded exactly as shown. */
+function saved_cart_consent_label(string $lang): string
+{
+    $lang = $lang === 'en' ? 'en' : 'bg';
+    return t_or('checkout.cart_reminder', 'Изпратете ми напомняне по имейл, ако не завърша поръчката', 'Email me a reminder if I don\'t finish my order', $lang);
+}
+
+/** Opt-in checkbox for checkout step 1; empty when the email reminder switch is off. */
+function saved_cart_consent_checkbox_html(string $lang, bool $checked): string
+{
+    if (!saved_cart_email_enabled()) return '';
+    $label = saved_cart_consent_label($lang);
+    return '<div style="margin-top:1rem;display:flex;align-items:flex-start;gap:.6rem;">'
+        . '<input type="checkbox" id="cart_reminder" name="cart_reminder" value="1"'
+        . ($checked ? ' checked' : '')
+        . ' style="width:1.25rem;height:1.25rem;margin:.1rem 0 0;flex-shrink:0;accent-color:var(--teal);">'
+        . '<label for="cart_reminder" style="font-size:.9rem;line-height:1.5;cursor:pointer;">'
+        . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</label></div>';
+}
+
+/**
+ * Records the shopper's answer to the reminder checkbox. Ticked: stores email,
+ * name, time and the exact wording agreed to. Unticked: forgets the email.
+ * Shop mode writes the browser's open shop row (creating it if the cart was not
+ * saved yet); pledge mode writes only the pledge's own row.
+ */
+function saved_cart_record_consent(PDO $pdo, bool $opted_in, string $email, string $name, string $lang, string $consent_text, ?int $pledge_id = null): void
+{
+    $lang = $lang === 'en' ? 'en' : 'bg';
+    $set  = $opted_in
+        ? 'email = ?, name = ?, remind_opt_in = 1, remind_consent_at = NOW(), remind_consent_text = ?, lang = ?, updated_at = NOW()'
+        : 'remind_opt_in = 0, email = NULL, name = NULL, updated_at = NOW()';
+    $args = $opted_in ? [$email, $name, $consent_text, $lang] : [];
+
+    if ($pledge_id !== null) {
+        $sel = $pdo->prepare('SELECT id FROM saved_carts WHERE pledge_id = ?');
+        $sel->execute([$pledge_id]);
+        $id = $sel->fetchColumn();
+        if ($id !== false) {
+            $pdo->prepare("UPDATE saved_carts SET $set WHERE id = ?")->execute([...$args, (int)$id]);
+            return;
+        }
+        if (!$opted_in) return;
+        $browser = saved_cart_browser_token(true);
+        if ($browser === null) return;
+        $pdo->prepare('INSERT INTO saved_carts (token, browser_token, pledge_id, items, lang, email, name, remind_opt_in, remind_consent_at, remind_consent_text, created_at, updated_at)'
+            . " VALUES (?, ?, ?, '[]', ?, ?, ?, 1, NOW(), ?, NOW(), NOW())")
+            ->execute([bin2hex(random_bytes(32)), $browser, $pledge_id, $lang, $email, $name, $consent_text]);
+        return;
+    }
+
+    $browser = saved_cart_browser_token(false);
+    $id = false;
+    $find = $pdo->prepare('SELECT id FROM saved_carts WHERE browser_token = ? AND pledge_id IS NULL AND ordered_at IS NULL ORDER BY id DESC LIMIT 1');
+    if ($browser !== null) {
+        $find->execute([$browser]);
+        $id = $find->fetchColumn();
+    }
+    if ($id === false) {
+        saved_cart_sync($pdo, $_SESSION['cart'] ?? [], $lang);
+        $browser = saved_cart_browser_token(false);
+        if ($browser === null) return;
+        $find->execute([$browser]);
+        $id = $find->fetchColumn();
+        if ($id === false) return;
+    }
+    $pdo->prepare("UPDATE saved_carts SET $set WHERE id = ?")->execute([...$args, (int)$id]);
+}
+
 /** Stops a row driving the on-site notice (used once its email link has been followed). */
 function saved_cart_dismiss_row(PDO $pdo, int $id): void
 {

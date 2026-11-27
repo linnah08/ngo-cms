@@ -124,6 +124,7 @@
   "checkout.f.name": "Имена",
   "checkout.f.email": "Имейл",
   "checkout.f.phone": "Телефон",
+  "checkout.cart_reminder": "Изпратете ми напомняне по имейл, ако не завърша поръчката",
   "checkout.invoice": "Нуждая се от фактура",
   "checkout.invoice.hint": "За юридически лица с ЕИК — попълнете данните на фирмата",
   "checkout.f.company": "Наименование на фирмата",
