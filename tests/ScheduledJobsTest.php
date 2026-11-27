@@ -16,7 +16,7 @@ final class ScheduledJobsTest extends TestCase
 
     public function test_every_job_script_exists_and_is_tracked(): void
     {
-        $this->assertCount(7, scheduled_jobs());
+        $this->assertCount(8, scheduled_jobs());
         foreach (scheduled_jobs() as $key => $job) {
             $path = $_SERVER['DOCUMENT_ROOT'] . '/' . $job['script'];
             $this->assertFileExists($path, $key);
@@ -33,6 +33,16 @@ final class ScheduledJobsTest extends TestCase
         $this->assertSame('late',    scheduled_job_status(7200, $now - 7201,  $now - 86400, $now));
         $this->assertSame('waiting', scheduled_job_status(7200, null,         $now - 3600,  $now), 'just updated — give cron a chance');
         $this->assertSame('missing', scheduled_job_status(7200, null,         $now - 7201,  $now));
+    }
+
+    public function test_cart_reminders_job_is_registered_hourly_with_its_script(): void
+    {
+        $job = scheduled_jobs()['cart_reminders'] ?? null;
+        $this->assertNotNull($job);
+        $this->assertSame(['0', '*', '*', '*', '*'], $job['cron']);
+        $this->assertSame(3 * 3600, $job['grace']);
+        $this->assertFileExists($_SERVER['DOCUMENT_ROOT'] . '/' . $job['script']);
+        $this->assertSame('cron/cart-reminders-cron.php', $job['script']);
     }
 
     public function test_command_uses_real_paths_and_logs_output(): void

@@ -21,6 +21,7 @@ final class EmailTemplatePlaceholdersTest extends TestCase
         'order-cancelled-customer'         => ['includes/payment/order_refund.php'],
         'order-payment-failed-customer'    => ['includes/payment/unpaid_orders.php', 'includes/order_email_composer.php'],
         'donation-payment-failed-customer' => ['includes/payment/unpaid_orders.php', 'includes/order_email_composer.php'],
+        'cart-reminder-customer'           => ['includes/saved_carts.php'],
         'credit-note-customer'             => ['admin/generate-document.php'],
         'error-alert'                      => ['includes/emails/error-alert.php'],
         'error-digest'                     => ['includes/emails/error-digest.php'],

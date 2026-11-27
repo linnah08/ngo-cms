@@ -108,6 +108,19 @@ function _email_tpl_defaults(): array {
             'outro_en'   => '<p>If you have already paid, there is nothing more you need to do.</p>',
         ],
 
+        'cart-reminder-customer' => [
+            'subject_bg' => 'Оставихте нещо в количката си',
+            'intro_bg'   => '<h2>Още не сте завършили</h2>'
+                          . '<p>Здравейте, {{customer_name}},</p>'
+                          . '<p>Започнахте поръчка в нашия сайт, но не я завършихте. Запазихме я за вас — можете да продължите от там, докъдето стигнахте.</p>',
+            'outro_bg'   => '<p style="color:#6b6560;font-size:14px;">Получавате това писмо, защото поискахте да ви напомним.</p>',
+            'subject_en' => 'You left something in your cart',
+            'intro_en'   => '<h2>You have not finished yet</h2>'
+                          . '<p>Hello {{customer_name}},</p>'
+                          . '<p>You started an order on our website but did not finish it. We kept it for you, so you can carry on from where you stopped.</p>',
+            'outro_en'   => '<p style="color:#6b6560;font-size:14px;">You\'re getting this because you asked us to remind you.</p>',
+        ],
+
         'donation-payment-failed-customer' => [
             'subject_bg' => 'Дарението ви не беше завършено',
             'intro_bg'   => '<h2>Дарението не беше завършено</h2>'

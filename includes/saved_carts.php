@@ -340,3 +340,169 @@ function saved_cart_restore_pledge(PDO $pdo, array $row, string $lang): ?string
     order_session_remember((string)$p['pledge_number']);
     return null;
 }
+
+
+// ── Reminder emails ──────────────────────────────────────────────────────────
+
+/**
+ * Rows the hourly job would email now: opted in, address given, not yet reminded
+ * (a row is reminded at most once, however often the cart is edited afterwards),
+ * not opted out, not ordered, last touched between 24 hours and 7 days ago, and
+ * no order from the same address since. A shop row needs items; a pledge row
+ * has none (its pledge is checked when it is sent).
+ *
+ * @return list<array> decoded rows, oldest first
+ */
+function saved_carts_due(PDO $pdo): array
+{
+    $st = $pdo->query(
+        "SELECT * FROM saved_carts s
+         WHERE s.remind_opt_in = 1 AND s.email IS NOT NULL AND s.email <> ''
+           AND s.reminded_at IS NULL AND s.opted_out_at IS NULL AND s.ordered_at IS NULL
+           AND s.updated_at <= NOW() - INTERVAL " . (int)SAVED_CART_REMIND_AFTER_HOURS . " HOUR
+           AND s.updated_at >= NOW() - INTERVAL " . (int)SAVED_CART_REMIND_MAX_AGE_DAYS . " DAY
+           AND NOT EXISTS (SELECT 1 FROM orders o WHERE LOWER(o.customer_email) = LOWER(s.email) AND o.created_at > s.updated_at)
+         ORDER BY s.id"
+    );
+    $out = [];
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $row = saved_cart_decode($r);
+        if ($row['pledge_id'] === null && $row['items'] === []) continue;
+        $out[] = $row;
+    }
+    return $out;
+}
+
+/** The product lines of a reminder, with the shop's current names and prices (EUR). */
+function saved_cart_reminder_lines(PDO $pdo, array $items, string $lang): array
+{
+    $prod = $pdo->prepare('SELECT name_bg, name_en, image, price_eur FROM products WHERE id = ?');
+    $var  = $pdo->prepare('SELECT label_bg, label_en, image FROM product_variants WHERE id = ?');
+    $lines = [];
+    foreach ($items as $i) {
+        $prod->execute([(int)$i['product_id']]);
+        $p = $prod->fetch(PDO::FETCH_ASSOC);
+        if (!$p) continue;
+        $name  = $lang === 'en' ? ((string)$p['name_en'] ?: (string)$p['name_bg']) : (string)$p['name_bg'];
+        $image = (string)($p['image'] ?? '');
+        $parts = [];
+        if (!empty($i['variant_id'])) {
+            $var->execute([(int)$i['variant_id']]);
+            if ($v = $var->fetch(PDO::FETCH_ASSOC)) {
+                $parts[] = $lang === 'en' ? ((string)$v['label_en'] ?: (string)$v['label_bg']) : (string)$v['label_bg'];
+                if (!empty($v['image'])) $image = (string)$v['image'];
+            }
+        }
+        if (!empty($i['colour'])) $parts[] = ($lang === 'en' ? 'Colour' : 'Цвят') . ': ' . ucfirst((string)$i['colour']);
+        if (!empty($i['size']))   $parts[] = ($lang === 'en' ? 'Size' : 'Размер') . ': ' . $i['size'];
+        $lines[] = [
+            'name'    => $name,
+            'variant' => implode(' · ', $parts),
+            'qty'     => (int)$i['quantity'],
+            'price'   => (float)$p['price_eur'],
+            'image'   => $image !== '' ? SITE_URL . '/assets/images/products/' . rawurlencode($image) : '',
+        ];
+    }
+    return $lines;
+}
+
+/**
+ * Emails one saved cart or pledge its reminder. The row is claimed first
+ * (reminded_at) so overlapping runs cannot both send, and the claim stays when
+ * the mailer fails: at most one email, even at the cost of a lost one. Nothing is
+ * sent when nothing is left to come back to (items gone from the shop, pledge
+ * paid or reversed, campaign closed).
+ *
+ * @param callable|null $mailer fn(string $to, string $subject, string $html): bool, default send_mail()
+ * @return bool true when an email went out
+ */
+function send_cart_reminder(PDO $pdo, array $row, ?callable $mailer = null): bool
+{
+    if (!is_array($row['items'])) $row = saved_cart_decode($row);   // raw database row
+    $claim = $pdo->prepare('UPDATE saved_carts SET reminded_at = NOW() WHERE id = ? AND reminded_at IS NULL');
+    $claim->execute([(int)$row['id']]);
+    if ($claim->rowCount() === 0) return false;
+
+    $email = trim((string)($row['email'] ?? ''));
+    if ($email === '') return false;
+    $lang  = ($row['lang'] ?? 'bg') === 'en' ? 'en' : 'bg';
+    $lines = [];
+    $pledge = null;
+
+    if ($row['pledge_id'] !== null) {
+        $st = $pdo->prepare(
+            'SELECT p.amount_eur, p.payment_status, r.title, r.title_en
+             FROM campaign_pledges p LEFT JOIN campaign_rewards r ON r.id = p.reward_id WHERE p.id = ?'
+        );
+        $st->execute([(int)$row['pledge_id']]);
+        $p = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$p || $p['payment_status'] !== 'pending' || setting_get('campaign_active', '0') !== '1') return false;
+        // The campaign's name is a setting; English falls back to a generic wording, never to the Bulgarian title.
+        $campaign = trim(setting_get($lang === 'en' ? 'campaign_title_en' : 'campaign_title', ''));
+        if ($campaign === '') $campaign = t_or('cart.notice.campaign', 'кампанията', 'the campaign', $lang);
+        $reward = $lang === 'en' ? ((string)$p['title_en'] ?: (string)$p['title']) : (string)$p['title'];
+        $pledge = ['campaign' => $campaign, 'reward' => (string)$reward, 'amount' => (float)$p['amount_eur']];
+    } else {
+        $checked = saved_cart_validate_items($pdo, $row['items'], $lang);
+        $lines   = saved_cart_reminder_lines($pdo, $checked['items'], $lang);
+        if ($lines === []) return false;
+    }
+
+    require_once __DIR__ . '/email-templates.php';
+    $restore = SITE_URL . '/cart/restore.php?t=' . $row['token'];
+    $name    = trim((string)($row['name'] ?? ''));
+    if ($name === '') $name = $lang === 'en' ? 'there' : 'приятелю';
+    $tpl = email_tpl_get('cart-reminder-customer', $lang, ['customer_name' => $name, 'restore_url' => $restore]);
+    if ($pledge !== null) {
+        $tpl['subject'] = t_or('cart.reminder.pledge_subject', 'Подкрепата ви не е завършена', 'Your support isn\'t finished yet', $lang);
+    }
+    $html = render_email('cart-reminder-customer', [
+        'tpl' => $tpl, 'lang' => $lang, 'lines' => $lines, 'pledge' => $pledge,
+        'restore_url' => $restore, 'optout_url' => SITE_URL . '/cart/no-reminder.php?t=' . $row['token'],
+    ]);
+
+    $mailer ??= fn(string $to, string $subject, string $body): bool => send_mail($to, $subject, $body);
+    $sent = false;
+    try {
+        $sent = (bool)$mailer($email, $tpl['subject'], $html);
+    } catch (Throwable $e) {
+        error_log("cart reminder for saved cart {$row['id']}: " . $e->getMessage());
+    }
+    if (!$sent) error_log("cart reminder for saved cart {$row['id']} was not sent and will not be retried");
+    return $sent;
+}
+
+/**
+ * Hourly job: email the due rows (one email per address per run), then forget
+ * rows untouched for 30 days. With the email switch off nothing is sent but the
+ * old rows are still removed.
+ *
+ * @return array{emailed:int, skipped:int, deleted:int}
+ */
+function run_cart_reminders_job(PDO $pdo, ?callable $mailer = null): array
+{
+    $result = ['emailed' => 0, 'skipped' => 0, 'deleted' => 0];
+    if (saved_cart_email_enabled()) {
+        $seen  = [];
+        $extra = $pdo->prepare('UPDATE saved_carts SET reminded_at = NOW() WHERE id = ? AND reminded_at IS NULL');
+        foreach (saved_carts_due($pdo) as $row) {
+            $key = strtolower(trim((string)$row['email']));
+            if (isset($seen[$key])) {
+                // The same person on a second browser: one email is enough, and this row must not send later.
+                $extra->execute([(int)$row['id']]);
+                $result['skipped']++;
+                continue;
+            }
+            if (send_cart_reminder($pdo, $row, $mailer)) {
+                $seen[$key] = true;
+                $result['emailed']++;
+            } else {
+                $result['skipped']++;
+            }
+        }
+    }
+    $del = $pdo->prepare('DELETE FROM saved_carts WHERE updated_at < NOW() - INTERVAL ' . (int)SAVED_CART_KEEP_DAYS . ' DAY');
+    $del->execute();
+    $result['deleted'] = $del->rowCount();
+    return $result;
+}

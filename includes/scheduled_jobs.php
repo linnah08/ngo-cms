@@ -31,6 +31,15 @@ function scheduled_jobs(): array
             'grace'       => 2 * 3600,
             'needed_when' => 'Нужна е само ако е включено плащането с карта или IRIS (Админ → Плащания).',
         ],
+        'cart_reminders' => [
+            'label'       => 'Напомняния за незавършени поръчки',
+            'what'        => 'Изпраща по един имейл на клиенти, които са поискали напомняне и не са завършили поръчката или подкрепата си, и изтрива запазените колички, стари над 30 дни.',
+            'script'      => 'cron/cart-reminders-cron.php',
+            'cron'        => ['0', '*', '*', '*', '*'],
+            'every'       => 'на всеки час',
+            'grace'       => 3 * 3600,
+            'needed_when' => 'Нужна е само ако е включено напомнянето по имейл за незавършени поръчки.',
+        ],
         'publish_articles' => [
             'label'       => 'Публикуване на планирани статии',
             'what'        => 'Публикува статиите, при които е отметнато „Публикувай автоматично на тази дата“, когато датата им дойде.',
@@ -208,6 +217,10 @@ function scheduled_job_needed(string $key): bool
         switch ($key) {
             case 'unpaid_orders':
                 return setting_get('dsk_enabled', '0') === '1';
+
+            case 'cart_reminders':
+                require_once __DIR__ . '/saved_carts.php';
+                return saved_cart_email_enabled();
 
             case 'publish_articles':
                 require_once __DIR__ . '/articles.php';

@@ -43,6 +43,10 @@ $templates = [
         'label' => 'Неуспешно плащане на поръчка',
         'vars'  => ['{{customer_name}}', '{{order_number}}', '{{cancel_date}}', '{{cancel_days}}'],
     ],
+    'cart-reminder-customer' => [
+        'label' => 'Напомняне за незавършена поръчка',
+        'vars'  => ['{{customer_name}}', '{{restore_url}}'],
+    ],
     'donation-payment-failed-customer' => [
         'label' => 'Неуспешно плащане на дарение',
         'vars'  => ['{{customer_name}}', '{{amount_eur}}'],
