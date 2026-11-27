@@ -66,7 +66,11 @@ final class ForgedRequestsTest extends TestCase
 
     private function campaignPost(array $post): array
     {
-        return run_admin_page('admin/campaign.php', ['section' => 'photos'] + $post, ['role' => 'admin']);
+        $r = run_admin_page('admin/campaign.php', ['section' => 'photos'] + $post, ['role' => 'admin']);
+        // With Кампания off the page is a 404 and deletes nothing, so these
+        // tests would fail, or pass without checking anything.
+        if ($r['status'] === 404) $this->markTestSkipped('admin/campaign.php is off on this site (Кампания is switched off).');
+        return $r;
     }
 
     public function test_campaign_photo_delete_cannot_reach_files_outside_its_folder(): void
