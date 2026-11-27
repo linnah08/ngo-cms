@@ -229,6 +229,11 @@ function org_text(string $const, string $lang = 'bg'): string
 // one answers the same.
 if (!function_exists('feature_enabled')) {
 function feature_enabled(string $name): bool {
+    // Tests only: NGO_TEST_MODULES_OFF="donations,campaign" runs the site (and
+    // the pages tests start in their own process) as one with those modules
+    // off, whatever its own switches say. Never set on a real server.
+    $off = (string) getenv('NGO_TEST_MODULES_OFF');
+    if ($off !== '' && in_array(strtolower($name), array_map('trim', explode(',', $off)), true)) return false;
     $const = 'FEATURE_' . strtoupper($name);
     // Never set: on, so a site that updates keeps what it had — except a module
     // that is new in a release (registry 'unset_default' => false), which a site

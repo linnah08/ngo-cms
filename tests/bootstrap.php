@@ -186,7 +186,13 @@ function with_setting(string $key, string $value, callable $fn): mixed {
  *        json (array: sent as the raw JSON body, with the CSRF token inside it),
  *        user (array: overrides the session's id/name/email, for pages that act
  *              on the signed-in user's own admin_users row),
- *        globals (array: $GLOBALS set before the page runs, e.g. _om_pages_dir).
+ *        globals (array: $GLOBALS set before the page runs, e.g. _om_pages_dir),
+ *        module_off_ok (true: return the "module is off" 404 instead of skipping).
+ *
+ * A page whose module is switched off on this site answers "Този модул е
+ * изключен" (or the JSON "Модулът „…“ е изключен") with a 404. The test is then
+ * skipped, not failed: a site with that module off can't run it. A test that
+ * checks the module-off page itself passes module_off_ok.
  */
 function run_admin_page(string $rel, array $post = [], array $opts = []): array {
     $spec = [
@@ -240,5 +246,10 @@ PHP;
     $pos = strrpos($out, "\n@@RESULT@@");
     if ($pos === false) return ['status' => 500, 'body' => $out, 'flash' => [], 'session' => []];
     $meta = json_decode(substr($out, $pos + 11), true) ?: [];
-    return ['status' => (int) ($meta['status'] ?? 500), 'body' => substr($out, 0, $pos), 'flash' => $meta['flash'] ?? [], 'session' => $meta['session'] ?? []];
+    $res = ['status' => (int) ($meta['status'] ?? 500), 'body' => substr($out, 0, $pos), 'flash' => $meta['flash'] ?? [], 'session' => $meta['session'] ?? []];
+    if ($res['status'] === 404 && empty($opts['module_off_ok'])
+        && (str_contains($res['body'], 'id="module-off-title"') || preg_match('/"error":"Модулът „[^"]*“ е изключен/u', $res['body']))) {
+        throw new PHPUnit\Framework\SkippedWithMessageException("$rel belongs to a module that is switched off on this site.");
+    }
+    return $res;
 }
