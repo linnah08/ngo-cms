@@ -39,7 +39,16 @@ jobs:
           extensions: zip, pdo_mysql, mbstring, intl, gd, curl
 
       - name: Install dependencies
-        run: composer install --no-interaction --no-progress
+        # GitHub sometimes refuses downloads with 429 (too many requests);
+        # wait and try again instead of failing the run.
+        run: |
+          for i in 1 2 3 4; do
+            composer install --no-interaction --no-progress && exit 0
+            [ "$i" -lt 4 ] || break
+            echo "::warning::composer install failed (try $i of 4), retrying in $((i * 30))s"
+            sleep $((i * 30))
+          done
+          exit 1
 
       - name: Known holes in PHP libraries
         run: composer audit

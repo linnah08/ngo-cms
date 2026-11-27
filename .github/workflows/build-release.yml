@@ -43,7 +43,16 @@ jobs:
           extensions: zip, pdo_mysql, mbstring, intl, gd, curl
 
       - name: Install production dependencies
-        run: composer install --no-dev --optimize-autoloader --no-interaction
+        # GitHub sometimes refuses downloads with 429 (too many requests);
+        # wait and try again instead of failing the run.
+        run: |
+          for i in 1 2 3 4; do
+            composer install --no-dev --optimize-autoloader --no-interaction && exit 0
+            [ "$i" -lt 4 ] || break
+            echo "::warning::composer install failed (try $i of 4), retrying in $((i * 30))s"
+            sleep $((i * 30))
+          done
+          exit 1
 
       - name: Stamp VERSION
         run: |
