@@ -93,8 +93,10 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
   <div class="container" style="max-width:800px;">
 
     <?php foreach ($flash as $f): ?>
-    <div style="padding:.9rem 1.25rem;border-radius:6px;margin-bottom:1.5rem;
-      <?= $f['type'] === 'success' ? 'background:#e6f4ea;border:1px solid #a8d5b0;color:#2d6a35;' : 'background:#fdf0ef;border:1px solid #f0c4c0;color:#c0392b;' ?>">
+    <div role="<?= $f['type'] === 'error' ? 'alert' : 'status' ?>" style="padding:.9rem 1.25rem;border-radius:6px;margin-bottom:1.5rem;
+      <?php if ($f['type'] === 'success'): ?>background:#e6f4ea;border:1px solid #a8d5b0;color:#2d6a35;
+      <?php elseif ($f['type'] === 'info'): ?>background:#eef4fb;border:1px solid #a9c4e4;color:#1d4a7a;
+      <?php else: ?>background:#fdf0ef;border:1px solid #f0c4c0;color:#c0392b;<?php endif; ?>">
       <?= h($f['message']) ?>
     </div>
     <?php endforeach; ?>

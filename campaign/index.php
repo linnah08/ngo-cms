@@ -91,6 +91,7 @@ function fmt_campaign_amount(float $eur): string {
 
 $page_title = h($title) . ' — ' . SITE_NAME_BG;
 $page_head_extra = '';
+$restore_notes = flash_get();   // e.g. a pledge reminder link that can no longer be used (cart/restore.php)
 require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
 ?>
 
@@ -159,6 +160,12 @@ require $_SERVER['DOCUMENT_ROOT'] . '/templates/header.php';
   .campaign-layout{grid-template-columns:1fr!important;}
 }
 </style>
+
+<?php foreach ($restore_notes as $_n): ?>
+<div class="container" style="margin-top:1.5rem;">
+  <div role="alert" style="padding:.9rem 1.25rem;border-radius:6px;background:#fdf0ef;border:1px solid #f0c4c0;color:#c0392b;"><?= h($_n['message']) ?></div>
+</div>
+<?php endforeach; ?>
 
 <!-- ── Hero / Progress ────────────────────────────────────────────────────────── -->
 <section class="campaign-hero">

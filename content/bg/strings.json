@@ -465,5 +465,17 @@
   "email.cert_sign.button": "Подпишете сертификата",
   "email.cert_sign.hint": "Намерете бутона „Подпиши“ до сертификата в страницата на поръчката.",
   "common.close": "Затвори",
-  "social.read_more": "Прочетете повече"
+  "social.read_more": "Прочетете повече",
+  "cart.restore.gone_unknown": "Един артикул от количката ви вече не се продава и не е добавен.",
+  "cart.restore.gone": "„{name}“ вече не се продава и не е добавен.",
+  "cart.restore.variant_gone": "Избраният вариант на „{name}“ вече не се предлага и не е добавен.",
+  "cart.restore.design_gone": "Дизайнът за „{name}“ вече не е наличен и артикулът не е добавен.",
+  "cart.restore.sold_out": "„{name}“ е изчерпан и не е добавен.",
+  "cart.restore.capped": "От „{name}“ са налични само {n} бр. — количеството е коригирано.",
+  "cart.restore.pledge_gone": "Тази подкрепа вече не може да бъде довършена.",
+  "cart.restore.pledge_done": "Тази подкрепа вече е обработена.",
+  "cart.restore.campaign_closed": "Кампанията вече не приема подкрепа.",
+  "cart.restore.reward_gone": "Наградата, която сте избрали, вече не се предлага.",
+  "cart.restore.expired": "Тази количка вече не е налична.",
+  "cart.restore.merged": "Добавихме артикулите от напомнянето ви в количката."
 }

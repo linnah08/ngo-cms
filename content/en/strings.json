@@ -465,5 +465,17 @@
   "email.cert_sign.button": "Sign the certificate",
   "email.cert_sign.hint": "Find the \"Sign\" button next to the certificate on the order page.",
   "common.close": "Close",
-  "social.read_more": "Read more"
+  "social.read_more": "Read more",
+  "cart.restore.gone_unknown": "An item from your cart is no longer sold and was not added.",
+  "cart.restore.gone": "\"{name}\" is no longer sold and was not added.",
+  "cart.restore.variant_gone": "The option you chose for \"{name}\" is no longer offered and was not added.",
+  "cart.restore.design_gone": "The design for \"{name}\" is no longer available, so it was not added.",
+  "cart.restore.sold_out": "\"{name}\" is sold out and was not added.",
+  "cart.restore.capped": "Only {n} of \"{name}\" are available — the quantity was adjusted.",
+  "cart.restore.pledge_gone": "This pledge can no longer be completed.",
+  "cart.restore.pledge_done": "This pledge has already been dealt with.",
+  "cart.restore.campaign_closed": "The campaign is no longer taking pledges.",
+  "cart.restore.reward_gone": "The reward you chose is no longer offered.",
+  "cart.restore.expired": "This cart is no longer available.",
+  "cart.restore.merged": "We added the items from your reminder to your cart."
 }
