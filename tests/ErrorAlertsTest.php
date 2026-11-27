@@ -23,7 +23,17 @@ final class ErrorAlertsTest extends TestCase
         self::$pdo = get_pdo();
         foreach (self::SETTINGS as $key) self::$saved[$key] = setting_get($key);
         error_alert_ensure_table();
-        self::$pdo->exec("DELETE FROM error_alerts WHERE error_class = 'TestCapture'");
+        self::cleanUp();
+    }
+
+    /**
+     * Every row these tests write: class TestCapture, or the made-up file
+     * /f.php (the payment-error tests write class PaymentError, so the class
+     * alone missed them and every run left three behind).
+     */
+    private static function cleanUp(): void
+    {
+        self::$pdo->exec("DELETE FROM error_alerts WHERE error_class = 'TestCapture' OR file = '/f.php'");
     }
 
     /** Tests run from the CLI, where only errors in the site's own files raise an alert. */
@@ -238,7 +248,7 @@ final class ErrorAlertsTest extends TestCase
     public static function tearDownAfterClass(): void
     {
         if (!isset(self::$pdo)) return;
-        self::$pdo->exec("DELETE FROM error_alerts WHERE error_class = 'TestCapture'");
+        self::cleanUp();
         foreach (self::$saved as $key => $value) setting_set($key, $value);
     }
 }
