@@ -243,13 +243,14 @@ final class CartRemindersJobTest extends TestCase
 
         $this->assertSame($en['email'], $e['to']);
         $this->assertSame('You left something in your cart', $e['subject']);
-        $this->assertStringContainsString(SITE_URL . '/cart/restore.php?t=' . $en['token'], $e['html']);
-        $this->assertStringContainsString(SITE_URL . '/cart/no-reminder.php?t=' . $en['token'], $e['html']);
+        $this->assertStringContainsString(SITE_URL . '/en/cart/restore.php?t=' . $en['token'], $e['html']);
+        $this->assertStringContainsString(SITE_URL . '/en/cart/no-reminder.php?t=' . $en['token'], $e['html']);
         $this->assertStringContainsString("You're getting this because you asked us to remind you.", html_entity_decode($e['html'], ENT_QUOTES));
         $this->assertStringContainsString('25.00 €', $e['html']);   // 2 x 12.50: the line total, as in order emails
 
         $this->assertSame('Оставихте нещо в количката си', $b['subject']);
         $this->assertStringContainsString(SITE_URL . '/cart/restore.php?t=' . $bg['token'], $b['html']);
+        $this->assertStringContainsString(SITE_URL . '/cart/no-reminder.php?t=' . $bg['token'], $b['html']);
         $this->assertStringContainsString('Получавате това писмо, защото поискахте да ви напомним.', $b['html']);
     }
 
@@ -277,48 +278,93 @@ final class CartRemindersJobTest extends TestCase
     }
 
     // ── run_cart_reminders_job ────────────────────────────────────────────────
+    // The job works on the whole table, so these tests run inside a transaction that is rolled
+    // back: other local rows are never changed, and only our own fixture rows are asserted on.
 
-    public function test_job_emails_due_rows_and_counts(): void
+    /** Emails our fixtures were sent (the job may also see other rows in a shared local database). */
+    private function sentToMine(): array
     {
-        $this->row(30);
+        return array_values(array_filter($this->sent, fn($m) => str_ends_with(strtolower($m['to']), self::$mark)));
+    }
+
+    private function begin(): void
+    {
+        self::$pdo->beginTransaction();
+    }
+
+    protected function tearDown(): void
+    {
+        if (self::$pdo && self::$pdo->inTransaction()) self::$pdo->rollBack();
+    }
+
+    public function test_job_emails_due_rows_and_skips_ones_with_nothing_left(): void
+    {
+        $this->begin();
+        $ok   = $this->row(30);
         $gone = $this->product(['active' => 0]);
-        $this->row(30, ['email' => $this->email('x'), 'items' => json_encode([['product_id' => $gone, 'quantity' => 1]])]);
-        $r = run_cart_reminders_job(self::$pdo, $this->mailer());
-        $this->assertSame(1, $r['emailed']);
-        $this->assertGreaterThanOrEqual(1, $r['skipped']);
-        $this->assertCount(1, $this->sent);
+        $none = $this->row(30, ['email' => $this->email('x'), 'items' => json_encode([['product_id' => $gone, 'quantity' => 1]])]);
+        run_cart_reminders_job(self::$pdo, $this->mailer());
+        $mine = $this->sentToMine();
+        $this->assertCount(1, $mine);
+        $this->assertSame($ok['email'], $mine[0]['to']);
+        $this->assertNotNull($this->reload((int)$none['id'])['reminded_at']);
     }
 
     public function test_job_sends_one_email_per_address_per_run(): void
     {
+        $this->begin();
         $a = $this->row(30);
         $b = $this->row(31, ['email' => strtoupper($a['email'])]);   // a second browser, same person
-        $r = run_cart_reminders_job(self::$pdo, $this->mailer());
-        $this->assertSame(1, $r['emailed']);
-        $this->assertSame(1, $r['skipped']);
-        $this->assertCount(1, $this->sent);
+        run_cart_reminders_job(self::$pdo, $this->mailer());
+        $this->assertCount(1, $this->sentToMine());
         $this->assertNotNull($this->reload((int)$a['id'])['reminded_at']);
         $this->assertNotNull($this->reload((int)$b['id'])['reminded_at'], 'the extra row is marked so it is never emailed later');
     }
 
-    public function test_job_does_nothing_but_clean_up_when_switch_is_off(): void
+    public function test_second_row_for_same_address_due_in_a_later_run_is_not_emailed(): void
     {
+        $this->begin();
+        $a = $this->row(30);
+        run_cart_reminders_job(self::$pdo, $this->mailer());
+        $this->assertCount(1, $this->sentToMine());
+        // A second browser's row for the same person (other letter case) only becomes due now.
+        $b = $this->row(26, ['email' => strtoupper($a['email'])]);
+        $this->assertNotContains((int)$b['id'], $this->dueIds());
+        run_cart_reminders_job(self::$pdo, $this->mailer());
+        $this->assertCount(1, $this->sentToMine(), 'still just the first email');
+        $this->assertNull($this->reload((int)$b['id'])['reminded_at']);
+    }
+
+    public function test_job_does_nothing_when_switch_is_off(): void
+    {
+        $this->begin();
         setting_set('cart_reminder_email', '0');
         $r = $this->row(30);
-        $res = run_cart_reminders_job(self::$pdo, $this->mailer());
-        $this->assertSame(0, $res['emailed']);
-        $this->assertSame([], $this->sent);
+        run_cart_reminders_job(self::$pdo, $this->mailer());
+        $this->assertSame([], $this->sentToMine());
         $this->assertNull($this->reload((int)$r['id'])['reminded_at']);
     }
 
     public function test_job_deletes_rows_older_than_30_days(): void
     {
+        $this->begin();
         $old  = $this->row(24 * 31, ['email' => $this->email('old')]);
         $keep = $this->row(24 * 20, ['email' => $this->email('keep')]);
-        $res = run_cart_reminders_job(self::$pdo, $this->mailer());
-        $this->assertGreaterThanOrEqual(1, $res['deleted']);
+        run_cart_reminders_job(self::$pdo, $this->mailer());
         $this->assertFalse(self::$pdo->query('SELECT 1 FROM saved_carts WHERE id = ' . (int)$old['id'])->fetchColumn());
         $this->assertNotFalse(self::$pdo->query('SELECT 1 FROM saved_carts WHERE id = ' . (int)$keep['id'])->fetchColumn());
+    }
+
+    public function test_send_does_not_mail_an_opted_out_or_ordered_row(): void
+    {
+        $out = $this->row(30, ['opted_out_at' => date('Y-m-d H:i:s')]);
+        $this->assertFalse(send_cart_reminder(self::$pdo, $out, $this->mailer()));
+        $ord = $this->row(30, ['email' => $this->email('o2'), 'ordered_at' => date('Y-m-d H:i:s')]);
+        $this->assertFalse(send_cart_reminder(self::$pdo, $ord, $this->mailer()));
+        $off = $this->row(30, ['email' => $this->email('o3'), 'remind_opt_in' => 0]);
+        $this->assertFalse(send_cart_reminder(self::$pdo, $off, $this->mailer()));
+        $this->assertSame([], $this->sent);
+        $this->assertNull($this->reload((int)$out['id'])['reminded_at']);
     }
 
     // ── cart/no-reminder.php ──────────────────────────────────────────────────
@@ -345,6 +391,10 @@ final class CartRemindersJobTest extends TestCase
             $this->assertSame(200, $get['code']);
             $this->assertNull($this->reload((int)$r['id'])['opted_out_at'], 'a GET (a mail scanner following the link) changes nothing');
             $this->assertStringContainsString('name="csrf_token"', $get['body']);
+            $enget = $this->http('/en/cart/no-reminder.php?t=' . $r['token'], $jar);
+            $this->assertSame(200, $enget['code']);
+            $this->assertStringContainsString('<html lang="en"', $enget['body']);
+            $this->assertStringContainsString('action="/en/cart/no-reminder.php?t=', $enget['body']);
             $this->assertStringContainsString('method="post"', strtolower($get['body']));
             preg_match('/name="csrf_token" value="([^"]+)"/', $get['body'], $m);
 

@@ -59,7 +59,7 @@ $_home = $nr_lang === 'en' ? '/en/' : '/';
     </div>
 <?php if ($state === 'confirm' || $state === 'retry'): ?>
     <p style="font-size:1.05rem;line-height:1.6;"><?= h(t_or('cart.noreminder.ask', 'Искате ли да спрем напомнянията по имейл за тази поръчка?', 'Do you want us to stop emailing you reminders about this order?', $nr_lang)) ?></p>
-    <form method="post" action="/cart/no-reminder.php?t=<?= h($token) ?>" style="margin:1.25rem 0;">
+    <form method="post" action="<?= get_lang() === 'en' ? '/en' : '' ?>/cart/no-reminder.php?t=<?= h($token) ?>" style="margin:1.25rem 0;">
       <?= csrf_field() ?>
       <button type="submit" style="min-height:44px;padding:0 1.5rem;border:2px solid #0387A5;border-radius:6px;background:#0387A5;color:#fff;font-size:1rem;font-weight:700;cursor:pointer;"><?= h(t_or('cart.noreminder.button', 'Да, не ми напомняйте', 'Yes, don\'t remind me', $nr_lang)) ?></button>
     </form>

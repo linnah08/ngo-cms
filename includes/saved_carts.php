@@ -361,6 +361,8 @@ function saved_carts_due(PDO $pdo): array
            AND s.reminded_at IS NULL AND s.opted_out_at IS NULL AND s.ordered_at IS NULL
            AND s.updated_at <= NOW() - INTERVAL " . (int)SAVED_CART_REMIND_AFTER_HOURS . " HOUR
            AND s.updated_at >= NOW() - INTERVAL " . (int)SAVED_CART_REMIND_MAX_AGE_DAYS . " DAY
+           AND NOT EXISTS (SELECT 1 FROM saved_carts r WHERE LOWER(r.email) = LOWER(s.email) AND r.id <> s.id
+                           AND r.reminded_at >= NOW() - INTERVAL " . (int)SAVED_CART_REMIND_MAX_AGE_DAYS . " DAY)
            AND NOT EXISTS (SELECT 1 FROM orders o WHERE LOWER(o.customer_email) = LOWER(s.email) AND o.created_at > s.updated_at)
          ORDER BY s.id"
     );
@@ -393,8 +395,8 @@ function saved_cart_reminder_lines(PDO $pdo, array $items, string $lang): array
                 if (!empty($v['image'])) $image = (string)$v['image'];
             }
         }
-        if (!empty($i['colour'])) $parts[] = ($lang === 'en' ? 'Colour' : 'Цвят') . ': ' . ucfirst((string)$i['colour']);
-        if (!empty($i['size']))   $parts[] = ($lang === 'en' ? 'Size' : 'Размер') . ': ' . $i['size'];
+        if (!empty($i['colour'])) $parts[] = t_or('cart.reminder.colour', 'Цвят', 'Colour', $lang) . ': ' . ucfirst((string)$i['colour']);
+        if (!empty($i['size']))   $parts[] = t_or('cart.reminder.size', 'Размер', 'Size', $lang) . ': ' . $i['size'];
         $lines[] = [
             'name'    => $name,
             'variant' => implode(' · ', $parts),
@@ -419,7 +421,13 @@ function saved_cart_reminder_lines(PDO $pdo, array $items, string $lang): array
 function send_cart_reminder(PDO $pdo, array $row, ?callable $mailer = null): bool
 {
     if (!is_array($row['items'])) $row = saved_cart_decode($row);   // raw database row
-    $claim = $pdo->prepare('UPDATE saved_carts SET reminded_at = NOW() WHERE id = ? AND reminded_at IS NULL');
+    // The row is re-checked in the claim itself: an opt-out or order since it was read, or a row
+    // that was never due, is never emailed.
+    $claim = $pdo->prepare(
+        "UPDATE saved_carts SET reminded_at = NOW()
+         WHERE id = ? AND reminded_at IS NULL AND remind_opt_in = 1 AND opted_out_at IS NULL
+           AND ordered_at IS NULL AND email IS NOT NULL AND email <> ''"
+    );
     $claim->execute([(int)$row['id']]);
     if ($claim->rowCount() === 0) return false;
 
@@ -449,16 +457,17 @@ function send_cart_reminder(PDO $pdo, array $row, ?callable $mailer = null): boo
     }
 
     require_once __DIR__ . '/email-templates.php';
-    $restore = SITE_URL . '/cart/restore.php?t=' . $row['token'];
+    $prefix  = $lang === 'en' ? '/en' : '';
+    $restore = SITE_URL . $prefix . '/cart/restore.php?t=' . $row['token'];
     $name    = trim((string)($row['name'] ?? ''));
-    if ($name === '') $name = $lang === 'en' ? 'there' : 'приятелю';
+    if ($name === '') $name = t_or('cart.reminder.there', 'приятелю', 'there', $lang);
     $tpl = email_tpl_get('cart-reminder-customer', $lang, ['customer_name' => $name, 'restore_url' => $restore]);
     if ($pledge !== null) {
         $tpl['subject'] = t_or('cart.reminder.pledge_subject', 'Подкрепата ви не е завършена', 'Your support isn\'t finished yet', $lang);
     }
     $html = render_email('cart-reminder-customer', [
         'tpl' => $tpl, 'lang' => $lang, 'lines' => $lines, 'pledge' => $pledge,
-        'restore_url' => $restore, 'optout_url' => SITE_URL . '/cart/no-reminder.php?t=' . $row['token'],
+        'restore_url' => $restore, 'optout_url' => SITE_URL . $prefix . '/cart/no-reminder.php?t=' . $row['token'],
     ]);
 
     $mailer ??= fn(string $to, string $subject, string $body): bool => send_mail($to, $subject, $body);
@@ -493,12 +502,12 @@ function run_cart_reminders_job(PDO $pdo, ?callable $mailer = null): array
                 $result['skipped']++;
                 continue;
             }
-            if (send_cart_reminder($pdo, $row, $mailer)) {
-                $seen[$key] = true;
-                $result['emailed']++;
-            } else {
-                $result['skipped']++;
-            }
+            $sent = send_cart_reminder($pdo, $row, $mailer);
+            // Claimed (even if the email failed or there was nothing to send): this address is dealt with.
+            $chk = $pdo->prepare('SELECT reminded_at FROM saved_carts WHERE id = ?');
+            $chk->execute([(int)$row['id']]);
+            if ($chk->fetchColumn() !== null) $seen[$key] = true;
+            $result[$sent ? 'emailed' : 'skipped']++;
         }
     }
     $del = $pdo->prepare('DELETE FROM saved_carts WHERE updated_at < NOW() - INTERVAL ' . (int)SAVED_CART_KEEP_DAYS . ' DAY');

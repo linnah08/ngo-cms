@@ -9,19 +9,19 @@ echo $tpl['intro'];
 
 <?php if (!empty($pledge)): ?>
 <div class="box">
-  <strong><?= $_lang === 'en' ? 'Campaign' : 'Кампания' ?>:</strong> <?= $_esc($pledge['campaign']) ?><br>
+  <strong><?= t_or('cart.reminder.campaign', 'Кампания', 'Campaign', $_lang) ?>:</strong> <?= $_esc($pledge['campaign']) ?><br>
 <?php if ($pledge['reward'] !== ''): ?>
-  <strong><?= $_lang === 'en' ? 'Reward' : 'Награда' ?>:</strong> <?= $_esc($pledge['reward']) ?><br>
+  <strong><?= t_or('cart.reminder.reward', 'Награда', 'Reward', $_lang) ?>:</strong> <?= $_esc($pledge['reward']) ?><br>
 <?php endif; ?>
-  <strong><?= $_lang === 'en' ? 'Your support' : 'Вашата подкрепа' ?>:</strong> <?= $_esc(number_format((float)$pledge['amount'], 2, '.', '')) ?> €
+  <strong><?= t_or('cart.reminder.support', 'Вашата подкрепа', 'Your support', $_lang) ?>:</strong> <?= $_esc(number_format((float)$pledge['amount'], 2, '.', '')) ?> €
 </div>
 <?php elseif (!empty($lines)): ?>
 <table>
   <thead>
     <tr>
-      <th colspan="2"><?= $_lang === 'en' ? 'Product' : 'Продукт' ?></th>
-      <th style="text-align:right;"><?= $_lang === 'en' ? 'Qty' : 'Бр.' ?></th>
-      <th style="text-align:right;"><?= $_lang === 'en' ? 'Price' : 'Цена' ?></th>
+      <th colspan="2"><?= t_or('cart.reminder.product', 'Продукт', 'Product', $_lang) ?></th>
+      <th style="text-align:right;"><?= t_or('cart.reminder.qty', 'Бр.', 'Qty', $_lang) ?></th>
+      <th style="text-align:right;"><?= t_or('cart.reminder.price', 'Цена', 'Price', $_lang) ?></th>
     </tr>
   </thead>
   <tbody>
@@ -48,12 +48,12 @@ echo $tpl['intro'];
 
 <p style="text-align:center;margin:28px 0;">
   <a href="<?= $_esc($restore_url) ?>" style="display:inline-block;background:#0387A5;color:#ffffff;text-decoration:none;font-weight:bold;padding:14px 32px;border-radius:6px;font-size:16px;">
-    <?= $_esc(!empty($pledge) ? ($_lang === 'en' ? 'Finish my support' : 'Довършете подкрепата') : ($_lang === 'en' ? 'Back to my cart' : 'Към количката')) ?>
+    <?= $_esc(!empty($pledge) ? t_or('cart.reminder.finish', 'Довършете подкрепата', 'Finish my support', $_lang) : t_or('cart.reminder.back', 'Към количката', 'Back to my cart', $_lang)) ?>
   </a>
 </p>
 
 <?php echo $tpl['outro']; ?>
 
 <p style="color:#6b6560;font-size:14px;">
-  <a href="<?= $_esc($optout_url) ?>" style="color:#6b6560;"><?= $_lang === 'en' ? "Don't remind me" : 'Не ми напомняйте' ?></a>
+  <a href="<?= $_esc($optout_url) ?>" style="color:#6b6560;"><?= t_or('cart.reminder.optout', 'Не ми напомняйте', 'Don\'t remind me', $_lang) ?></a>
 </p>
