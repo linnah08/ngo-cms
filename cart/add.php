@@ -4,6 +4,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/print_helpers.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/images.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/saved_carts.php';
 start_session();
 
 // Module switched off in Admin → Модули — the shop does not exist (site's 404).
@@ -211,6 +213,8 @@ if (!$found) {
     $cart[] = $entry;
 }
 $_SESSION['cart'] = $cart;
+try { saved_cart_sync($pdo, $cart, $lang); }
+catch (Throwable $e) { error_log('Saved cart sync failed: ' . $e->getMessage()); }
 
 // GA4 add_to_cart for what was really added — the header of the page this
 // redirects to sends it once (templates/header.php).

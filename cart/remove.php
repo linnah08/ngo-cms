@@ -1,5 +1,8 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/saved_carts.php';
 start_session();
 
 // Module switched off in Admin → Модули — the shop does not exist (site's 404).
@@ -19,6 +22,8 @@ if ($idx >= 0 && isset($cart[$idx])) {
     array_splice($cart, $idx, 1);
 }
 $_SESSION['cart'] = array_values($cart);
+try { saved_cart_sync(get_pdo(), $_SESSION['cart'], post_lang()); }
+catch (Throwable $e) { error_log('Saved cart sync failed: ' . $e->getMessage()); }
 
 header('Location: ' . $back);
 exit;

@@ -3,6 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/payment/payment_errors.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/saved_carts.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/mailer.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/shared_stock.php';
@@ -81,6 +82,8 @@ function update_cart_from_post(): void {
         $new[] = $entry;
     }
     $_SESSION['cart'] = $new;
+    try { saved_cart_sync(get_pdo(), $new, post_lang()); }
+    catch (Throwable $e) { error_log('Saved cart sync failed: ' . $e->getMessage()); }
 }
 
 // Load shipping rates for JS
@@ -310,6 +313,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $result    = $dsk->register($ref, $pledge_amount, $returnUrl);
                     $pdo->prepare('UPDATE campaign_pledges SET dsk_order_id=? WHERE id=?')
                         ->execute([$result['dsk_order_id'], $pledge_id]);
+                    try { saved_cart_mark_ordered($pdo, $pledge_id); }
+                    catch (Throwable $e) { error_log('Saved cart mark-ordered failed: ' . $e->getMessage()); }
                     unset($_SESSION['checkout_data'], $_SESSION['cart']);
                     header('Location: ' . $result['formUrl']);
                 } catch (Throwable $e) {
@@ -473,6 +478,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
             $order_id = $pdo->lastInsertId();
             $pdo->commit();
+
+            // The order is placed: this cart is no longer a forgotten one.
+            try { saved_cart_mark_ordered($pdo); }
+            catch (Throwable $e) { error_log('Saved cart mark-ordered failed: ' . $e->getMessage()); }
 
             // Who the buyer is to Google Analytics (only with cookie consent), for the
             // conversion sent once the order is paid (includes/ga4.php).

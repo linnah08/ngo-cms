@@ -2,6 +2,8 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/products.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/saved_carts.php';
 start_session();
 
 // Module switched off in Admin → Модули — the shop does not exist (site's 404).
@@ -65,6 +67,8 @@ foreach ($cart as $i => $item) {
     $new_cart[] = $item;
 }
 $_SESSION['cart'] = $new_cart;
+try { saved_cart_sync($pdo, $new_cart, $lang); }
+catch (Throwable $e) { error_log('Saved cart sync failed: ' . $e->getMessage()); }
 
 if ($capped) {
     $msg = t_or('cart.err.quantities_adjusted', 'Количествата са коригирани според наличността.', 'Some quantities were adjusted to match available stock.', $lang);
