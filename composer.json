@@ -13,6 +13,7 @@
     "scripts": {
         "setup-git-hooks": "git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
         "post-install-cmd": ["@setup-git-hooks"],
-        "post-update-cmd": ["@setup-git-hooks"]
+        "post-update-cmd": ["@setup-git-hooks"],
+        "test-modules-off": "bash tests/modules-off.sh"
     }
 }

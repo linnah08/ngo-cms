@@ -1,13 +1,60 @@
 #!/usr/bin/env bash
-# Pre-push hook: run checkout browser tests when shop-related files changed.
+# Pre-push hook. Wired up via `git config core.hooksPath .githooks`
+# (composer install does it). Two checks, each only when it applies:
 #
-# Auth is self-provisioning — tests/Browser/admin.setup.js seeds a known local
-# admin (tests/seed-admin.php) and logs in as it. No ADMIN_PASSWORD needed.
-# (You may still set ADMIN_PASSWORD/ADMIN_EMAIL to log in as another account.)
+# 1. A release tag (v*) is pushed → the PHPUnit suite with every optional
+#    module switched off (tests/modules-off.sh). ngo-cms runs with every
+#    module on, so a test that only works with its module on would pass here
+#    and fail on a site that switched it off. Blocks the push on a failure.
 #
-# This hook is tracked in .githooks/ and wired up via:
-#   git config core.hooksPath .githooks
+# 2. Shop files changed → the checkout browser tests (Playwright). Auth is
+#    self-provisioning — tests/Browser/admin.setup.js seeds a known local admin
+#    (tests/seed-admin.php) and logs in as it. No ADMIN_PASSWORD needed. (You
+#    may still set ADMIN_PASSWORD/ADMIN_EMAIL to log in as another account.)
 
+# Git passes one line per ref: <local ref> <local sha> <remote ref> <remote sha>
+refs=$(cat)
+
+# ── 1. Release tag: tests with every module off ─────────────────────────────
+ZERO='0000000000000000000000000000000000000000'
+tag_commits=""
+while read -r local_ref local_sha _remote_ref _remote_sha; do
+  case "$local_ref" in
+    refs/tags/v*)
+      [ "$local_sha" = "$ZERO" ] && continue   # deleting a tag
+      tag_commits="$tag_commits $local_ref=$(git rev-parse "$local_sha^{commit}")"
+      ;;
+  esac
+done <<< "$refs"
+
+if [ -n "$tag_commits" ]; then
+  head=$(git rev-parse HEAD)
+  for pair in $tag_commits; do
+    if [ "${pair#*=}" != "$head" ]; then
+      echo "❌  ${pair%%=*} is not the commit checked out here, so its tests can't be run here."
+      echo "    Push the tag from a checkout of its commit (git checkout ${pair%%=*})."
+      exit 1
+    fi
+  done
+  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+    echo "❌  This checkout has uncommitted changes, so the tests would not run on the tagged code."
+    echo "    Commit or remove them, then push the tag again."
+    exit 1
+  fi
+
+  echo "🏷  Release tag — running the tests with every module switched off..."
+  if ! "$(git rev-parse --show-toplevel)/tests/modules-off.sh" --no-progress; then
+    echo ""
+    echo "❌  Tests fail on a site with modules switched off. Push blocked."
+    echo "    A test that needs a module calls skip_unless_modules_on('<module>');"
+    echo "    a test of the switches themselves goes in #[Group('module-switches')]."
+    echo "    Run tests/modules-off.sh to see the failures."
+    exit 1
+  fi
+  echo "✅  Tests pass with every module off."
+fi
+
+# ── 2. Shop files changed: checkout browser tests ───────────────────────────
 SHOP_PATTERN='(^magazin/|^cart/|^checkout/|^includes/couriers/|^includes/payment/|^includes/print_helpers\.php|^includes/settings\.php|^admin/product)'
 
 # Files changed between local HEAD and its upstream (fall back to last commit).
