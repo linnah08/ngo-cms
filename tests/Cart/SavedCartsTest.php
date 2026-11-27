@@ -171,6 +171,24 @@ final class SavedCartsTest extends TestCase
         $this->assertNull(saved_cart_for_browser(self::$pdo)['cart']);
     }
 
+    public function test_sync_after_order_starts_a_new_row(): void
+    {
+        $this->requireDb();
+        saved_cart_sync(self::$pdo, [['id' => 1, 'qty' => 1]], 'bg');
+        $old = $this->shopRow();
+        saved_cart_mark_ordered(self::$pdo);
+        saved_cart_sync(self::$pdo, [['id' => 2, 'qty' => 1]], 'bg');
+        $this->assertSame(2, $this->rowCount());
+        $got = saved_cart_for_browser(self::$pdo)['cart'];
+        $this->assertNotNull($got);
+        $this->assertNotSame((int)$old['id'], (int)$got['id']);
+        $this->assertNotSame($old['token'], $got['token']);
+        $this->assertSame([['id' => 2, 'qty' => 1]], $got['items']);
+        $s = self::$pdo->prepare('SELECT ordered_at FROM saved_carts WHERE id = ?');
+        $s->execute([$old['id']]);
+        $this->assertNotNull($s->fetchColumn());
+    }
+
     public function test_token_valid_rejects_short_uppercase_and_non_hex(): void
     {
         require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/saved_carts.php';

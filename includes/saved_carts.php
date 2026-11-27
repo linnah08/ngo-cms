@@ -56,7 +56,7 @@ function saved_cart_sync(PDO $pdo, array $items, string $lang): void
     $lang = $lang === 'en' ? 'en' : 'bg';
     $json = json_encode(array_values($items), JSON_UNESCAPED_UNICODE);
 
-    $sel = $pdo->prepare('SELECT id FROM saved_carts WHERE browser_token = ? AND pledge_id IS NULL ORDER BY id DESC LIMIT 1');
+    $sel = $pdo->prepare('SELECT id FROM saved_carts WHERE browser_token = ? AND pledge_id IS NULL AND ordered_at IS NULL ORDER BY id DESC LIMIT 1');
     $sel->execute([$browser]);
     $id = $sel->fetchColumn();
     if ($id !== false) {
