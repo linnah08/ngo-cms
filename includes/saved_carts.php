@@ -20,7 +20,7 @@ function saved_carts_enabled(): bool       { return saved_cart_email_enabled() |
 
 function saved_cart_token_valid(string $t): bool
 {
-    return (bool)preg_match('/^[0-9a-f]{64}$/', $t);
+    return (bool)preg_match('/\A[0-9a-f]{64}\z/', $t);
 }
 
 function saved_cart_set_cookie(string $token): void
@@ -99,10 +99,43 @@ function saved_cart_for_browser(PDO $pdo): array
     $cart = saved_cart_decode($st->fetch(PDO::FETCH_ASSOC) ?: null);
     if ($cart !== null && $cart['items'] !== []) $out['cart'] = $cart;
 
-    $st = $pdo->prepare($base . ' AND pledge_id IS NOT NULL ORDER BY updated_at DESC, id DESC LIMIT 1');
-    $st->execute([$browser]);
-    $out['pledge'] = saved_cart_decode($st->fetch(PDO::FETCH_ASSOC) ?: null);
+    // A pledge only counts while it can still be finished: still unpaid, the campaign
+    // taking pledges and its module switched on. Otherwise the notice would lead nowhere.
+    if (setting_get('campaign_active', '0') === '1' && module_enabled_with_needs('campaign')) {
+        $st = $pdo->prepare(
+            "SELECT s.* FROM saved_carts s JOIN campaign_pledges p ON p.id = s.pledge_id
+             WHERE s.browser_token = ? AND s.ordered_at IS NULL AND s.dismissed_at IS NULL
+               AND s.updated_at >= DATE_SUB(NOW(), INTERVAL " . (int)SAVED_CART_KEEP_DAYS . " DAY)
+               AND p.payment_status = 'pending'
+             ORDER BY s.updated_at DESC, s.id DESC LIMIT 1"
+        );
+        $st->execute([$browser]);
+        $out['pledge'] = saved_cart_decode($st->fetch(PDO::FETCH_ASSOC) ?: null);
+    }
     return $out;
+}
+
+/**
+ * Remembers a pledge being finished at checkout step 1, for this browser, whether
+ * or not the shopper asks for an email: the on-site notice is for everyone. Only
+ * the pledge's own row is written; the browser's shop row is never touched.
+ */
+function saved_cart_pledge_upsert(PDO $pdo, int $pledge_id, string $lang): void
+{
+    if ($pledge_id <= 0 || !saved_carts_enabled()) return;
+    $lang = $lang === 'en' ? 'en' : 'bg';
+    $sel = $pdo->prepare('SELECT id FROM saved_carts WHERE pledge_id = ?');
+    $sel->execute([$pledge_id]);
+    $id = $sel->fetchColumn();
+    if ($id !== false) {
+        $pdo->prepare('UPDATE saved_carts SET lang = ?, updated_at = NOW(), dismissed_at = NULL WHERE id = ? AND ordered_at IS NULL')
+            ->execute([$lang, (int)$id]);
+        return;
+    }
+    $browser = saved_cart_browser_token(true);
+    if ($browser === null) return;
+    $pdo->prepare("INSERT INTO saved_carts (token, browser_token, pledge_id, items, lang, created_at, updated_at) VALUES (?, ?, ?, '[]', ?, NOW(), NOW())")
+        ->execute([bin2hex(random_bytes(32)), $browser, $pledge_id, $lang]);
 }
 
 // ── Email consent ────────────────────────────────────────────────────────────
@@ -182,16 +215,34 @@ function saved_cart_dismiss_row(PDO $pdo, int $id): void
     $pdo->prepare('UPDATE saved_carts SET dismissed_at = NOW() WHERE id = ?')->execute([$id]);
 }
 
+/**
+ * The order (or pledge payment) is under way: the row is no longer a forgotten one.
+ * The email address and name go now — the privacy text promises they are kept only
+ * until then. The consent time and wording stay as proof of what was agreed to.
+ */
 function saved_cart_mark_ordered(PDO $pdo, ?int $pledge_id = null): void
 {
     if ($pledge_id !== null) {
-        $pdo->prepare('UPDATE saved_carts SET ordered_at = NOW() WHERE pledge_id = ?')->execute([$pledge_id]);
+        $pdo->prepare('UPDATE saved_carts SET ordered_at = COALESCE(ordered_at, NOW()), email = NULL, name = NULL WHERE pledge_id = ?')->execute([$pledge_id]);
         return;
     }
     $browser = saved_cart_browser_token(false);
     if ($browser === null) return;
-    $pdo->prepare('UPDATE saved_carts SET ordered_at = NOW() WHERE browser_token = ? AND pledge_id IS NULL AND ordered_at IS NULL')
+    $pdo->prepare('UPDATE saved_carts SET ordered_at = NOW(), email = NULL, name = NULL WHERE browser_token = ? AND pledge_id IS NULL AND ordered_at IS NULL')
         ->execute([$browser]);
+}
+
+/**
+ * "Don't remind me" on one row (by its email token): no reminder is ever sent for
+ * it and the email address and name are forgotten at once. The consent time and
+ * wording stay as proof. Returns false for an unknown token.
+ */
+function saved_cart_opt_out(PDO $pdo, string $token): bool
+{
+    if (!saved_cart_token_valid($token)) return false;
+    $st = $pdo->prepare('UPDATE saved_carts SET opted_out_at = COALESCE(opted_out_at, NOW()), email = NULL, name = NULL WHERE token = ?');
+    $st->execute([$token]);
+    return $st->rowCount() > 0 || saved_cart_find($pdo, $token) !== null;
 }
 
 // ── Restoring ────────────────────────────────────────────────────────────────
@@ -199,8 +250,8 @@ function saved_cart_mark_ordered(PDO $pdo, ?int $pledge_id = null): void
 /**
  * Checks a saved cart's lines against the shop as it is now, with the same rules
  * as cart/add.php: the product must be active, a variant must still exist and be
- * active, quantity is capped to stock unless the line is a pre-order, and a print
- * design file must still be on disk. Prices are never stored or read here.
+ * active, quantity is capped to stock unless the line is a pre-order, a print
+ * line's colour and size must still be offered and its design file still on disk. Prices are never stored or read here.
  * Each dropped or capped line adds one plain-language note that names the product.
  *
  * @return array{items: list<array>, notes: list<string>}
@@ -208,10 +259,11 @@ function saved_cart_mark_ordered(PDO $pdo, ?int $pledge_id = null): void
 function saved_cart_validate_items(PDO $pdo, array $items, string $lang): array
 {
     require_once __DIR__ . '/products.php';
+    require_once __DIR__ . '/print_helpers.php';
     $lang  = $lang === 'en' ? 'en' : 'bg';
     $out   = [];
     $notes = [];
-    $prod_st = $pdo->prepare('SELECT id, name_bg, name_en, stock, active, `type`, preorder_enabled FROM products WHERE id = ?');
+    $prod_st = $pdo->prepare('SELECT id, name_bg, name_en, stock, active, `type`, preorder_enabled, variants FROM products WHERE id = ?');
     $var_st  = $pdo->prepare('SELECT id, label_bg, label_en, stock, active FROM product_variants WHERE id = ? AND product_id = ?');
 
     foreach ($items as $item) {
@@ -245,7 +297,15 @@ function saved_cart_validate_items(PDO $pdo, array $items, string $lang): array
             $available = (int)$v['stock'];
             $entry['variant_id']    = $vid;
             $entry['variant_label'] = $v['label_bg'];
-        } elseif ($p['type'] === 'print' && !empty($item['design_file'])) {
+        } elseif ($p['type'] === 'print') {
+            // The same check cart/add.php makes: the colour and size must still be on offer.
+            $print_opts = json_decode((string)($p['variants'] ?? '{}'), true);
+            if (print_validate_item(is_array($print_opts) ? $print_opts : [], (string)($item['colour'] ?? ''), (string)($item['size'] ?? ''), $lang)) {
+                $notes[] = t_or('cart.restore.print_option_gone', 'Избраният цвят или размер на „{name}“ вече не се предлага и артикулът не е добавен.', 'The colour or size you chose for "{name}" is no longer offered, so it was not added.', $lang, ['name' => $name]);
+                continue;
+            }
+        }
+        if ($p['type'] === 'print' && !empty($item['design_file'])) {
             $file = (string)$item['design_file'];
             if (!preg_match('#^uploads/print-designs/[A-Za-z0-9._-]+$#', $file) || str_contains($file, '..')
                 || !is_file($_SERVER['DOCUMENT_ROOT'] . '/' . $file)) {
@@ -306,7 +366,7 @@ function saved_cart_merge(array $current, array $saved): array
 /**
  * Puts a saved pledge back at checkout step 1. Returns a plain-language error, or
  * null after setting the checkout data. Same checks campaign/checkout.php makes:
- * campaign switched on, rewards need the shop, reward still active.
+ * campaign module and campaign switched on, rewards need the shop, reward still active.
  */
 function saved_cart_restore_pledge(PDO $pdo, array $row, string $lang): ?string
 {
@@ -318,7 +378,7 @@ function saved_cart_restore_pledge(PDO $pdo, array $row, string $lang): ?string
     if (!$p || $p['payment_status'] !== 'pending') {
         return t_or('cart.restore.pledge_done', 'Тази подкрепа вече е обработена.', 'This pledge has already been dealt with.', $lang);
     }
-    if (setting_get('campaign_active', '0') !== '1') {
+    if (setting_get('campaign_active', '0') !== '1' || !module_enabled_with_needs('campaign')) {
         return t_or('cart.restore.campaign_closed', 'Кампанията вече не приема подкрепа.', 'The campaign is no longer taking pledges.', $lang);
     }
     if ((int)($p['reward_id'] ?? 0) <= 0 || !module_enabled_with_needs('shop')) return $gone;
@@ -413,7 +473,8 @@ function saved_cart_reminder_lines(PDO $pdo, array $items, string $lang): array
  * (reminded_at) so overlapping runs cannot both send, and the claim stays when
  * the mailer fails: at most one email, even at the cost of a lost one. Nothing is
  * sent when nothing is left to come back to (items gone from the shop, pledge
- * paid or reversed, campaign closed).
+ * paid or reversed, campaign closed); such a row can never be emailed, so its
+ * address and name are forgotten there and then.
  *
  * @param callable|null $mailer fn(string $to, string $subject, string $html): bool, default send_mail()
  * @return bool true when an email went out
@@ -444,7 +505,10 @@ function send_cart_reminder(PDO $pdo, array $row, ?callable $mailer = null): boo
         );
         $st->execute([(int)$row['pledge_id']]);
         $p = $st->fetch(PDO::FETCH_ASSOC);
-        if (!$p || $p['payment_status'] !== 'pending' || setting_get('campaign_active', '0') !== '1') return false;
+        if (!$p || $p['payment_status'] !== 'pending' || setting_get('campaign_active', '0') !== '1') {
+            saved_cart_forget_address($pdo, (int)$row['id']);
+            return false;
+        }
         // The campaign's name is a setting; English falls back to a generic wording, never to the Bulgarian title.
         $campaign = trim(setting_get($lang === 'en' ? 'campaign_title_en' : 'campaign_title', ''));
         if ($campaign === '') $campaign = t_or('cart.notice.campaign', 'кампанията', 'the campaign', $lang);
@@ -453,7 +517,10 @@ function send_cart_reminder(PDO $pdo, array $row, ?callable $mailer = null): boo
     } else {
         $checked = saved_cart_validate_items($pdo, $row['items'], $lang);
         $lines   = saved_cart_reminder_lines($pdo, $checked['items'], $lang);
-        if ($lines === []) return false;
+        if ($lines === []) {
+            saved_cart_forget_address($pdo, (int)$row['id']);
+            return false;
+        }
     }
 
     require_once __DIR__ . '/email-templates.php';
@@ -481,17 +548,23 @@ function send_cart_reminder(PDO $pdo, array $row, ?callable $mailer = null): boo
     return $sent;
 }
 
+/** A claimed row that will never be emailed: its address and name go early. */
+function saved_cart_forget_address(PDO $pdo, int $id): void
+{
+    $pdo->prepare('UPDATE saved_carts SET email = NULL, name = NULL WHERE id = ?')->execute([$id]);
+}
+
 /**
  * Hourly job: email the due rows (one email per address per run), then forget
- * rows untouched for 30 days. With the email switch off nothing is sent but the
- * old rows are still removed.
+ * rows untouched for 30 days. With the email switch or the shop module off
+ * nothing is sent, but the old rows are still removed.
  *
  * @return array{emailed:int, skipped:int, deleted:int}
  */
 function run_cart_reminders_job(PDO $pdo, ?callable $mailer = null): array
 {
     $result = ['emailed' => 0, 'skipped' => 0, 'deleted' => 0];
-    if (saved_cart_email_enabled()) {
+    if (saved_cart_email_enabled() && module_enabled_with_needs('shop')) {
         $seen  = [];
         $extra = $pdo->prepare('UPDATE saved_carts SET reminded_at = NOW() WHERE id = ? AND reminded_at IS NULL');
         foreach (saved_carts_due($pdo) as $row) {
@@ -503,10 +576,12 @@ function run_cart_reminders_job(PDO $pdo, ?callable $mailer = null): array
                 continue;
             }
             $sent = send_cart_reminder($pdo, $row, $mailer);
-            // Claimed (even if the email failed or there was nothing to send): this address is dealt with.
-            $chk = $pdo->prepare('SELECT reminded_at FROM saved_carts WHERE id = ?');
+            // The address is dealt with once an email was attempted (sent or failed). A row
+            // claimed with nothing to send had its address forgotten, so it does not count.
+            $chk = $pdo->prepare('SELECT reminded_at, email FROM saved_carts WHERE id = ?');
             $chk->execute([(int)$row['id']]);
-            if ($chk->fetchColumn() !== null) $seen[$key] = true;
+            $now = $chk->fetch(PDO::FETCH_ASSOC);
+            if ($now && $now['reminded_at'] !== null && $now['email'] !== null) $seen[$key] = true;
             $result[$sent ? 'emailed' : 'skipped']++;
         }
     }

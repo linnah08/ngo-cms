@@ -81,12 +81,12 @@ final class SavedCartNoticeTest extends TestCase
         return $browser;
     }
 
-    private function pledgeRow(): string
+    private function pledgeRow(string $browser = '', string $status = 'pending'): string
     {
-        $browser = bin2hex(random_bytes(32));
+        if ($browser === '') $browser = bin2hex(random_bytes(32));
         self::$tokens[] = $browser;
         self::$pdo->prepare('INSERT INTO campaign_pledges (pledge_number,name,email,phone,amount_eur,reward_id,payment_status) VALUES (?,?,?,?,?,?,?)')
-            ->execute(['CP-TEST-' . strtoupper(bin2hex(random_bytes(3))), 'Мария', 'm@example.com', '0888123456', 25.00, null, 'pending']);
+            ->execute(['CP-TEST-' . strtoupper(bin2hex(random_bytes(3))), 'Мария', 'm@example.com', '0888123456', 25.00, null, $status]);
         $pid = (int)self::$pdo->lastInsertId();
         self::$pledge_ids[] = $pid;
         self::$pdo->prepare('INSERT INTO saved_carts (token,browser_token,pledge_id,items,lang,created_at,updated_at) VALUES (?,?,?,?,?,NOW(),NOW())')
@@ -135,9 +135,64 @@ final class SavedCartNoticeTest extends TestCase
             $bg = $this->http('/magazin/', $jar, $b);
             $this->assertStringContainsString('Започнахте да подкрепите', $bg['body']);
             $this->assertStringContainsString('Тестова кауза', $bg['body']);
-            $this->assertStringContainsString('/cart/restore.php', $bg['body']);
+            $this->assertStringContainsString('/cart/restore.php?what=pledge&amp;lang=bg', $bg['body']);
             $en = $this->http('/en/shop/', $jar, $b);
             $this->assertStringContainsString('You started supporting Test cause.', $en['body']);
+        } finally { @unlink($jar); }
+    }
+
+    public function test_notice_shows_both_lines_each_with_its_own_link(): void
+    {
+        skip_unless_modules_on('campaign');
+        $b = $this->cartRow(1, 1);
+        $this->pledgeRow($b);
+        $jar = $this->jar();
+        try {
+            $body = $this->http('/magazin/', $jar, $b)['body'];
+            $this->assertStringContainsString('Оставихте 2 продукта в количката.', $body);
+            $this->assertStringContainsString('Започнахте да подкрепите', $body);
+            $this->assertStringContainsString('href="/cart/restore.php?what=cart&amp;lang=bg"', $body);
+            $this->assertStringContainsString('href="/cart/restore.php?what=pledge&amp;lang=bg"', $body);
+            $this->assertStringContainsString('name="what[]" value="cart"', $body);
+            $this->assertStringContainsString('name="what[]" value="pledge"', $body);
+            $en = $this->http('/en/shop/', $jar, $b)['body'];
+            $this->assertStringContainsString('You left 2 items in your cart.', $en);
+            $this->assertStringContainsString('You started supporting Test cause.', $en);
+            $this->assertStringContainsString('href="/cart/restore.php?what=pledge&amp;lang=en"', $en);
+        } finally { @unlink($jar); }
+    }
+
+    public function test_notice_leaves_out_a_pledge_that_can_no_longer_be_finished(): void
+    {
+        skip_unless_modules_on('campaign');
+        $b = $this->pledgeRow('', 'paid');
+        $jar = $this->jar();
+        try {
+            $this->assertStringNotContainsString('data-saved-cart-notice', $this->http('/magazin/', $jar, $b)['body']);
+        } finally { @unlink($jar); }
+    }
+
+    public function test_dismiss_closes_only_the_lines_that_were_shown(): void
+    {
+        skip_unless_modules_on('campaign');
+        $b = $this->cartRow();
+        $jar = $this->jar();
+        try {
+            $page = $this->http('/magazin/', $jar, $b);
+            $this->assertStringNotContainsString('value="pledge"', $page['body']);
+            preg_match('/name="csrf_token" value="([0-9a-f]{64})"/', $page['body'], $m);
+            // A pledge started in another tab after this page was shown.
+            $this->pledgeRow($b);
+            $this->http('/cart/dismiss-notice.php', $jar, $b, ['csrf_token' => $m[1], 'return' => '/magazin/', 'what' => ['cart']]);
+            $s = self::$pdo->prepare('SELECT pledge_id IS NULL AS shop, dismissed_at FROM saved_carts WHERE browser_token = ?');
+            $s->execute([$b]);
+            foreach ($s->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                if ((int)$r['shop']) $this->assertNotNull($r['dismissed_at'], 'the cart line was shown and closed');
+                else $this->assertNull($r['dismissed_at'], 'the pledge line was never shown');
+            }
+            $after = $this->http('/magazin/', $jar, $b)['body'];
+            $this->assertStringContainsString('Започнахте да подкрепите', $after);
+            $this->assertStringNotContainsString('Оставихте', $after);
         } finally { @unlink($jar); }
     }
 
@@ -196,7 +251,7 @@ final class SavedCartNoticeTest extends TestCase
         try {
             $page = $this->http('/magazin/', $jar, $b);
             $this->assertSame(1, preg_match('/name="csrf_token" value="([0-9a-f]{64})"/', $page['body'], $m));
-            $r = $this->http('/cart/dismiss-notice.php', $jar, $b, ['csrf_token' => $m[1], 'return' => '/en/shop/', 'victim' => '1', 'id' => '1']);
+            $r = $this->http('/cart/dismiss-notice.php', $jar, $b, ['csrf_token' => $m[1], 'return' => '/en/shop/', 'what' => ['cart'], 'victim' => '1', 'id' => '1']);
             $this->assertSame(302, $r['code']);
             $this->assertSame('/en/shop/', $r['location']);
             $this->assertStringNotContainsString('data-saved-cart-notice', $this->http('/magazin/', $jar, $b)['body']);
@@ -206,13 +261,23 @@ final class SavedCartNoticeTest extends TestCase
         } finally { @unlink($jar); }
     }
 
+    public function test_partial_checks_the_page_before_reading_the_setting(): void
+    {
+        $src = (string)file_get_contents(dirname(__DIR__, 2) . '/templates/partials/saved-cart-notice.php');
+        $try = strpos($src, 'try {');
+        $this->assertNotFalse($try);
+        $this->assertLessThan(strpos($src, '$_scn_show = '), $try, 'the whole body is inside the try');
+        $this->assertLessThan(strpos($src, 'saved_cart_notice_enabled()'), strpos($src, 'if ($_scn_show'), 'no setting read on other pages');
+        $this->assertSame(1, substr_count($src, 'saved_cart_notice_enabled()'));
+    }
+
     public function test_dismiss_requires_csrf(): void
     {
         $b = $this->cartRow();
         $jar = $this->jar();
         try {
             $this->http('/magazin/', $jar, $b);
-            $this->http('/cart/dismiss-notice.php', $jar, $b, ['csrf_token' => 'nope', 'return' => '/magazin/']);
+            $this->http('/cart/dismiss-notice.php', $jar, $b, ['csrf_token' => 'nope', 'return' => '/magazin/', 'what' => ['cart', 'pledge']]);
             $s = self::$pdo->prepare('SELECT dismissed_at FROM saved_carts WHERE browser_token = ?');
             $s->execute([$b]);
             $this->assertNull($s->fetchColumn());

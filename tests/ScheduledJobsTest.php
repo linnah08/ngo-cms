@@ -45,6 +45,23 @@ final class ScheduledJobsTest extends TestCase
         $this->assertSame('cron/cart-reminders-cron.php', $job['script']);
     }
 
+    public function test_cart_reminders_job_is_needed_while_either_switch_is_on(): void
+    {
+        if (!test_db_available()) $this->markTestSkipped('No local DB');
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/settings.php';
+        $saved = ['cart_reminder_email' => setting_get('cart_reminder_email', '0'), 'cart_reminder_notice' => setting_get('cart_reminder_notice', '0')];
+        try {
+            foreach ([['0', '0', false], ['1', '0', true], ['0', '1', true], ['1', '1', true]] as [$email, $notice, $needed]) {
+                setting_set('cart_reminder_email', $email);
+                setting_set('cart_reminder_notice', $notice);
+                $this->assertSame($needed, scheduled_job_needed('cart_reminders'), "email $email, notice $notice");
+            }
+        } finally {
+            foreach ($saved as $k => $v) setting_set($k, $v);
+        }
+        $this->assertStringContainsString('известието на сайта', scheduled_jobs()['cart_reminders']['needed_when']);
+    }
+
     public function test_command_uses_real_paths_and_logs_output(): void
     {
         $job = scheduled_jobs()['unpaid_orders'];

@@ -2,7 +2,9 @@
 /**
  * Brings a saved cart or pledge back: from the link in a reminder email (?t=token)
  * or from the on-site notice (no token: the row this browser's om_cart cookie
- * points at). GET only; changes nothing but this visitor's session and cookie.
+ * points at; ?what=cart|pledge picks which, else the cart if there is one).
+ * GET only; changes nothing but this visitor's session and cookie, and the
+ * saved row's own dismissed state.
  */
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
@@ -44,17 +46,27 @@ if ($from_email) {
     if ($row['pledge_id'] !== null) { $pledge_row = $row; $row = null; }
 } else {
     $found = saved_cart_for_browser($pdo);
-    if ($found['cart'] === null && $found['pledge'] === null) restore_expired($lang);
-    $row        = $found['cart'];
-    $pledge_row = $row === null ? $found['pledge'] : null;
+    $what  = $_GET['what'] ?? '';
+    if (!in_array($what, ['cart', 'pledge'], true)) $what = $found['cart'] !== null ? 'cart' : 'pledge';
+    if ($what === 'cart') {
+        $row = $found['cart'];
+    } else {
+        $pledge_row = $found['pledge'];
+    }
+    if ($row === null && $pledge_row === null) restore_expired($lang);
 }
 
-// A pledge goes back to checkout step 1; a failure goes to the campaign page.
+// A pledge goes back to checkout step 1. One that can no longer be finished stops
+// showing in the notice, and the visitor lands on the campaign page (the shop when
+// the campaign module is off) with the reason.
 if ($pledge_row !== null) {
     $err = saved_cart_restore_pledge($pdo, $pledge_row, $lang);
     if ($err !== null) {
+        try { saved_cart_dismiss_row($pdo, (int)$pledge_row['id']); }
+        catch (Throwable $e) { error_log('Saved cart dismiss failed: ' . $e->getMessage()); }
         flash_set('error', $err);
-        restore_go($lang === 'en' ? '/en/campaign/' : '/campaign/');
+        if (module_enabled_with_needs('campaign')) restore_go($lang === 'en' ? '/en/campaign/' : '/campaign/');
+        restore_go(shop_path('shop', $lang));
     }
     restore_go(shop_path('checkout', $lang) . '?step=1');
 }

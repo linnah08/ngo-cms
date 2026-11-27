@@ -181,9 +181,38 @@ final class SavedCartRestoreTest extends TestCase
         $this->assertStringContainsString($this->pname($soldout), $r['notes'][1]);
     }
 
+    private function printOptions(int $product_id, array $colours, array $sizes): void
+    {
+        $opts = ['colours' => array_map(fn($c) => ['name' => $c, 'hex' => '#000000'], $colours), 'sizes' => $sizes];
+        self::$pdo->prepare('UPDATE products SET variants = ? WHERE id = ?')->execute([json_encode($opts), $product_id]);
+    }
+
+    public function test_validate_drops_print_item_whose_colour_or_size_is_no_longer_offered(): void
+    {
+        $p = $this->product(['type' => 'print']);
+        $this->printOptions($p, ['black', 'white'], ['M', 'L']);
+        $r = saved_cart_validate_items(self::$pdo, [
+            ['product_id' => $p, 'quantity' => 1, 'colour' => 'black', 'size' => 'M'],
+            ['product_id' => $p, 'quantity' => 1, 'colour' => 'purple', 'size' => 'M'],
+            ['product_id' => $p, 'quantity' => 1, 'colour' => 'white', 'size' => 'XXL'],
+            ['product_id' => $p, 'quantity' => 1],
+        ], 'en');
+        $this->assertCount(1, $r['items']);
+        $this->assertSame('black', $r['items'][0]['colour']);
+        $this->assertCount(3, $r['notes']);
+        foreach ($r['notes'] as $note) {
+            $this->assertStringContainsString($this->pname($p), $note);
+            $this->assertStringContainsString('no longer offered', $note);
+        }
+        $bg = saved_cart_validate_items(self::$pdo, [['product_id' => $p, 'quantity' => 1, 'colour' => 'purple', 'size' => 'M']], 'bg');
+        $this->assertStringContainsString($this->pname($p, 'name_bg'), $bg['notes'][0]);
+        $this->assertStringContainsString('вече не се предлага', $bg['notes'][0]);
+    }
+
     public function test_validate_drops_print_item_whose_design_file_is_missing(): void
     {
         $p = $this->product(['type' => 'print']);
+        $this->printOptions($p, ['black', 'white', 'red'], ['M', 'L']);
         $dir = $_SERVER['DOCUMENT_ROOT'] . '/uploads/print-designs/';
         if (!is_dir($dir)) mkdir($dir, 0755, true);
         $present = 'test-restore-' . uniqid() . '.png';
@@ -278,15 +307,30 @@ final class SavedCartRestoreTest extends TestCase
         $this->assertArrayNotHasKey('checkout_data', $_SESSION);
     }
 
+    public function test_restore_pledge_refuses_when_campaign_module_off(): void
+    {
+        skip_unless_modules_on('shop');
+        $ok  = $this->pledge(['reward_id' => 'new']);
+        $off = getenv('NGO_TEST_MODULES_OFF');
+        putenv('NGO_TEST_MODULES_OFF=campaign');
+        try {
+            $this->assertIsString(saved_cart_restore_pledge(self::$pdo, ['pledge_id' => $ok['pledge_id']], 'en'));
+        } finally {
+            putenv($off === false ? 'NGO_TEST_MODULES_OFF' : 'NGO_TEST_MODULES_OFF=' . $off);
+        }
+        $this->assertArrayNotHasKey('checkout_data', $_SESSION);
+    }
+
     // ── HTTP ──────────────────────────────────────────────────────────────────
 
-    private function http(string $path, string $jar, array $post = [], bool $follow = false): array
+    private function http(string $path, string $jar, array $post = [], bool $follow = false, string $browser = ''): array
     {
         $ch = curl_init(self::$base . $path);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true, CURLOPT_HEADER => true, CURLOPT_TIMEOUT => 15,
             CURLOPT_FOLLOWLOCATION => $follow, CURLOPT_COOKIEJAR => $jar, CURLOPT_COOKIEFILE => $jar,
         ]);
+        if ($browser !== '') curl_setopt($ch, CURLOPT_COOKIE, 'om_cart=' . $browser);
         if ($post) { curl_setopt($ch, CURLOPT_POST, true); curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($post)); }
         $raw  = (string)curl_exec($ch);
         $hs   = (int)curl_getinfo($ch, CURLINFO_HEADER_SIZE);
@@ -386,7 +430,115 @@ final class SavedCartRestoreTest extends TestCase
             $this->assertStringContainsString('/campaign/', $r2['location']);
             $page = $this->http('/cart/restore.php?t=' . $t2, $jar, [], true);
             $this->assertStringContainsString('Тази подкрепа вече е обработена.', $page['body']);
+            $this->assertNotNull($this->dismissedAt($t2), 'a pledge that cannot be finished stops showing in the notice');
+            $this->assertNull($this->dismissedAt($t));
         } finally { @unlink($jar); }
+    }
+
+    private function dismissedAt(string $token): ?string
+    {
+        $s = self::$pdo->prepare('SELECT dismissed_at FROM saved_carts WHERE token = ?');
+        $s->execute([$token]);
+        $v = $s->fetchColumn();
+        return $v === false ? null : $v;
+    }
+
+    public function test_pledge_link_goes_to_the_shop_when_campaign_module_off(): void
+    {
+        $this->startServer();
+        $ok = $this->pledge(['reward_id' => 'new']);
+        $t  = $this->savedRow(bin2hex(random_bytes(32)), [], $ok['pledge_id']);
+        $off = getenv('NGO_TEST_MODULES_OFF');
+        $jar = tempnam(sys_get_temp_dir(), 'jar');
+        // A server of its own that runs the site with the campaign module off.
+        TestServer::stop();
+        putenv('NGO_TEST_MODULES_OFF=campaign');
+        try {
+            self::$base = TestServer::start();
+            if (self::$base === '') $this->markTestSkipped('Could not start a local test server.');
+            $r = $this->http('/cart/restore.php?t=' . $t, $jar);
+            $this->assertSame(302, $r['code']);
+            $this->assertSame('/magazin/', $r['location']);
+            $this->assertNotNull($this->dismissedAt($t));
+            $page = $this->http('/magazin/', $jar);
+            $this->assertStringContainsString('Кампанията вече не приема подкрепа.', $page['body']);
+        } finally {
+            @unlink($jar);
+            TestServer::stop();
+            putenv($off === false ? 'NGO_TEST_MODULES_OFF' : 'NGO_TEST_MODULES_OFF=' . $off);
+        }
+    }
+
+    public function test_notice_link_restores_the_line_it_names(): void
+    {
+        $this->startServer();
+        skip_unless_modules_on('campaign');
+        $browser = bin2hex(random_bytes(32));
+        $a  = $this->product(['stock' => 9]);
+        $this->savedRow($browser, [['product_id' => $a, 'quantity' => 2]]);
+        $pl = $this->pledge(['reward_id' => 'new']);
+        $this->savedRow($browser, [], $pl['pledge_id']);
+
+        $jar = tempnam(sys_get_temp_dir(), 'jar');
+        try {
+            $r = $this->http('/cart/restore.php?what=pledge&lang=bg', $jar, [], false, $browser);
+            $this->assertSame(302, $r['code']);
+            $this->assertStringContainsString('/checkout/?step=1', $r['location'], 'the pledge line restores the pledge, even with a cart saved');
+        } finally { @unlink($jar); }
+
+        $jar = tempnam(sys_get_temp_dir(), 'jar');
+        try {
+            foreach (['/cart/restore.php?lang=bg', '/cart/restore.php?what=cart&lang=bg', '/cart/restore.php?what=nonsense&lang=bg'] as $path) {
+                $r = $this->http($path, $jar, [], false, $browser);
+                $this->assertSame(302, $r['code'], $path);
+                $this->assertSame('/cart/', $r['location'], $path . ': the cart comes first');
+            }
+        } finally { @unlink($jar); }
+
+        // Only a pledge saved: asking for the cart finds nothing; no choice gets the pledge.
+        $only = bin2hex(random_bytes(32));
+        $pl2  = $this->pledge(['reward_id' => 'new']);
+        $this->savedRow($only, [], $pl2['pledge_id']);
+        $jar = tempnam(sys_get_temp_dir(), 'jar');
+        try {
+            $page = $this->http('/cart/restore.php?what=cart&lang=bg', $jar, [], true, $only);
+            $this->assertStringContainsString('Тази количка вече не е налична.', $page['body']);
+            $r = $this->http('/cart/restore.php?lang=bg', $jar, [], false, $only);
+            $this->assertStringContainsString('/checkout/?step=1', $r['location']);
+        } finally { @unlink($jar); }
+    }
+
+    public function test_pledge_checkout_step_one_saves_the_pledge_for_the_notice(): void
+    {
+        $this->startServer();
+        skip_unless_modules_on('campaign');
+        setting_set('cart_reminder_email', '0');   // the notice alone is enough
+        $pl = $this->pledge(['reward_id' => 'new']);
+        $t  = $this->savedRow(bin2hex(random_bytes(32)), [], $pl['pledge_id']);
+        $jar = tempnam(sys_get_temp_dir(), 'jar');
+        try {
+            $this->assertStringContainsString('/checkout/?step=1', $this->http('/cart/restore.php?t=' . $t, $jar)['location']);
+            // Start from no saved row at all, as a pledge that was never saved before.
+            self::$pdo->prepare('DELETE FROM saved_carts WHERE token = ?')->execute([$t]);
+            $this->assertSame(200, $this->http('/checkout/?step=1', $jar)['code']);
+            $device = $this->jarCookie($jar, 'om_cart');
+            $this->assertTrue(saved_cart_token_valid($device));
+            self::$tokens[] = $device;
+
+            $s = self::$pdo->prepare('SELECT * FROM saved_carts WHERE pledge_id = ?');
+            $s->execute([$pl['pledge_id']]);
+            $rows = $s->fetchAll(PDO::FETCH_ASSOC);
+            $this->assertCount(1, $rows);
+            $this->assertSame($device, $rows[0]['browser_token']);
+            $this->assertSame('[]', $rows[0]['items']);
+            $this->assertNull($rows[0]['email']);
+            $s = self::$pdo->prepare('SELECT COUNT(*) FROM saved_carts WHERE browser_token = ? AND pledge_id IS NULL');
+            $s->execute([$device]);
+            $this->assertSame(0, (int)$s->fetchColumn(), 'no shop row in pledge mode');
+        } finally {
+            @unlink($jar);
+            setting_set('cart_reminder_email', '1');
+        }
     }
 
     public function test_restore_onto_empty_cart_never_adopts_the_links_browser_token(): void

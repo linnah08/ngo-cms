@@ -38,7 +38,7 @@ function scheduled_jobs(): array
             'cron'        => ['0', '*', '*', '*', '*'],
             'every'       => 'на всеки час',
             'grace'       => 3 * 3600,
-            'needed_when' => 'Нужна е само ако е включено напомнянето по имейл за незавършени поръчки.',
+            'needed_when' => 'Нужна е, ако е включено поне едно от двете напомняния за незавършени поръчки — по имейл или известието на сайта (Админ → Напомняния за поръчки).',
         ],
         'publish_articles' => [
             'label'       => 'Публикуване на планирани статии',
@@ -219,8 +219,9 @@ function scheduled_job_needed(string $key): bool
                 return setting_get('dsk_enabled', '0') === '1';
 
             case 'cart_reminders':
+                // Also forgets old saved carts, which exist while either switch is on.
                 require_once __DIR__ . '/saved_carts.php';
-                return saved_cart_email_enabled();
+                return saved_carts_enabled();
 
             case 'publish_articles':
                 require_once __DIR__ . '/articles.php';

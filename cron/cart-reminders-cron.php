@@ -33,6 +33,8 @@ $pdo = get_pdo();
 if (in_array('--dry-run', $argv ?? [], true)) {
     if (!saved_cart_email_enabled()) {
         echo "Email reminders are switched off — a real run would send nothing.\n";
+    } elseif (!module_enabled_with_needs('shop')) {
+        echo "The shop module is switched off — a real run would send nothing.\n";
     }
     $due = saved_carts_due($pdo);
     echo 'Would email "you left something behind" (' . count($due) . "):\n";

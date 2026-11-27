@@ -1,5 +1,5 @@
 <?php
-// Variables: $tpl (rendered subject/intro/outro), $lang, $lines (shop rows: name, variant, qty, price, image),
+// Variables: $tpl (rendered subject/intro/outro), $lang, $lines (shop rows: name, variant, qty, price = unit price, image; the table shows the line total),
 //            $pledge (pledge rows: reward, amount, campaign), $restore_url, $optout_url
 $_lang = ($lang ?? 'bg') === 'en' ? 'en' : 'bg';
 $_esc  = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
@@ -21,7 +21,7 @@ echo $tpl['intro'];
     <tr>
       <th colspan="2"><?= t_or('cart.reminder.product', 'Продукт', 'Product', $_lang) ?></th>
       <th style="text-align:right;"><?= t_or('cart.reminder.qty', 'Бр.', 'Qty', $_lang) ?></th>
-      <th style="text-align:right;"><?= t_or('cart.reminder.price', 'Цена', 'Price', $_lang) ?></th>
+      <th style="text-align:right;"><?= t_or('cart.reminder.total', 'Сума', 'Total', $_lang) ?></th>
     </tr>
   </thead>
   <tbody>

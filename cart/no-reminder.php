@@ -3,8 +3,9 @@
  * "Don't remind me": the link at the bottom of a reminder email (?t=token).
  * GET only shows a confirm page and changes nothing, so a mail scanner that
  * follows the link cannot opt anyone out; the button posts the form (CSRF
- * checked) and sets opted_out_at on that one row. An unknown or malformed link
- * gets a plain message (HTTP 404) and nothing from any row.
+ * checked), sets opted_out_at on that one row and forgets its email and name.
+ * An unknown or malformed link gets a plain message (HTTP 404) and nothing from
+ * any row.
  */
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
@@ -27,7 +28,7 @@ if ($row !== null) {
     $state = 'confirm';
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (csrf_verify()) {
-            get_pdo()->prepare('UPDATE saved_carts SET opted_out_at = COALESCE(opted_out_at, NOW()) WHERE token = ?')->execute([$token]);
+            saved_cart_opt_out(get_pdo(), $token);   // also forgets the email address and name
             $state = 'done';
         } else {
             $state = 'retry';

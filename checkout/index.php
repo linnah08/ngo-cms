@@ -66,7 +66,7 @@ function load_cart_products(array $cart, \PDO $pdo): array {
 }
 
 // Update $_SESSION['cart'] quantities from POST data (quantity[pid] => qty)
-function update_cart_from_post(): void {
+function update_cart_from_post(string $lang): void {
     $qtys = $_POST['quantity'] ?? [];
     if (!is_array($qtys)) return;
     $cart = $_SESSION['cart'] ?? [];
@@ -82,7 +82,7 @@ function update_cart_from_post(): void {
         $new[] = $entry;
     }
     $_SESSION['cart'] = $new;
-    try { saved_cart_sync(get_pdo(), $new, post_lang()); }
+    try { saved_cart_sync(get_pdo(), $new, $lang); }
     catch (Throwable $e) { error_log('Saved cart sync failed: ' . $e->getMessage()); }
 }
 
@@ -97,6 +97,13 @@ $step   = (int)($_GET['step'] ?? 1);
 $data   = $_SESSION['checkout_data'] ?? [];
 $errors = [];
 
+// A pledge being finished is remembered for the returning-visitor notice, for
+// everyone (the email checkbox below only adds the address). Shop rows are untouched.
+if ($_is_pledge_mode && $step === 1) {
+    try { saved_cart_pledge_upsert($pdo, (int)($data['_pledge_id'] ?? 0), $lang); }
+    catch (Throwable $e) { error_log('Saved pledge failed: ' . $e->getMessage()); }
+}
+
 // ── POST handlers ────────────────────────────────────────────────────────────
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -105,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Step 1 → save contact
     if ($action === 'contact') {
-        update_cart_from_post();
+        update_cart_from_post($lang);
         $name  = trim($_POST['customer_name']  ?? '');
         $email = trim($_POST['customer_email'] ?? '');
         $phone = trim($_POST['customer_phone'] ?? '');
@@ -175,8 +182,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (saved_cart_email_enabled()) {
                 try {
                     saved_cart_record_consent(
-                        get_pdo(), $cart_reminder, $email, $name, post_lang(),
-                        saved_cart_consent_label(post_lang()),
+                        get_pdo(), $cart_reminder, $email, $name, $lang,
+                        saved_cart_consent_label($lang),
                         !empty($data['_pledge_number']) ? (int)($data['_pledge_id'] ?? 0) : null
                     );
                 } catch (Throwable $e) {
@@ -392,7 +399,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        update_cart_from_post();
+        update_cart_from_post($lang);
         $cart_info = load_cart_products($_SESSION['cart'], $pdo);
         $rows      = $cart_info['rows'];
         $subtotal  = $cart_info['subtotal'];

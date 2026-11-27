@@ -22,6 +22,7 @@ final class CartRemindersJobTest extends TestCase
     private static array $pledge_ids  = [];
     private static array $reward_ids  = [];
     private static array $order_ids   = [];
+    private static array $row_ids     = [];   // rows whose email a test may have cleared
     private static string $mark = '';
 
     /** @var list<array{to:string,subject:string,html:string}> */
@@ -48,6 +49,7 @@ final class CartRemindersJobTest extends TestCase
         if (!self::$pdo) return;
         $pdo = self::$pdo;
         $pdo->prepare('DELETE FROM saved_carts WHERE email LIKE ? OR name = ?')->execute(['%' . self::$mark, 'CRTEST']);
+        foreach (self::$row_ids as $id) $pdo->prepare('DELETE FROM saved_carts WHERE id = ?')->execute([$id]);
         foreach (self::$order_ids as $id) $pdo->prepare('DELETE FROM orders WHERE id = ?')->execute([$id]);
         foreach (self::$pledge_ids as $id) $pdo->prepare('DELETE FROM campaign_pledges WHERE id = ?')->execute([$id]);
         foreach (self::$reward_ids as $id) $pdo->prepare('DELETE FROM campaign_rewards WHERE id = ?')->execute([$id]);
@@ -105,7 +107,9 @@ final class CartRemindersJobTest extends TestCase
              VALUES (?,?,?,?,?,?,?,?,?,?,?, NOW() - INTERVAL ? HOUR, NOW() - INTERVAL ? HOUR)'
         )->execute([$d['token'], $d['browser_token'], $d['pledge_id'], $d['items'], $d['lang'], $d['email'], $d['name'],
             $d['remind_opt_in'], $d['reminded_at'], $d['opted_out_at'], $d['ordered_at'], $age_hours, $age_hours]);
-        return $this->reload((int)self::$pdo->lastInsertId());
+        $id = (int)self::$pdo->lastInsertId();
+        if (!self::$pdo->inTransaction()) self::$row_ids[] = $id;
+        return $this->reload($id);
     }
 
     private function reload(int $id): array
@@ -230,7 +234,10 @@ final class CartRemindersJobTest extends TestCase
         $r = $this->row(30, ['items' => json_encode([['product_id' => $gone, 'quantity' => 1]])]);
         $this->assertFalse(send_cart_reminder(self::$pdo, $r, $this->mailer()));
         $this->assertSame([], $this->sent);
-        $this->assertNotNull($this->reload((int)$r['id'])['reminded_at']);
+        $after = $this->reload((int)$r['id']);
+        $this->assertNotNull($after['reminded_at']);
+        $this->assertNull($after['email'], 'a row that can never be emailed forgets its address');
+        $this->assertNull($after['name']);
     }
 
     public function test_email_contains_restore_link_and_no_reminder_link_in_shopper_language(): void
@@ -247,11 +254,14 @@ final class CartRemindersJobTest extends TestCase
         $this->assertStringContainsString(SITE_URL . '/en/cart/no-reminder.php?t=' . $en['token'], $e['html']);
         $this->assertStringContainsString("You're getting this because you asked us to remind you.", html_entity_decode($e['html'], ENT_QUOTES));
         $this->assertStringContainsString('25.00 €', $e['html']);   // 2 x 12.50: the line total, as in order emails
+        $this->assertStringContainsString('>Total<', $e['html']);
+        $this->assertStringNotContainsString('>Price<', $e['html']);
 
         $this->assertSame('Оставихте нещо в количката си', $b['subject']);
         $this->assertStringContainsString(SITE_URL . '/cart/restore.php?t=' . $bg['token'], $b['html']);
         $this->assertStringContainsString(SITE_URL . '/cart/no-reminder.php?t=' . $bg['token'], $b['html']);
         $this->assertStringContainsString('Получавате това писмо, защото поискахте да ви напомним.', $b['html']);
+        $this->assertStringContainsString('>Сума<', $b['html']);
     }
 
     public function test_pledge_reminder_shows_reward_and_amount(): void
@@ -335,6 +345,39 @@ final class CartRemindersJobTest extends TestCase
         $this->assertNull($this->reload((int)$b['id'])['reminded_at']);
     }
 
+    public function test_a_row_with_nothing_to_send_does_not_block_the_address(): void
+    {
+        $this->begin();
+        setting_set('campaign_active', '0');
+        $pledge = $this->pledgeRow([], 32);                       // the campaign closed: nothing to send
+        $shop   = $this->row(30, ['email' => $pledge['email']]);   // same person, a cart still worth a reminder
+        run_cart_reminders_job(self::$pdo, $this->mailer());
+        $mine = $this->sentToMine();
+        $this->assertCount(1, $mine);
+        $this->assertSame($shop['email'], $mine[0]['to']);
+        $this->assertSame('Оставихте нещо в количката си', $mine[0]['subject']);
+        $p = $this->reload((int)$pledge['id']);
+        $this->assertNotNull($p['reminded_at']);
+        $this->assertNull($p['email']);
+    }
+
+    public function test_job_sends_nothing_with_the_shop_module_off_but_still_forgets_old_rows(): void
+    {
+        $this->begin();
+        $r   = $this->row(30);
+        $old = $this->row(24 * 31, ['email' => $this->email('old2')]);
+        $off = getenv('NGO_TEST_MODULES_OFF');
+        putenv('NGO_TEST_MODULES_OFF=shop');
+        try {
+            run_cart_reminders_job(self::$pdo, $this->mailer());
+        } finally {
+            putenv($off === false ? 'NGO_TEST_MODULES_OFF' : 'NGO_TEST_MODULES_OFF=' . $off);
+        }
+        $this->assertSame([], $this->sentToMine());
+        $this->assertNull($this->reload((int)$r['id'])['reminded_at']);
+        $this->assertFalse(self::$pdo->query('SELECT 1 FROM saved_carts WHERE id = ' . (int)$old['id'])->fetchColumn());
+    }
+
     public function test_job_does_nothing_when_switch_is_off(): void
     {
         $this->begin();
@@ -404,7 +447,10 @@ final class CartRemindersJobTest extends TestCase
 
             $post = $this->http('/cart/no-reminder.php?t=' . $r['token'], $jar, ['csrf_token' => $m[1]]);
             $this->assertSame(200, $post['code']);
-            $this->assertNotNull($this->reload((int)$r['id'])['opted_out_at']);
+            $after = $this->reload((int)$r['id']);
+            $this->assertNotNull($after['opted_out_at']);
+            $this->assertNull($after['email'], 'opting out forgets the address');
+            $this->assertNull($after['name']);
             $this->assertStringContainsString('Done', $post['body']);
             $this->assertNotContains((int)$r['id'], $this->dueIds());
         } finally {

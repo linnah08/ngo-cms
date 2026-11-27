@@ -4,6 +4,8 @@ declare(strict_types=1);
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\Group;
 
+require_once __DIR__ . '/../Support/TestServer.php';
+
 /** Opt-in reminder checkbox at checkout step 1 and the consent it records. */
 #[Group('shop')]
 #[Group('cart')]
@@ -15,6 +17,8 @@ final class CartReminderConsentTest extends TestCase
     private array $saved_cookie = [];
     private array $saved_session = [];
     private array $pledge_ids = [];
+    private array $product_ids = [];
+    private array $browsers = [];
 
     public static function setUpBeforeClass(): void
     {
@@ -47,7 +51,14 @@ final class CartReminderConsentTest extends TestCase
         $_SESSION = $this->saved_session;
         if (!self::$pdo) return;
         self::$pdo->prepare('DELETE FROM saved_carts WHERE browser_token = ?')->execute([$this->browser]);
+        foreach ($this->browsers as $b) self::$pdo->prepare('DELETE FROM saved_carts WHERE browser_token = ?')->execute([$b]);
+        foreach ($this->product_ids as $id) self::$pdo->prepare('DELETE FROM products WHERE id = ?')->execute([$id]);
         foreach ($this->saved_settings as $k => $v) setting_set($k, $v);
+    }
+
+    public static function tearDownAfterClass(): void
+    {
+        TestServer::stop();
     }
 
     private function requireDb(): void
@@ -114,7 +125,86 @@ final class CartReminderConsentTest extends TestCase
         $handler = substr($handler, 0, strpos($handler, "if (\$action === 'delivery')"));
         $this->assertGreaterThan(strpos($handler, 'if (!$errors) {', strpos($handler, 'needs_invoice')), strpos($handler, 'saved_cart_record_consent('));
         $this->assertMatchesRegularExpression('/catch \(Throwable \$e\)\s*\{\s*error_log/', $handler);
-        $this->assertStringContainsString('saved_cart_consent_label(post_lang())', $handler);
+    }
+
+    // ── step 1 over HTTP ─────────────────────────────────────────────────────
+
+    private function http(string $url, string $jar, array $post = []): array
+    {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_HEADER => true, CURLOPT_TIMEOUT => 15,
+            CURLOPT_FOLLOWLOCATION => false, CURLOPT_COOKIEJAR => $jar, CURLOPT_COOKIEFILE => $jar,
+        ]);
+        if ($post) { curl_setopt($ch, CURLOPT_POST, true); curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($post)); }
+        $raw  = (string)curl_exec($ch);
+        $hs   = (int)curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        curl_close($ch);
+        preg_match('/^Location:\s*(\S+)/mi', substr($raw, 0, $hs), $m);
+        return ['code' => $code, 'location' => $m[1] ?? '', 'body' => substr($raw, $hs)];
+    }
+
+    private function jarCookie(string $jar, string $name): string
+    {
+        foreach (file($jar) ?: [] as $line) {
+            $f = explode("\t", (string)preg_replace('/^#HttpOnly_/', '', trim($line)));
+            if (count($f) >= 7 && $f[5] === $name) return $f[6];
+        }
+        return '';
+    }
+
+    /** Puts a product in a fresh session's cart, ticks the box at step 1 of $checkout; returns the saved row. */
+    private function stepOneWithReminder(string $shop, string $checkout): array
+    {
+        skip_unless_modules_on('shop');
+        $base = TestServer::start();
+        if ($base === '') $this->markTestSkipped('Could not start a local test server.');
+        self::$pdo->prepare('INSERT INTO products (slug,name_bg,name_en,price_eur,stock,active,`type`) VALUES (?,?,?,?,?,?,?)')
+            ->execute(['test-consent-' . uniqid(), 'Тениска', 'Shirt', 10.00, 9, 1, 'standard']);
+        $pid = $this->product_ids[] = (int)self::$pdo->lastInsertId();
+        $jar = tempnam(sys_get_temp_dir(), 'jar');
+        try {
+            $page = $this->http($base . $shop, $jar);
+            $this->assertSame(1, preg_match('/name="csrf_token" value="([0-9a-f]{64})"/', $page['body'], $m), 'no csrf token on the shop page');
+            $this->http($base . '/cart/add.php', $jar, ['csrf_token' => $m[1], 'product_id' => $pid, 'quantity' => 1]);
+            $this->browsers[] = $browser = $this->jarCookie($jar, 'om_cart');
+            $this->assertTrue(saved_cart_token_valid($browser));
+
+            $form = $this->http($base . $checkout, $jar);
+            $this->assertSame(200, $form['code']);
+            $this->assertStringContainsString('name="cart_reminder"', $form['body']);
+            preg_match('/name="csrf_token" value="([0-9a-f]{64})"/', $form['body'], $m);
+            $r = $this->http($base . $checkout, $jar, [
+                'csrf_token' => $m[1], 'action' => 'contact', 'customer_name' => 'Anna Smith',
+                'customer_email' => 'consent-test@example.com', 'customer_phone' => '0888123456', 'cart_reminder' => '1',
+            ]);
+            $this->assertSame(302, $r['code']);
+            $this->assertStringContainsString('step=2', $r['location']);
+        } finally {
+            @unlink($jar);
+        }
+        $s = self::$pdo->prepare('SELECT * FROM saved_carts WHERE browser_token = ? AND pledge_id IS NULL');
+        $s->execute([$browser]);
+        return $s->fetch(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function test_english_step_one_records_english_language_and_wording(): void
+    {
+        $this->requireDb();
+        $row = $this->stepOneWithReminder('/en/shop/', '/en/checkout/');
+        $this->assertSame('en', $row['lang']);
+        $this->assertSame("Email me a reminder if I don't finish my order", $row['remind_consent_text']);
+        $this->assertSame('consent-test@example.com', $row['email']);
+        $this->assertSame(1, (int)$row['remind_opt_in']);
+    }
+
+    public function test_bulgarian_step_one_records_bulgarian_language_and_wording(): void
+    {
+        $this->requireDb();
+        $row = $this->stepOneWithReminder('/magazin/', '/checkout/');
+        $this->assertSame('bg', $row['lang']);
+        $this->assertSame('Изпратете ми напомняне по имейл, ако не завърша поръчката', $row['remind_consent_text']);
     }
 
     // ── recording ────────────────────────────────────────────────────────────
