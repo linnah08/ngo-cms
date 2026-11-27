@@ -242,8 +242,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
         <thead>
           <tr style="text-align:left;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">
             <th style="padding:.25rem .5rem .25rem 0;font-weight:600;">Наименование</th>
-            <th style="padding:.25rem .5rem;font-weight:600;width:5rem;">К-во</th>
-            <th style="padding:.25rem .5rem;font-weight:600;width:8rem;">Ед. цена (EUR)</th>
+            <th style="padding:.25rem .5rem;font-weight:600;width:7rem;">К-во</th>
+            <th style="padding:.25rem .5rem;font-weight:600;width:10rem;">Ед. цена (EUR)</th>
             <th style="width:2rem;"></th>
           </tr>
         </thead>
@@ -260,11 +260,11 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
                      value="<?= h($pn) ?>" placeholder="Описание">
             </td>
             <td style="padding:.25rem .5rem;">
-              <input type="number" name="item_qty[]" class="form-input" aria-label="Количество" min="1" step="1"
+              <input type="number" name="item_qty[]" class="form-input" style="padding-left:.6rem;padding-right:.4rem;" aria-label="Количество" min="1" step="1"
                      value="<?= h($post_qtys[$i] ?? '1') ?>">
             </td>
             <td style="padding:.25rem .5rem;">
-              <input type="number" name="item_price[]" class="form-input" aria-label="Единична цена" min="0" step="0.01"
+              <input type="number" name="item_price[]" class="form-input" style="padding-left:.6rem;padding-right:.4rem;" aria-label="Единична цена" min="0" step="0.01"
                      value="<?= h($post_prices[$i] ?? '') ?>" placeholder="0.00">
             </td>
             <td style="padding:.25rem 0;text-align:center;">
@@ -317,8 +317,8 @@ function addRow() {
   var tr = document.createElement('tr');
   tr.innerHTML =
     '<td style="padding:.25rem .5rem .25rem 0;"><input type="text" name="item_name[]" class="form-input" aria-label="Наименование на артикул" placeholder="Описание"></td>' +
-    '<td style="padding:.25rem .5rem;"><input type="number" name="item_qty[]" class="form-input" aria-label="Количество" min="1" step="1" value="1"></td>' +
-    '<td style="padding:.25rem .5rem;"><input type="number" name="item_price[]" class="form-input" aria-label="Единична цена" min="0" step="0.01" placeholder="0.00"></td>' +
+    '<td style="padding:.25rem .5rem;"><input type="number" name="item_qty[]" class="form-input" style="padding-left:.6rem;padding-right:.4rem;" aria-label="Количество" min="1" step="1" value="1"></td>' +
+    '<td style="padding:.25rem .5rem;"><input type="number" name="item_price[]" class="form-input" style="padding-left:.6rem;padding-right:.4rem;" aria-label="Единична цена" min="0" step="0.01" placeholder="0.00"></td>' +
     '<td style="padding:.25rem 0;text-align:center;"><button type="button" onclick="removeRow(this)" aria-label="Премахни артикул" style="min-width:44px;min-height:44px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.1rem;line-height:1;"><span aria-hidden="true">×</span></button></td>';
   body.appendChild(tr);
 }
