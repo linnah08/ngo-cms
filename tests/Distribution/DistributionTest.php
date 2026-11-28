@@ -105,6 +105,14 @@ final class DistributionTest extends TestCase
         );
     }
 
+    /** Lines of one product from variant_id => quantity. */
+    private function lines(int $pid, array $map, float $price = 0.0): array
+    {
+        $out = [];
+        foreach ($map as $vid => $q) $out[] = ['product_id' => $pid, 'variant_id' => $vid ?: null, 'quantity' => $q, 'unit_price_eur' => $price];
+        return $out;
+    }
+
     // ── pure helpers ───────────────────────────────────────────────────────────
 
     public function testDateValidation(): void
@@ -606,7 +614,7 @@ final class DistributionTest extends TestCase
         foreach ([$v1, $v2, $v3] as $v) $this->batch($pid, 10, $v);
         $d = $this->distributor();
 
-        $r = distribution_allocate_many(self::$pdo, $pid, [$v1 => 4, $v2 => 0, $v3 => 6], 'distributor', $d, 5.0, '2026-03-01');
+        $r = distribution_allocate_items(self::$pdo, $this->lines($pid, [$v1 => 4, $v2 => 0, $v3 => 6], 5.0), 'distributor', $d, '2026-03-01');
         $this->assertTrue($r['ok'], $r['error'] ?? '');
         $this->assertCount(2, $r['ids'], 'an empty box is skipped');
         $this->assertSame(10, $r['quantity']);
@@ -644,14 +652,14 @@ final class DistributionTest extends TestCase
         $this->batch($pid, 2, $v2);
         $d = $this->distributor();
 
-        $r = distribution_allocate_many(self::$pdo, $pid, [$v1 => 3, $v2 => 3], 'distributor', $d, 10.0, '2026-03-01');
+        $r = distribution_allocate_items(self::$pdo, $this->lines($pid, [$v1 => 3, $v2 => 3], 10.0), 'distributor', $d, '2026-03-01');
         $this->assertFalse($r['ok']);
         $this->assertStringContainsString('Втора', $r['error']);
         $this->assertStringContainsString('Нищо не е записано', $r['error']);
         $this->assertSame(0, distribution_distributor_stock(self::$pdo, $d, $pid, $v1)['allocated'], 'the first line was rolled back');
 
-        $this->assertFalse(distribution_allocate_many(self::$pdo, $pid, [$v1 => 0], 'distributor', $d, 10.0, '2026-03-01')['ok'], 'nothing entered');
-        $this->assertFalse(distribution_allocate_many(self::$pdo, $pid, [$v1 => -1], 'distributor', $d, 10.0, '2026-03-01')['ok']);
+        $this->assertFalse(distribution_allocate_items(self::$pdo, $this->lines($pid, [$v1 => 0], 10.0), 'distributor', $d, '2026-03-01')['ok'], 'nothing entered');
+        $this->assertFalse(distribution_allocate_items(self::$pdo, $this->lines($pid, [$v1 => -1], 10.0), 'distributor', $d, '2026-03-01')['ok']);
     }
 
     public function testRecordSalesManyForOneDistributor(): void
@@ -662,18 +670,49 @@ final class DistributionTest extends TestCase
         $v3  = $this->variant($pid, 'Трета');
         foreach ([$v1, $v2, $v3] as $v) $this->batch($pid, 10, $v);
         $d = $this->distributor();
-        $this->assertTrue(distribution_allocate_many(self::$pdo, $pid, [$v1 => 5, $v2 => 5, $v3 => 5], 'distributor', $d, 10.0, '2026-03-01')['ok']);
+        $this->assertTrue(distribution_allocate_items(self::$pdo, $this->lines($pid, [$v1 => 5, $v2 => 5, $v3 => 5], 10.0), 'distributor', $d, '2026-03-01')['ok']);
 
-        $r = distribution_record_sales_many(self::$pdo, $d, $pid, [$v1 => 2, $v2 => 3, $v3 => 5], '2026-03-10', true, '2026-03-12');
+        $r = distribution_record_sales_items(self::$pdo, $d, $this->lines($pid, [$v1 => 2, $v2 => 3, $v3 => 5]), '2026-03-10', true, '2026-03-12');
         $this->assertTrue($r['ok'], $r['error'] ?? '');
         $this->assertCount(3, $r['ids']);
         $this->assertSame(0, distribution_distributor_stock(self::$pdo, $d, $pid, $v3)['unsold']);
         $this->assertSame(10, distribution_distributor_payment_summary(self::$pdo, $d, $pid)['paid_qty']);
 
         // More than they hold of one variant cancels the lot.
-        $bad = distribution_record_sales_many(self::$pdo, $d, $pid, [$v1 => 1, $v3 => 1], '2026-03-11', false);
+        $bad = distribution_record_sales_items(self::$pdo, $d, $this->lines($pid, [$v1 => 1, $v3 => 1]), '2026-03-11', false);
         $this->assertFalse($bad['ok']);
         $this->assertStringContainsString('Трета', $bad['error']);
         $this->assertSame(3, distribution_distributor_stock(self::$pdo, $d, $pid, $v1)['unsold'], 'nothing saved');
+    }
+
+    public function testSeveralProductsToOneDistributorShareOneProtocol(): void
+    {
+        $a = $this->product(0, 'standard', 6.0);
+        $b = $this->product(0, 'standard', 7.0);
+        $this->batch($a, 5);
+        $this->batch($b, 5);
+        $d = $this->distributor();
+
+        $r = distribution_allocate_items(self::$pdo, [
+            ['product_id' => $b, 'variant_id' => null, 'quantity' => 2, 'unit_price_eur' => 7.0],
+            ['product_id' => $a, 'variant_id' => null, 'quantity' => 1, 'unit_price_eur' => 6.0],
+            ['product_id' => $a, 'variant_id' => null, 'quantity' => 2, 'unit_price_eur' => 6.0],
+        ], 'distributor', $d, '2026-03-01');
+        $this->assertTrue($r['ok'], $r['error'] ?? '');
+        $this->assertCount(2, $r['ids'], 'the same product twice is one line');
+        $this->assertSame(3, distribution_distributor_stock(self::$pdo, $d, $a, null)['unsold']);
+
+        $p = distribution_issue_protocol(self::$pdo, $r['ids'][0], self::$tmp_root, $r['ids']);
+        $this->assertTrue($p['ok'], $p['error'] ?? '');
+        $this->assertSame(2, (int) self::$pdo->query("SELECT COUNT(*) FROM distribution_allocations WHERE protocol_formatted_number = '{$p['number']}'")->fetchColumn());
+
+        $this->assertTrue(distribution_record_sales_items(self::$pdo, $d, [
+            ['product_id' => $a, 'variant_id' => null, 'quantity' => 3],
+            ['product_id' => $b, 'variant_id' => null, 'quantity' => 1],
+        ], '2026-03-05', false)['ok']);
+        $t = distribution_distributor_totals(self::$pdo)[$d];
+        $this->assertSame(['allocated' => 5, 'sold' => 4, 'unsold' => 1, 'paid_qty' => 0, 'unpaid_qty' => 4], $t);
+        $this->assertSame(3, distribution_distributor_totals(self::$pdo, $a)[$d]['sold']);
+        $this->assertSame([$b . '_0' => 1], distribution_distributor_holdings(self::$pdo)[$d], 'only what they still hold');
     }
 }

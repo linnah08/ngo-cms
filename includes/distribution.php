@@ -712,72 +712,78 @@ function distribution_give_out_many(
 }
 
 /**
- * Hand several variants of one product to the same recipient in one go — e.g. all
- * three series to one distributor. Same rules as distribution_create_allocation()
- * for each line; either every line is saved or none is, and the error names the
- * variant that stopped it. For a distributor, issue one protocol for all of them:
- * distribution_issue_protocol($pdo, $ids[0], $root, $ids).
+ * Hand several items — other products, other variants — to the same recipient
+ * in one go, e.g. three books to one distributor. Same rules as
+ * distribution_create_allocation() for each line; either every line is saved or
+ * none is, and the error names the item that stopped it. For a distributor, issue
+ * one protocol for all of them: distribution_issue_protocol($pdo, $ids[0], $root, $ids).
  *
- * @param array<int,int> $lines variant_id => quantity; quantity 0 is skipped
+ * @param list<array{product_id:int, variant_id:?int, quantity:int, unit_price_eur?:float}> $lines quantity 0 is skipped
  * @return array{ok: bool, ids?: list<int>, quantity?: int, error?: string}
  */
-function distribution_allocate_many(
+function distribution_allocate_items(
     PDO $pdo,
-    int $product_id,
     array $lines,
     string $destination,
     ?int $distributor_id,
-    float $unit_price_eur,
     string $allocated_on,
     ?string $notes = null,
     bool $use_shop_stock = false,
     ?string $sample_recipient = null
 ): array {
-    $todo = _distribution_many_lines($lines);
+    $todo = _distribution_item_lines($lines);
     if (is_string($todo)) return ['ok' => false, 'error' => $todo];
 
     return _distribution_tx($pdo, function () use (
-        $pdo, $product_id, $todo, $destination, $distributor_id, $unit_price_eur, $allocated_on, $notes, $use_shop_stock, $sample_recipient
+        $pdo, $todo, $destination, $distributor_id, $allocated_on, $notes, $use_shop_stock, $sample_recipient
     ): array {
         $ids = [];
-        foreach ($todo as $vid => $q) {
+        foreach ($todo as $l) {
             $r = distribution_create_allocation(
-                $pdo, $product_id, $vid ?: null, $destination, $distributor_id, $q, $unit_price_eur,
-                $allocated_on, $notes, $use_shop_stock, $sample_recipient
+                $pdo, $l['product_id'], $l['variant_id'], $destination, $distributor_id, $l['quantity'],
+                $l['unit_price_eur'], $allocated_on, $notes, $use_shop_stock, $sample_recipient
             );
-            if (!$r['ok']) return ['ok' => false, 'error' => _distribution_many_error($pdo, $product_id, $vid, $r['error'], count($todo))];
+            if (!$r['ok']) return ['ok' => false, 'error' => _distribution_line_error($pdo, $l, $r['error'], count($todo))];
             $ids[] = $r['id'];
         }
-        return ['ok' => true, 'ids' => $ids, 'quantity' => array_sum($todo)];
+        return ['ok' => true, 'ids' => $ids, 'quantity' => array_sum(array_column($todo, 'quantity'))];
     });
 }
 
 /**
- * Quantities from a per-variant form, cleaned: variant_id => quantity > 0, in
- * variant order (so locks are always taken in the same order). A string is the
- * error to show.
+ * Lines of a multi-item form, cleaned: quantity > 0 only, the same item twice
+ * merged, in product/variant order (so locks are always taken in the same order
+ * and two admins saving at once can't deadlock). A string is the error to show.
  *
- * @param array<int,int> $lines
- * @return array<int,int>|string
+ * @return list<array{product_id:int, variant_id:?int, quantity:int, unit_price_eur:float}>|string
  */
-function _distribution_many_lines(array $lines): array|string
+function _distribution_item_lines(array $lines): array|string
 {
     $todo = [];
-    foreach ($lines as $vid => $q) {
-        $q = (int) $q;
+    foreach ($lines as $l) {
+        $q = (int) ($l['quantity'] ?? 0);
         if ($q < 0) return 'Броят не може да е отрицателен.';
-        if ($q > 0) $todo[(int) $vid] = $q;
+        if ($q === 0) continue;
+        $pid = (int) ($l['product_id'] ?? 0);
+        $vid = !empty($l['variant_id']) ? (int) $l['variant_id'] : null;
+        $key = $pid . '_' . (int) $vid;
+        if (isset($todo[$key])) {
+            $todo[$key]['quantity'] += $q;
+        } else {
+            $todo[$key] = ['product_id' => $pid, 'variant_id' => $vid, 'quantity' => $q, 'unit_price_eur' => (float) ($l['unit_price_eur'] ?? 0)];
+        }
     }
-    if (!$todo) return 'Въведете брой поне за един вариант.';
-    ksort($todo);
+    if (!$todo) return 'Изберете продукт и въведете брой поне на един ред.';
+    $todo = array_values($todo);
+    usort($todo, fn($a, $b) => [$a['product_id'], (int) $a['variant_id']] <=> [$b['product_id'], (int) $b['variant_id']]);
     return $todo;
 }
 
-/** The error of one line of a multi-line save, naming the variant when there are several. */
-function _distribution_many_error(PDO $pdo, int $product_id, int $variant_id, string $error, int $count): string
+/** The error of one line of a multi-line save, naming the item when there are several. */
+function _distribution_line_error(PDO $pdo, array $line, string $error, int $count): string
 {
     if ($count < 2) return $error;
-    return '„' . distribution_item_label($pdo, $product_id, $variant_id ?: null) . '“: ' . $error . ' Нищо не е записано.';
+    return '„' . distribution_item_label($pdo, $line['product_id'], $line['variant_id']) . '“: ' . $error . ' Нищо не е записано.';
 }
 
 // ── Hand-over protocol ─────────────────────────────────────────────────────────
@@ -935,37 +941,90 @@ function distribution_record_sale(
 }
 
 /**
- * Record a distributor's sales of several variants of one product at once.
- * Either every line is saved or none is; the error names the variant.
+ * Record a distributor's sales of several items — other products, other variants
+ * — at once. Either every line is saved or none is; the error names the item.
  *
- * @param array<int,int> $lines variant_id => quantity; quantity 0 is skipped
+ * @param list<array{product_id:int, variant_id:?int, quantity:int}> $lines quantity 0 is skipped
  * @return array{ok: bool, ids?: list<int>, quantity?: int, error?: string}
  */
-function distribution_record_sales_many(
+function distribution_record_sales_items(
     PDO $pdo,
     int $distributor_id,
-    int $product_id,
     array $lines,
     string $sale_date,
     bool $payment_received,
     ?string $payment_received_on = null,
     ?string $notes = null
 ): array {
-    $todo = _distribution_many_lines($lines);
+    $todo = _distribution_item_lines($lines);
     if (is_string($todo)) return ['ok' => false, 'error' => $todo];
 
     return _distribution_tx($pdo, function () use (
-        $pdo, $distributor_id, $product_id, $todo, $sale_date, $payment_received, $payment_received_on, $notes
+        $pdo, $distributor_id, $todo, $sale_date, $payment_received, $payment_received_on, $notes
     ): array {
-        _distribution_lock_product($pdo, $product_id);
         $ids = [];
-        foreach ($todo as $vid => $q) {
-            $r = distribution_record_sale($pdo, $distributor_id, $product_id, $vid ?: null, $q, $sale_date, $payment_received, $payment_received_on, $notes);
-            if (!$r['ok']) return ['ok' => false, 'error' => _distribution_many_error($pdo, $product_id, $vid, $r['error'], count($todo))];
+        foreach ($todo as $l) {
+            _distribution_lock_product($pdo, $l['product_id']);
+            $r = distribution_record_sale($pdo, $distributor_id, $l['product_id'], $l['variant_id'], $l['quantity'], $sale_date, $payment_received, $payment_received_on, $notes);
+            if (!$r['ok']) return ['ok' => false, 'error' => _distribution_line_error($pdo, $l, $r['error'], count($todo))];
             $ids[] = $r['id'];
         }
-        return ['ok' => true, 'ids' => $ids, 'quantity' => array_sum($todo)];
+        return ['ok' => true, 'ids' => $ids, 'quantity' => array_sum(array_column($todo, 'quantity'))];
     });
+}
+
+/**
+ * Every distributor's numbers, all products together or one product:
+ * distributor_id => allocated, sold, unsold, paid_qty, unpaid_qty.
+ *
+ * @return array<int, array{allocated:int, sold:int, unsold:int, paid_qty:int, unpaid_qty:int}>
+ */
+function distribution_distributor_totals(PDO $pdo, ?int $product_id = null): array
+{
+    $pw  = $product_id ? ' AND product_id = ?' : '';
+    $arg = $product_id ? [$product_id] : [];
+    $out = [];
+    $blank = ['allocated' => 0, 'sold' => 0, 'unsold' => 0, 'paid_qty' => 0, 'unpaid_qty' => 0];
+
+    $a = $pdo->prepare("SELECT distributor_id, SUM(quantity) FROM distribution_allocations WHERE destination = 'distributor'$pw GROUP BY distributor_id");
+    $a->execute($arg);
+    foreach ($a->fetchAll(PDO::FETCH_KEY_PAIR) as $d => $q) $out[(int) $d] = ['allocated' => (int) $q] + $blank;
+
+    $s = $pdo->prepare("SELECT distributor_id, payment_received, SUM(quantity) q FROM distribution_sales WHERE 1 = 1$pw GROUP BY distributor_id, payment_received");
+    $s->execute($arg);
+    foreach ($s->fetchAll() as $r) {
+        $d = (int) $r['distributor_id'];
+        $out[$d] ??= $blank;
+        $out[$d]['sold'] += (int) $r['q'];
+        $out[$d][(int) $r['payment_received'] ? 'paid_qty' : 'unpaid_qty'] += (int) $r['q'];
+    }
+    foreach ($out as &$o) $o['unsold'] = $o['allocated'] - $o['sold'];
+    return $out;
+}
+
+/**
+ * What each distributor still holds, per item: distributor_id => "<product>_<variant or 0>" => unsold.
+ * Items they hold none of are left out.
+ *
+ * @return array<int, array<string,int>>
+ */
+function distribution_distributor_holdings(PDO $pdo): array
+{
+    $held = [];
+    $a = $pdo->query("SELECT distributor_id, product_id, COALESCE(variant_id, 0) v, SUM(quantity) q FROM distribution_allocations
+                       WHERE destination = 'distributor' GROUP BY distributor_id, product_id, COALESCE(variant_id, 0)");
+    foreach ($a->fetchAll() as $r) $held[(int) $r['distributor_id']][$r['product_id'] . '_' . $r['v']] = (int) $r['q'];
+    $s = $pdo->query('SELECT distributor_id, product_id, COALESCE(variant_id, 0) v, SUM(quantity) q FROM distribution_sales
+                       GROUP BY distributor_id, product_id, COALESCE(variant_id, 0)');
+    foreach ($s->fetchAll() as $r) {
+        $k = $r['product_id'] . '_' . $r['v'];
+        $held[(int) $r['distributor_id']][$k] = ($held[(int) $r['distributor_id']][$k] ?? 0) - (int) $r['q'];
+    }
+    foreach ($held as $d => $items) {
+        $held[$d] = array_filter($items, fn($q) => $q > 0);
+        if (!$held[$d]) unset($held[$d]);
+    }
+    return $held;
 }
 
 /** @return array{ok: bool, error?: string} */

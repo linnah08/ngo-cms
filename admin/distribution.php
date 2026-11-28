@@ -23,10 +23,10 @@ const DIST_TABS = [
     'distributors' => 'Дистрибутори',
 ];
 
-/** Back to this page for the same product, on a tab, keeping list filters. */
+/** Back to this page on a tab, keeping the list filters. */
 function dist_redirect(int $product_id, string $tab, array $keep = []): never
 {
-    $q = array_filter(['product' => $product_id ?: null] + $keep, fn($v) => $v !== null && $v !== '');
+    $q = array_filter($keep, fn($v) => $v !== null && $v !== '');
     header('Location: /admin/distribution.php' . ($q ? '?' . http_build_query($q) : '') . '#' . $tab);
     exit;
 }
@@ -38,29 +38,41 @@ function dist_post_text(string $key, int $max = 1000): ?string
     return $v === '' ? null : $v;
 }
 
-/** variant_id from POST, null when not given. */
-function dist_post_variant(): ?int
+/**
+ * The item a form's „Продукт“ dropdown chose: [product_id, variant_id or null].
+ * Its value is "<product>_<variant or 0>".
+ *
+ * @return array{0:int, 1:?int}
+ */
+function dist_item_key(string $value): array
 {
-    $v = (int) ($_POST['variant_id'] ?? 0);
-    return $v > 0 ? $v : null;
+    if (!preg_match('/^(\d+)_(\d+)$/', $value, $m)) return [0, null];
+    return [(int) $m[1], (int) $m[2] ?: null];
 }
 
 /**
- * Per-variant quantities from a form with a box per variant (qty[<variant_id>]).
- * null when the form has no such boxes, false when a box isn't a whole number.
+ * Lines of a form with a product dropdown per line (line_item[], line_qty[],
+ * and line_price[] when it has prices). A string is the error to show.
  *
- * @return array<int,int>|null|false
+ * @return list<array{product_id:int, variant_id:?int, quantity:int, unit_price_eur:float}>|string
  */
-function dist_post_qty_lines(): array|null|false
+function dist_post_lines(): array|string
 {
-    if (!isset($_POST['qty']) || !is_array($_POST['qty'])) return null;
-    $lines = [];
-    foreach ($_POST['qty'] as $vid => $q) {
-        $q = trim((string) $q);
-        if ($q === '' || !ctype_digit((string) $vid)) continue;
+    $items  = (array) ($_POST['line_item'] ?? []);
+    $qtys   = (array) ($_POST['line_qty'] ?? []);
+    $prices = (array) ($_POST['line_price'] ?? []);
+    $lines  = [];
+    foreach ($items as $i => $key) {
+        [$pid, $vid] = dist_item_key((string) $key);
+        $q = trim((string) ($qtys[$i] ?? ''));
+        if ($q === '') continue;
+        if (!$pid) return 'На един от редовете има брой, но не е избран продукт.';
         $qi = filter_var($q, FILTER_VALIDATE_INT);
-        if ($qi === false) return false;
-        $lines[(int) $vid] = $qi;
+        if ($qi === false) return 'Броят трябва да е цяло число.';
+        $lines[] = [
+            'product_id' => $pid, 'variant_id' => $vid, 'quantity' => $qi,
+            'unit_price_eur' => (float) str_replace([',', ' '], ['.', ''], (string) ($prices[$i] ?? '0')),
+        ];
     }
     return $lines;
 }
@@ -89,8 +101,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) { http_response_code(400); exit('Невалидна заявка. Презаредете страницата и опитайте отново.'); }
 
     $action = (string) ($_POST['action'] ?? '');
-    $pid    = (int) ($_POST['product_id'] ?? 0);
-    $keep   = array_intersect_key($_POST, array_flip(['af', 'av', 'sd', 'sp', 'sv', 'archived']));
+    $pid    = 0;
+    $keep   = array_intersect_key($_POST, array_flip(['fp', 'af', 'av', 'sd', 'sp', 'sv', 'archived', 'df', 'dq']));
     $keep   = array_map(fn($v) => is_string($v) ? mb_substr($v, 0, 20) : '', $keep);
     $ok     = function (string $msg) { flash_set('success', $msg); };
     $fail   = function (string $msg) { flash_set('error', $msg); };
@@ -98,20 +110,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     switch ($action) {
         case 'set_online_stock':
             $stock = filter_var($_POST['stock'] ?? '', FILTER_VALIDATE_INT);
-            $vid   = dist_post_variant();
-            if ($stock === false) {
+            [$item_pid, $vid] = dist_item_key((string) ($_POST['item'] ?? ''));
+            if (!$item_pid) {
+                $fail('Моля изберете продукт.');
+            } elseif ($stock === false) {
                 $fail('Моля въведете цяло число.');
-            } elseif ($err = distribution_item_error($pdo, $pid, $vid)) {
+            } elseif ($err = distribution_item_error($pdo, $item_pid, $vid)) {
                 $fail($err);
             } else {
-                distribution_set_online_stock($pdo, $pid, $vid, (int) $stock);
+                distribution_set_online_stock($pdo, $item_pid, $vid, (int) $stock);
                 $ok('Наличността в онлайн магазина е поправена на ' . (int) $stock . ' бр.');
             }
             dist_redirect($pid, 'batches', $keep);
 
         case 'add_batch':
-            $r = distribution_create_batch($pdo, $pid, dist_post_variant(), (int) ($_POST['quantity'] ?? 0),
-                trim((string) ($_POST['produced_on'] ?? '')), dist_post_text('notes'));
+            [$item_pid, $vid] = dist_item_key((string) ($_POST['item'] ?? ''));
+            $r = $item_pid ? distribution_create_batch($pdo, $item_pid, $vid, (int) ($_POST['quantity'] ?? 0),
+                trim((string) ($_POST['produced_on'] ?? '')), dist_post_text('notes'))
+                : ['ok' => false, 'error' => 'Моля изберете продукт.'];
             $r['ok'] ? $ok('Партидата е добавена.') : $fail($r['error']);
             dist_redirect($pid, 'batches', $keep);
 
@@ -156,25 +172,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $recipient   = (string) ($_POST['recipient'] ?? '');
             $destination = in_array($recipient, ['online', 'personal', 'sample'], true) ? $recipient : 'distributor';
             $dist_id     = $destination === 'distributor' ? (int) $recipient : null;
-            $args        = [
-                $destination, $dist_id ?: null, dist_post_price('unit_price_eur'),
-                trim((string) ($_POST['allocated_on'] ?? '')), dist_post_text('notes'),
-                !empty($_POST['use_shop_stock']), dist_post_text('sample_recipient', 150),
-            ];
-            $lines = dist_post_qty_lines();
-            if ($lines === false) {
-                $fail('Броят трябва да е цяло число.');
+            $lines       = dist_post_lines();
+            if (is_string($lines)) {
+                $fail($lines);
                 dist_redirect($pid, 'allocations', $keep);
             }
-            if ($lines !== null) {
-                // A box per variant — several variants to the same recipient at once.
-                $r   = distribution_allocate_many($pdo, $pid, $lines, ...$args);
-                $ids = $r['ids'] ?? [];
-            } else {
-                [$dest, $did, $price, $on, $notes, $shop, $sample] = $args;
-                $r   = distribution_create_allocation($pdo, $pid, dist_post_variant(), $dest, $did, (int) ($_POST['quantity'] ?? 0), $price, $on, $notes, $shop, $sample);
-                $ids = isset($r['id']) ? [$r['id']] : [];
-            }
+            // One line per product (or variant) — several to the same recipient at once.
+            $r   = distribution_allocate_items(
+                $pdo, $lines, $destination, $dist_id ?: null, trim((string) ($_POST['allocated_on'] ?? '')),
+                dist_post_text('notes'), !empty($_POST['use_shop_stock']), dist_post_text('sample_recipient', 150)
+            );
+            $ids = $r['ids'] ?? [];
             if (!$r['ok']) {
                 $fail($r['error']);
             } elseif ($destination === 'distributor') {
@@ -247,16 +255,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $dist_id = (int) ($_POST['distributor_id'] ?? 0);
             $date    = trim((string) ($_POST['sale_date'] ?? ''));
             $paid_on = $paid ? trim((string) ($_POST['payment_received_on'] ?? '')) : null;
-            $lines   = dist_post_qty_lines();
-            if ($lines === false) {
-                $fail('Броят трябва да е цяло число.');
+            $lines   = dist_post_lines();
+            if (is_string($lines)) {
+                $fail($lines);
                 dist_redirect($pid, 'sales', $keep);
             }
-            $r = $lines !== null
-                // A box per variant — one distributor's sales of several variants at once.
-                ? distribution_record_sales_many($pdo, $dist_id, $pid, $lines, $date, $paid, $paid_on, dist_post_text('notes'))
-                : distribution_record_sale($pdo, $dist_id, $pid, dist_post_variant(), (int) ($_POST['quantity'] ?? 0), $date, $paid, $paid_on, dist_post_text('notes'));
-            $r['ok'] ? $ok(isset($r['ids']) && count($r['ids']) > 1 ? 'Продажбите са записани (' . $r['quantity'] . ' бр.).' : 'Продажбата е записана.') : $fail($r['error']);
+            // One line per product (or variant) the distributor sold.
+            $r = distribution_record_sales_items($pdo, $dist_id, $lines, $date, $paid, $paid_on, dist_post_text('notes'));
+            $r['ok'] ? $ok(count($r['ids']) > 1 ? 'Продажбите са записани (' . $r['quantity'] . ' бр.).' : 'Продажбата е записана.') : $fail($r['error']);
             dist_redirect($pid, 'sales', $keep);
 
         case 'update_sale':
@@ -285,114 +291,114 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // ── Page data ─────────────────────────────────────────────────────────────────
-$products   = distribution_products($pdo);
-$product_id = (int) ($_GET['product'] ?? 0);
-$product    = $product_id ? distribution_product($pdo, $product_id) : null;
-if (!$product && $products) {
-    $product    = distribution_product($pdo, (int) $products[0]['id']);
-    $product_id = (int) $product['id'];
+$products = distribution_products($pdo);
+$overview = distribution_overview($pdo);
+$today    = date('Y-m-d');
+
+// Every item the forms' „Продукт“ dropdowns offer — one per product, or per variant.
+// Choosing one changes only that form: nothing reloads.
+$all_items = [];   // "<product>_<variant or 0>" => label, price, unallocated, in the shop
+foreach ($products as $p) {
+    foreach (distribution_product_items($pdo, $p) as $it) {
+        if (!$it['active']) continue;
+        $vid   = $it['variant_id'];
+        $multi = $p['type'] === 'variant';
+        $all_items[(int) $p['id'] . '_' . (int) $vid] = [
+            'product'   => (int) $p['id'],
+            'group'     => (string) $p['name_bg'] . ((int) $p['active'] ? '' : ' (неактивен)'),
+            'label'     => $multi ? $p['name_bg'] . ' — ' . $it['label'] : (string) $p['name_bg'],
+            'short'     => $multi ? (string) $it['label'] : (string) $p['name_bg'],
+            'multi'     => $multi,
+            'price'     => number_format((float) $p['price_eur'], 2, '.', ''),
+            'available' => max(0, distribution_available($pdo, (int) $p['id'], $vid)),
+            'shop'      => max(0, distribution_online_stock($pdo, (int) $p['id'], $vid)),
+        ];
+    }
 }
+$item_label = fn(array $row): string => $row['variant_label'] !== null && $row['variant_label'] !== ''
+    ? $row['product_name'] . ' — ' . $row['variant_label'] : (string) $row['product_name'];
 
-$items        = $product ? distribution_product_items($pdo, $product) : [];
-$has_variants = $product && $product['type'] === 'variant';
-$summary      = $product ? distribution_product_summary($pdo, $product) : ['items' => [], 'total' => []];
-$overview     = distribution_overview($pdo);
-$today        = date('Y-m-d');
-
-// Filters (GET), all narrowed on the server.
+// List filters (GET), all narrowed on the server. „fp“ narrows a tab's list to one product.
+$f_prod    = (int) ($_GET['fp'] ?? 0);
+$f_product = $f_prod ? distribution_product($pdo, $f_prod) : null;
+if (!$f_product) $f_prod = 0;
+$f_items   = $f_product && $f_product['type'] === 'variant' ? distribution_product_items($pdo, $f_product) : [];
 $f_alloc   = mb_substr((string) ($_GET['af'] ?? ''), 0, 20);
-$f_alloc_v = (int) ($_GET['av'] ?? 0);
+$f_alloc_v = $f_items ? (int) ($_GET['av'] ?? 0) : 0;
 $f_sale_d  = (int) ($_GET['sd'] ?? 0);
 $f_sale_p  = in_array($_GET['sp'] ?? '', ['paid', 'unpaid'], true) ? $_GET['sp'] : '';
-$f_sale_v  = (int) ($_GET['sv'] ?? 0);
+$f_sale_v  = $f_items ? (int) ($_GET['sv'] ?? 0) : 0;
 $f_arch    = ($_GET['archived'] ?? '') === '1';
 $f_dist    = in_array($_GET['df'] ?? '', ['holding', 'unpaid'], true) ? $_GET['df'] : '';
 $f_dist_q  = mb_substr(trim((string) ($_GET['dq'] ?? '')), 0, 100);
-$keep_get  = array_filter(['af' => $f_alloc, 'av' => $f_alloc_v ?: '', 'sd' => $f_sale_d ?: '', 'sp' => $f_sale_p,
+$keep_get  = array_filter(['fp' => $f_prod ?: '', 'af' => $f_alloc, 'av' => $f_alloc_v ?: '', 'sd' => $f_sale_d ?: '', 'sp' => $f_sale_p,
                            'sv' => $f_sale_v ?: '', 'archived' => $f_arch ? '1' : '', 'df' => $f_dist, 'dq' => $f_dist_q],
                           fn($v) => $v !== '');
 
 $all_distributors    = $pdo->query('SELECT * FROM distribution_distributors ORDER BY active DESC, name')->fetchAll();
 $active_distributors = array_values(array_filter($all_distributors, fn($d) => (int) $d['active'] === 1));
 
-$batches = $allocations = $sales = $distributor_rows = [];
-$distributor_count = 0;
-if ($product) {
-    $stmt = $pdo->prepare(
-        'SELECT b.*, pv.label_bg AS variant_label FROM distribution_batches b
-           LEFT JOIN product_variants pv ON pv.id = b.variant_id
-          WHERE b.product_id = ? ORDER BY b.produced_on DESC, b.id DESC'
-    );
-    $stmt->execute([$product_id]);
-    $batches = $stmt->fetchAll();
+$name_join = 'JOIN products p ON p.id = %1$s.product_id LEFT JOIN product_variants pv ON pv.id = %1$s.variant_id';
+$name_cols = 'p.name_bg AS product_name, pv.label_bg AS variant_label';
 
-    $where  = ['a.product_id = ?'];
-    $params = [$product_id];
-    if (in_array($f_alloc, ['online', 'personal', 'sample', 'writeoff', 'distributor'], true)) {
-        $where[] = 'a.destination = ?'; $params[] = $f_alloc;
-    } elseif (preg_match('/^d(\d+)$/', $f_alloc, $m)) {
-        $where[] = 'a.distributor_id = ?'; $params[] = (int) $m[1];
-    }
-    if ($f_alloc_v) { $where[] = 'a.variant_id = ?'; $params[] = $f_alloc_v; }
-    $stmt = $pdo->prepare(
-        'SELECT a.*, d.name AS distributor_name, pv.label_bg AS variant_label FROM distribution_allocations a
-           LEFT JOIN distribution_distributors d ON d.id = a.distributor_id
-           LEFT JOIN product_variants pv ON pv.id = a.variant_id
-          WHERE ' . implode(' AND ', $where) . ' ORDER BY a.allocated_on DESC, a.id DESC'
-    );
-    $stmt->execute($params);
-    $allocations = $stmt->fetchAll();
+$where  = $f_prod ? ['b.product_id = ?'] : ['1 = 1'];
+$stmt = $pdo->prepare(
+    "SELECT b.*, $name_cols FROM distribution_batches b " . sprintf($name_join, 'b')
+    . ' WHERE ' . implode(' AND ', $where) . ' ORDER BY b.produced_on DESC, b.id DESC'
+);
+$stmt->execute($f_prod ? [$f_prod] : []);
+$batches = $stmt->fetchAll();
 
-    $where  = ['s.product_id = ?'];
-    $params = [$product_id];
-    if ($f_sale_d) { $where[] = 's.distributor_id = ?'; $params[] = $f_sale_d; }
-    if ($f_sale_p) { $where[] = 's.payment_received = ?'; $params[] = $f_sale_p === 'paid' ? 1 : 0; }
-    if ($f_sale_v) { $where[] = 's.variant_id = ?'; $params[] = $f_sale_v; }
-    $stmt = $pdo->prepare(
-        'SELECT s.*, d.name AS distributor_name, pv.label_bg AS variant_label FROM distribution_sales s
-           JOIN distribution_distributors d ON d.id = s.distributor_id
-           LEFT JOIN product_variants pv ON pv.id = s.variant_id
-          WHERE ' . implode(' AND ', $where) . ' ORDER BY s.sale_date DESC, s.id DESC'
-    );
-    $stmt->execute($params);
-    $sales = $stmt->fetchAll();
-
-    foreach ($all_distributors as $d) {
-        if (!$f_arch && !(int) $d['active']) continue;
-        $distributor_rows[] = $d
-            + distribution_distributor_stock($pdo, (int) $d['id'], $product_id, null, true)
-            + distribution_distributor_payment_summary($pdo, (int) $d['id'], $product_id);
-    }
-    $distributor_count = count($distributor_rows);
-    // Distributors filter: who still holds stock of this product / owes money for it, and a name search.
-    $distributor_rows = array_values(array_filter($distributor_rows, function (array $d) use ($f_dist, $f_dist_q): bool {
-        if ($f_dist === 'holding' && (int) $d['unsold'] <= 0) return false;
-        if ($f_dist === 'unpaid' && (int) $d['unpaid_qty'] <= 0) return false;
-        if ($f_dist_q !== '') {
-            $hay = mb_strtolower(implode(' ', [$d['name'], $d['company_number'], $d['contact_name'], $d['address'], $d['email']]));
-            if (!str_contains($hay, mb_strtolower($f_dist_q))) return false;
-        }
-        return true;
-    }));
+$where  = $f_prod ? ['a.product_id = ?'] : ['1 = 1'];
+$params = $f_prod ? [$f_prod] : [];
+if (in_array($f_alloc, ['online', 'personal', 'sample', 'writeoff', 'distributor'], true)) {
+    $where[] = 'a.destination = ?'; $params[] = $f_alloc;
+} elseif (preg_match('/^d(\d+)$/', $f_alloc, $m)) {
+    $where[] = 'a.distributor_id = ?'; $params[] = (int) $m[1];
 }
+if ($f_alloc_v) { $where[] = 'a.variant_id = ?'; $params[] = $f_alloc_v; }
+$stmt = $pdo->prepare(
+    "SELECT a.*, d.name AS distributor_name, $name_cols FROM distribution_allocations a
+       LEFT JOIN distribution_distributors d ON d.id = a.distributor_id " . sprintf($name_join, 'a')
+    . ' WHERE ' . implode(' AND ', $where) . ' ORDER BY a.allocated_on DESC, a.id DESC'
+);
+$stmt->execute($params);
+$allocations = $stmt->fetchAll();
+
+$where  = $f_prod ? ['s.product_id = ?'] : ['1 = 1'];
+$params = $f_prod ? [$f_prod] : [];
+if ($f_sale_d) { $where[] = 's.distributor_id = ?'; $params[] = $f_sale_d; }
+if ($f_sale_p) { $where[] = 's.payment_received = ?'; $params[] = $f_sale_p === 'paid' ? 1 : 0; }
+if ($f_sale_v) { $where[] = 's.variant_id = ?'; $params[] = $f_sale_v; }
+$stmt = $pdo->prepare(
+    "SELECT s.*, d.name AS distributor_name, $name_cols FROM distribution_sales s
+       JOIN distribution_distributors d ON d.id = s.distributor_id " . sprintf($name_join, 's')
+    . ' WHERE ' . implode(' AND ', $where) . ' ORDER BY s.sale_date DESC, s.id DESC'
+);
+$stmt->execute($params);
+$sales = $stmt->fetchAll();
+
+// Distributors with their numbers — all products together, or the filtered one.
+$totals = distribution_distributor_totals($pdo, $f_prod ?: null);
+$distributor_rows = [];
+foreach ($all_distributors as $d) {
+    if (!$f_arch && !(int) $d['active']) continue;
+    $distributor_rows[] = $d + ($totals[(int) $d['id']] ?? ['allocated' => 0, 'sold' => 0, 'unsold' => 0, 'paid_qty' => 0, 'unpaid_qty' => 0]);
+}
+$distributor_count = count($distributor_rows);
+$distributor_rows  = array_values(array_filter($distributor_rows, function (array $d) use ($f_dist, $f_dist_q): bool {
+    if ($f_dist === 'holding' && (int) $d['unsold'] <= 0) return false;
+    if ($f_dist === 'unpaid' && (int) $d['unpaid_qty'] <= 0) return false;
+    if ($f_dist_q !== '') {
+        $hay = mb_strtolower(implode(' ', [$d['name'], $d['company_number'], $d['contact_name'], $d['address'], $d['email']]));
+        if (!str_contains($hay, mb_strtolower($f_dist_q))) return false;
+    }
+    return true;
+}));
 $archived_count = count($all_distributors) - count($active_distributors);
 
-// What each active distributor still holds of every variant — the sale form's hints.
-$dist_unsold = [];
-if ($has_variants) {
-    foreach ($active_distributors as $d) {
-        foreach ($items as $it) {
-            if (!$it['active']) continue;
-            $dist_unsold[(int) $d['id']][(int) $it['variant_id']] = distribution_distributor_stock($pdo, (int) $d['id'], $product_id, (int) $it['variant_id'])['unsold'];
-        }
-    }
-}
-
-// Per-item numbers the allocation form's helpers read.
-$item_numbers = [];
-foreach ($summary['items'] as $it) {
-    $item_numbers[(string) ($it['variant_id'] ?? '')] = ['available' => max(0, $it['available']), 'shop' => $it['online_stock']];
-}
+// What each distributor still holds, per item — the sale form shows only those.
+$holdings = distribution_distributor_holdings($pdo);
 
 $dest_labels = [
     'online'   => 'Онлайн магазин',
@@ -413,44 +419,59 @@ $page_head_extra = '<style>
 
 require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
-/** One labelled variant <select> for a form (nothing for products without variants). */
-$variant_select = function (string $id, ?int $selected = null) use ($has_variants, $items): string {
-    if (!$has_variants) return '';
-    $html = '<label for="' . h($id) . '">Вариант<select name="variant_id" id="' . h($id) . '" required>'
-          . '<option value="">— Изберете —</option>';
-    foreach ($items as $it) {
-        if (!$it['active']) continue;
-        $sel   = $selected === $it['variant_id'] ? ' selected' : '';
-        $html .= '<option value="' . (int) $it['variant_id'] . '"' . $sel . '>' . h($it['label']) . '</option>';
+/** <option>s of every item, grouped by product when it has variants. */
+$item_options = function (string $selected = '') use ($all_items): string {
+    $html = '<option value="">— Изберете продукт —</option>';
+    $open = null;
+    foreach ($all_items as $key => $it) {
+        $group = $it['multi'] ? $it['group'] : null;
+        if ($group !== $open) {
+            if ($open !== null) $html .= '</optgroup>';
+            if ($group !== null) $html .= '<optgroup label="' . h($group) . '">';
+            $open = $group;
+        }
+        $html .= '<option value="' . h($key) . '"' . ($key === $selected ? ' selected' : '') . '>'
+               . h($it['multi'] ? $it['label'] : $it['group']) . '</option>';
+    }
+    return $html . ($open !== null ? '</optgroup>' : '');
+};
+
+/** The „Продукт“ filter of a tab's list (fp) — narrows the list below, nothing else. */
+$product_filter = function (string $id) use ($products, $f_prod): string {
+    $html = '<label for="' . h($id) . '" style="display:flex;flex-direction:column;gap:.35rem;font-weight:600;font-size:.875rem;">Продукт'
+          . '<select name="fp" id="' . h($id) . '"><option value="">Всички продукти</option>';
+    foreach ($products as $p) {
+        $html .= '<option value="' . (int) $p['id'] . '"' . ((int) $p['id'] === $f_prod ? ' selected' : '') . '>'
+               . h($p['name_bg']) . ((int) $p['active'] ? '' : ' (неактивен)') . '</option>';
     }
     return $html . '</select></label>';
 };
 
 /**
- * A quantity box per variant (qty[<variant_id>]), for handing over or recording
- * several variants at once. $hint gives the line under each variant's name.
+ * Lines of a form: a „Продукт“ dropdown and a quantity per line (plus a price),
+ * with „+ Добави още продукт“ for the next one. JS clones the <template>.
  */
-$variant_rows = function (string $prefix, string $legend, callable $hint) use ($items): string {
-    $html = '<fieldset style="border:0;padding:0;margin:1.25rem 0 0;">'
-          . '<legend style="text-transform:none;letter-spacing:normal;font-weight:600;font-size:.9rem;margin-bottom:.4rem;">' . h($legend)
-          . ' <span class="dist-hint">(празните се пропускат)</span></legend>';
-    foreach ($items as $it) {
-        if (!$it['active']) continue;
-        $vid  = (int) $it['variant_id'];
-        $fid  = $prefix . 'Qty' . $vid;
-        $html .= '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1rem;padding:.4rem 0;border-bottom:1px solid var(--border);">'
-               . '<label for="' . $fid . '" style="text-transform:none;letter-spacing:normal;flex:1 1 12rem;font-weight:600;font-size:.95rem;margin:0;">' . h($it['label']) . '</label>'
-               . '<span class="dist-hint" id="' . $fid . '-h" style="flex:0 1 18rem;">' . h($hint($it)) . '</span>'
-               . '<input type="number" name="qty[' . $vid . ']" id="' . $fid . '" data-variant="' . $vid . '" min="0" step="1" inputmode="numeric"'
-               . ' aria-describedby="' . $fid . '-h" placeholder="0" style="width:6rem;">'
-               . '</div>';
-    }
-    return $html . '</fieldset>';
+$lines_block = function (string $prefix, bool $with_price) use ($item_options): string {
+    $row = function (string $n) use ($prefix, $with_price, $item_options): string {
+        $id = $prefix . 'Line' . $n;
+        $html = '<div class="dist-line dist-inline" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem 1rem;padding:.6rem 0;border-bottom:1px solid var(--border);">'
+              . '<label for="' . $id . 'Item" style="flex:2 1 16rem;">Продукт<select name="line_item[]" id="' . $id . 'Item" data-line-item aria-describedby="' . $id . 'Hint">' . $item_options() . '</select></label>'
+              . '<label for="' . $id . 'Qty" style="flex:0 1 8rem;">Брой<input type="number" name="line_qty[]" id="' . $id . 'Qty" min="1" step="1" inputmode="numeric" data-line-qty aria-describedby="' . $id . 'Hint"></label>';
+        if ($with_price) {
+            $html .= '<label for="' . $id . 'Price" style="flex:0 1 9rem;" data-line-price-wrap>Цена за брой (€)'
+                   . '<input type="text" inputmode="decimal" name="line_price[]" id="' . $id . 'Price" data-line-price></label>';
+        }
+        return $html . '<button type="button" class="btn-link" data-line-remove style="min-height:44px;">Махни реда</button>'
+             . '<span class="dist-hint" id="' . $id . 'Hint" data-line-hint aria-live="polite" style="flex:1 1 100%;"></span></div>';
+    };
+    return '<div data-lines="' . h($prefix) . '" style="margin-top:1rem;">' . $row('1') . '</div>'
+         . '<template data-line-template="' . h($prefix) . '">' . $row('__N__') . '</template>'
+         . '<button type="button" class="btn btn--outline" data-line-add="' . h($prefix) . '" style="display:block;margin-top:.75rem;min-height:44px;">+ Добави още продукт</button>';
 };
 
 /** Hidden fields every form on the page carries. */
-$common = function () use ($product_id, $keep_get): string {
-    $html = csrf_field() . '<input type="hidden" name="product_id" value="' . (int) $product_id . '">';
+$common = function () use ($keep_get): string {
+    $html = csrf_field();
     foreach ($keep_get as $k => $v) $html .= '<input type="hidden" name="' . h($k) . '" value="' . h((string) $v) . '">';
     return $html;
 };
@@ -626,49 +647,20 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
 </section>
 <?php endif; ?>
 
-<!-- ── Product the tabs below work on ───────────────────────────────────────── -->
-<?php $n = fn(int $v): string => number_format($v, 0, ',', ' '); ?>
-<section id="distProductBox" style="<?= $box ?>padding:1.5rem;" aria-labelledby="distProductTitle">
-  <h2 id="distProductTitle" style="font-size:1.15rem;margin:0 0 .35rem;">Партиди, разпределения и продажби — по продукт</h2>
-  <p class="dist-hint" style="margin:0 0 1rem;max-width:75ch;line-height:1.55;">Изберете продукта — разделите отдолу показват и записват само за него.</p>
-  <form method="get" action="/admin/distribution.php" class="dist-inline" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;">
-    <label for="distProduct" style="flex:1 1 240px;">Продукт
-      <select name="product" id="distProduct" onchange="this.form.action = '/admin/distribution.php' + location.hash; this.form.submit()">
-        <?php foreach ($products as $p): ?>
-          <option value="<?= (int) $p['id'] ?>" <?= (int) $p['id'] === $product_id ? 'selected' : '' ?>>
-            <?= h($p['name_bg']) ?><?= $p['active'] ? '' : ' (неактивен)' ?>
-          </option>
-        <?php endforeach; ?>
-      </select>
-    </label>
-    <button type="submit" class="btn btn--outline">Покажи</button>
-  </form>
-
-  <?php foreach ($summary['items'] as $it): if ($it['shop_surplus'] <= 0) continue; ?>
-    <p role="note" style="margin:1rem 0 0;padding:.75rem 1rem;border:1px solid #b45309;border-radius:8px;background:#fffbeb;font-size:.875rem;line-height:1.5;">
-      <strong>⚠ Сметката не излиза<?= $has_variants ? ' за „' . h($it['label']) . '“' : '' ?>:</strong>
-      в онлайн магазина има <?= $n((int) $it['online_stock']) ?> бр., а като изпратени към магазина са записани само <?= $n((int) $it['to_online']) ?> бр.
-      Запишете останалите <?= $n((int) $it['shop_surplus']) ?> бр. в „Разпределения“ като „Онлайн магазин“, без отметката за наличността в магазина.
-    </p>
-  <?php endforeach; ?>
-
-  <details style="margin-top:1rem;border-top:1px solid var(--border);padding-top:1rem;">
-    <summary style="cursor:pointer;font-weight:600;font-size:.9rem;padding:.7rem 0;">Поправи наличността в онлайн магазина (след преброяване)</summary>
-    <p class="dist-hint" style="margin:.5rem 0 0;line-height:1.55;">
-      Въведете колко бройки има в магазина в момента. Клиентите купуват от това число и то намалява само с всяка поръчка.
-    </p>
-    <form method="post" class="dist-inline" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-top:.75rem;">
-      <?= $common() ?>
-      <input type="hidden" name="action" value="set_online_stock">
-      <?= $variant_select('distStockVariant') ?>
-      <label for="distStockQty" style="display:flex;flex-direction:column;gap:.35rem;font-weight:600;font-size:.875rem;">Брой в онлайн магазина сега
-        <input type="number" name="stock" id="distStockQty" step="1" required
-               value="<?= $has_variants ? '' : (int) ($summary['items'][0]['online_stock'] ?? 0) ?>">
-      </label>
-      <button type="submit" class="btn btn--outline">Поправи наличността</button>
-    </form>
-  </details>
-</section>
+<?php
+  $n = fn(int $v): string => number_format($v, 0, ',', ' ');
+  $surplus = [];
+  foreach ($overview as $o) foreach ($o['items'] as $it) {
+      if ($it['shop_surplus'] > 0) $surplus[] = ['label' => count($o['items']) > 1 || $o['product']['type'] === 'variant' ? $o['product']['name_bg'] . ' — ' . $it['label'] : $o['product']['name_bg']] + $it;
+  }
+?>
+<?php foreach ($surplus as $it): ?>
+  <p role="note" style="margin:0 0 1rem;padding:.75rem 1rem;border:1px solid #b45309;border-radius:8px;background:#fffbeb;font-size:.875rem;line-height:1.5;">
+    <strong>⚠ Сметката не излиза за „<?= h($it['label']) ?>“:</strong>
+    в онлайн магазина има <?= $n((int) $it['online_stock']) ?> бр., а като изпратени към магазина са записани само <?= $n((int) $it['to_online']) ?> бр.
+    Запишете останалите <?= $n((int) $it['shop_surplus']) ?> бр. в „Разпределения“ като „Онлайн магазин“, без отметката за наличността в магазина.
+  </p>
+<?php endforeach; ?>
 
 <!-- ── Tabs ───────────────────────────────────────────────────────────────── -->
 <nav aria-label="Раздели" id="distTabs" style="display:flex;flex-wrap:wrap;gap:.25rem;border-bottom:2px solid var(--border);margin-bottom:1rem;">
@@ -686,7 +678,7 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
     <?= $common() ?>
     <input type="hidden" name="action" value="add_batch">
     <div class="admin-form-grid">
-      <?= $variant_select('batchVariant') ?>
+      <label for="batchItem">Продукт<select name="item" id="batchItem" required><?= $item_options() ?></select></label>
       <label for="batchQty">Количество (бр.)<input type="number" name="quantity" id="batchQty" min="1" step="1" required></label>
       <label for="batchDate">Дата<input type="date" name="produced_on" id="batchDate" value="<?= h($today) ?>" required></label>
       <label for="batchNotes">Бележка <span class="dist-hint">(по желание)</span><input type="text" name="notes" id="batchNotes" maxlength="1000"></label>
@@ -694,21 +686,44 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
     <button type="submit" class="btn btn--primary" style="margin-top:1rem;">+ Добави партида</button>
   </form>
 
+  <details style="margin-top:1.25rem;border-top:1px solid var(--border);padding-top:.5rem;">
+    <summary style="cursor:pointer;font-weight:600;font-size:.9rem;padding:.7rem 0;">Поправи наличността в онлайн магазина (след преброяване)</summary>
+    <p class="dist-hint" style="margin:.5rem 0 0;line-height:1.55;">
+      Въведете колко бройки има в магазина в момента. Клиентите купуват от това число и то намалява само с всяка поръчка.
+    </p>
+    <form method="post" class="dist-inline" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-top:.75rem;">
+      <?= $common() ?>
+      <input type="hidden" name="action" value="set_online_stock">
+      <label for="stockItem" style="flex:1 1 16rem;">Продукт<select name="item" id="stockItem" required><?= $item_options() ?></select></label>
+      <label for="distStockQty">Брой в онлайн магазина сега
+        <input type="number" name="stock" id="distStockQty" step="1" required aria-describedby="distStockHint">
+        <span class="dist-hint" id="distStockHint" aria-live="polite"></span>
+      </label>
+      <button type="submit" class="btn btn--outline">Поправи наличността</button>
+    </form>
+  </details>
+
+  <form method="get" action="/admin/distribution.php#batches" class="dist-inline" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-top:1.75rem;padding-top:1rem;border-top:1px solid var(--border);">
+    <?= $product_filter('fBatchP') ?>
+    <button type="submit" class="btn btn--outline">Филтрирай</button>
+    <?php if ($f_prod): ?><a href="/admin/distribution.php#batches" class="btn-link" style="min-height:44px;display:inline-flex;align-items:center;">Изчисти филтъра</a><?php endif; ?>
+  </form>
+
   <?php if ($batches): ?>
   <div class="admin-table-wrap" style="margin-top:1.5rem;">
     <table class="admin-table">
-      <thead><tr><th scope="col">Дата</th><?php if ($has_variants): ?><th scope="col">Вариант</th><?php endif; ?><th scope="col">Количество</th><th scope="col">Бележка</th><th scope="col"><span class="visually-hidden" style="position:absolute;left:-9999px;">Действия</span></th></tr></thead>
+      <thead><tr><th scope="col">Дата</th><th scope="col">Продукт</th><th scope="col">Количество</th><th scope="col">Бележка</th><th scope="col"><span class="visually-hidden" style="position:absolute;left:-9999px;">Действия</span></th></tr></thead>
       <tbody>
       <?php foreach ($batches as $b): $eid = 'edit-batch-' . (int) $b['id']; ?>
         <tr>
           <td><?= h(dist_date_bg((string) $b['produced_on'])) ?></td>
-          <?php if ($has_variants): ?><td><?= h((string) $b['variant_label']) ?></td><?php endif; ?>
+          <td><?= h($item_label($b)) ?></td>
           <td><?= (int) $b['quantity'] ?></td>
           <td><?= h((string) $b['notes']) ?></td>
           <td><button type="button" class="btn-link" data-edit-toggle="<?= $eid ?>" aria-expanded="false" aria-controls="<?= $eid ?>">Поправи</button></td>
         </tr>
         <tr id="<?= $eid ?>" hidden>
-          <td colspan="<?= $has_variants ? 5 : 4 ?>">
+          <td colspan="5">
             <form method="post" class="admin-form-grid" style="align-items:end;">
               <?= $common() ?>
               <input type="hidden" name="action" value="update_batch">
@@ -725,7 +740,7 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
     </table>
   </div>
   <?php else: ?>
-    <p style="margin:1.25rem 0 0;color:#4b5563;">Още няма партиди за този продукт.</p>
+    <p style="margin:1.25rem 0 0;color:#4b5563;"><?= $f_prod ? 'Още няма партиди за този продукт.' : 'Още няма партиди.' ?></p>
   <?php endif; ?>
 </section>
 
@@ -750,26 +765,13 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
           <?php endif; ?>
         </select>
       </label>
-      <?php if (!$has_variants): ?>
-      <label for="allocQty">Количество (бр.)
-        <input type="number" name="quantity" id="allocQty" min="1" step="1" required aria-describedby="allocAvail">
-        <span class="dist-hint" id="allocAvail"></span>
-        <button type="button" class="btn-link" id="allocUseAll" style="align-self:flex-start;min-height:44px;">Попълни всички неразпределени</button>
-      </label>
-      <?php endif; ?>
       <label for="allocSample" id="allocSampleWrap" style="display:none;">На кого са подарени
         <input type="text" name="sample_recipient" id="allocSample" maxlength="150" placeholder="напр. училище, читалище, партньор">
-      </label>
-      <label for="allocPrice" id="allocPriceWrap">Цена за брой (€)
-        <input type="text" inputmode="decimal" name="unit_price_eur" id="allocPrice" value="<?= h(number_format((float) $product['price_eur'], 2, '.', '')) ?>" required>
       </label>
       <label for="allocDate">Дата<input type="date" name="allocated_on" id="allocDate" value="<?= h($today) ?>" required></label>
       <label for="allocNotes">Бележка <span class="dist-hint">(по желание)</span><input type="text" name="notes" id="allocNotes" maxlength="1000"></label>
     </div>
-    <?php if ($has_variants): ?>
-      <?= $variant_rows('alloc', 'Колко бройки от всеки вариант', fn($it) => 'неразпределени ' . max(0, (int) $it['available']) . ' · в магазина ' . max(0, (int) $it['online_stock'])) ?>
-      <button type="button" class="btn-link" id="allocUseAll" style="display:block;min-height:44px;">Попълни всички неразпределени</button>
-    <?php endif; ?>
+    <?= $lines_block('alloc', true) ?>
     <label class="admin-checkbox" id="allocShopWrap" style="margin-top:1rem;min-height:44px;">
       <input type="checkbox" name="use_shop_stock" value="1" id="allocShop" checked>
       <span id="allocShopText">Добави ги и към наличността в онлайн магазина</span>
@@ -779,7 +781,7 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
   </form>
 
   <form method="get" action="/admin/distribution.php#allocations" class="dist-inline" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-top:1.75rem;padding-top:1rem;border-top:1px solid var(--border);">
-    <input type="hidden" name="product" value="<?= (int) $product_id ?>">
+    <?= $product_filter('fAllocP') ?>
     <label for="fAlloc" style="display:flex;flex-direction:column;gap:.35rem;font-weight:600;font-size:.875rem;">Покажи
       <select name="af" id="fAlloc">
         <option value="">Всички</option>
@@ -792,29 +794,29 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
         <?php endforeach; ?>
       </select>
     </label>
-    <?php if ($has_variants): ?>
+    <?php if ($f_items): ?>
     <label for="fAllocV" style="display:flex;flex-direction:column;gap:.35rem;font-weight:600;font-size:.875rem;">Вариант
       <select name="av" id="fAllocV">
         <option value="">Всички</option>
-        <?php foreach ($items as $it): ?>
+        <?php foreach ($f_items as $it): ?>
           <option value="<?= (int) $it['variant_id'] ?>" <?= $f_alloc_v === $it['variant_id'] ? 'selected' : '' ?>><?= h($it['label']) ?></option>
         <?php endforeach; ?>
       </select>
     </label>
     <?php endif; ?>
     <button type="submit" class="btn btn--outline">Филтрирай</button>
-    <?php if ($f_alloc || $f_alloc_v): ?><a href="/admin/distribution.php?product=<?= (int) $product_id ?>#allocations" class="btn-link" style="min-height:44px;display:inline-flex;align-items:center;">Изчисти филтъра</a><?php endif; ?>
+    <?php if ($f_prod || $f_alloc || $f_alloc_v): ?><a href="/admin/distribution.php#allocations" class="btn-link" style="min-height:44px;display:inline-flex;align-items:center;">Изчисти филтъра</a><?php endif; ?>
   </form>
 
   <?php if ($allocations): ?>
   <div class="admin-table-wrap" style="margin-top:1rem;">
     <table class="admin-table">
       <thead><tr>
-        <th scope="col">Дата</th><th scope="col">На кого</th><?php if ($has_variants): ?><th scope="col">Вариант</th><?php endif; ?>
+        <th scope="col">Дата</th><th scope="col">На кого</th><th scope="col">Продукт</th>
         <th scope="col">Количество</th><th scope="col">Цена</th><th scope="col">Протокол</th><th scope="col"><span style="position:absolute;left:-9999px;">Действия</span></th>
       </tr></thead>
       <tbody>
-      <?php foreach ($allocations as $a): $eid = 'edit-alloc-' . (int) $a['id']; $cols = $has_variants ? 7 : 6; ?>
+      <?php foreach ($allocations as $a): $eid = 'edit-alloc-' . (int) $a['id']; $cols = 7; ?>
         <tr>
           <td><?= h(dist_date_bg((string) $a['allocated_on'])) ?></td>
           <td>
@@ -825,7 +827,7 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
               <?php if ($a['destination'] === 'sample' && $a['sample_recipient']): ?><br><span class="dist-hint"><?= h($a['sample_recipient']) ?></span><?php endif; ?>
             <?php endif; ?>
           </td>
-          <?php if ($has_variants): ?><td><?= h((string) $a['variant_label']) ?></td><?php endif; ?>
+          <td><?= h($item_label($a)) ?></td>
           <td><?= (int) $a['quantity'] ?></td>
           <td><?= in_array($a['destination'], DISTRIBUTION_FREE_DESTINATIONS, true) ? '<span class="dist-hint">безплатно</span>' : h(format_eur((float) $a['unit_price_eur'])) ?></td>
           <td>
@@ -858,7 +860,7 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
               <label for="<?= $eid ?>-n">Бележка<input type="text" id="<?= $eid ?>-n" name="notes" maxlength="1000" value="<?= h((string) $a['notes']) ?>"></label>
               <button type="submit" class="btn btn--primary">Запази</button>
             </form>
-            <p class="dist-hint" style="margin:.5rem 0 0;">Това поправя само записа. Наличността в магазина не се променя — за нея ползвайте „Поправи наличността“ горе.</p>
+            <p class="dist-hint" style="margin:.5rem 0 0;">Това поправя само записа. Наличността в магазина не се променя — за нея ползвайте „Поправи наличността“ в раздел „Партиди“.</p>
             <?php if ($a['protocol_file_path']): ?>
               <p class="dist-hint" style="margin:.5rem 0 0;">Запазването обновява протокол № <?= h($a['protocol_formatted_number']) ?> с новите данни. Ако вече е подписан, разпечатайте и подпишете новия.</p>
             <?php endif; ?>
@@ -869,7 +871,7 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
     </table>
   </div>
   <?php else: ?>
-    <p style="margin:1.25rem 0 0;color:#4b5563;"><?= ($f_alloc || $f_alloc_v) ? 'Няма записи, които отговарят на филтъра.' : 'Още няма разпределения за този продукт.' ?></p>
+    <p style="margin:1.25rem 0 0;color:#4b5563;"><?= ($f_prod || $f_alloc || $f_alloc_v) ? 'Няма записи, които отговарят на филтъра.' : 'Още няма разпределения.' ?></p>
   <?php endif; ?>
 </section>
 
@@ -889,9 +891,6 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
           <?php endforeach; ?>
         </select>
       </label>
-      <?php if (!$has_variants): ?>
-      <label for="saleQty">Продадени (бр.)<input type="number" name="quantity" id="saleQty" min="1" step="1" required></label>
-      <?php endif; ?>
       <label for="saleDate">Дата на продажба<input type="date" name="sale_date" id="saleDate" value="<?= h($today) ?>" required></label>
       <label class="admin-checkbox" style="flex-direction:row;align-self:end;min-height:44px;">
         <input type="checkbox" name="payment_received" value="1" id="salePaid"> Плащането е получено
@@ -899,10 +898,9 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
       <label for="salePaidOn">Дата на плащане<input type="date" name="payment_received_on" id="salePaidOn" value="<?= h($today) ?>"></label>
       <label for="saleNotes">Бележка <span class="dist-hint">(по желание)</span><input type="text" name="notes" id="saleNotes" maxlength="1000"></label>
     </div>
-    <?php if ($has_variants): ?>
-      <?= $variant_rows('sale', 'Колко бройки от всеки вариант са продадени', fn($it) => 'изберете дистрибутор, за да видите колко има') ?>
-      <button type="button" class="btn-link" id="saleUseAll" style="display:block;min-height:44px;">Попълни всичко, което дистрибуторът има</button>
-    <?php endif; ?>
+    <p class="dist-hint" id="saleHeld" aria-live="polite" style="margin:1rem 0 0;">Изберете дистрибутор — в списъка с продукти остават само тези, които той има.</p>
+    <button type="button" class="btn-link" id="saleUseAll" style="display:block;min-height:44px;">Попълни всичко, което дистрибуторът има</button>
+    <?= $lines_block('sale', false) ?>
     <button type="submit" class="btn btn--primary" style="margin-top:1rem;">Запиши продажба</button>
   </form>
   <?php else: ?>
@@ -910,7 +908,7 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
   <?php endif; ?>
 
   <form method="get" action="/admin/distribution.php#sales" class="dist-inline" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-top:1.75rem;padding-top:1rem;border-top:1px solid var(--border);">
-    <input type="hidden" name="product" value="<?= (int) $product_id ?>">
+    <?= $product_filter('fSaleProd') ?>
     <label for="fSaleD" style="display:flex;flex-direction:column;gap:.35rem;font-weight:600;font-size:.875rem;">Дистрибутор
       <select name="sd" id="fSaleD">
         <option value="">Всички</option>
@@ -926,18 +924,18 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
         <option value="paid" <?= $f_sale_p === 'paid' ? 'selected' : '' ?>>Платени</option>
       </select>
     </label>
-    <?php if ($has_variants): ?>
+    <?php if ($f_items): ?>
     <label for="fSaleV" style="display:flex;flex-direction:column;gap:.35rem;font-weight:600;font-size:.875rem;">Вариант
       <select name="sv" id="fSaleV">
         <option value="">Всички</option>
-        <?php foreach ($items as $it): ?>
+        <?php foreach ($f_items as $it): ?>
           <option value="<?= (int) $it['variant_id'] ?>" <?= $f_sale_v === $it['variant_id'] ? 'selected' : '' ?>><?= h($it['label']) ?></option>
         <?php endforeach; ?>
       </select>
     </label>
     <?php endif; ?>
     <button type="submit" class="btn btn--outline">Филтрирай</button>
-    <?php if ($f_sale_d || $f_sale_p || $f_sale_v): ?><a href="/admin/distribution.php?product=<?= (int) $product_id ?>#sales" class="btn-link" style="min-height:44px;display:inline-flex;align-items:center;">Изчисти филтъра</a><?php endif; ?>
+    <?php if ($f_prod || $f_sale_d || $f_sale_p || $f_sale_v): ?><a href="/admin/distribution.php#sales" class="btn-link" style="min-height:44px;display:inline-flex;align-items:center;">Изчисти филтъра</a><?php endif; ?>
   </form>
 
   <?php if ($sales): ?>
@@ -945,17 +943,17 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
     <table class="admin-table">
       <thead><tr>
         <th scope="col" style="width:44px;"><input type="checkbox" class="bulk-all" data-bulk="sales" aria-label="Избери всички продажби" style="width:20px;height:20px;"></th>
-        <th scope="col">Дата</th><th scope="col">Дистрибутор</th><?php if ($has_variants): ?><th scope="col">Вариант</th><?php endif; ?>
+        <th scope="col">Дата</th><th scope="col">Дистрибутор</th><th scope="col">Продукт</th>
         <th scope="col">Количество</th><th scope="col">Плащане</th><th scope="col"><span style="position:absolute;left:-9999px;">Действия</span></th>
       </tr></thead>
       <tbody>
-      <?php foreach ($sales as $s): $eid = 'edit-sale-' . (int) $s['id']; $cols = $has_variants ? 7 : 6; ?>
+      <?php foreach ($sales as $s): $eid = 'edit-sale-' . (int) $s['id']; $cols = 7; ?>
         <tr>
           <td><input type="checkbox" class="bulk-cb" data-bulk="sales" value="<?= (int) $s['id'] ?>" data-on="<?= $s['payment_received'] ? '1' : '0' ?>"
                      aria-label="Избери продажбата от <?= h(substr($s['sale_date'], 0, 10)) ?>, <?= h($s['distributor_name']) ?>" style="width:20px;height:20px;"></td>
           <td><?= h(dist_date_bg((string) $s['sale_date'])) ?></td>
           <td><?= h($s['distributor_name']) ?></td>
-          <?php if ($has_variants): ?><td><?= h((string) $s['variant_label']) ?></td><?php endif; ?>
+          <td><?= h($item_label($s)) ?></td>
           <td><?= (int) $s['quantity'] ?></td>
           <td>
             <?php if ($s['payment_received']): ?>
@@ -991,14 +989,14 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
     <input type="hidden" name="paid" value="1">
   </form>
   <?php else: ?>
-    <p style="margin:1.25rem 0 0;color:#4b5563;"><?= ($f_sale_d || $f_sale_p || $f_sale_v) ? 'Няма продажби, които отговарят на филтъра.' : 'Още няма записани продажби за този продукт.' ?></p>
+    <p style="margin:1.25rem 0 0;color:#4b5563;"><?= ($f_prod || $f_sale_d || $f_sale_p || $f_sale_v) ? 'Няма продажби, които отговарят на филтъра.' : 'Още няма записани продажби.' ?></p>
   <?php endif; ?>
 </section>
 
 <!-- ── Distributors ───────────────────────────────────────────────────────── -->
 <section class="dist-panel" data-panel="distributors" id="panel-distributors" style="<?= $box ?>" aria-labelledby="h-distributors">
   <h2 id="h-distributors" style="font-size:1.1rem;margin:0 0 .5rem;">Дистрибутори</h2>
-  <p class="dist-hint" style="margin:0 0 1rem;">Магазини, партньори и други, които продават вместо вас. Числата в таблицата са за избрания продукт.</p>
+  <p class="dist-hint" style="margin:0 0 1rem;">Магазини, партньори и други, които продават вместо вас. Числата в таблицата са за всички продукти заедно — изберете продукт във филтъра, за да видите само неговите.</p>
   <form method="post">
     <?= $common() ?>
     <input type="hidden" name="action" value="add_distributor">
@@ -1016,16 +1014,16 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
   <?php if ($archived_count): ?>
   <p style="margin:1.5rem 0 0;">
     <?php if ($f_arch): ?>
-      <a href="/admin/distribution.php?<?= h(http_build_query(['product' => $product_id] + array_diff_key($keep_get, ['archived' => 1]))) ?>#distributors" class="btn-link">Скрий архивираните (<?= (int) $archived_count ?>)</a>
+      <a href="/admin/distribution.php?<?= h(http_build_query(array_diff_key($keep_get, ['archived' => 1]))) ?>#distributors" class="btn-link">Скрий архивираните (<?= (int) $archived_count ?>)</a>
     <?php else: ?>
-      <a href="/admin/distribution.php?<?= h(http_build_query(['product' => $product_id, 'archived' => 1] + $keep_get)) ?>#distributors" class="btn-link">Покажи и архивираните (<?= (int) $archived_count ?>)</a>
+      <a href="/admin/distribution.php?<?= h(http_build_query(['archived' => 1] + $keep_get)) ?>#distributors" class="btn-link">Покажи и архивираните (<?= (int) $archived_count ?>)</a>
     <?php endif; ?>
   </p>
   <?php endif; ?>
 
   <?php if ($distributor_count): ?>
   <form method="get" action="/admin/distribution.php#distributors" class="dist-inline" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-top:1.75rem;padding-top:1rem;border-top:1px solid var(--border);">
-    <input type="hidden" name="product" value="<?= (int) $product_id ?>">
+    <?= $product_filter('fDistP') ?>
     <?php if ($f_arch): ?><input type="hidden" name="archived" value="1"><?php endif; ?>
     <label for="fDist" style="display:flex;flex-direction:column;gap:.35rem;font-weight:600;font-size:.875rem;">Покажи
       <select name="df" id="fDist">
@@ -1040,7 +1038,7 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
       <span class="dist-hint" id="fDistQHint">име, ЕИК, контакт, адрес или имейл</span>
     </label>
     <button type="submit" class="btn btn--outline">Филтрирай</button>
-    <?php if ($f_dist || $f_dist_q !== ''): ?><a href="/admin/distribution.php?<?= h(http_build_query(['product' => $product_id] + ($f_arch ? ['archived' => 1] : []))) ?>#distributors" class="btn-link" style="min-height:44px;display:inline-flex;align-items:center;">Изчисти филтъра</a><?php endif; ?>
+    <?php if ($f_prod || $f_dist || $f_dist_q !== ''): ?><a href="/admin/distribution.php<?= $f_arch ? '?archived=1' : '' ?>#distributors" class="btn-link" style="min-height:44px;display:inline-flex;align-items:center;">Изчисти филтъра</a><?php endif; ?>
   </form>
   <?php endif; ?>
 
@@ -1169,91 +1167,152 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
     refreshMulti();
   }
 
+  // ── Product lines (allocations, sales): a „Продукт“ dropdown + quantity per line ──
+  var itemData = <?= json_encode(array_map(fn($it) => ['label' => $it['label'], 'price' => $it['price'], 'available' => $it['available'], 'shop' => $it['shop']], $all_items), JSON_HEX_TAG | JSON_HEX_AMP | JSON_FORCE_OBJECT) ?>;
+  var holdings = <?= json_encode($holdings, JSON_HEX_TAG | JSON_HEX_AMP | JSON_FORCE_OBJECT) ?>;
+  var lineCount = 1;
+  var lineHint = {};   // prefix => function(row) that fills the row's hint
+
+  function lineRows(prefix) { return Array.prototype.slice.call(document.querySelectorAll('[data-lines="' + prefix + '"] .dist-line')); }
+  function addLine(prefix, itemKey, qty) {
+    var tpl  = document.querySelector('template[data-line-template="' + prefix + '"]');
+    var wrap = document.querySelector('[data-lines="' + prefix + '"]');
+    lineCount++;
+    var holder = document.createElement('div');
+    holder.innerHTML = tpl.innerHTML.replace(/__N__/g, String(lineCount));
+    var row = holder.firstElementChild;
+    wrap.appendChild(row);
+    wireLine(prefix, row);
+    if (itemKey) { row.querySelector('[data-line-item]').value = itemKey; refreshLine(prefix, row); }
+    if (qty) row.querySelector('[data-line-qty]').value = qty;
+    return row;
+  }
+  function refreshLine(prefix, row) {
+    var key   = row.querySelector('[data-line-item]').value;
+    var price = row.querySelector('[data-line-price]');
+    if (price && key && itemData[key] && price.dataset.touched !== '1') price.value = itemData[key].price;
+    if (lineHint[prefix]) lineHint[prefix](row);
+  }
+  function wireLine(prefix, row) {
+    row.querySelector('[data-line-item]').addEventListener('change', function () { refreshLine(prefix, row); });
+    var price = row.querySelector('[data-line-price]');
+    if (price) price.addEventListener('input', function () { price.dataset.touched = '1'; });
+    row.querySelector('[data-line-remove]').addEventListener('click', function () {
+      var rows = lineRows(prefix);
+      if (rows.length > 1) {
+        var i = rows.indexOf(row);
+        row.remove();
+        var next = lineRows(prefix)[Math.max(0, i - 1)];
+        next.querySelector('[data-line-item]').focus();
+      } else {
+        // The last line is cleared, not removed — the form always keeps one.
+        row.querySelector('[data-line-item]').value = '';
+        row.querySelector('[data-line-qty]').value = '';
+        if (price) { price.value = ''; price.dataset.touched = ''; }
+        refreshLine(prefix, row);
+      }
+    });
+    refreshLine(prefix, row);
+  }
+  document.querySelectorAll('[data-lines]').forEach(function (wrap) {
+    var prefix = wrap.dataset.lines;
+    lineRows(prefix).forEach(function (row) { wireLine(prefix, row); });
+  });
+  document.querySelectorAll('[data-line-add]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      addLine(btn.dataset.lineAdd).querySelector('[data-line-item]').focus();
+    });
+  });
+
   // Allocation form: fields follow the chosen recipient
-  var numbers   = <?= json_encode($item_numbers, JSON_HEX_TAG | JSON_HEX_AMP) ?>;
   var recipient = document.getElementById('allocRecipient');
-  var variant   = document.getElementById('allocVariant');
-  var qty       = document.getElementById('allocQty');
-  var availEl   = document.getElementById('allocAvail');
-  var shopWrap  = document.getElementById('allocShopWrap');
   var shopBox   = document.getElementById('allocShop');
   var shopText  = document.getElementById('allocShopText');
   var sampleW   = document.getElementById('allocSampleWrap');
   var sampleIn  = document.getElementById('allocSample');
-  var priceW    = document.getElementById('allocPriceWrap');
-  var priceIn   = document.getElementById('allocPrice');
   var distHint  = document.getElementById('allocDistHint');
   var lastDest  = null;
   function show(el, on) { if (el) el.style.display = on ? '' : 'none'; }
-
-  function itemNums() {
-    var key = variant ? variant.value : '';
-    return numbers[key] || null;
+  function allocDest() {
+    var dest = recipient ? recipient.value : 'online';
+    return ['online', 'personal', 'sample'].indexOf(dest) === -1 ? 'distributor' : dest;
   }
+  lineHint.alloc = function (row) {
+    var key = row.querySelector('[data-line-item]').value, n = itemData[key];
+    row.querySelector('[data-line-hint]').textContent = n ? 'неразпределени ' + n.available + ' бр. · в магазина ' + n.shop + ' бр.' : '';
+    // Free samples have no price — the price box hides and stops being required.
+    var free = allocDest() === 'sample';
+    var pw = row.querySelector('[data-line-price-wrap]'), pi = row.querySelector('[data-line-price]');
+    show(pw, !free);
+    if (pi) pi.required = !free && key !== '';
+  };
   function refreshAlloc() {
     if (!recipient) return;
-    var dest = recipient.value;
-    if (['online', 'personal', 'sample'].indexOf(dest) === -1) dest = 'distributor';
-    var n = itemNums();
-    if (availEl) availEl.textContent = n ? 'Неразпределени: ' + n.available + ' бр. · в магазина: ' + n.shop + ' бр.' : '';
+    var dest = allocDest();
     var isSample = dest === 'sample';
     // style.display, not [hidden]: the admin CSS gives these labels display:flex,
     // which would beat the hidden attribute. `required` moves with visibility —
     // a hidden required field blocks submit with an error nobody can see.
     show(sampleW, isSample);  sampleIn.required = isSample;
-    show(priceW, !isSample);  priceIn.required  = !isSample;
     show(distHint, dest === 'distributor');
-    var shopNow = n ? ' (сега там: ' + n.shop + ' бр.)' : '';
-    if (dest === 'online') shopText.textContent = 'Добави ги и към наличността в онлайн магазина' + shopNow;
-    if (dest !== 'online') shopText.textContent = 'Извади ги и от наличността в онлайн магазина' + shopNow;
+    shopText.textContent = dest === 'online' ? 'Добави ги и към наличността в онлайн магазина' : 'Извади ги и от наличността в онлайн магазина';
     // Ticked by default for every recipient; re-ticked when the recipient changes.
     if (dest !== lastDest) { shopBox.checked = true; lastDest = dest; }
+    lineRows('alloc').forEach(function (row) { lineHint.alloc(row); });
   }
   if (recipient) {
     recipient.addEventListener('change', refreshAlloc);
-    if (variant) variant.addEventListener('change', refreshAlloc);
-    document.getElementById('allocUseAll').addEventListener('click', function () {
-      if (qty) {
-        var n = itemNums();
-        if (n) { qty.value = n.available; qty.focus(); }
-        return;
-      }
-      // A box per variant: fill each with what is still unallocated.
-      var first = null;
-      document.querySelectorAll('#allocForm input[data-variant]').forEach(function (box) {
-        var v = numbers[box.dataset.variant];
-        box.value = v && v.available > 0 ? v.available : '';
-        if (!first) first = box;
-      });
-      if (first) first.focus();
-    });
     refreshAlloc();
   }
 
-  // Sale form with a box per variant: show what the chosen distributor still holds.
-  var unsold   = <?= json_encode($dist_unsold, JSON_HEX_TAG | JSON_HEX_AMP | JSON_FORCE_OBJECT) ?>;
+  // Sale form: only the products the chosen distributor still holds.
   var saleDist = document.getElementById('saleDist');
-  var saleBoxes = document.querySelectorAll('#panel-sales input[data-variant]');
-  function refreshSale() {
-    var held = unsold[saleDist.value] || null;
-    saleBoxes.forEach(function (box) {
-      var hint = document.getElementById(box.id + '-h');
-      if (!held) { hint.textContent = 'изберете дистрибутор, за да видите колко има'; box.removeAttribute('max'); return; }
-      var n = held[box.dataset.variant] || 0;
-      hint.textContent = 'при дистрибутора: ' + n + ' непродадени';
-      box.max = n;
+  var saleHeld = document.getElementById('saleHeld');
+  function heldNow() { return saleDist && saleDist.value ? (holdings[saleDist.value] || {}) : null; }
+  lineHint.sale = function (row) {
+    var held = heldNow(), sel = row.querySelector('[data-line-item]');
+    Array.prototype.forEach.call(sel.options, function (o) {
+      if (!o.value) return;
+      var n = held ? (held[o.value] || 0) : null;
+      o.hidden = o.disabled = held !== null && n <= 0 && o.value !== sel.value;
+      o.textContent = o.textContent.replace(/ \(има \d+\)$/, '') + (n ? ' (има ' + n + ')' : '');
     });
+    var n = held && sel.value ? (held[sel.value] || 0) : null;
+    row.querySelector('[data-line-hint]').textContent = n === null ? '' : 'при дистрибутора: ' + n + ' непродадени';
+    var qty = row.querySelector('[data-line-qty]');
+    if (n !== null) qty.max = n; else qty.removeAttribute('max');
+  };
+  function refreshSale() {
+    var held = heldNow();
+    var count = held ? Object.keys(held).length : 0;
+    if (saleHeld) saleHeld.textContent = !held ? 'Изберете дистрибутор — в списъка с продукти остават само тези, които той има.'
+      : (count ? 'Дистрибуторът има непродадени бройки от ' + count + (count === 1 ? ' продукт.' : ' продукта.') : 'Този дистрибутор няма непродадени бройки — първо му дайте стока от „Разпределения“.');
+    lineRows('sale').forEach(function (row) { lineHint.sale(row); });
   }
-  if (saleDist && saleBoxes.length) {
+  if (saleDist) {
     saleDist.addEventListener('change', refreshSale);
     refreshSale();
     document.getElementById('saleUseAll').addEventListener('click', function () {
-      var held = unsold[saleDist.value] || null;
+      var held = heldNow();
       if (!held) { saleDist.focus(); return; }
-      saleBoxes.forEach(function (box) { var n = held[box.dataset.variant] || 0; box.value = n > 0 ? n : ''; });
-      saleBoxes[0].focus();
+      // One line per product they hold, each with everything they still have.
+      lineRows('sale').forEach(function (row, i) { if (i > 0) row.remove(); });
+      var keys = Object.keys(held), first = lineRows('sale')[0];
+      keys.forEach(function (key, i) {
+        if (i === 0) { first.querySelector('[data-line-item]').value = key; first.querySelector('[data-line-qty]').value = held[key]; lineHint.sale(first); }
+        else addLine('sale', key, held[key]);
+      });
+      if (first) first.querySelector('[data-line-qty]').focus();
     });
   }
+
+  // „Поправи наличността“: show what the shop has now for the chosen product.
+  var stockItem = document.getElementById('stockItem');
+  if (stockItem) stockItem.addEventListener('change', function () {
+    var n = itemData[stockItem.value];
+    document.getElementById('distStockHint').textContent = n ? 'сега в магазина: ' + n.shop + ' бр.' : '';
+    if (n) document.getElementById('distStockQty').value = n.shop;
+  });
 
   // Bulk selection — sales (paid/unpaid) and distributors (archive/restore)
   var bar = document.getElementById('distBulkBar');
@@ -1309,6 +1368,16 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
   if (clearBtn) clearBtn.addEventListener('click', clearBulk);
 
   activate(location.hash.slice(1));
+  // After saving or filtering, the page opens on its tab: show the tabs, not the top of the page.
+  if (tabKeys.indexOf(location.hash.slice(1)) !== -1) {
+    // Instant and measured: the admin's smooth scrolling made scrollIntoView overshoot.
+    var nav = document.getElementById('distTabs');
+    // Leave room for the admin's sticky top bar, so the tabs aren't hidden under it.
+    var bar = document.querySelector('.admin-topbar');
+    var pos = bar ? getComputedStyle(bar).position : '';
+    var gap = (pos === 'sticky' || pos === 'fixed' ? bar.getBoundingClientRect().height : 0) + 16;
+    if (nav) window.scrollTo({ top: window.scrollY + nav.getBoundingClientRect().top - gap, behavior: 'instant' });
+  }
 })();
 </script>
 
