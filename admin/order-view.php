@@ -95,6 +95,11 @@ if (!empty($_GET['doc_success'])) {
 if (!empty($_GET['doc_error'])) {
     $errors[] = $_GET['doc_error'];
 }
+// Stock a manual invoice took below zero (admin/manual-invoice.php) — shown once.
+start_session();
+$stock_warning = $_SESSION['stock_warning'][$id] ?? [];
+unset($_SESSION['stock_warning'][$id]);
+
 if (!empty($_GET['email_sent'])) {
     $success = 'Имейлът е изпратен до ' . $order['customer_email'] . '. Виждате го в „Комуникация с клиента“.';
 }
@@ -529,6 +534,13 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
 <?php if ($success): ?>
   <div class="admin-alert admin-alert--success" role="status" style="margin-bottom:1.5rem;"><?= h($success) ?></div>
+<?php endif; ?>
+<?php if ($stock_warning): ?>
+  <div role="alert" style="margin-bottom:1.5rem;padding:.85rem 1rem;border:2px solid #b45309;border-radius:8px;background:#fffbeb;color:#78350f;">
+    <strong><span aria-hidden="true">⚠</span> Внимание: наличността стана отрицателна.</strong>
+    Фактурата е издадена, но в магазина няма достатъчно от: <?= h(implode(', ', $stock_warning)) ?>.
+    Проверете наличността на продукта.
+  </div>
 <?php endif; ?>
 <?php foreach ($errors as $e): ?>
   <div class="admin-alert admin-alert--error" role="alert" style="margin-bottom:1rem;"><?= h($e) ?></div>

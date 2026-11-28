@@ -9,7 +9,9 @@
  * orders.stock_returned_at records that the items are back on the shelf, so
  * stock moves at most once in each direction no matter how often the status
  * flips. Only product lines with a product_id count — donation add-ons and
- * manual-invoice lines never touched stock.
+ * free-text manual-invoice lines never touched stock. A manual-invoice line
+ * picked from the shop (includes/manual_invoice.php) took its item out of stock
+ * when the invoice was saved, so it is returned like any shop order's.
  *
  * Pre-order lines mirror checkout: their stock may go negative (that's the
  * oversold-demand figure), so taking them out again is never blocked or

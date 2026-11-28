@@ -10,6 +10,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/db.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DocumentGenerator.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/InvoiceGenerator.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/manual_invoice.php';
 
 admin_require_shop();
 
@@ -31,28 +32,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                            ? $_POST['payment_method'] : 'bank_transfer';
     $shipping_eur    = round((float)($_POST['shipping_eur'] ?? 0), 2);
 
-    // ── Line items ────────────────────────────────────────────────────────────
-    $names  = $_POST['item_name']  ?? [];
-    $qtys   = $_POST['item_qty']   ?? [];
-    $prices = $_POST['item_price'] ?? [];
-    $items  = [];
-    $subtotal_eur = 0.0;
-    foreach ($names as $i => $name) {
-        $name = trim((string)$name);
-        if ($name === '') continue;                      // skip blank rows
-        $qty   = max(1, (int)($qtys[$i] ?? 1));
-        $price = round((float)($prices[$i] ?? 0), 2);
-        $line  = round($price * $qty, 2);
-        $subtotal_eur += $line;
-        $items[] = [
-            'type'         => 'product',
-            'name_bg'      => $name,
-            'name'         => $name,
-            'quantity'     => $qty,
-            'price_eur'    => $price,
-            'subtotal_eur' => $line,
-        ];
-    }
+    // ── Line items (free text, or a shop product — includes/manual_invoice.php) ──
+    $items        = manual_invoice_items($pdo, $_POST);
+    $subtotal_eur = round(array_sum(array_column($items, 'subtotal_eur')), 2);
     $total_eur = round($subtotal_eur + $shipping_eur, 2);
 
     // ── Validate ──────────────────────────────────────────────────────────────
@@ -84,7 +66,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'mol'             => $mol,
         ];
         $order_number = generate_order_number();
+        $stock_short  = [];
         try {
+            // The order and its stock change are saved together, or not at all.
+            $pdo->beginTransaction();
             $pdo->prepare("
                 INSERT INTO orders
                     (order_number, type, status, customer_name, customer_email,
@@ -103,8 +88,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 json_encode($invoice_data),
                 $invoice_date . ' 00:00:00',
             ]);
-            $order_id = (int)$pdo->lastInsertId();
+            $order_id    = (int)$pdo->lastInsertId();
+            $stock_short = manual_invoice_take_stock($pdo, $items);
+            $pdo->commit();
+            if ($stock_short) {
+                // Shown once on the order page (admin/order-view.php), under the success message.
+                start_session();
+                $_SESSION['stock_warning'][$order_id] = $stock_short;
+            }
+        } catch (ManualInvoiceStockException $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            $errors[] = $e->getMessage();
         } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
             $errors[] = 'Грешка при запис: ' . $e->getMessage();
         }
     }
@@ -168,6 +164,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+
+// Shop products for the line picker: active first, then inactive.
+$product_options = manual_invoice_product_options($pdo);
+
+/** One line-item row; also rendered empty into the <template> addRow() clones. */
+$render_item_row = function (string $product = '', string $name = '', string $qty = '1', string $price = '') use ($product_options): void {
+    $groups = ['Активни продукти' => $product_options['active'], 'Неактивни продукти' => $product_options['inactive']];
+    ?>
+    <div class="mi-row" style="border:1px solid var(--border);border-radius:8px;padding:.75rem;margin-bottom:.75rem;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:.75rem;margin-bottom:.5rem;">
+        <label style="display:block;margin:0;">
+          <span class="form-label" style="display:block;">Търси продукт</span>
+          <input type="search" class="form-input mi-search" autocomplete="off" placeholder="Напишете част от името">
+        </label>
+        <label style="display:block;margin:0;">
+          <span class="form-label" style="display:block;">Продукт от магазина</span>
+          <select name="item_product[]" class="form-input mi-product">
+            <option value="">— Без продукт (въведете ръчно) —</option>
+            <?php foreach ($groups as $label => $entries): if (!$entries) continue; ?>
+            <optgroup label="<?= h($label) ?>">
+              <?php foreach ($entries as $e): ?>
+              <option value="<?= h($e['value']) ?>" <?= $product === $e['value'] ? 'selected' : '' ?>><?= h(manual_invoice_option_label($e)) ?></option>
+              <?php endforeach; ?>
+            </optgroup>
+            <?php endforeach; ?>
+          </select>
+        </label>
+      </div>
+      <p class="mi-count" role="status" aria-live="polite" style="margin:0 0 .5rem;font-size:.8rem;color:var(--text-muted);min-height:1em;"></p>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 5.5rem 8rem 44px;gap:.5rem;align-items:end;">
+        <label style="display:block;margin:0;">
+          <span class="form-label" style="display:block;">Наименование</span>
+          <input type="text" name="item_name[]" class="form-input" value="<?= h($name) ?>" placeholder="Описание">
+        </label>
+        <label style="display:block;margin:0;">
+          <span class="form-label" style="display:block;">К-во</span>
+          <input type="number" name="item_qty[]" class="form-input" style="padding-left:.6rem;padding-right:.4rem;" min="1" step="1" value="<?= h($qty) ?>">
+        </label>
+        <label style="display:block;margin:0;">
+          <span class="form-label" style="display:block;">Ед. цена (EUR)</span>
+          <input type="number" name="item_price[]" class="form-input" style="padding-left:.6rem;padding-right:.4rem;" min="0" step="0.01" value="<?= h($price) ?>" placeholder="0.00">
+        </label>
+        <button type="button" onclick="removeRow(this)" aria-label="Премахни артикул"
+                style="min-width:44px;min-height:44px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.1rem;line-height:1;"><span aria-hidden="true">×</span></button>
+      </div>
+    </div>
+    <?php
+};
 
 $page_title_admin = 'Нова фактура';
 $active_nav       = 'orders';
@@ -238,43 +282,23 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 
       <!-- Line items -->
       <h2 style="font-size:.95rem;margin:0 0 1rem;">Артикули</h2>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:.75rem;">
-        <thead>
-          <tr style="text-align:left;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">
-            <th style="padding:.25rem .5rem .25rem 0;font-weight:600;">Наименование</th>
-            <th style="padding:.25rem .5rem;font-weight:600;width:7rem;">К-во</th>
-            <th style="padding:.25rem .5rem;font-weight:600;width:10rem;">Ед. цена (EUR)</th>
-            <th style="width:2rem;"></th>
-          </tr>
-        </thead>
-        <tbody id="itemsBody">
-          <?php
-          // Re-render submitted rows on validation error, else one blank row
-          $post_names  = $_POST['item_name']  ?? [''];
-          $post_qtys   = $_POST['item_qty']   ?? ['1'];
-          $post_prices = $_POST['item_price'] ?? [''];
-          foreach ($post_names as $i => $pn): ?>
-          <tr>
-            <td style="padding:.25rem .5rem .25rem 0;">
-              <input type="text" name="item_name[]" class="form-input" aria-label="Наименование на артикул"
-                     value="<?= h($pn) ?>" placeholder="Описание">
-            </td>
-            <td style="padding:.25rem .5rem;">
-              <input type="number" name="item_qty[]" class="form-input" style="padding-left:.6rem;padding-right:.4rem;" aria-label="Количество" min="1" step="1"
-                     value="<?= h($post_qtys[$i] ?? '1') ?>">
-            </td>
-            <td style="padding:.25rem .5rem;">
-              <input type="number" name="item_price[]" class="form-input" style="padding-left:.6rem;padding-right:.4rem;" aria-label="Единична цена" min="0" step="0.01"
-                     value="<?= h($post_prices[$i] ?? '') ?>" placeholder="0.00">
-            </td>
-            <td style="padding:.25rem 0;text-align:center;">
-              <button type="button" onclick="removeRow(this)" aria-label="Премахни артикул"
-                      style="min-width:44px;min-height:44px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.1rem;line-height:1;"><span aria-hidden="true">×</span></button>
-            </td>
-          </tr>
-          <?php endforeach; ?>
-        </tbody>
-      </table>
+      <p style="margin:0 0 1rem;font-size:.85rem;color:var(--text-muted);">
+        Изберете продукт от магазина — името и цената се попълват сами и можете да ги промените.
+        Продуктът се изважда от наличността. Без продукт редът се въвежда ръчно и не променя наличността.
+      </p>
+      <div id="itemsBody">
+        <?php
+        // Re-render submitted rows on validation error, else one blank row
+        $post_names    = $_POST['item_name']    ?? [''];
+        $post_products = $_POST['item_product'] ?? [];
+        $post_qtys     = $_POST['item_qty']     ?? ['1'];
+        $post_prices   = $_POST['item_price']   ?? [''];
+        foreach ($post_names as $i => $pn) {
+            $render_item_row((string)($post_products[$i] ?? ''), (string)$pn, (string)($post_qtys[$i] ?? '1'), (string)($post_prices[$i] ?? ''));
+        }
+        ?>
+      </div>
+      <template id="itemRowTpl"><?php $render_item_row(); ?></template>
       <button type="button" onclick="addRow()" class="btn btn--outline" style="font-size:.85rem;padding:.35rem .9rem;margin-bottom:1.25rem;">+ Артикул</button>
 
       <hr style="border:none;border-top:1px solid var(--border);margin:1.25rem 0;">
@@ -312,21 +336,77 @@ require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-header.php';
 </div>
 
 <script>
+// Picker entries for the search box: [{value, name_bg, price_eur, label}], grouped.
+var MI_GROUPS = <?= json_encode([
+    ['label' => 'Активни продукти',   'entries' => array_map(fn($e) => ['value' => $e['value'], 'name' => $e['name_bg'], 'price' => $e['price_eur'], 'label' => manual_invoice_option_label($e)], $product_options['active'])],
+    ['label' => 'Неактивни продукти', 'entries' => array_map(fn($e) => ['value' => $e['value'], 'name' => $e['name_bg'], 'price' => $e['price_eur'], 'label' => manual_invoice_option_label($e)], $product_options['inactive'])],
+], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
+
+function miEntry(value) {
+  for (var g = 0; g < MI_GROUPS.length; g++)
+    for (var i = 0; i < MI_GROUPS[g].entries.length; i++)
+      if (MI_GROUPS[g].entries[i].value === value) return MI_GROUPS[g].entries[i];
+  return null;
+}
+
+// Rebuild a row's product list to the entries matching the search text.
+// The chosen product always stays in the list, so filtering never loses it.
+function miFilter(row) {
+  var select = row.querySelector('.mi-product');
+  var query  = row.querySelector('.mi-search').value.trim().toLowerCase();
+  var chosen = select.value;
+  while (select.options.length > 1) select.remove(1);
+  select.querySelectorAll('optgroup').forEach(function (g) { g.remove(); });
+  var found = 0;
+  MI_GROUPS.forEach(function (group) {
+    var og = document.createElement('optgroup');
+    og.label = group.label;
+    group.entries.forEach(function (e) {
+      var match = query === '' || e.label.toLowerCase().indexOf(query) !== -1;
+      if (!match && e.value !== chosen) return;
+      if (match) found++;
+      var o = new Option(e.label, e.value, false, e.value === chosen);
+      og.appendChild(o);
+    });
+    if (og.children.length) select.appendChild(og);
+  });
+  select.value = chosen;
+  row.querySelector('.mi-count').textContent = query === ''
+    ? '' : (found === 0 ? 'Няма намерени продукти.' : (found === 1 ? 'Намерен е 1 продукт.' : 'Намерени са ' + found + ' продукта.'));
+}
+
+function miWire(row) {
+  var search = row.querySelector('.mi-search');
+  var select = row.querySelector('.mi-product');
+  search.addEventListener('input', function () { miFilter(row); });
+  // Enter in the search box moves to the list instead of sending the form.
+  search.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); select.focus(); }
+  });
+  select.addEventListener('change', function () {
+    var e = miEntry(select.value);
+    if (!e) return;
+    row.querySelector('input[name="item_name[]"]').value  = e.name;
+    row.querySelector('input[name="item_price[]"]').value = Number(e.price).toFixed(2);
+  });
+}
+
 function addRow() {
   var body = document.getElementById('itemsBody');
-  var tr = document.createElement('tr');
-  tr.innerHTML =
-    '<td style="padding:.25rem .5rem .25rem 0;"><input type="text" name="item_name[]" class="form-input" aria-label="Наименование на артикул" placeholder="Описание"></td>' +
-    '<td style="padding:.25rem .5rem;"><input type="number" name="item_qty[]" class="form-input" style="padding-left:.6rem;padding-right:.4rem;" aria-label="Количество" min="1" step="1" value="1"></td>' +
-    '<td style="padding:.25rem .5rem;"><input type="number" name="item_price[]" class="form-input" style="padding-left:.6rem;padding-right:.4rem;" aria-label="Единична цена" min="0" step="0.01" placeholder="0.00"></td>' +
-    '<td style="padding:.25rem 0;text-align:center;"><button type="button" onclick="removeRow(this)" aria-label="Премахни артикул" style="min-width:44px;min-height:44px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.1rem;line-height:1;"><span aria-hidden="true">×</span></button></td>';
-  body.appendChild(tr);
+  var row  = document.getElementById('itemRowTpl').content.firstElementChild.cloneNode(true);
+  body.appendChild(row);
+  miWire(row);
+  row.querySelector('.mi-search').focus();
 }
 function removeRow(btn) {
   var body = document.getElementById('itemsBody');
-  if (body.rows.length > 1) btn.closest('tr').remove();
-  else btn.closest('tr').querySelectorAll('input').forEach(function(i){ i.value = i.type === 'number' && i.min === '1' ? '1' : ''; });
+  var row  = btn.closest('.mi-row');
+  if (body.querySelectorAll('.mi-row').length > 1) { row.remove(); return; }
+  row.querySelectorAll('input').forEach(function (i) { i.value = i.name === 'item_qty[]' ? '1' : ''; });
+  row.querySelector('.mi-product').value = '';
+  miFilter(row);
 }
+document.querySelectorAll('#itemsBody .mi-row').forEach(miWire);
 </script>
 
 <?php require $_SERVER['DOCUMENT_ROOT'] . '/admin/includes/admin-footer.php'; ?>
