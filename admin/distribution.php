@@ -1088,11 +1088,16 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
         <option value="unpaid" <?= $f_dist === 'unpaid' ? 'selected' : '' ?>>Имат неплатени продажби</option>
       </select>
     </label>
-    <label for="fDistQ" style="display:flex;flex-direction:column;gap:.35rem;font-weight:600;font-size:.875rem;">Търси
+    <?php /* The hint sits beside the label, not under the input: under it, it made this
+             field taller than the select and pushed the row out of line with the button. */ ?>
+    <div style="display:flex;flex-direction:column;gap:.35rem;flex:0 1 20rem;min-width:min(100%,14rem);">
+      <span style="display:flex;flex-wrap:wrap;align-items:baseline;column-gap:.4rem;">
+        <label for="fDistQ" style="font-weight:600;font-size:.875rem;margin:0;">Търси</label>
+        <span class="dist-hint" id="fDistQHint" style="text-transform:none;letter-spacing:normal;">име, ЕИК, контакт, адрес или имейл</span>
+      </span>
       <input type="search" name="dq" id="fDistQ" maxlength="100" value="<?= h($f_dist_q) ?>" aria-describedby="fDistQHint"
-             style="padding:.5rem .75rem;border:1px solid #6b7280;border-radius:6px;font-size:.9rem;min-height:44px;box-sizing:border-box;">
-      <span class="dist-hint" id="fDistQHint">име, ЕИК, контакт, адрес или имейл</span>
-    </label>
+             style="width:100%;padding:.5rem .75rem;border:1px solid #6b7280;border-radius:6px;font-size:.9rem;font-family:inherit;background:#fff;min-height:44px;box-sizing:border-box;margin:0;">
+    </div>
     <button type="submit" class="btn btn--outline">Филтрирай</button>
     <?php if ($f_prod || $f_dist || $f_dist_q !== ''): ?><a href="/admin/distribution.php<?= $f_arch ? '?archived=1' : '' ?>#distributors" class="btn-link" style="min-height:44px;display:inline-flex;align-items:center;">Изчисти филтъра</a><?php endif; ?>
   </form>
