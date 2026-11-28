@@ -273,6 +273,36 @@ final class DistributionHttpTest extends TestCase
         $paid = (int) $pdo->query("SELECT SUM(payment_received) FROM distribution_sales WHERE distributor_id = $did")->fetchColumn();
         $this->assertSame(2, $paid);
 
+        // Delete: the page offers it with a confirm, a sale goes, then the hand-over and its protocol.
+        [, $body] = $this->req('/admin/distribution.php?product=' . $pid);
+        $this->assertStringContainsString('value="delete_sale"', $body);
+        $this->assertStringContainsString('Записът за полученото плащане също ще бъде изтрит', $body, 'paid sales warn about the payment');
+        $this->assertStringContainsString('value="delete_allocation"', $body);
+        $this->assertStringContainsString('value="delete_batch"', $body);
+
+        [, , $loc] = $this->req('/admin/distribution.php', $base + ['action' => 'delete_allocation', 'id' => (int) $alloc['id']]);
+        $this->assertStringEndsWith('#allocations', $loc);
+        [, $body] = $this->req('/admin/distribution.php?product=' . $pid);
+        $this->assertStringContainsString('Първо изтрийте или намалете продажбите', $body, '7 sold blocks deleting the hand-over');
+
+        foreach ($ids as $sid) {
+            [, , $loc] = $this->req('/admin/distribution.php', $base + ['action' => 'delete_sale', 'id' => (int) $sid]);
+            $this->assertStringEndsWith('#sales', $loc);
+        }
+        $this->assertSame(0, (int) $pdo->query("SELECT COUNT(*) FROM distribution_sales WHERE distributor_id = $did")->fetchColumn());
+
+        $this->req('/admin/distribution.php', $base + ['action' => 'delete_allocation', 'id' => (int) $alloc['id']]);
+        $this->assertFalse($pdo->query('SELECT id FROM distribution_allocations WHERE id = ' . (int) $alloc['id'])->fetchColumn());
+        $this->assertFileDoesNotExist(self::$root . '/' . $alloc['protocol_file_path'], 'the only row on it: the PDF goes');
+        [, $body] = $this->req('/admin/distribution.php?product=' . $pid);
+        $this->assertStringContainsString('Записът и протокол № ' . $alloc['protocol_formatted_number'] . ' са изтрити', $body);
+
+        // Unauthenticated: no delete.
+        $sid = (int) $pdo->query("SELECT id FROM distribution_batches WHERE product_id = $pid LIMIT 1")->fetchColumn();
+        [$code] = $this->req('/admin/distribution.php', ['action' => 'delete_batch', 'id' => $sid, 'product_id' => $pid], false);
+        $this->assertNotSame(200, $code);
+        $this->assertSame($sid, (int) $pdo->query("SELECT id FROM distribution_batches WHERE id = $sid")->fetchColumn());
+
         $this->req('/admin/distribution.php', $base + ['action' => 'distributors_active', 'active' => '0', 'ids' => [$did]]);
         $this->assertSame(0, (int) $pdo->query("SELECT active FROM distribution_distributors WHERE id = $did")->fetchColumn());
     }

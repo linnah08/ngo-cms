@@ -494,6 +494,35 @@ function distribution_update_batch(PDO $pdo, int $id, int $quantity, string $pro
     });
 }
 
+/**
+ * Delete a batch entered by mistake. Refused when the other batches wouldn't
+ * cover what is already handed out.
+ *
+ * @return array{ok: bool, error?: string}
+ */
+function distribution_delete_batch(PDO $pdo, int $id): array
+{
+    return _distribution_tx($pdo, function () use ($pdo, $id): array {
+        $stmt = $pdo->prepare('SELECT product_id, variant_id, quantity FROM distribution_batches WHERE id = ?');
+        $stmt->execute([$id]);
+        $batch = $stmt->fetch();
+        if (!$batch) return ['ok' => false, 'error' => 'Партидата не е намерена.'];
+
+        $pid = (int) $batch['product_id'];
+        $vid = $batch['variant_id'] !== null ? (int) $batch['variant_id'] : null;
+        _distribution_lock_product($pdo, $pid);
+
+        $produced_others = distribution_total_produced($pdo, $pid, $vid) - (int) $batch['quantity'];
+        $allocated       = distribution_total_allocated($pdo, $pid, $vid);
+        if ($produced_others < $allocated) {
+            return ['ok' => false, 'error' => "Не може да изтриете партидата: без нея ще останат {$produced_others} бр. произведени, а вече са разпределени {$allocated} бр. Първо изтрийте или намалете разпределенията."];
+        }
+
+        $pdo->prepare('DELETE FROM distribution_batches WHERE id = ?')->execute([$id]);
+        return ['ok' => true];
+    });
+}
+
 // ── Allocations ────────────────────────────────────────────────────────────────
 
 /**
@@ -655,6 +684,66 @@ function distribution_update_allocation(PDO $pdo, int $id, int $quantity, float 
             ->execute([$quantity, $price, $allocated_on, $notes, $id]);
         return ['ok' => true];
     });
+}
+
+/**
+ * Delete an allocation entered by mistake. The items go back to the
+ * unallocated pool; live shop stock is left alone (as on edit). Refused when a
+ * distributor would be left with less than they already reported sold.
+ *
+ * When the row was on a hand-over protocol, the protocol is re-created under
+ * the same number for the rows still on it, or — when it was the only row —
+ * its PDF is deleted and the number is not used again.
+ *
+ * $root is the site root (the documents/ folder lives under it).
+ *
+ * @return array{ok: bool, error?: string, protocol?: array{number: string, removed: bool, ok: bool, error?: string}}
+ */
+function distribution_delete_allocation(PDO $pdo, int $id, string $root): array
+{
+    $r = _distribution_tx($pdo, function () use ($pdo, $id): array {
+        $stmt = $pdo->prepare('SELECT * FROM distribution_allocations WHERE id = ?');
+        $stmt->execute([$id]);
+        $a = $stmt->fetch();
+        if (!$a) return ['ok' => false, 'error' => 'Записът не е намерен.'];
+
+        $pid = (int) $a['product_id'];
+        $vid = $a['variant_id'] !== null ? (int) $a['variant_id'] : null;
+        _distribution_lock_product($pdo, $pid);
+
+        if ($a['destination'] === 'distributor') {
+            $held = distribution_distributor_stock($pdo, (int) $a['distributor_id'], $pid, $vid);
+            if ($held['allocated'] - (int) $a['quantity'] < $held['sold']) {
+                return ['ok' => false, 'error' => "Не може да изтриете това даване: дистрибуторът вече е отчел {$held['sold']} бр. продадени. Първо изтрийте или намалете продажбите му в раздел „Продажби“."];
+            }
+        }
+
+        $pdo->prepare('DELETE FROM distribution_allocations WHERE id = ?')->execute([$id]);
+        return ['ok' => true, 'row' => $a];
+    });
+    if (!$r['ok']) return $r;
+
+    $a = $r['row'];
+    $out = ['ok' => true];
+    if ($a['protocol_number'] !== null) {
+        $stmt = $pdo->prepare("SELECT id FROM distribution_allocations WHERE protocol_number = ? AND destination = 'distributor' ORDER BY id LIMIT 1");
+        $stmt->execute([(int) $a['protocol_number']]);
+        $left = (int) $stmt->fetchColumn();
+        $number = (string) $a['protocol_formatted_number'];
+        if ($left) {
+            $p = distribution_issue_protocol($pdo, $left, $root);
+            $out['protocol'] = ['number' => $number, 'removed' => false, 'ok' => $p['ok']] + (isset($p['error']) ? ['error' => $p['error']] : []);
+        } else {
+            $path = (string) $a['protocol_file_path'];
+            // Only ever a file under documents/distribution_protocols/ — never follow a path elsewhere.
+            if ($path !== '' && str_starts_with($path, 'documents/distribution_protocols/') && !str_contains($path, '..')) {
+                $abs = rtrim($root, '/') . '/' . $path;
+                if (is_file($abs)) @unlink($abs);
+            }
+            $out['protocol'] = ['number' => $number, 'removed' => true, 'ok' => true];
+        }
+    }
+    return $out;
 }
 
 /**
@@ -1050,6 +1139,19 @@ function distribution_update_sale(PDO $pdo, int $id, int $quantity, string $sale
         'UPDATE distribution_sales SET quantity = ?, sale_date = ?, payment_received = ?, payment_received_on = ?, notes = ? WHERE id = ?'
     )->execute([$quantity, $sale_date, $payment_received ? 1 : 0, $payment_received ? $payment_received_on : null, $notes, $id]);
     return ['ok' => true];
+}
+
+/**
+ * Delete a sale entered by mistake (paid or not). The items count as unsold
+ * by that distributor again.
+ *
+ * @return array{ok: bool, error?: string}
+ */
+function distribution_delete_sale(PDO $pdo, int $id): array
+{
+    $stmt = $pdo->prepare('DELETE FROM distribution_sales WHERE id = ?');
+    $stmt->execute([$id]);
+    return $stmt->rowCount() ? ['ok' => true] : ['ok' => false, 'error' => 'Продажбата не е намерена.'];
 }
 
 /**

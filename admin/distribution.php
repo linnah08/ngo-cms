@@ -137,6 +137,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $r['ok'] ? $ok('Партидата е запазена.') : $fail($r['error']);
             dist_redirect($pid, 'batches', $keep);
 
+        case 'delete_batch':
+            $r = distribution_delete_batch($pdo, (int) ($_POST['id'] ?? 0));
+            $r['ok'] ? $ok('Партидата е изтрита.') : $fail($r['error']);
+            dist_redirect($pid, 'batches', $keep);
+
         case 'add_distributor':
         case 'update_distributor':
             $name    = trim((string) ($_POST['name'] ?? ''));
@@ -245,6 +250,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             dist_redirect($pid, 'allocations', $keep);
 
+        case 'delete_allocation':
+            $r = distribution_delete_allocation($pdo, (int) ($_POST['id'] ?? 0), $_SERVER['DOCUMENT_ROOT']);
+            if (!$r['ok']) {
+                $fail($r['error']);
+            } elseif (!isset($r['protocol'])) {
+                $ok('Записът е изтрит.');
+            } elseif ($r['protocol']['removed']) {
+                $ok('Записът и протокол № ' . $r['protocol']['number'] . ' са изтрити.');
+            } elseif ($r['protocol']['ok']) {
+                $ok('Записът е изтрит. Протокол № ' . $r['protocol']['number'] . ' е обновен без него.');
+            } else {
+                $fail('Записът е изтрит, но: ' . $r['protocol']['error']);
+            }
+            dist_redirect($pid, 'allocations', $keep);
+
         case 'regenerate_protocol':
             $p = distribution_issue_protocol($pdo, (int) ($_POST['id'] ?? 0), $_SERVER['DOCUMENT_ROOT']);
             $p['ok'] ? $ok('Протокол № ' . $p['number'] . ' е създаден отново.') : $fail($p['error']);
@@ -272,6 +292,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $paid, $paid ? trim((string) ($_POST['payment_received_on'] ?? '')) : null, dist_post_text('notes')
             );
             $r['ok'] ? $ok('Продажбата е запазена.') : $fail($r['error']);
+            dist_redirect($pid, 'sales', $keep);
+
+        case 'delete_sale':
+            $r = distribution_delete_sale($pdo, (int) ($_POST['id'] ?? 0));
+            $r['ok'] ? $ok('Продажбата е изтрита.') : $fail($r['error']);
             dist_redirect($pid, 'sales', $keep);
 
         case 'sales_paid':
@@ -474,6 +499,19 @@ $common = function () use ($keep_get): string {
     $html = csrf_field();
     foreach ($keep_get as $k => $v) $html .= '<input type="hidden" name="' . h($k) . '" value="' . h((string) $v) . '">';
     return $html;
+};
+
+/** Confirm text for deleting an allocation row — says what happens to stock and the protocol. */
+$alloc_delete_msg = function (array $a): string {
+    $msg = 'Изтриване на записа от ' . dist_date_bg((string) $a['allocated_on']) . ' (' . (int) $a['quantity'] . ' бр.)? '
+         . 'Бройките се връщат като неразпределени.';
+    if (in_array($a['destination'], ['online', 'personal', 'distributor'], true)) {
+        $msg .= ' Наличността в онлайн магазина не се променя — ако трябва, поправете я горе.';
+    }
+    if ($a['protocol_file_path']) {
+        $msg .= ' Протокол № ' . $a['protocol_formatted_number'] . ' ще бъде изтрит или обновен без този ред; номерът му няма да се използва отново. Ако вече е подписан, отбележете това на хартия.';
+    }
+    return $msg . ' Това не може да се върне.';
 };
 
 $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.5rem;';
@@ -733,6 +771,12 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
               <label for="<?= $eid ?>-n">Бележка<input type="text" id="<?= $eid ?>-n" name="notes" maxlength="1000" value="<?= h((string) $b['notes']) ?>"></label>
               <button type="submit" class="btn btn--primary">Запази</button>
             </form>
+            <form method="post" style="margin:.75rem 0 0;" data-confirm="Изтриване на партидата от <?= h(dist_date_bg((string) $b['produced_on'])) ?> (<?= (int) $b['quantity'] ?> бр.)? Това не може да се върне." data-confirm-ok="Изтрий">
+              <?= $common() ?>
+              <input type="hidden" name="action" value="delete_batch">
+              <input type="hidden" name="id" value="<?= (int) $b['id'] ?>">
+              <button type="submit" class="btn-link btn-link--danger" style="min-height:44px;" aria-label="Изтрий партидата от <?= h(dist_date_bg((string) $b['produced_on'])) ?>">Изтрий</button>
+            </form>
           </td>
         </tr>
       <?php endforeach; ?>
@@ -864,6 +908,12 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
             <?php if ($a['protocol_file_path']): ?>
               <p class="dist-hint" style="margin:.5rem 0 0;">Запазването обновява протокол № <?= h($a['protocol_formatted_number']) ?> с новите данни. Ако вече е подписан, разпечатайте и подпишете новия.</p>
             <?php endif; ?>
+            <form method="post" style="margin:.75rem 0 0;" data-confirm="<?= h($alloc_delete_msg($a)) ?>" data-confirm-ok="Изтрий">
+              <?= $common() ?>
+              <input type="hidden" name="action" value="delete_allocation">
+              <input type="hidden" name="id" value="<?= (int) $a['id'] ?>">
+              <button type="submit" class="btn-link btn-link--danger" style="min-height:44px;" aria-label="Изтрий записа от <?= h(dist_date_bg((string) $a['allocated_on'])) ?>">Изтрий</button>
+            </form>
           </td>
         </tr>
       <?php endforeach; ?>
@@ -976,6 +1026,12 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
               <label for="<?= $eid ?>-pd">Дата на плащане<input type="date" id="<?= $eid ?>-pd" name="payment_received_on" value="<?= h((string) ($s['payment_received_on'] ?? $today)) ?>"></label>
               <label for="<?= $eid ?>-n">Бележка<input type="text" id="<?= $eid ?>-n" name="notes" maxlength="1000" value="<?= h((string) $s['notes']) ?>"></label>
               <button type="submit" class="btn btn--primary">Запази</button>
+            </form>
+            <form method="post" style="margin:.75rem 0 0;" data-confirm="Изтриване на продажбата от <?= h(dist_date_bg((string) $s['sale_date'])) ?> (<?= (int) $s['quantity'] ?> бр., <?= h($s['distributor_name']) ?>)?<?= $s['payment_received'] ? ' Записът за полученото плащане също ще бъде изтрит.' : '' ?> Бройките отново ще се водят като непродадени при дистрибутора. Това не може да се върне." data-confirm-ok="Изтрий">
+              <?= $common() ?>
+              <input type="hidden" name="action" value="delete_sale">
+              <input type="hidden" name="id" value="<?= (int) $s['id'] ?>">
+              <button type="submit" class="btn-link btn-link--danger" style="min-height:44px;" aria-label="Изтрий продажбата от <?= h(dist_date_bg((string) $s['sale_date'])) ?>, <?= h($s['distributor_name']) ?>">Изтрий</button>
             </form>
           </td>
         </tr>

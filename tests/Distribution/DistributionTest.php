@@ -715,4 +715,86 @@ final class DistributionTest extends TestCase
         $this->assertSame(3, distribution_distributor_totals(self::$pdo, $a)[$d]['sold']);
         $this->assertSame([$b . '_0' => 1], distribution_distributor_holdings(self::$pdo)[$d], 'only what they still hold');
     }
+
+    // ── delete ─────────────────────────────────────────────────────────────────
+
+    public function testDeleteSaleGivesItemsBackToTheDistributor(): void
+    {
+        $pid = $this->product();
+        $d   = $this->distributor();
+        $this->batch($pid, 10);
+        $this->alloc($pid, 'distributor', 5, ['distributor' => $d]);
+        $paid = distribution_record_sale(self::$pdo, $d, $pid, null, 5, '2026-11-28', true, '2026-11-28')['id'];
+        $this->assertSame(0, distribution_distributor_stock(self::$pdo, $d, $pid, null)['unsold']);
+
+        $this->assertTrue(distribution_delete_sale(self::$pdo, $paid)['ok'], 'a paid sale can be deleted too');
+        $this->assertSame(['allocated' => 5, 'sold' => 0, 'unsold' => 5], distribution_distributor_stock(self::$pdo, $d, $pid, null));
+        $this->assertSame(['paid_qty' => 0, 'unpaid_qty' => 0], distribution_distributor_payment_summary(self::$pdo, $d, $pid));
+        $this->assertFalse(distribution_delete_sale(self::$pdo, $paid)['ok'], 'already gone');
+    }
+
+    public function testDeleteAllocationReturnsItemsButNotBelowWhatWasSold(): void
+    {
+        $pid = $this->product(4);
+        $d   = $this->distributor();
+        $this->batch($pid, 10);
+        $a1 = $this->alloc($pid, 'distributor', 5, ['distributor' => $d])['id'];
+        $a2 = $this->alloc($pid, 'distributor', 2, ['distributor' => $d])['id'];
+        $sale = distribution_record_sale(self::$pdo, $d, $pid, null, 4, '2026-03-01', false)['id'];
+
+        $no = distribution_delete_allocation(self::$pdo, $a1, self::$tmp_root);
+        $this->assertFalse($no['ok'], '7 given − 5 = 2 < 4 sold');
+        $this->assertStringContainsString('Продажби', $no['error']);
+
+        $this->assertTrue(distribution_delete_allocation(self::$pdo, $a2, self::$tmp_root)['ok'], '7 − 2 = 5 ≥ 4 sold');
+        $this->assertSame(5, distribution_available(self::$pdo, $pid, null));
+        $this->assertSame(4, distribution_online_stock(self::$pdo, $pid, null), 'shop stock is left alone');
+
+        distribution_delete_sale(self::$pdo, $sale);
+        $this->assertTrue(distribution_delete_allocation(self::$pdo, $a1, self::$tmp_root)['ok']);
+        $this->assertSame(10, distribution_available(self::$pdo, $pid, null));
+        $this->assertFalse(distribution_delete_allocation(self::$pdo, $a1, self::$tmp_root)['ok'], 'already gone');
+    }
+
+    public function testDeleteAllocationRemovesOrRewritesItsProtocol(): void
+    {
+        $pid = $this->product(0, 'variant', 5.0);
+        $v1  = $this->variant($pid, 'Първа');
+        $v2  = $this->variant($pid, 'Втора');
+        foreach ([$v1, $v2] as $v) $this->batch($pid, 10, $v);
+        $d = $this->distributor();
+
+        $r = distribution_allocate_items(self::$pdo, $this->lines($pid, [$v1 => 3, $v2 => 4], 5.0), 'distributor', $d, '2026-03-01');
+        $p = distribution_issue_protocol(self::$pdo, $r['ids'][0], self::$tmp_root, $r['ids']);
+        $this->assertTrue($p['ok'], $p['error'] ?? '');
+        $path = self::$pdo->query('SELECT protocol_file_path FROM distribution_allocations WHERE id = ' . $r['ids'][0])->fetchColumn();
+        $abs  = self::$tmp_root . '/' . $path;
+        $this->assertFileExists($abs);
+
+        // One of two rows: the protocol stays, re-made under the same number without it.
+        $first = distribution_delete_allocation(self::$pdo, $r['ids'][0], self::$tmp_root);
+        $this->assertTrue($first['ok'], $first['error'] ?? '');
+        $this->assertSame(['number' => $p['number'], 'removed' => false, 'ok' => true], $first['protocol']);
+        $this->assertFileExists($abs);
+        $left = self::$pdo->query('SELECT protocol_formatted_number FROM distribution_allocations WHERE id = ' . $r['ids'][1])->fetchColumn();
+        $this->assertSame($p['number'], $left);
+
+        // The last row: the PDF goes.
+        $last = distribution_delete_allocation(self::$pdo, $r['ids'][1], self::$tmp_root);
+        $this->assertTrue($last['protocol']['removed']);
+        $this->assertFileDoesNotExist($abs);
+    }
+
+    public function testDeleteBatchOnlyWhenTheRestCoversWhatIsHandedOut(): void
+    {
+        $pid = $this->product();
+        $b1  = $this->batch($pid, 10);
+        $b2  = $this->batch($pid, 5);
+        $this->alloc($pid, 'personal', 8);
+
+        $this->assertFalse(distribution_delete_batch(self::$pdo, $b1)['ok'], '5 left < 8 handed out');
+        $this->assertTrue(distribution_delete_batch(self::$pdo, $b2)['ok'], '10 left ≥ 8');
+        $this->assertSame(2, distribution_available(self::$pdo, $pid, null));
+        $this->assertFalse(distribution_delete_batch(self::$pdo, $b2)['ok'], 'already gone');
+    }
 }
