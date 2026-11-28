@@ -482,6 +482,7 @@
   "cart.restore.merged": "We added the items from your reminder to your cart.",
   "cart.notice.one": "You left 1 item in your cart.",
   "cart.notice.many": "You left {n} items in your cart.",
+  "cart.notice.restore_one": "Bring it back",
   "cart.notice.restore": "Bring them back",
   "cart.notice.campaign": "the campaign",
   "cart.reminder.pledge_subject": "Your support isn't finished yet",

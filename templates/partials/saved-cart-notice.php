@@ -30,7 +30,9 @@ try {
                         $n === 1
                             ? t_or('cart.notice.one', 'Оставихте 1 продукт в количката.', 'You left 1 item in your cart.', $_scn_lang)
                             : t_or('cart.notice.many', 'Оставихте {n} продукта в количката.', 'You left {n} items in your cart.', $_scn_lang, ['n' => $n]),
-                        t_or('cart.notice.restore', 'Върнете ги', 'Bring them back', $_scn_lang),
+                        $n === 1
+                            ? t_or('cart.notice.restore_one', 'Върнете го', 'Bring it back', $_scn_lang)
+                            : t_or('cart.notice.restore', 'Върнете ги', 'Bring them back', $_scn_lang),
                     ];
                 }
             }

@@ -482,6 +482,7 @@
   "cart.restore.merged": "Добавихме артикулите от напомнянето ви в количката.",
   "cart.notice.one": "Оставихте 1 продукт в количката.",
   "cart.notice.many": "Оставихте {n} продукта в количката.",
+  "cart.notice.restore_one": "Върнете го",
   "cart.notice.restore": "Върнете ги",
   "cart.notice.campaign": "кампанията",
   "cart.reminder.pledge_subject": "Подкрепата ви не е завършена",

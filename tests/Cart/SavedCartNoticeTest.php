@@ -126,6 +126,27 @@ final class SavedCartNoticeTest extends TestCase
         } finally { @unlink($jar); }
     }
 
+    public function test_notice_for_one_item_uses_the_singular(): void
+    {
+        $b = $this->cartRow(1, 0);
+        $jar = $this->jar();
+        try {
+            $bg = $this->http('/magazin/', $jar, $b);
+            $this->assertStringContainsString('Оставихте 1 продукт в количката.', $bg['body']);
+            $this->assertStringContainsString('Върнете го', $bg['body']);
+            $this->assertStringNotContainsString('Върнете ги', $bg['body']);
+            $en = $this->http('/en/shop/', $jar, $b);
+            $this->assertStringContainsString('Bring it back', $en['body']);
+            $this->assertStringNotContainsString('Bring them back', $en['body']);
+        } finally { @unlink($jar); }
+
+        $b = $this->cartRow(1, 1);
+        $jar = $this->jar();
+        try {
+            $this->assertStringContainsString('Върнете ги', $this->http('/magazin/', $jar, $b)['body']);
+        } finally { @unlink($jar); }
+    }
+
     public function test_notice_shows_pledge_line(): void
     {
         skip_unless_modules_on('campaign');
