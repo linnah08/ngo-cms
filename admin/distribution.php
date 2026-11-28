@@ -538,118 +538,23 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
 </section>
 <?php endif; ?>
 
-<form method="get" action="/admin/distribution.php" class="dist-inline" style="<?= $box ?>display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;">
-  <label for="distProduct" style="display:flex;flex-direction:column;gap:.35rem;font-weight:600;font-size:.875rem;flex:1 1 240px;">Продукт
-    <select name="product" id="distProduct" onchange="this.form.submit()">
-      <?php foreach ($products as $p): ?>
-        <option value="<?= (int) $p['id'] ?>" <?= (int) $p['id'] === $product_id ? 'selected' : '' ?>>
-          <?= h($p['name_bg']) ?><?= $p['active'] ? '' : ' (неактивен)' ?>
-        </option>
-      <?php endforeach; ?>
-    </select>
-  </label>
-  <button type="submit" class="btn btn--outline">Покажи</button>
-</form>
-
-<!-- ── Stock overview ─────────────────────────────────────────────────────── -->
-<?php
-  $t = $summary['total'] + ['produced' => 0, 'sold' => 0, 'with_distributors' => 0, 'remaining' => 0, 'to_samples' => 0, 'to_writeoff' => 0,
-                            'to_personal' => 0, 'sold_online' => 0, 'distributor_sold' => 0, 'to_distributors' => 0,
-                            'available' => 0, 'online_stock' => 0, 'shop_surplus' => 0];
-  // Each part of "produced": key, label, colour (≥3:1 on white, and always shown with its number as text).
-  $parts = [
-      'sold'              => ['Продадени', '#14796d'],
-      'with_distributors' => ['При дистрибутори', '#b45309'],
-      'remaining'         => ['Налични за продажба', '#2563eb'],
-      'to_samples'        => ['Безплатни мостри', '#6b7280'],
-      'to_writeoff'       => ['Отписани', '#7c3aed'],
-  ];
-  /** A bar splitting one item's produced quantity into its parts — decoration; the numbers are in the text next to it. */
-  $bar = function (array $s, string $height) use ($parts): string {
-      $whole = max(1, $s['produced'], $s['sold'] + $s['with_distributors'] + $s['remaining'] + $s['to_samples'] + ($s['to_writeoff'] ?? 0));
-      $html  = '<div aria-hidden="true" style="display:flex;height:' . $height . ';border-radius:999px;overflow:hidden;background:#e5e7eb;">';
-      foreach ($parts as $key => [, $colour]) {
-          $v = max(0, (int) ($s[$key] ?? 0));
-          if ($v > 0) $html .= '<span style="flex:0 0 ' . round($v / $whole * 100, 2) . '%;background:' . $colour . ';"></span>';
-      }
-      return $html . '</div>';
-  };
-  // Row headers look like the cells, not like the uppercase column headers admin.css gives every <th>.
-  $row_head = 'text-align:left;font-weight:600;text-transform:none;letter-spacing:normal;font-size:.95rem;color:var(--text);background:transparent;';
-  $n = fn(int $v): string => number_format($v, 0, ',', ' ');
-  $cards = [
-      ['produced', 'Произведени', '#111827', ['всички партиди', 'от тях ' . $n($t['to_samples']) . ' безплатни мостри'
-          . ($t['to_writeoff'] ? ' · ' . $n($t['to_writeoff']) . ' отписани' : '')]],
-      ['sold', 'Продадени', $parts['sold'][1],
-          ['лично ' . $n($t['to_personal']) . ' · онлайн ' . $n($t['sold_online']), 'от дистрибутори ' . $n($t['distributor_sold'])]],
-      ['with_distributors', 'При дистрибутори', $parts['with_distributors'][1],
-          ['дадени ' . $n($t['to_distributors']), 'от тях продадени ' . $n($t['distributor_sold'])]],
-      ['remaining', 'Налични за продажба', $parts['remaining'][1],
-          ['в склада ' . $n(max(0, $t['available'])), 'в онлайн магазина ' . $n(max(0, $t['online_stock']))]],
-  ];
-?>
-<section style="<?= $box ?>padding:1.5rem;" aria-labelledby="distStockTitle">
-  <h2 id="distStockTitle" style="font-size:1.15rem;margin:0 0 1.25rem;">Наличност — <?= h($product['name_bg']) ?></h2>
-
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;">
-    <?php foreach ($cards as [$key, $label, $colour, $detail]): ?>
-      <div style="border:1px solid var(--border);border-top:4px solid <?= $colour ?>;border-radius:10px;padding:1rem 1.1rem;display:flex;flex-direction:column;gap:.3rem;">
-        <div style="font-size:.9rem;font-weight:600;color:#374151;"><?= h($label) ?></div>
-        <div style="font-size:2.1rem;font-weight:700;line-height:1.1;color:<?= $key === 'produced' ? 'var(--text)' : $colour ?>;font-variant-numeric:tabular-nums;"><?= $n((int) $t[$key]) ?></div>
-        <div style="font-size:.8rem;color:#4b5563;line-height:1.5;"><?= implode('<br>', array_map('h', $detail)) ?></div>
-      </div>
-    <?php endforeach; ?>
-  </div>
-
-  <?php if ($t['produced'] > 0): ?>
-  <div style="margin-top:1.25rem;">
-    <?= $bar($t, '14px') ?>
-    <ul style="list-style:none;display:flex;flex-wrap:wrap;gap:.4rem 1.25rem;padding:0;margin:.6rem 0 0;font-size:.8rem;color:#374151;">
-      <?php foreach ($parts as $key => [$label, $colour]): if ($key === 'to_writeoff' && !$t['to_writeoff']) continue; ?>
-        <li style="display:flex;align-items:center;gap:.4rem;">
-          <span aria-hidden="true" style="width:.75rem;height:.75rem;border-radius:3px;background:<?= $colour ?>;"></span>
-          <?= h($label) ?> <?= $n((int) $t[$key]) ?>
-        </li>
-      <?php endforeach; ?>
-    </ul>
-  </div>
-  <?php endif; ?>
-
-  <?php if ($has_variants && $summary['items']): ?>
-  <div class="admin-table-wrap" style="margin-top:1.5rem;max-height:none;">
-    <table class="admin-table" style="font-variant-numeric:tabular-nums;">
-      <caption style="text-align:left;padding:.5rem 1rem;font-weight:600;">По варианти</caption>
-      <thead><tr>
-        <th scope="col" style="min-width:12rem;">Вариант</th>
-        <th scope="col" style="text-align:right;">Произведени</th>
-        <th scope="col" style="text-align:right;">Продадени</th>
-        <th scope="col" style="text-align:right;">При дистрибутори</th>
-        <th scope="col" style="text-align:right;">Налични за продажба</th>
-      </tr></thead>
-      <tbody>
-      <?php foreach ($summary['items'] as $it): ?>
-        <tr>
-          <th scope="row" style="<?= $row_head ?>">
-            <?= h($it['label']) ?><?= $it['active'] ? '' : ' <span class="dist-hint">(скрит)</span>' ?>
-            <?php if ($it['produced'] > 0): ?><div style="margin-top:.45rem;"><?= $bar($it, '6px') ?></div><?php endif; ?>
-          </th>
-          <td style="text-align:right;"><?= $n((int) $it['produced']) ?></td>
-          <td style="text-align:right;"><?= $n((int) $it['sold']) ?></td>
-          <td style="text-align:right;"><?= $n((int) $it['with_distributors']) ?></td>
-          <td style="text-align:right;"><strong><?= $n((int) $it['remaining']) ?></strong></td>
-        </tr>
-      <?php endforeach; ?>
-      </tbody>
-      <tfoot><tr style="border-top:2px solid var(--border);">
-        <th scope="row" style="<?= $row_head ?>font-weight:700;">Общо</th>
-        <td style="text-align:right;font-weight:700;"><?= $n($t['produced']) ?></td>
-        <td style="text-align:right;font-weight:700;"><?= $n($t['sold']) ?></td>
-        <td style="text-align:right;font-weight:700;"><?= $n($t['with_distributors']) ?></td>
-        <td style="text-align:right;font-weight:700;"><?= $n($t['remaining']) ?></td>
-      </tr></tfoot>
-    </table>
-  </div>
-  <?php endif; ?>
+<!-- ── Product the tabs below work on ───────────────────────────────────────── -->
+<?php $n = fn(int $v): string => number_format($v, 0, ',', ' '); ?>
+<section id="distProductBox" style="<?= $box ?>padding:1.5rem;" aria-labelledby="distProductTitle">
+  <h2 id="distProductTitle" style="font-size:1.15rem;margin:0 0 .35rem;">Партиди, разпределения и продажби — по продукт</h2>
+  <p class="dist-hint" style="margin:0 0 1rem;max-width:75ch;line-height:1.55;">Изберете продукта — разделите отдолу показват и записват само за него.</p>
+  <form method="get" action="/admin/distribution.php" class="dist-inline" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;">
+    <label for="distProduct" style="flex:1 1 240px;">Продукт
+      <select name="product" id="distProduct" onchange="this.form.action = '/admin/distribution.php' + location.hash; this.form.submit()">
+        <?php foreach ($products as $p): ?>
+          <option value="<?= (int) $p['id'] ?>" <?= (int) $p['id'] === $product_id ? 'selected' : '' ?>>
+            <?= h($p['name_bg']) ?><?= $p['active'] ? '' : ' (неактивен)' ?>
+          </option>
+        <?php endforeach; ?>
+      </select>
+    </label>
+    <button type="submit" class="btn btn--outline">Покажи</button>
+  </form>
 
   <?php foreach ($summary['items'] as $it): if ($it['shop_surplus'] <= 0) continue; ?>
     <p role="note" style="margin:1rem 0 0;padding:.75rem 1rem;border:1px solid #b45309;border-radius:8px;background:#fffbeb;font-size:.875rem;line-height:1.5;">
@@ -658,11 +563,6 @@ $box = 'background:#fff;border:1px solid var(--border);border-radius:var(--radiu
       Запишете останалите <?= $n((int) $it['shop_surplus']) ?> бр. в „Разпределения“ като „Онлайн магазин“, без отметката за наличността в магазина.
     </p>
   <?php endforeach; ?>
-
-  <p class="dist-hint" style="margin:1.25rem 0 0;line-height:1.55;max-width:75ch;">
-    „Продадени“ събира всичко продадено: лично, от дистрибуторите (по техните отчети) и онлайн — поръчки, билети и всичко
-    друго, което е излязло от наличността в онлайн магазина. „Налични за продажба“ е неразпределеното плюс това, което е в онлайн магазина сега.
-  </p>
 
   <details style="margin-top:1rem;border-top:1px solid var(--border);padding-top:1rem;">
     <summary style="cursor:pointer;font-weight:600;font-size:.9rem;padding:.7rem 0;">Поправи наличността в онлайн магазина (след преброяване)</summary>

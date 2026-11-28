@@ -195,7 +195,12 @@ final class DistributionHttpTest extends TestCase
         $this->login();
         [$code, $body] = $this->req('/admin/distribution.php?product=' . self::$productId);
         $this->assertSame(200, $code);
-        $this->assertStringContainsString('Наличност — Календар тест', $body);
+        // One product picker, above the tabs, with this product chosen.
+        $this->assertSame(1, substr_count($body, 'name="product" id="distProduct"'));
+        $this->assertMatchesRegularExpression('/<option value="' . self::$productId . '" selected>\s*Календар тест/u', $body);
+        $this->assertLessThan(strpos($body, 'id="distTabs"'), strpos($body, 'id="distProduct"'), 'the picker sits right above the tabs');
+        // The single-product summary is gone — the all-products table already has those numbers.
+        $this->assertStringNotContainsString('id="distStockTitle"', $body);
         foreach (['Партиди', 'Разпределения', 'Продажби', 'Дистрибутори'] as $tab) {
             $this->assertStringContainsString($tab, $body);
         }
