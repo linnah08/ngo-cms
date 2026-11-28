@@ -40,12 +40,30 @@ class DistributionProtocolGenerator extends DocumentGenerator {
         $recipient  = self::h((string) $order['distributor_name']);
         // Wording a site can change in strings.site.json: the item line ({product} is the
         // product and variant) and the price column. The protocol itself is in Bulgarian.
-        $item_name  = self::h(t_or('distribution.protocol.item_name', '{product}', '{product}', 'bg', ['product' => (string) $order['item_name']]));
         $price_head = self::h(t_or('distribution.protocol.price_label', 'Цена за брой', 'Price per item', 'bg'));
-        $quantity   = (int) $order['quantity'];
-        $unit_price = (float) $order['unit_price_eur'];
-        $unit_fmt   = self::fmtEur($unit_price);
-        $total_fmt  = self::fmtEur($unit_price * $quantity);
+        // One row per item handed over (several when variants went together).
+        $lines = $order['lines'] ?? [[
+            'item_name' => (string) $order['item_name'], 'quantity' => (int) $order['quantity'], 'unit_price_eur' => (float) $order['unit_price_eur'],
+        ]];
+        $rows_html = '';
+        $sum_qty   = 0;
+        $sum_eur   = 0.0;
+        foreach ($lines as $l) {
+            $item_name  = self::h(t_or('distribution.protocol.item_name', '{product}', '{product}', 'bg', ['product' => (string) $l['item_name']]));
+            $quantity   = (int) $l['quantity'];
+            $unit_price = (float) $l['unit_price_eur'];
+            $sum_qty   += $quantity;
+            $sum_eur   += $unit_price * $quantity;
+            $rows_html .= '<tr><td>' . $item_name . '</td><td style="text-align:center;">бр.</td>'
+                        . '<td style="text-align:center;">' . $quantity . '</td>'
+                        . '<td class="right">' . self::fmtEur($unit_price) . '</td>'
+                        . '<td class="right">' . self::fmtEur($unit_price * $quantity) . '</td></tr>';
+        }
+        if (count($lines) > 1) {
+            $rows_html .= '<tr><td style="font-weight:bold;">Общо</td><td></td>'
+                        . '<td style="text-align:center;font-weight:bold;">' . $sum_qty . '</td><td></td>'
+                        . '<td class="right" style="font-weight:bold;">' . self::fmtEur($sum_eur) . '</td></tr>';
+        }
 
         $css = self::sharedCss();
         $t   = $c['teal'];
@@ -113,13 +131,7 @@ class DistributionProtocolGenerator extends DocumentGenerator {
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td>{$item_name}</td>
-              <td style="text-align:center;">бр.</td>
-              <td style="text-align:center;">{$quantity}</td>
-              <td class="right">{$unit_fmt}</td>
-              <td class="right">{$total_fmt}</td>
-            </tr>
+            {$rows_html}
           </tbody>
         </table>
 

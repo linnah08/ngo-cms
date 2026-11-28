@@ -593,4 +593,87 @@ final class DistributionTest extends TestCase
         $this->assertFalse(distribution_give_out_many(self::$pdo, 'writeoff', [['product_id' => $ok, 'variant_id' => null, 'quantity' => 1]], '01.03.2026')['ok']);
         $this->assertSame($before, distribution_total_allocated(self::$pdo, $ok, null));
     }
+
+    // ── several variants of one product at once ────────────────────────────────
+
+    public function testAllocateManyGivesAllVariantsToOneDistributorOnOneProtocol(): void
+    {
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/documents/DistributionProtocolGenerator.php';
+        $pid = $this->product(0, 'variant', 5.0);
+        $v1  = $this->variant($pid, 'Първа');
+        $v2  = $this->variant($pid, 'Втора');
+        $v3  = $this->variant($pid, 'Трета');
+        foreach ([$v1, $v2, $v3] as $v) $this->batch($pid, 10, $v);
+        $d = $this->distributor();
+
+        $r = distribution_allocate_many(self::$pdo, $pid, [$v1 => 4, $v2 => 0, $v3 => 6], 'distributor', $d, 5.0, '2026-03-01');
+        $this->assertTrue($r['ok'], $r['error'] ?? '');
+        $this->assertCount(2, $r['ids'], 'an empty box is skipped');
+        $this->assertSame(10, $r['quantity']);
+        $this->assertSame(4, distribution_distributor_stock(self::$pdo, $d, $pid, $v1)['unsold']);
+        $this->assertSame(6, distribution_distributor_stock(self::$pdo, $d, $pid, $v3)['unsold']);
+
+        $p = distribution_issue_protocol(self::$pdo, $r['ids'][0], self::$tmp_root, $r['ids']);
+        $this->assertTrue($p['ok'], $p['error'] ?? '');
+        $nums = self::$pdo->query('SELECT DISTINCT protocol_formatted_number FROM distribution_allocations WHERE id IN (' . implode(',', $r['ids']) . ')')->fetchAll(PDO::FETCH_COLUMN);
+        $this->assertSame([$p['number']], $nums, 'both lines share one protocol');
+
+        // The protocol lists every line with a total; re-issuing from either row keeps them together.
+        $row    = self::$pdo->query('SELECT * FROM distribution_allocations WHERE id = ' . $r['ids'][1])->fetch();
+        $again  = distribution_issue_protocol(self::$pdo, $r['ids'][1], self::$tmp_root);
+        $this->assertSame($p['number'], $again['number']);
+        $rows   = self::$pdo->query('SELECT * FROM distribution_allocations WHERE id IN (' . implode(',', $r['ids']) . ') ORDER BY id')->fetchAll();
+        $fields = distribution_protocol_fields(self::$pdo, $row, $rows);
+        $this->assertCount(2, $fields['lines']);
+        $gen = new class extends DistributionProtocolGenerator {
+            public function html(array $o): string { return $this->buildHtml($o, [], ['formatted_number' => '00001']); }
+        };
+        $html = $gen->html($fields);
+        $this->assertStringContainsString('Тестова книга (Първа)', $html);
+        $this->assertStringContainsString('Тестова книга (Трета)', $html);
+        $this->assertStringContainsString('Общо', $html);
+        $this->assertStringContainsString('50.00 €', $html, 'total = 10 × 5.00');
+    }
+
+    public function testAllocateManyIsAllOrNothingAndNamesTheVariant(): void
+    {
+        $pid = $this->product(0, 'variant');
+        $v1  = $this->variant($pid, 'Първа');
+        $v2  = $this->variant($pid, 'Втора');
+        $this->batch($pid, 5, $v1);
+        $this->batch($pid, 2, $v2);
+        $d = $this->distributor();
+
+        $r = distribution_allocate_many(self::$pdo, $pid, [$v1 => 3, $v2 => 3], 'distributor', $d, 10.0, '2026-03-01');
+        $this->assertFalse($r['ok']);
+        $this->assertStringContainsString('Втора', $r['error']);
+        $this->assertStringContainsString('Нищо не е записано', $r['error']);
+        $this->assertSame(0, distribution_distributor_stock(self::$pdo, $d, $pid, $v1)['allocated'], 'the first line was rolled back');
+
+        $this->assertFalse(distribution_allocate_many(self::$pdo, $pid, [$v1 => 0], 'distributor', $d, 10.0, '2026-03-01')['ok'], 'nothing entered');
+        $this->assertFalse(distribution_allocate_many(self::$pdo, $pid, [$v1 => -1], 'distributor', $d, 10.0, '2026-03-01')['ok']);
+    }
+
+    public function testRecordSalesManyForOneDistributor(): void
+    {
+        $pid = $this->product(0, 'variant');
+        $v1  = $this->variant($pid, 'Първа');
+        $v2  = $this->variant($pid, 'Втора');
+        $v3  = $this->variant($pid, 'Трета');
+        foreach ([$v1, $v2, $v3] as $v) $this->batch($pid, 10, $v);
+        $d = $this->distributor();
+        $this->assertTrue(distribution_allocate_many(self::$pdo, $pid, [$v1 => 5, $v2 => 5, $v3 => 5], 'distributor', $d, 10.0, '2026-03-01')['ok']);
+
+        $r = distribution_record_sales_many(self::$pdo, $d, $pid, [$v1 => 2, $v2 => 3, $v3 => 5], '2026-03-10', true, '2026-03-12');
+        $this->assertTrue($r['ok'], $r['error'] ?? '');
+        $this->assertCount(3, $r['ids']);
+        $this->assertSame(0, distribution_distributor_stock(self::$pdo, $d, $pid, $v3)['unsold']);
+        $this->assertSame(10, distribution_distributor_payment_summary(self::$pdo, $d, $pid)['paid_qty']);
+
+        // More than they hold of one variant cancels the lot.
+        $bad = distribution_record_sales_many(self::$pdo, $d, $pid, [$v1 => 1, $v3 => 1], '2026-03-11', false);
+        $this->assertFalse($bad['ok']);
+        $this->assertStringContainsString('Трета', $bad['error']);
+        $this->assertSame(3, distribution_distributor_stock(self::$pdo, $d, $pid, $v1)['unsold'], 'nothing saved');
+    }
 }

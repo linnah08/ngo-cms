@@ -341,4 +341,84 @@ final class DistributionHttpTest extends TestCase
         ]);
         $this->assertSame(1, $count('writeoff'));
     }
+
+    public function testAllVariantsToOneDistributorAndTheDistributorsFilter(): void
+    {
+        skip_unless_modules_on('distribution');
+        $pdo   = get_pdo();
+        $token = $this->login();
+
+        $pdo->prepare('INSERT INTO products (slug, name_bg, name_en, price_eur, stock, active, `type`) VALUES (?, ?, ?, ?, ?, 0, ?)')
+            ->execute(['test-dist-http-var-' . bin2hex(random_bytes(4)), 'Серия тест', 'Series test', 6.00, 0, 'variant']);
+        $pid  = (int) $pdo->lastInsertId();
+        $vids = [];
+        foreach (['Първа', 'Втора', 'Трета'] as $i => $label) {
+            $pdo->prepare('INSERT INTO product_variants (product_id, label_bg, label_en, attributes, stock, active, sort_order) VALUES (?, ?, ?, ?, 0, 1, ?)')
+                ->execute([$pid, $label, $label, '{}', $i]);
+            $vids[] = (int) $pdo->lastInsertId();
+        }
+        try {
+            $base = ['csrf_token' => $token, 'product_id' => $pid];
+            foreach ($vids as $v) {
+                $this->req('/admin/distribution.php', $base + ['action' => 'add_batch', 'variant_id' => $v, 'quantity' => 10, 'produced_on' => '2026-07-01']);
+            }
+            $this->req('/admin/distribution.php', $base + ['action' => 'add_distributor', 'name' => 'HTTP тест варианти', 'company_number' => '111222333']);
+            $did = (int) $pdo->query("SELECT id FROM distribution_distributors WHERE name = 'HTTP тест варианти'")->fetchColumn();
+
+            // A box per variant in both forms, instead of one variant picker.
+            [, $body] = $this->req('/admin/distribution.php?product=' . $pid);
+            foreach (['allocQty', 'saleQty'] as $prefix) {
+                foreach ($vids as $v) $this->assertStringContainsString('id="' . $prefix . $v . '"', $body);
+            }
+            $this->assertStringNotContainsString('id="allocVariant"', $body);
+            $this->assertStringNotContainsString('id="saleVariant"', $body);
+
+            // All three to one distributor: three rows, one protocol.
+            [, , $loc] = $this->req('/admin/distribution.php', $base + [
+                'action' => 'allocate', 'recipient' => (string) $did, 'unit_price_eur' => '6',
+                'allocated_on' => '2026-07-02', 'qty' => [$vids[0] => '4', $vids[1] => '5', $vids[2] => '6'],
+            ]);
+            $this->assertStringEndsWith('#allocations', $loc);
+            $rows = $pdo->query("SELECT quantity, protocol_number FROM distribution_allocations WHERE product_id = $pid AND distributor_id = $did ORDER BY variant_id")->fetchAll();
+            $this->assertSame([4, 5, 6], array_map(fn($r) => (int) $r['quantity'], $rows));
+            $this->assertCount(1, array_unique(array_column($rows, 'protocol_number')), 'one protocol for the whole hand-over');
+            $this->assertNotNull($rows[0]['protocol_number']);
+
+            // A sale of all three in one go.
+            $this->req('/admin/distribution.php', $base + [
+                'action' => 'record_sale', 'distributor_id' => $did, 'sale_date' => '2026-07-10',
+                'qty' => [$vids[0] => '4', $vids[1] => '', $vids[2] => '2'],
+            ]);
+            $sold = $pdo->query("SELECT variant_id, quantity FROM distribution_sales WHERE product_id = $pid ORDER BY variant_id")->fetchAll(PDO::FETCH_KEY_PAIR);
+            $this->assertSame([$vids[0] => 4, $vids[2] => 2], array_map('intval', $sold), 'the empty box is skipped');
+
+            // Too many of one variant: refused visibly, nothing written.
+            $this->req('/admin/distribution.php', $base + [
+                'action' => 'record_sale', 'distributor_id' => $did, 'sale_date' => '2026-07-11', 'qty' => [$vids[1] => '1', $vids[2] => '9'],
+            ]);
+            [, $body] = $this->req('/admin/distribution.php?product=' . $pid);
+            $this->assertStringContainsString('Трета', $body);
+            $this->assertStringContainsString('Нищо не е записано', $body);
+            $this->assertSame(2, (int) $pdo->query("SELECT COUNT(*) FROM distribution_sales WHERE product_id = $pid")->fetchColumn());
+
+            // Distributors filter.
+            [, $body] = $this->req('/admin/distribution.php?product=' . $pid . '&df=unpaid#distributors');
+            $this->assertStringContainsString('id="fDist"', $body);
+            $this->assertStringContainsString('<strong>HTTP тест варианти</strong>', $body, 'has unpaid sales');
+            [, $body] = $this->req('/admin/distribution.php?product=' . $pid . '&df=holding&dq=111222333');
+            $this->assertStringContainsString('<strong>HTTP тест варианти</strong>', $body, 'still holds stock; found by EIK');
+            [, $body] = $this->req('/admin/distribution.php?product=' . $pid . '&dq=' . urlencode('няма-такъв'));
+            $this->assertStringNotContainsString('<strong>HTTP тест варианти</strong>', $body);
+            $this->assertStringContainsString('Няма дистрибутори, които отговарят на филтъра', $body);
+        } finally {
+            foreach ($pdo->query("SELECT DISTINCT protocol_file_path FROM distribution_allocations WHERE product_id = $pid AND protocol_file_path IS NOT NULL")->fetchAll(PDO::FETCH_COLUMN) as $f) {
+                @unlink(self::$root . '/' . $f);
+                @rmdir(dirname(self::$root . '/' . $f));
+            }
+            foreach (['distribution_sales', 'distribution_allocations', 'distribution_batches', 'product_variants'] as $t) {
+                $pdo->prepare("DELETE FROM $t WHERE product_id = ?")->execute([$pid]);
+            }
+            $pdo->prepare('DELETE FROM products WHERE id = ?')->execute([$pid]);
+        }
+    }
 }

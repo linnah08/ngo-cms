@@ -711,6 +711,75 @@ function distribution_give_out_many(
     });
 }
 
+/**
+ * Hand several variants of one product to the same recipient in one go — e.g. all
+ * three series to one distributor. Same rules as distribution_create_allocation()
+ * for each line; either every line is saved or none is, and the error names the
+ * variant that stopped it. For a distributor, issue one protocol for all of them:
+ * distribution_issue_protocol($pdo, $ids[0], $root, $ids).
+ *
+ * @param array<int,int> $lines variant_id => quantity; quantity 0 is skipped
+ * @return array{ok: bool, ids?: list<int>, quantity?: int, error?: string}
+ */
+function distribution_allocate_many(
+    PDO $pdo,
+    int $product_id,
+    array $lines,
+    string $destination,
+    ?int $distributor_id,
+    float $unit_price_eur,
+    string $allocated_on,
+    ?string $notes = null,
+    bool $use_shop_stock = false,
+    ?string $sample_recipient = null
+): array {
+    $todo = _distribution_many_lines($lines);
+    if (is_string($todo)) return ['ok' => false, 'error' => $todo];
+
+    return _distribution_tx($pdo, function () use (
+        $pdo, $product_id, $todo, $destination, $distributor_id, $unit_price_eur, $allocated_on, $notes, $use_shop_stock, $sample_recipient
+    ): array {
+        $ids = [];
+        foreach ($todo as $vid => $q) {
+            $r = distribution_create_allocation(
+                $pdo, $product_id, $vid ?: null, $destination, $distributor_id, $q, $unit_price_eur,
+                $allocated_on, $notes, $use_shop_stock, $sample_recipient
+            );
+            if (!$r['ok']) return ['ok' => false, 'error' => _distribution_many_error($pdo, $product_id, $vid, $r['error'], count($todo))];
+            $ids[] = $r['id'];
+        }
+        return ['ok' => true, 'ids' => $ids, 'quantity' => array_sum($todo)];
+    });
+}
+
+/**
+ * Quantities from a per-variant form, cleaned: variant_id => quantity > 0, in
+ * variant order (so locks are always taken in the same order). A string is the
+ * error to show.
+ *
+ * @param array<int,int> $lines
+ * @return array<int,int>|string
+ */
+function _distribution_many_lines(array $lines): array|string
+{
+    $todo = [];
+    foreach ($lines as $vid => $q) {
+        $q = (int) $q;
+        if ($q < 0) return 'Броят не може да е отрицателен.';
+        if ($q > 0) $todo[(int) $vid] = $q;
+    }
+    if (!$todo) return 'Въведете брой поне за един вариант.';
+    ksort($todo);
+    return $todo;
+}
+
+/** The error of one line of a multi-line save, naming the variant when there are several. */
+function _distribution_many_error(PDO $pdo, int $product_id, int $variant_id, string $error, int $count): string
+{
+    if ($count < 2) return $error;
+    return '„' . distribution_item_label($pdo, $product_id, $variant_id ?: null) . '“: ' . $error . ' Нищо не е записано.';
+}
+
 // ── Hand-over protocol ─────────────────────────────────────────────────────────
 
 /** Next protocol number (includes/document_numbers.php). */
@@ -720,24 +789,32 @@ function distribution_next_protocol_number(PDO $pdo): int
 }
 
 /** The fields DistributionProtocolGenerator prints, for one allocation row. */
-function distribution_protocol_fields(PDO $pdo, array $allocation): array
+function distribution_protocol_fields(PDO $pdo, array $allocation, array $rows = []): array
 {
     $d = $pdo->prepare('SELECT * FROM distribution_distributors WHERE id = ?');
     $d->execute([(int) $allocation['distributor_id']]);
     $distributor = $d->fetch() ?: [];
+
+    $label = fn(array $a): string => distribution_item_label(
+        $pdo, (int) $a['product_id'], $a['variant_id'] !== null ? (int) $a['variant_id'] : null
+    );
+    // One line per allocation on the protocol (several when variants were handed over together).
+    $lines = array_map(fn(array $a): array => [
+        'item_name'      => $label($a),
+        'quantity'       => (int) $a['quantity'],
+        'unit_price_eur' => (float) $a['unit_price_eur'],
+    ], $rows ?: [$allocation]);
 
     return [
         'distributor_name'    => (string) ($distributor['name'] ?? ''),
         'distributor_eik'     => (string) ($distributor['company_number'] ?? ''),
         'distributor_contact' => (string) ($distributor['contact_name'] ?? ''),
         'distributor_address' => (string) ($distributor['address'] ?? ''),
-        'item_name'           => distribution_item_label(
-            $pdo, (int) $allocation['product_id'],
-            $allocation['variant_id'] !== null ? (int) $allocation['variant_id'] : null
-        ),
+        'item_name'           => $lines[0]['item_name'],
         'allocated_on'        => (string) $allocation['allocated_on'],
-        'quantity'            => (int) $allocation['quantity'],
-        'unit_price_eur'      => (float) $allocation['unit_price_eur'],
+        'quantity'            => $lines[0]['quantity'],
+        'unit_price_eur'      => $lines[0]['unit_price_eur'],
+        'lines'               => $lines,
     ];
 }
 
@@ -749,7 +826,7 @@ function distribution_protocol_fields(PDO $pdo, array $allocation): array
  *
  * @return array{ok: bool, number?: string, error?: string}
  */
-function distribution_issue_protocol(PDO $pdo, int $allocation_id, string $root): array
+function distribution_issue_protocol(PDO $pdo, int $allocation_id, string $root, array $with_ids = []): array
 {
     require_once __DIR__ . '/documents/DistributionProtocolGenerator.php';
 
@@ -760,8 +837,28 @@ function distribution_issue_protocol(PDO $pdo, int $allocation_id, string $root)
         return ['ok' => false, 'error' => 'Протокол се издава само при даване на дистрибутор.'];
     }
 
+    // The rows on this protocol: everything already under its number, or — for a new
+    // one — this row plus the others handed to the same distributor with it.
+    if ($a['protocol_number'] !== null) {
+        $stmt = $pdo->prepare("SELECT * FROM distribution_allocations WHERE protocol_number = ? AND destination = 'distributor' ORDER BY id");
+        $stmt->execute([(int) $a['protocol_number']]);
+        $rows = $stmt->fetchAll() ?: [$a];
+    } else {
+        $rows   = [$a];
+        $others = array_values(array_diff(array_map('intval', $with_ids), [$allocation_id]));
+        if ($others) {
+            $in   = implode(',', array_fill(0, count($others), '?'));
+            $stmt = $pdo->prepare(
+                "SELECT * FROM distribution_allocations
+                  WHERE id IN ($in) AND destination = 'distributor' AND distributor_id = ? AND protocol_number IS NULL ORDER BY id"
+            );
+            $stmt->execute(array_merge($others, [(int) $a['distributor_id']]));
+            $rows = array_merge($rows, $stmt->fetchAll());
+        }
+    }
+
     try {
-        if ($a['protocol_file_path']) {
+        if ($a['protocol_number'] !== null && $a['protocol_file_path']) {
             $number    = (int) $a['protocol_number'];
             $formatted = (string) $a['protocol_formatted_number'];
             $rel_path  = (string) $a['protocol_file_path'];
@@ -777,17 +874,19 @@ function distribution_issue_protocol(PDO $pdo, int $allocation_id, string $root)
             throw new RuntimeException('cannot create ' . dirname($abs));
         }
         $pdf = (new DistributionProtocolGenerator())->generate(
-            distribution_protocol_fields($pdo, $a), [], ['formatted_number' => $formatted]
+            distribution_protocol_fields($pdo, $a, $rows), [], ['formatted_number' => $formatted]
         );
         if (file_put_contents($abs, $pdf) === false) {
             throw new RuntimeException('cannot write ' . $abs);
         }
 
+        $ids = array_map(fn($r) => (int) $r['id'], $rows);
+        $in  = implode(',', array_fill(0, count($ids), '?'));
         $pdo->prepare(
-            'UPDATE distribution_allocations
+            "UPDATE distribution_allocations
                 SET protocol_number = ?, protocol_formatted_number = ?, protocol_file_path = ?, protocol_generated_at = NOW()
-              WHERE id = ?'
-        )->execute([$number, $formatted, $rel_path, $allocation_id]);
+              WHERE id IN ($in)"
+        )->execute(array_merge([$number, $formatted, $rel_path], $ids));
     } catch (Throwable $e) {
         error_log('distribution: protocol for allocation ' . $allocation_id . ' failed: ' . $e->getMessage());
         return ['ok' => false, 'error' => 'Протоколът не можа да бъде създаден. Опитайте пак с бутона „Създай протокола отново“.'];
@@ -833,6 +932,40 @@ function distribution_record_sale(
         $payment_received ? 1 : 0, $payment_received ? $payment_received_on : null, $notes,
     ]);
     return ['ok' => true, 'id' => (int) $pdo->lastInsertId()];
+}
+
+/**
+ * Record a distributor's sales of several variants of one product at once.
+ * Either every line is saved or none is; the error names the variant.
+ *
+ * @param array<int,int> $lines variant_id => quantity; quantity 0 is skipped
+ * @return array{ok: bool, ids?: list<int>, quantity?: int, error?: string}
+ */
+function distribution_record_sales_many(
+    PDO $pdo,
+    int $distributor_id,
+    int $product_id,
+    array $lines,
+    string $sale_date,
+    bool $payment_received,
+    ?string $payment_received_on = null,
+    ?string $notes = null
+): array {
+    $todo = _distribution_many_lines($lines);
+    if (is_string($todo)) return ['ok' => false, 'error' => $todo];
+
+    return _distribution_tx($pdo, function () use (
+        $pdo, $distributor_id, $product_id, $todo, $sale_date, $payment_received, $payment_received_on, $notes
+    ): array {
+        _distribution_lock_product($pdo, $product_id);
+        $ids = [];
+        foreach ($todo as $vid => $q) {
+            $r = distribution_record_sale($pdo, $distributor_id, $product_id, $vid ?: null, $q, $sale_date, $payment_received, $payment_received_on, $notes);
+            if (!$r['ok']) return ['ok' => false, 'error' => _distribution_many_error($pdo, $product_id, $vid, $r['error'], count($todo))];
+            $ids[] = $r['id'];
+        }
+        return ['ok' => true, 'ids' => $ids, 'quantity' => array_sum($todo)];
+    });
 }
 
 /** @return array{ok: bool, error?: string} */
