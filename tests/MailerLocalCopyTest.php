@@ -72,6 +72,19 @@ final class MailerLocalCopyTest extends TestCase
         $this->assertFalse(mail_blocked_as_local_copy('http://localhost:8080'));
     }
 
+    public function test_php_built_in_server_is_blocked_even_with_the_live_address(): void
+    {
+        $this->assertTrue(mail_blocked_as_local_copy('https://ngo.org', 'cli-server'));
+        $this->assertFalse(mail_blocked_as_local_copy('https://ngo.org', 'fpm-fcgi'));
+        $this->assertFalse(mail_blocked_as_local_copy('https://ngo.org', 'cli'));
+    }
+
+    public function test_the_test_run_itself_never_sends_mail(): void
+    {
+        $this->assertTrue(defined('MAIL_DISABLED') && MAIL_DISABLED);
+        $this->assertFalse(send_mail('someone@example.org', 'test', '<p>test</p>'));
+    }
+
     public function test_send_mail_checks_for_a_local_copy_before_any_transport(): void
     {
         $src  = (string) file_get_contents(dirname(__DIR__) . '/includes/mailer.php');

@@ -9,6 +9,11 @@ $_SERVER['HTTP_HOST']     = 'localhost';
 require_once $root . '/vendor/autoload.php';
 // Tests fake admin sessions for users that aren't in admin_users; AdminSessionRecheckTest covers the check.
 define('ADMIN_SESSION_RECHECK', false);
+// No test ever sends real mail. Tests call site code (payments, orders) in this
+// process too, and the "local copy" guard in send_mail() keys on SITE_URL — which
+// falls back to the live address when the local config is missing (a fresh
+// worktree, a CI rehearsal) while real mail credentials may be configured.
+define('MAIL_DISABLED', true);
 
 // ── A site's own wording stays out of the tests ──────────────────────────────
 // A site checkout can have content/{bg,en}/strings.site.json, which rewords the

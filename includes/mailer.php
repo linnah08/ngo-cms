@@ -484,10 +484,14 @@ function mail_site_is_local(string $site_url): bool
  * its config (site.config.php or local.config.php). A test with a fake SMTP sender
  * (mail_set_smtp_sender) never reaches a real server, so it is let through.
  */
-function mail_blocked_as_local_copy(string $site_url): bool
+function mail_blocked_as_local_copy(string $site_url, string $sapi = PHP_SAPI): bool
 {
     if (defined('MAIL_ALLOW_LOCAL') && MAIL_ALLOW_LOCAL) return false;
     if (is_callable($GLOBALS['_mail_smtp_sender'] ?? null)) return false;
+    // PHP's built-in server (php -S: dev previews, browser tests) is never the
+    // live site, whatever SITE_URL says — without a local config it says the
+    // live address.
+    if ($sapi === 'cli-server') return true;
     return mail_site_is_local($site_url);
 }
 
@@ -504,7 +508,10 @@ function send_mail(string $to, string $subject, string $body_html, string $reply
 
     // Set by the test runner (run_admin_page) so a page under test never mails
     // a real address, whatever transport this machine has configured.
-    if (defined('MAIL_DISABLED') && MAIL_DISABLED) {
+    // Also set for the whole PHPUnit run (tests/bootstrap.php). A fake SMTP
+    // sender installed by a test (mail_set_smtp_sender) never reaches a real
+    // server, so it is let through.
+    if (defined('MAIL_DISABLED') && MAIL_DISABLED && !is_callable($GLOBALS['_mail_smtp_sender'] ?? null)) {
         _mail_set_last_error('Mail disabled (MAIL_DISABLED)');
         return false;
     }
